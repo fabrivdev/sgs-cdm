@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import {
   ResponsiveDrawer,
   ResponsiveDrawerHeader,
@@ -15,7 +15,9 @@ import { PRIORIDADES, trabajoOsNumero, type Prioridad } from "@/lib/trabajos";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
 import { toast } from "sonner";
-import { canonicalClientId, canonicalClientOptions } from "@/lib/clientIdentity";
+import { resolveWorkClientText, workClientGroups } from "@/lib/workClientSelection";
+import { TrabajoClienteInput } from "./TrabajoClienteInput";
+import type { Database } from "@/integrations/supabase/types";
 
 interface Cliente { id: string; nombre: string; sucursal: Sucursal | null; ruc?: string | null; cod_entidad?: string | null }
 
@@ -23,22 +25,34 @@ interface Props {
   open: boolean;
   onOpenChange: (o: boolean) => void;
   clientes: Cliente[];
-  trabajo?: any | null;
+  trabajo?: {
+    id: string; cliente_id?: string | null; codigo?: string | null;
+    os_numero?: string | number | null; proxima_accion?: string | null;
+    marca: Marca; sucursal: Sucursal; tipo_trabajo: TipoTrabajo;
+    descripcion_problema: string; prioridad: Prioridad; legacy_servicio_id?: string | null;
+  } | null;
   onSaved: (trabajoId?: string) => void;
 }
 
 const isMissingOsColumnError = (error: unknown) => {
-  const message = String((error as any)?.message ?? "");
-  const code = String((error as any)?.code ?? "");
+  const detail = error as { message?: string; code?: string } | null;
+  const message = String(detail?.message ?? "");
+  const code = String(detail?.code ?? "");
   return code === "PGRST204" && message.includes("os_numero");
 };
 
-const clienteNombreKey = (nombre: string) => nombre
-  .normalize("NFD")
-  .replace(/[\u0300-\u036f]/g, "")
-  .trim()
-  .toLowerCase()
-  .replace(/\s+/g, " ");
+// Revalidar el maestro completo antes de crear, sin filtro por parque/sucursal.
+async function readClientCatalog(): Promise<Cliente[]> {
+  const rows: Cliente[] = [];
+  const pageSize = 1000;
+  for (let from = 0; ; from += pageSize) {
+    const { data, error } = await supabase.from("clientes")
+      .select("id, nombre, sucursal, ruc, cod_entidad").order("id").range(from, from + pageSize - 1);
+    if (error) throw error;
+    rows.push(...data);
+    if (data.length < pageSize) return rows;
+  }
+}
 
 /**
  * Caso madre = solo registra el problema. NO se asignan fechas ni técnicos acá.
@@ -59,16 +73,41 @@ export function NuevoTrabajoDialog({ open, onOpenChange, clientes, trabajo, onSa
     prioridad: "media" as Prioridad,
   });
   const [busy, setBusy] = useState(false);
-
-  const clientesUnicos = useMemo(() => {
-    return canonicalClientOptions(clientes);
-  }, [clientes]);
+  const [clientSearchOpen, setClientSearchOpen] = useState(false);
+  const saving = useRef(false);
+  const initializedFor = useRef<string | null>(null);
+  const sessionGeneration = useRef(0);
+  const clientTouched = useRef(false);
+  const [knownClients, setKnownClients] = useState<Cliente[]>([]);
+  const availableClients = useMemo(() => Array.from(new Map([
+    ...knownClients, ...clientes,
+  ].map(client => [client.id, client])).values()), [clientes, knownClients]);
+  const clientGroups = useMemo(() => workClientGroups(availableClients), [availableClients]);
 
   useEffect(() => {
-    if (!open) return;
+    if (!open) {
+      if (initializedFor.current !== null) sessionGeneration.current++;
+      initializedFor.current = null;
+      return;
+    }
+    const session = trabajo?.id ?? "new";
+    if (initializedFor.current === session) {
+      // La llegada/refrescado del catálogo no debe borrar cambios del usuario.
+      if (!clientTouched.current) {
+        setForm(current => {
+          const client = availableClients.find(row => row.id === current.cliente_id);
+          return !client || current.cliente_text === client.nombre ? current : { ...current, cliente_text: client.nombre };
+        });
+      }
+      return;
+    }
+    initializedFor.current = session;
+    sessionGeneration.current++;
+    setClientSearchOpen(false);
+    clientTouched.current = false;
     if (trabajo) {
-      const clienteId = canonicalClientId(clientesUnicos, trabajo.cliente_id);
-      const cli = clientesUnicos.find(c => c.id === clienteId);
+      const clienteId = trabajo.cliente_id ?? "";
+      const cli = availableClients.find(c => c.id === clienteId);
       setForm({
         cliente_id: clienteId,
         cliente_text: cli?.nombre ?? "",
@@ -86,30 +125,48 @@ export function NuevoTrabajoDialog({ open, onOpenChange, clientes, trabajo, onSa
         tipo_trabajo: "Visita de campo", descripcion_problema: "", prioridad: "media",
       });
     }
-  }, [open, trabajo, clientesUnicos, profile?.sucursal]);
+  }, [open, trabajo, availableClients, profile?.sucursal]);
 
   const guardar = async () => {
+    if (saving.current) return;
     if (!form.descripcion_problema.trim()) {
       toast.error("Cargá el problema o trabajo a resolver");
       return;
     }
+    saving.current = true;
     setBusy(true);
+    const saveSession = sessionGeneration.current;
     try {
       let clienteId: string | null = form.cliente_id || null;
       if (!clienteId && form.cliente_text.trim()) {
-        const key = clienteNombreKey(form.cliente_text);
-        const ex = clientesUnicos.find(c => clienteNombreKey(c.nombre) === key);
-        if (ex) clienteId = ex.id;
+        let resolution = resolveWorkClientText(form.cliente_text, clientGroups, trabajo?.cliente_id);
+        if (resolution.kind === "new") {
+          const latest = await readClientCatalog();
+          if (saveSession !== sessionGeneration.current) return;
+          // Incluir altas de un intento anterior aunque el catálogo aún no las devuelva.
+          const refreshed = Array.from(new Map([...knownClients, ...latest].map(client => [client.id, client])).values());
+          setKnownClients(refreshed);
+          resolution = resolveWorkClientText(form.cliente_text, workClientGroups(refreshed), trabajo?.cliente_id);
+        }
+        if (resolution.kind === "ambiguous") {
+          throw new Error("Hay clientes con este nombre y distintas identidades. Seleccioná el cliente por su RUC o código.");
+        }
+        if (resolution.kind === "existing") clienteId = resolution.client.id;
         else {
           const { data, error } = await supabase.from("clientes")
             .insert({ nombre: form.cliente_text.trim(), sucursal: form.sucursal })
             .select("id").single();
           if (error) throw error;
           clienteId = data.id;
+          setKnownClients(current => [...current, { id: data.id, nombre: form.cliente_text.trim(), sucursal: form.sucursal }]);
         }
+        if (saveSession !== sessionGeneration.current) return;
+        // Si guardar el trabajo falla después del alta, el reintento usa el mismo ID.
+        clientTouched.current = true;
+        setForm(current => ({ ...current, cliente_id: clienteId ?? "" }));
       }
       const osNumero = form.os_numero.trim();
-      const payload: any = {
+      const payload: Database["public"]["Tables"]["trabajos"]["Insert"] = {
         cliente_id: clienteId,
         marca: form.marca,
         sucursal: form.sucursal,
@@ -159,20 +216,17 @@ export function NuevoTrabajoDialog({ open, onOpenChange, clientes, trabajo, onSa
       }
       toast.success(editing ? "Trabajo actualizado" : "Trabajo creado");
       onSaved(trabajoId);
-      onOpenChange(false);
-    } catch (e: any) {
-      toast.error(e?.message ?? "No se pudo guardar");
-    } finally { setBusy(false); }
+      if (saveSession === sessionGeneration.current) onOpenChange(false);
+    } catch (error: unknown) {
+      toast.error((error as { message?: string })?.message ?? "No se pudo guardar");
+    } finally { saving.current = false; setBusy(false); }
   };
 
-  const clientesFiltrados = (() => {
-    const q = clienteNombreKey(form.cliente_text);
-    if (!q) return clientesUnicos.slice(0, 100);
-    return clientesUnicos.filter(c => clienteNombreKey(c.nombre).includes(q)).slice(0, 100);
-  })();
-
   return (
-    <ResponsiveDrawer open={open} onOpenChange={onOpenChange} size="lg">
+    <ResponsiveDrawer open={open} onOpenChange={next => { if (!saving.current) onOpenChange(next); }} size="lg"
+      onEscapeKeyDown={event => {
+        if (clientSearchOpen) { event.preventDefault(); setClientSearchOpen(false); }
+      }}>
       <ResponsiveDrawerHeader>
         <h2 className="text-[14px] font-semibold">{editing ? "Editar trabajo" : "Nuevo trabajo"}</h2>
         <p className="text-[12px] text-muted-foreground mt-1">
@@ -180,24 +234,20 @@ export function NuevoTrabajoDialog({ open, onOpenChange, clientes, trabajo, onSa
         </p>
       </ResponsiveDrawerHeader>
       <ResponsiveDrawerBody>
-        <div className="grid gap-4">
-          <div className="space-y-1.5">
-            <Label>Cliente</Label>
-            <Input
-              list="clientes-nuevotrabajo"
-              value={form.cliente_text}
-              onChange={(e) => {
-                const v = e.target.value;
-                const key = clienteNombreKey(v);
-                const m = clientesUnicos.find(c => clienteNombreKey(c.nombre) === key);
-                setForm(f => ({ ...f, cliente_text: v, cliente_id: m?.id ?? "" }));
-              }}
-              placeholder="Buscar o escribir cliente..."
-            />
-            <datalist id="clientes-nuevotrabajo">
-              {clientesFiltrados.map(c => <option key={c.id} value={c.nombre} />)}
-            </datalist>
-          </div>
+        <fieldset disabled={busy} className="grid gap-4">
+          <TrabajoClienteInput
+            key={`${open}:${trabajo?.id ?? "new"}`}
+            value={form.cliente_text}
+            selectedId={form.cliente_id}
+            groups={clientGroups}
+            disabled={busy}
+            expanded={clientSearchOpen}
+            onExpandedChange={setClientSearchOpen}
+            onChange={(text, id) => {
+              clientTouched.current = true;
+              setForm(current => ({ ...current, cliente_text: text, cliente_id: id }));
+            }}
+          />
 
           <div className="grid gap-3 sm:grid-cols-2">
             <Field label="Nro OS interna para importar Excel">
@@ -238,10 +288,10 @@ export function NuevoTrabajoDialog({ open, onOpenChange, clientes, trabajo, onSa
           </div>
 
           <Field label="Trabajo o problema a resolver">
-            <Textarea rows={5} value={form.descripcion_problema}
+            <Textarea aria-label="Trabajo o problema a resolver" rows={5} value={form.descripcion_problema}
               onChange={(e) => setForm(f => ({ ...f, descripcion_problema: e.target.value }))} />
           </Field>
-        </div>
+        </fieldset>
       </ResponsiveDrawerBody>
       <ResponsiveDrawerFooter>
         <Button variant="ghost" onClick={() => onOpenChange(false)} disabled={busy}>Cancelar</Button>

@@ -18,6 +18,7 @@ import { MACHINE_SUBGROUPS, machineSubgroupLabel } from "@/lib/machineModels";
 import { useAuth } from "@/hooks/useAuth";
 import { useMachineCatalog } from "@/hooks/useMachineCatalog";
 import { reviewCatalogLine } from "@/lib/machineOrderValidation";
+import { summarizeFilteredMachines } from "@/lib/machineParkSummary";
 
 const MARCA_AMBAS = "ambas";
 type Maquina = {
@@ -146,20 +147,13 @@ export function MaquinasTab({
       const normalized = m.map((machine) => ({ ...machine, marca: machine.marca_nombre || (machine.marca === "OTROS" ? "Sin marca" : machine.marca) }));
       setMaquinas(normalized);
       setClientes(c);
-      const activas = normalized.filter((maquina) => maquina.activo !== false);
-      onResumenChange?.({
-        totalMaquinas: activas.length,
-        totalClientes: new Set(activas.map((maquina) => maquina.cliente_id).filter(Boolean)).size,
-        totalHorsch: activas.filter((maquina) => maquina.marca === "HORSCH").length,
-        totalClaas: activas.filter((maquina) => maquina.marca === "CLAAS").length,
-      });
     } catch (e) {
       setLoadError(true);
       console.error(e);
     } finally {
       setLoading(false);
     }
-  }, [onResumenChange]);
+  }, []);
 
   useEffect(() => {
     cargar();
@@ -239,6 +233,10 @@ export function MaquinasTab({
       return true;
     });
   }, [maquinas, cliById, q, fSucursal, fMarca, fSubgrupo, fEstado, añoDesde, añoHasta, clientesConAmbasMarcas]);
+
+  useEffect(() => {
+    onResumenChange?.(summarizeFilteredMachines(filtradas));
+  }, [filtradas, onResumenChange]);
 
   const columns: SalesColumn<typeof filtradas[number]>[] = [
     { key: "cliente", label: "Cliente", kind: "text", value: m => m.cliente_id ? cliById.get(m.cliente_id)?.nombre : null },

@@ -6,7 +6,6 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Search, SlidersHorizontal, X } from "lucide-react";
 import { Sheet, SheetContent, SheetHeader, SheetTitle } from "@/components/ui/sheet";
 import { cn } from "@/lib/utils";
-import { useDebouncedValue } from "@/hooks/useDebouncedValue";
 import { filterLabel as labelCls, controlHeight, controlText } from "@/lib/ui-classes";
 
 const ctrl = `${controlHeight} ${controlText}`;
@@ -103,20 +102,33 @@ export function FiltersBar({
   useOverflowHiding(rowRef);
 
   const [searchDraft, setSearchDraft] = useState(search?.value ?? "");
-  const debouncedSearch = useDebouncedValue(searchDraft, 250);
+  const searchValue = search?.value;
+  const searchOnChange = useRef(search?.onChange);
   const hasControls = !!children || !!actions || !!secondaryActions || !!expanded || (activeCount > 0 && !!onClear);
 
   useEffect(() => {
-    setSearchDraft(search?.value ?? "");
-  }, [search?.value]);
+    searchOnChange.current = search?.onChange;
+  }, [search?.onChange]);
 
   useEffect(() => {
-    if (search && debouncedSearch !== search.value) search.onChange(debouncedSearch);
-  }, [debouncedSearch, search]);
+    setSearchDraft(searchValue ?? "");
+  }, [searchValue]);
+
+  useEffect(() => {
+    if (searchValue === undefined || searchDraft === searchValue) return;
+    // Cancel pending input on reset/external updates instead of replaying a stale value.
+    const timer = window.setTimeout(() => searchOnChange.current?.(searchDraft), 250);
+    return () => window.clearTimeout(timer);
+  }, [searchDraft, searchValue]);
 
   const clearSearch = () => {
     setSearchDraft("");
     search?.onChange("");
+  };
+
+  const clearFilters = () => {
+    setSearchDraft("");
+    onClear?.();
   };
 
   const searchInput = (mobile = false) => (
@@ -202,7 +214,7 @@ export function FiltersBar({
           </div>
 
           <div className="flex items-center justify-between border-t px-4 py-3">
-            <Button variant="ghost" size="sm" onClick={() => onClear?.()} disabled={!onClear || activeCount === 0}>
+            <Button variant="ghost" size="sm" onClick={clearFilters} disabled={!onClear || activeCount === 0}>
               <X className="mr-1 h-3.5 w-3.5" /> Limpiar{activeCount > 0 ? ` (${activeCount})` : ""}
             </Button>
             <Button size="sm" onClick={() => setPanelOpen(false)}>Aplicar</Button>

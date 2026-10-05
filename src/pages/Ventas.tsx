@@ -3,7 +3,7 @@ import { SalesMobileProvider, SalesMobileRange, SalesMobileTabs, SalesMobileSumm
 import { useSalesMobile, useSalesExplorerView } from "@/components/ventas/salesMobileContext";
 import { SalesSectionExportsProvider, SalesSectionExportMenu } from "@/components/ventas/SalesSectionExports";
 /* eslint-disable @typescript-eslint/no-explicit-any -- La RPC queda tipada al regenerar los tipos después de aplicar su migración. */
-import { Fragment, useCallback, useEffect, useMemo, useState } from "react";
+import { Fragment, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { salesHeader, TableScroll } from "@/components/ventas/TableScroll";
 import { AlertTriangle, ChevronDown, FileText, Receipt, Users } from "lucide-react";
 import { differenceInCalendarDays, endOfDay, endOfISOWeek, endOfMonth, endOfYear, format, startOfMonth, startOfWeek, startOfYear, subMonths, subWeeks } from "date-fns";
@@ -319,26 +319,39 @@ function VentasContent({ area }: { area: VentasArea }) {
   const [serviciosSummary, setServiciosSummary] = useState<ServiciosSummary | null>(null);
   const [maquinasData, setMaquinasData] = useState<MaquinasDashboardResponse | null>(null);
   const [data, setData] = useState<SalesResponse | null>(null); const [loading, setLoading] = useState(true); const [error, setError] = useState<string | null>(null);
+  const loadRequest = useRef(0);
   const load = useCallback(async () => {
+    const request = ++loadRequest.current;
     setLoading(true); setError(null);
     if (!desde || !hasta || desde > hasta) { setError("Seleccioná un rango de fechas válido."); setData(null); setLoading(false); return; }
     if (area === "servicios" || area === "repuestos") { setData(null); setMaquinasData(null); setLoading(false); return; }
     if (area === "maquinas") {
-      const { data: response, error: rpcError } = await (supabase as any).rpc("ventas_maquinas_dashboard_v1", {
-        p_desde: desde,
-        p_hasta: hasta,
-        p_sucursal: sucursal === "TODAS" ? null : sucursal,
-        p_buscar: buscar.trim() || null,
-        p_marca: marca || null,
-        p_tipo_maquina: tipoMaquina || null,
-        p_agrupacion: periodMode,
-      });
-      if (rpcError) { setError(rpcError.message ?? "No se pudo cargar Ventas de Máquinas."); setMaquinasData(null); }
-      else setMaquinasData(response as MaquinasDashboardResponse);
-      setData(null); setLoading(false); return;
+      try {
+        const { data: response, error: rpcError } = await (supabase as any).rpc("ventas_maquinas_dashboard_v1", {
+          p_desde: desde,
+          p_hasta: hasta,
+          p_sucursal: sucursal === "TODAS" ? null : sucursal,
+          p_buscar: buscar.trim() || null,
+          p_marca: marca || null,
+          p_tipo_maquina: tipoMaquina || null,
+          p_agrupacion: periodMode,
+        });
+        if (request !== loadRequest.current) return;
+        if (rpcError) { setError(rpcError.message ?? "No se pudo cargar Ventas de Máquinas."); setMaquinasData(null); }
+        else setMaquinasData(response as MaquinasDashboardResponse);
+      } catch (loadError) {
+        if (request !== loadRequest.current) return;
+        setError(loadError instanceof Error ? loadError.message : "No se pudo cargar Ventas de Máquinas.");
+        setMaquinasData(null);
+      } finally {
+        if (request === loadRequest.current) { setData(null); setLoading(false); }
+      }
     }
   }, [area, buscar, desde, hasta, marca, periodMode, sucursal, tipoMaquina]);
-  useEffect(() => { void load(); }, [load]);
+  useEffect(() => {
+    void load();
+    return () => { loadRequest.current += 1; };
+  }, [load]);
   useEffect(() => { setSelectedPeriod(null); setServiciosSummary(null); }, [area, desde, hasta, periodMode, sucursal, tipoTiempo, marca, tipoMaquina, serviceFilterKey]);
 
   const weekStart = useMemo(() => startOfWeek(now, { weekStartsOn: 1 }), [now]);

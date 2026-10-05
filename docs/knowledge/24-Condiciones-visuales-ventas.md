@@ -163,3 +163,11 @@ Evidencia: inspección visual de la versión publicada como línea base y revisi
 
 
 Ajuste posterior sobre captura móvil: Períodos usa un solo encabezado del panel, sin segundo título ni borde interior; los controles de columnas/orden pasan al encabezado de la tabla. Encabezados compactos conservan 44 px táctiles, igual que búsqueda, filtros y menú de sección en teléfonos. Ventas muestra explícitamente el rango consultado junto al título en móvil (rango general, no el recorte de selección de una fila). Se conservan colapsado, selección de períodos, detalle, totales y exportaciones. Verificación local con fixture de MaquinasPanorama y componentes compartidos; no es validación del despliegue productivo. No requiere SQL.
+
+## Restablecimiento y respuestas de filtros — 03/10/2026
+
+`FiltersBar.tsx` conserva los 250 ms de espera al escribir, pero cancela la búsqueda pendiente al limpiar con la X, restablecer desde el panel, recibir un valor externo o desmontarse. El borrador no vuelve a publicar el texto anterior sobre el valor controlado. El restablecimiento del panel también descarta texto todavía no enviado, aunque la búsqueda del padre ya esté vacía. No cambia campos, disposición, fechas predeterminadas ni cálculos.
+
+`Ventas.tsx` asigna cada carga de Máquinas a su solicitud vigente. Una respuesta anterior, incluidos errores o rechazos, no reemplaza indicadores, períodos, error ni estado de carga después de cambiar filtros, limpiar, reintentar o salir de la vista. Los argumentos y la RPC permanecen iguales; no se modifica ninguna regla financiera ni permiso.
+
+Regresiones locales con componentes reales: `FiltersBar.search.test.tsx` y `VentasAsync.test.tsx`, incluyendo demoras controladas, orden inverso de respuestas, limpieza repetida, desmontaje y StrictMode. La prueba visual local en el navegador cloud quedó bloqueada al abrir localhost (`ERR_BLOCKED_BY_CLIENT`); no se publicó el fixture ni se consultó producción. Esta nota no acredita despliegue, ejecución de SQL ni sincronización de Obsidian; el clon no contiene el índice, mapa ni configuración local de sincronización.

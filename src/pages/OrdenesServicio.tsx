@@ -98,7 +98,7 @@ export function OrdersWorkspace() {
     [financialRows, efficiencyKeys, productivity.evolucion, billingFailed, billingLoading]);
   const productivityPeriods = useMemo(() => productivity.evolucion.map((row, index) => ({ ...row, eficiencia: periodEfficiency[index] })),
     [productivity.evolucion, periodEfficiency]);
-  const active = [filters.q, ...filters.fSucursales, ...filters.fMarcas,
+  const active = [filters.dateFrom !== defaults.dateFrom || filters.dateTo !== defaults.dateTo, filters.q, ...filters.fSucursales, ...filters.fMarcas,
     ...(tab === "cumplimiento" ? [...filters.fEstadosTrabajo, ...filters.fTécnicos] : [...filters.fTiposTiempo, ...filters.fEstadosOS, ...filters.fResponsablesOS, ...filters.fOSRubros])].filter(Boolean).length;
   useEffect(() => {
     setPageFilters({ seccion: tab, fecha_desde: filters.dateFrom, fecha_hasta: filters.dateTo, agrupacion: modelFilters.periodMode, busqueda: filters.q,

@@ -11,6 +11,7 @@ interface ResponsiveDrawerProps {
   /** Tailwind max-width clase (desktop). Por defecto max-w-xl. */
   size?: "sm" | "md" | "lg" | "xl";
   className?: string;
+  onEscapeKeyDown?: (event: KeyboardEvent) => void;
 }
 
 const SIZE_MAP = {
@@ -27,7 +28,7 @@ const SIZE_MAP = {
  *
  * Usalo con <ResponsiveDrawerHeader/>, <ResponsiveDrawerBody/>, <ResponsiveDrawerFooter/>.
  */
-export function ResponsiveDrawer({ open, onOpenChange, children, size = "lg", className }: ResponsiveDrawerProps) {
+export function ResponsiveDrawer({ open, onOpenChange, children, size = "lg", className, onEscapeKeyDown }: ResponsiveDrawerProps) {
   const isMobile = useIsMobile();
 
   return (
@@ -40,6 +41,7 @@ export function ResponsiveDrawer({ open, onOpenChange, children, size = "lg", cl
           )}
         />
         <SheetPrimitive.Content
+          onEscapeKeyDown={onEscapeKeyDown}
           className={cn(
             "fixed z-50 flex flex-col bg-background shadow-2xl",
             "transition ease-in-out data-[state=open]:animate-in data-[state=closed]:animate-out",

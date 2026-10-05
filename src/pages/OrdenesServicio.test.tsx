@@ -60,10 +60,66 @@ describe("orders workspace", () => {
     fireEvent.change(search, { target: { value: "demo" } });
     await waitFor(() => expect(mocks.set).toHaveBeenLastCalledWith(expect.objectContaining({ busqueda: "demo" })));
     fireEvent.click(screen.getByRole("button", { name: "Más filtros" }));
-    fireEvent.click(within(screen.getByRole("dialog")).getByRole("button", { name: "Limpiar (1)" }));
+    fireEvent.click(within(screen.getByRole("dialog")).getByRole("button", { name: "Limpiar (2)" }));
     expect(dates[0]).toHaveValue("2026-07-01");
     expect(dates[1]).toHaveValue("2026-09-25");
     expect(quickPeriod).toHaveValue("");
+  });
+  it.each([390, 1280])("keeps clear disabled for the default range in every view at %i px", width => {
+    mocks.width = width;
+    setup();
+    for (const view of ["Órdenes", "Productividad", "Cumplimiento"]) {
+      tab(view);
+      fireEvent.click(screen.getByRole("button", { name: "Más filtros" }));
+      const panel = within(screen.getByRole("dialog"));
+      expect(panel.getByRole("button", { name: "Limpiar" })).toBeDisabled();
+      fireEvent.click(panel.getByRole("button", { name: "Aplicar" }));
+    }
+  });
+  it.each([
+    { field: "Desde", index: 0, value: "2026-08-03", original: "2026-07-01" },
+    { field: "Hasta", index: 1, value: "2026-09-20", original: "2026-09-25" },
+    { field: "Hasta vacío", index: 1, value: "", original: "2026-09-25" },
+  ])("allows clearing a date-only $field change and recognizes manual restoration", ({ index, value, original }) => {
+    setup();
+    fireEvent.click(screen.getByRole("button", { name: "Más filtros" }));
+    const dialog = screen.getByRole("dialog");
+    const panel = within(dialog);
+    const dates = dialog.querySelectorAll<HTMLInputElement>('input[type="date"]');
+    fireEvent.change(dates[index], { target: { value } });
+    expect(panel.getByRole("button", { name: "Limpiar (1)" })).toBeEnabled();
+    fireEvent.change(dates[index], { target: { value: original } });
+    expect(panel.getByRole("button", { name: "Limpiar" })).toBeDisabled();
+
+    fireEvent.change(dates[index], { target: { value } });
+    fireEvent.click(panel.getByRole("button", { name: "Limpiar (1)" }));
+    expect(dates[0]).toHaveValue("2026-07-01");
+    expect(dates[1]).toHaveValue("2026-09-25");
+    expect(mocks.query).toHaveBeenLastCalledWith("2026-07-01", "2026-09-25");
+    expect(panel.getByRole("button", { name: "Limpiar" })).toBeDisabled();
+  });
+  it.each([390, 1280])("clears a quick period back to Paraguay's default day at %i px", width => {
+    mocks.width = width;
+    vi.setSystemTime(new Date("2026-10-01T01:30:00Z"));
+    setup();
+    fireEvent.click(screen.getByRole("button", { name: "Más filtros" }));
+    const dialog = screen.getByRole("dialog");
+    const panel = within(dialog);
+    const dates = dialog.querySelectorAll<HTMLInputElement>('input[type="date"]');
+    const quickPeriod = panel.getByRole("combobox", { name: "Período rápido" });
+    expect(dates[1]).toHaveValue("2026-09-30");
+    expect(panel.getByRole("button", { name: "Limpiar" })).toBeDisabled();
+
+    fireEvent.change(quickPeriod, { target: { value: "previous-week" } });
+    expect(quickPeriod).toHaveValue("previous-week");
+    expect(mocks.set).toHaveBeenLastCalledWith(expect.objectContaining({ agrupacion: "dia", busqueda: "" }));
+    fireEvent.click(panel.getByRole("button", { name: "Limpiar (1)" }));
+    expect(dates[0]).toHaveValue("2026-07-01");
+    expect(dates[1]).toHaveValue("2026-09-30");
+    expect(quickPeriod).toHaveValue("");
+    expect(mocks.query).toHaveBeenLastCalledWith("2026-07-01", "2026-09-30");
+    expect(mocks.set).toHaveBeenLastCalledWith(expect.objectContaining({ agrupacion: "mes", busqueda: "" }));
+    expect(panel.getByRole("button", { name: "Limpiar" })).toBeDisabled();
   });
   it.each([390, 1280])("keeps its view tabs inside the page header at %i px", width => {
     mocks.width = width;
