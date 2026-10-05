@@ -32,6 +32,7 @@ import { LEGACY_IMPORT_CUTOFF, NEW_SYSTEM_START } from "@/lib/imports/cutoff";
 import { WorkLogTable } from "@/features/service-orders/WorkLogDetails";
 import { WorkIssuesList } from "@/features/service-orders/WorkIssuesList";
 import { MobileTechnicianMatrix } from "@/features/service-orders/MobileTechnicianMatrix";
+import { ComplianceDetailExport } from "@/features/service-orders/ComplianceDetailExport";
 import { ResponsiveDrawer, ResponsiveDrawerHeader, ResponsiveDrawerBody } from "@/components/ui/responsive-drawer";
 import { MatrizTécnicosDías } from "@/components/analytics/OperationalCharts";
 import { OperationsPanel } from "@/features/service-orders/OperationsPresentation";
@@ -114,7 +115,7 @@ export function OrdersWorkspace() {
 
   return <PageShell className="service-orders-workspace">
     <Tabs value={tab} onValueChange={setTab} className="min-w-0 space-y-3">
-      <PageHeader title="Órdenes de servicio" actions={phone && !blocked && tab !== "cumplimiento" ? <SalesSectionExportMenu /> : undefined}
+      <PageHeader title="Órdenes de servicio" actions={phone && !blocked ? <SalesSectionExportMenu /> : undefined}
         tabs={<TabsList aria-label="Vistas de órdenes de servicio"><TabsTrigger value="ordenes">Órdenes</TabsTrigger><TabsTrigger value="productividad">Productividad</TabsTrigger><TabsTrigger value="cumplimiento">Cumplimiento</TabsTrigger></TabsList>} />
       {!blocked && tab === "productividad" && workPeriod.includesLegacy && workEligible && <div role="status" className="flex flex-wrap items-center gap-x-3 gap-y-1 text-[12px] text-muted-foreground">
         <span>Productividad · {operationsDate(workPeriod.from)} — {operationsDate(workPeriod.to)}</span>
@@ -135,7 +136,7 @@ export function OrdersWorkspace() {
             detail={billingLoading ? "Calculando…" : billingFailed ? undefined : efficiency.incomplete ? `${efficiency.incomplete} OS sin cálculo` : undefined} />,
         ] : null}
       </KpiStrip>}
-      <FiltersBar search={{ value: filters.q, onChange: v => change("q", v), placeholder: tab === "cumplimiento" ? "Cliente, trabajo o TR…" : "OS, cliente o chasis…" }} activeCount={active} onClear={() => setFilters(defaults)} secondaryActions={!phone && tab !== "cumplimiento" ? <SalesSectionExportMenu /> : undefined} expanded={<>
+      <FiltersBar search={{ value: filters.q, onChange: v => change("q", v), placeholder: tab === "cumplimiento" ? "Cliente, trabajo o TR…" : "OS, cliente o chasis…" }} activeCount={active} onClear={() => setFilters(defaults)} secondaryActions={!phone ? <SalesSectionExportMenu /> : undefined} expanded={<>
         <FilterMultiSelect label="Marca" values={filters.fMarcas} onChange={v => change("fMarcas", v)} options={MARCAS.map(value => ({ value, label: value }))} />
         {tab !== "cumplimiento" && <FilterSelect label="Agrupar" placeholder="Período" value={filters.periodMode} onChange={v => change("periodMode", v as OperationsFilters["periodMode"])} options={[{ value: "dia", label: "Día" }, { value: "semana", label: "Semana" }, { value: "mes", label: "Mes" }, { value: "anio", label: "Año" }]} />}
         {tab === "cumplimiento" ? <>
@@ -148,7 +149,7 @@ export function OrdersWorkspace() {
           <FilterMultiSelect label="Rubro OS" values={filters.fOSRubros} onChange={v => change("fOSRubros", v as OperationsFilters["fOSRubros"])} options={["Servicio", "Repuestos", "Kilometraje"].map(value => ({ value, label: value }))} />
         </>}
       </>}>
-        <QuickPeriodFilter from={filters.dateFrom} to={filters.dateTo} endAtToday
+        <QuickPeriodFilter from={filters.dateFrom} to={filters.dateTo} endAtToday={tab !== "cumplimiento"}
           onChange={(dateFrom, dateTo, periodMode) => setFilters(previous => ({ ...previous, dateFrom, dateTo, periodMode }))} />
         <FilterDate label="Desde" value={filters.dateFrom} onChange={v => change("dateFrom", v)} max={filters.dateTo} />
         <FilterDate label="Hasta" value={filters.dateTo} onChange={v => change("dateTo", v)} min={filters.dateFrom} />
@@ -179,6 +180,7 @@ export function OrdersWorkspace() {
               </>}
         </TabsContent>
         <TabsContent value="cumplimiento" className="min-w-0">
+          <ComplianceDetailExport data={model.matrizTécnicosDías} />
           <OperationsPanel title="Matriz de técnicos por período" padded={!phone}>
             {phone ? <MobileTechnicianMatrix key={`${filters.dateFrom}:${filters.dateTo}:${complianceMode}`} data={model.matrizTécnicosDías} metric={matrixMetric} onMetricChange={setMatrixMetric} />
               : <MatrizTécnicosDías concise key={`${filters.dateFrom}:${filters.dateTo}:${complianceMode}:${model.matrizTécnicosDías.overLimit}:${model.matrizTécnicosDías.blocks.length}`} data={model.matrizTécnicosDías} currentBucketKey={model.matrizTécnicosDías.currentBucketKey} metric={matrixMetric} onMetricChange={setMatrixMetric} onSelectTecnico={id => change("fTécnicos", [id])} onSelectSucursal={s => change("fSucursales", [s])} />}

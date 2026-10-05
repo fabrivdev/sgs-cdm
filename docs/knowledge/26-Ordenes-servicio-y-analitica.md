@@ -254,6 +254,16 @@ Las listas que usan `CompactListTable` limitan el alto de la zona de filas cuand
 
 Propuesta evaluada, **no implementada**: al consultar varios meses, una matriz Técnico × Mes puede leer `ProductivityTechnicianRow.evolucion` de `workedProductivity.ts` sin otra consulta. Cada celda usaría horas aceptadas / meta de ese técnico y mes; las incidencias se asignarían desde `issues` al mes afectado para marcar «Parcial». Enero–junio de 2026 serían «No medible», nunca 0%. Para respetar la regla sin scroll horizontal, mostrar como máximo tres meses contiguos por vista en escritorio/tablet con navegación trimestral y total del rango fijo; en teléfono, conservar la lista de técnicos y ver sus meses al abrir el detalle. No mezclar esta matriz con Eficiencia, que depende de facturación y población de OS distinta. Requiere diseño y pruebas antes de implementarse.
 
+## Cumplimiento diario de dos semanas - 05/10/2026
+
+Cumplimiento conserva columnas diarias para rangos inclusivos de hasta 14 días. Esto cubre tanto el rango personalizado 28/09/2026-10/10/2026 como dos semanas completas contiguas. Desde 15 hasta 42 días mantiene la agrupación semanal; los umbrales mensual y anual no cambian.
+
+En esta pestaña, los atajos Semana actual y Semana anterior + actual llegan al domingo de la semana vigente. Órdenes y Productividad siguen terminando en hoy para no sumar capacidad futura. Los trabajos posteriores a hoy conservan el estado Programada: se muestran y exportan, pero no entran como incumplidos ni en el porcentaje cerrado.
+
+La vista registra `cumplimiento-detalle.xlsx` con Tipo, Fecha, Sucursal, Técnico(s), OS/TR, Cliente, Trabajo / motivo y Estado. Usa el mismo detalle deduplicado por jornada que el reporte imprimible y separa no disponibilidad. La fecha se escribe como texto `dd/MM/yyyy` para evitar desplazamientos por zona horaria. La impresión/PDF existente conserva matriz, resumen, detalle operativo y no disponibilidad.
+
+Validación local: 80 pruebas focalizadas, tipos ES2021, lint sin errores y build de producción. Navegador con datos sintéticos: 14 columnas visibles 28/09-11/10, programado futuro y ND separados; XLSX reabierto con encabezados/fechas/estados esperados y PDF imprimible renderizado en tres páginas. No se modificaron fuentes, permisos, jornadas ni datos operativos; la comprobación no acredita registros ni despliegue productivos. Este checkout continúa sin `00-Inicio.md`, `mapa-negocio.json` ni sincronización de Obsidian disponible.
+
 ## Aplicación del SQL inicial y despliegue
 
 El archivo `supabase/migrations/20260925150000_service_orders_section.sql` se entrega completo para copiar/pegar en Lovable Cloud → SQL editor. Crea la sección y copia una sola vez las asignaciones del Dashboard (sin conceder nuevos roles); desactiva la sección anterior y adapta la lectura restringida de la meta. Repetirlo no repone permisos revocados. Su ejecución correcta fue informada por el usuario el 25/09/2026, no comprobada mediante una consulta remota del agente. No modifica órdenes ni facturas y no ha sido ejecutado por el agente: un push no aplica SQL ni valida producción. La corrección de la consulta requiere incorporar el frontend actualizado, no repetir la migración.

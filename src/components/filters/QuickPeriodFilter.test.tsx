@@ -32,4 +32,13 @@ describe("quick period filter", () => {
     fireEvent.change(selector, { target: { value: "current-year" } });
     expect(onChange).toHaveBeenCalledWith("2026-01-01", "2026-09-25", "mes");
   });
+
+  it("keeps the current week complete when the view allows future scheduled days", () => {
+    const presets = quickPeriodPresets(new Date("2026-10-05T12:00:00"));
+    expect(presets.find(preset => preset.key === "previous-current-week")).toMatchObject({
+      from: "2026-09-28",
+      to: "2026-10-11",
+      mode: "dia",
+    });
+  });
 });

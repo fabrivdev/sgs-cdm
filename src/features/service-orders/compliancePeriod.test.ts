@@ -4,6 +4,9 @@ import { compliancePeriodMode } from "./compliancePeriod";
 describe("automatic compliance matrix periods", () => {
   it.each([
     ["2026-09-07", "2026-09-13", "dia"],
+    ["2026-09-28", "2026-10-10", "dia"],
+    ["2026-09-28", "2026-10-11", "dia"],
+    ["2026-09-28", "2026-10-12", "semana"],
     ["2026-09-01", "2026-09-30", "semana"],
     ["2026-07-01", "2026-09-29", "mes"],
     ["2026-01-01", "2026-12-31", "mes"],

@@ -617,9 +617,47 @@ describe("orders workspace", () => {
     expect(screen.getByText("Lun 07/09")).toBeVisible();
     expect(screen.getByText("Dom 13/09")).toBeVisible();
     expect(screen.queryByRole("button", { name: "Más análisis" })).not.toBeInTheDocument();
-    expect(screen.queryByRole("button", { name: "Acciones de la sección" })).not.toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Acciones de la sección" })).toBeVisible();
     expect(screen.queryByText("Agrupar")).not.toBeInTheDocument();
     expect(screen.queryByRole("table", { name: "Actividad por técnico" })).not.toBeInTheDocument();
+  });
+  it("shows two complete weeks by day and exports the same compliance detail", async () => {
+    mocks.width = 1280;
+    vi.setSystemTime(new Date("2026-10-05T12:00:00"));
+    response.data.data.jornadas[0].fecha = "2026-09-28";
+    response.data.data.jornadas[1].fecha = "2026-10-05";
+    response.data.data.jornadas[2].fecha = "2026-10-10";
+    setup(); tab("Cumplimiento");
+    fireEvent.change(screen.getByRole("combobox", { name: "Período rápido" }), { target: { value: "previous-current-week" } });
+
+    const dates = document.querySelectorAll<HTMLInputElement>('input[type="date"]');
+    expect(dates[0]).toHaveValue("2026-09-28");
+    expect(dates[1]).toHaveValue("2026-10-11");
+    expect(mocks.set).toHaveBeenLastCalledWith(expect.objectContaining({ agrupacion: "dia", fecha_desde: "2026-09-28", fecha_hasta: "2026-10-11" }));
+    expect(screen.getByText("Lun 28/09", { selector: ".dashboard-matrix-day-header" })).toBeVisible();
+    expect(screen.getByText("Dom 11/10", { selector: ".dashboard-matrix-day-header" })).toBeVisible();
+
+    fireEvent.keyDown(screen.getByRole("button", { name: "Acciones de la sección" }), { key: "Enter" });
+    fireEvent.click(await screen.findByRole("menuitem", { name: "Exportar detalle de cumplimiento" }));
+    await waitFor(() => expect(mocks.export).toHaveBeenCalledOnce());
+    const payload = mocks.export.mock.calls[0][0];
+    expect(payload.fileName).toBe("cumplimiento-detalle.xlsx");
+    expect(payload.columns.map((column: { label: string }) => column.label)).toEqual([
+      "Tipo", "Fecha", "Sucursal", "Técnico(s)", "OS/TR", "Cliente", "Trabajo / motivo", "Estado",
+    ]);
+    expect(payload.rows.map((row: { fecha: string }) => row.fecha)).toEqual(expect.arrayContaining(["2026-09-28", "2026-10-05", "2026-10-10"]));
+    expect(payload.rows.find((row: { fecha: string }) => row.fecha === "2026-10-10").estado).toBe("Programada");
+  });
+
+  it("keeps a custom thirteen-day compliance range daily", () => {
+    mocks.width = 1280;
+    setup(); tab("Cumplimiento");
+    const dates = document.querySelectorAll<HTMLInputElement>('input[type="date"]');
+    fireEvent.change(dates[0], { target: { value: "2026-09-28" } });
+    fireEvent.change(dates[1], { target: { value: "2026-10-10" } });
+    expect(mocks.set).toHaveBeenLastCalledWith(expect.objectContaining({ agrupacion: "dia" }));
+    expect(screen.getByText("Lun 28/09", { selector: ".dashboard-matrix-day-header" })).toBeVisible();
+    expect(screen.getByText("Sab 10/10", { selector: ".dashboard-matrix-day-header" })).toBeVisible();
   });
   it("presents a whole year by month without dropping empty months", () => {
     mocks.width = 1280;
