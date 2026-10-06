@@ -32,9 +32,29 @@ export interface FleetOdometerReading {
   void_reason: string | null;
 }
 
+export interface FleetResponsibleCandidate {
+  id: string;
+  nombre: string;
+  sucursal: string | null;
+  es_tecnico: boolean;
+}
+
+export interface FleetResponsibilityEvent {
+  id: string;
+  vehicle_id: string;
+  responsible_profile_id: string | null;
+  responsible_name_snapshot: string | null;
+  effective_date: string | null;
+  recorded_at: string;
+  recorded_by: string;
+  recorded_by_name: string;
+}
+
 export interface FleetSnapshot {
   vehicles: FleetVehicle[];
   readings: FleetOdometerReading[];
+  responsibleCandidates: FleetResponsibleCandidate[];
+  responsibilityEvents: FleetResponsibilityEvent[];
 }
 
 export interface FleetMileageRow extends FleetOdometerReading {
@@ -125,6 +145,37 @@ export function validateReading(
 export function vehicleLatestReading(vehicleId: string, readings: readonly FleetOdometerReading[]) {
   const vehicleReadings = activeReadings(readings.filter((reading) => reading.vehicle_id === vehicleId));
   return vehicleReadings[vehicleReadings.length - 1] ?? null;
+}
+
+export function currentFleetResponsibility(
+  vehicleId: string,
+  events: readonly FleetResponsibilityEvent[],
+  onDate: string,
+) {
+  return events
+    .filter((event) => event.vehicle_id === vehicleId && (event.effective_date === null || event.effective_date <= onDate))
+    .sort((left, right) => {
+      const leftDate = left.effective_date ?? "";
+      const rightDate = right.effective_date ?? "";
+      return rightDate.localeCompare(leftDate)
+        || right.recorded_at.localeCompare(left.recorded_at)
+        || right.id.localeCompare(left.id);
+    })[0] ?? null;
+}
+
+export function fleetResponsibilityHistory(
+  vehicleId: string,
+  events: readonly FleetResponsibilityEvent[],
+) {
+  return events
+    .filter((event) => event.vehicle_id === vehicleId)
+    .sort((left, right) => {
+      const leftDate = left.effective_date ?? "";
+      const rightDate = right.effective_date ?? "";
+      return rightDate.localeCompare(leftDate)
+        || right.recorded_at.localeCompare(left.recorded_at)
+        || right.id.localeCompare(left.id);
+    });
 }
 
 export function fleetTotalTravelled(readings: readonly FleetOdometerReading[]) {

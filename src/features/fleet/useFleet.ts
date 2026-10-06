@@ -6,9 +6,11 @@ import {
   correctFleetReading,
   createFleetVehicle,
   loadFleetSnapshot,
+  setFleetResponsible,
   type AddFleetReadingInput,
   type CorrectFleetReadingInput,
   type CreateFleetVehicleInput,
+  type SetFleetResponsibleInput,
 } from "./api";
 
 const FLEET_QUERY_KEY = "fleet-snapshot";
@@ -46,4 +48,8 @@ export function useAddFleetReading() {
 
 export function useCorrectFleetReading() {
   return useFleetMutation<CorrectFleetReadingInput>(correctFleetReading);
+}
+
+export function useSetFleetResponsible() {
+  return useFleetMutation<SetFleetResponsibleInput>(setFleetResponsible);
 }

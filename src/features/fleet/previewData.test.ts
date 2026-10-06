@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { activeReadings, mileageRows, vehiclesUpToDate } from "./model";
+import { activeReadings, currentFleetResponsibility, mileageRows, vehiclesUpToDate } from "./model";
 import { FLEET_PREVIEW_SNAPSHOT } from "./previewData";
 import { cloneFleetPreviewSnapshot } from "./previewState";
 
@@ -30,12 +30,23 @@ describe("fleet preview data", () => {
     expect(FLEET_PREVIEW_SNAPSHOT.vehicles.every((vehicle) => !vehicle.image_url)).toBe(true);
   });
 
+  it("incluye candidatos deduplicados y responsables DEMO auditables", () => {
+    expect(new Set(FLEET_PREVIEW_SNAPSHOT.responsibleCandidates.map((candidate) => candidate.id)).size).toBe(FLEET_PREVIEW_SNAPSHOT.responsibleCandidates.length);
+    expect(currentFleetResponsibility(
+      FLEET_PREVIEW_SNAPSHOT.vehicles[0].id,
+      FLEET_PREVIEW_SNAPSHOT.responsibilityEvents,
+      "2026-10-06",
+    )?.responsible_name_snapshot).toBe("Técnica DEMO");
+  });
+
   it("restablece la simulación desde una copia limpia", () => {
     const edited = cloneFleetPreviewSnapshot(FLEET_PREVIEW_SNAPSHOT);
     edited.vehicles[0].brand = "Cambio local";
     edited.readings.pop();
+    edited.responsibilityEvents.pop();
     const reset = cloneFleetPreviewSnapshot(FLEET_PREVIEW_SNAPSHOT);
-    expect(reset.vehicles[0]).toMatchObject({ brand: "Toyota", model: "Hilux" });
+    expect(reset.vehicles[0]).toMatchObject({ brand: "MAXUS", model: "T60 CONFORT 4X4", model_year: 2023 });
     expect(reset.readings).toHaveLength(FLEET_PREVIEW_SNAPSHOT.readings.length);
+    expect(reset.responsibilityEvents).toHaveLength(FLEET_PREVIEW_SNAPSHOT.responsibilityEvents.length);
   });
 });

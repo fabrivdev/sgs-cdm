@@ -1,6 +1,12 @@
 /* eslint-disable @typescript-eslint/no-explicit-any -- The generated client has not been refreshed with the Fleet tables/RPCs yet. */
 import { supabase } from "@/integrations/supabase/client";
-import type { FleetOdometerReading, FleetSnapshot, FleetVehicle } from "./model";
+import type {
+  FleetOdometerReading,
+  FleetResponsibleCandidate,
+  FleetResponsibilityEvent,
+  FleetSnapshot,
+  FleetVehicle,
+} from "./model";
 
 export interface CreateFleetVehicleInput {
   brand: string;
@@ -21,8 +27,14 @@ export interface CorrectFleetReadingInput extends AddFleetReadingInput {
   reason: string;
 }
 
+export interface SetFleetResponsibleInput {
+  vehicleId: string;
+  responsibleProfileId: string | null;
+  effectiveDate: string;
+}
+
 export async function loadFleetSnapshot(): Promise<FleetSnapshot> {
-  const [vehiclesResult, readingsResult] = await Promise.all([
+  const [vehiclesResult, readingsResult, responsibilityResult, candidatesResult] = await Promise.all([
     (supabase.from("fleet_vehicles" as never) as any)
       .select("id, brand, model, model_year, image_url, image_source_url, image_license, plate, plate_normalized, active, created_at, created_by, created_by_name")
       .order("brand")
@@ -31,10 +43,17 @@ export async function loadFleetSnapshot(): Promise<FleetSnapshot> {
       .select("id, vehicle_id, reading_date, odometer_km, reading_kind, correction_of, created_at, created_by, created_by_name, voided_at, voided_by, voided_by_name, void_reason")
       .order("reading_date", { ascending: false })
       .order("created_at", { ascending: false }),
+    (supabase.from("fleet_vehicle_responsibility_events" as never) as any)
+      .select("id, vehicle_id, responsible_profile_id, responsible_name_snapshot, effective_date, recorded_at, recorded_by, recorded_by_name")
+      .order("effective_date", { ascending: false, nullsFirst: false })
+      .order("recorded_at", { ascending: false }),
+    (supabase.rpc as any)("fleet_list_responsible_candidates"),
   ]);
 
   if (vehiclesResult.error) throw vehiclesResult.error;
   if (readingsResult.error) throw readingsResult.error;
+  if (responsibilityResult.error) throw responsibilityResult.error;
+  if (candidatesResult.error) throw candidatesResult.error;
 
   return {
     vehicles: (vehiclesResult.data ?? []) as FleetVehicle[],
@@ -42,6 +61,10 @@ export async function loadFleetSnapshot(): Promise<FleetSnapshot> {
       ...row,
       odometer_km: Number(row.odometer_km),
     })),
+    responsibilityEvents: (responsibilityResult.data ?? []) as FleetResponsibilityEvent[],
+    responsibleCandidates: [...((candidatesResult.data ?? []) as FleetResponsibleCandidate[])]
+      .filter((candidate, index, rows) => rows.findIndex((row) => row.id === candidate.id) === index)
+      .sort((left, right) => left.nombre.localeCompare(right.nombre, "es")),
   };
 }
 
@@ -73,6 +96,16 @@ export async function correctFleetReading(input: CorrectFleetReadingInput) {
     p_reading_date: input.readingDate,
     p_odometer_km: input.odometerKm,
     p_reason: input.reason,
+  });
+  if (error) throw error;
+  return data as string;
+}
+
+export async function setFleetResponsible(input: SetFleetResponsibleInput) {
+  const { data, error } = await (supabase.rpc as any)("fleet_set_vehicle_responsible", {
+    p_vehicle_id: input.vehicleId,
+    p_responsible_profile_id: input.responsibleProfileId,
+    p_effective_date: input.effectiveDate,
   });
   if (error) throw error;
   return data as string;

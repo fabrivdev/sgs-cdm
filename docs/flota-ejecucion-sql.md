@@ -11,6 +11,12 @@ La declaración del usuario no equivale a una verificación autenticada de produ
 
 Todo cambio posterior de esquema o datos debe usar una migración incremental nueva; no editar ni reejecutar estas migraciones históricas.
 
+## Responsables pendiente de aplicación
+
+La implementación local agrega `supabase/migrations/20261006201000_add_fleet_responsibility_history.sql`. Esta migración incremental todavía no fue aplicada desde este worktree. Crea un historial anexable de cambios con responsable, fecha efectiva, autor y momento de registro; las escrituras pasan por RPC con `auth.uid()` y acceso a `servicios.flota`.
+
+Los candidatos reúnen perfiles técnicos activos y perfiles vinculados a usuarios existentes, deduplicados por `profiles.id`. No crea cuentas ni perfiles. Las fichas identificaban a Hugo Rodas y Ruben Monges sin fecha de inicio: se conservan como línea de base con fecha no informada, únicamente si chapa, cuenta autora y perfil activo resuelven de forma única. Los otros trece vehículos permanecen sin responsable.
+
 ## Verificación de solo lectura pendiente
 
 ```sql
@@ -56,4 +62,4 @@ Resultado esperado según el seed: `15` vehículos, `15` chapas únicas, `15` at
 
 ## Imágenes
 
-El seed dejó `image_url`, `image_source_url` e `image_license` nulos. La UI usa un catálogo local de referencias verificadas que cubre las 15 unidades confirmadas por familia y carrocería: MAXUS T60 doble cabina, Mitsubishi L200 doble cabina e Isuzu D-Max en cabina simple o doble. Son imágenes referenciales, no fotos del vehículo real ni afirmaciones de versión exacta; cada una muestra autor, fuente y licencia junto a la imagen. La referencia D-Max de tercera generación sirve para las unidades 2025 y 2026 sin afirmar el año o acabado de la unidad. Este catálogo no requiere reejecutar ni modificar el seed. Persistir referencias en base, si se decide después, requiere una migración incremental y revisión previa.
+El seed dejó `image_url`, `image_source_url` e `image_license` nulos. La UI usa cinco assets generados locales, sin referencias ni créditos visibles: camionetas blancas, configuración básica y carrocería simple o doble según el catálogo confirmado. Cubren las 15 unidades por familia y año conocido sin afirmar que sean fotos de los vehículos reales. Este catálogo no requiere reejecutar ni modificar el seed.

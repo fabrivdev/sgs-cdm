@@ -1,10 +1,13 @@
 import { describe, expect, it } from "vitest";
 import {
   fleetTotalTravelled,
+  currentFleetResponsibility,
+  fleetResponsibilityHistory,
   mileageRows,
   normalizePlate,
   validateReading,
   type FleetOdometerReading,
+  type FleetResponsibilityEvent,
 } from "./model";
 
 function reading(overrides: Partial<FleetOdometerReading> = {}): FleetOdometerReading {
@@ -22,6 +25,19 @@ function reading(overrides: Partial<FleetOdometerReading> = {}): FleetOdometerRe
     voided_by: overrides.voided_by ?? null,
     voided_by_name: overrides.voided_by_name ?? null,
     void_reason: overrides.void_reason ?? null,
+  };
+}
+
+function responsibility(overrides: Partial<FleetResponsibilityEvent> = {}): FleetResponsibilityEvent {
+  return {
+    id: overrides.id ?? crypto.randomUUID(),
+    vehicle_id: overrides.vehicle_id ?? "vehicle-1",
+    responsible_profile_id: overrides.responsible_profile_id === undefined ? "profile-1" : overrides.responsible_profile_id,
+    responsible_name_snapshot: overrides.responsible_name_snapshot === undefined ? "Responsable" : overrides.responsible_name_snapshot,
+    effective_date: overrides.effective_date === undefined ? "2026-09-01" : overrides.effective_date,
+    recorded_at: overrides.recorded_at ?? "2026-09-01T12:00:00Z",
+    recorded_by: overrides.recorded_by ?? "user-1",
+    recorded_by_name: overrides.recorded_by_name ?? "Usuario",
   };
 }
 
@@ -69,5 +85,35 @@ describe("fleet mileage model", () => {
       reading({ id: "b1", vehicle_id: "b", odometer_km: 9_000, reading_date: "2026-09-01" }),
       reading({ id: "b2", vehicle_id: "b", odometer_km: 9_100, reading_date: "2026-09-08" }),
     ])).toBe(250);
+  });
+
+  it("resuelve el responsable vigente sin adelantar cambios futuros", () => {
+    const events = [
+      responsibility({ id: "baseline", effective_date: null, responsible_name_snapshot: "Hugo" }),
+      responsibility({ id: "current", effective_date: "2026-09-15", responsible_name_snapshot: "Ruben" }),
+      responsibility({ id: "future", effective_date: "2026-10-20", responsible_name_snapshot: "Ana" }),
+    ];
+
+    expect(currentFleetResponsibility("vehicle-1", events, "2026-10-06")?.id).toBe("current");
+    expect(fleetResponsibilityHistory("vehicle-1", events).map((event) => event.id)).toEqual(["future", "current", "baseline"]);
+  });
+
+  it("conserva la baja de responsable como un evento auditable", () => {
+    const events = [
+      responsibility({ id: "assigned", effective_date: "2026-09-01" }),
+      responsibility({
+        id: "unassigned",
+        responsible_profile_id: null,
+        responsible_name_snapshot: null,
+        effective_date: "2026-10-01",
+      }),
+    ];
+
+    expect(currentFleetResponsibility("vehicle-1", events, "2026-10-06")).toMatchObject({
+      id: "unassigned",
+      responsible_profile_id: null,
+      responsible_name_snapshot: null,
+    });
+    expect(events).toHaveLength(2);
   });
 });

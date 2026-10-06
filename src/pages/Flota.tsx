@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState, type FormEvent, type ReactNode } from "react";
-import { AlertTriangle, ArrowLeft, CalendarClock, CarFront, Gauge, PencilLine, Plus, RotateCcw } from "lucide-react";
+import { AlertTriangle, ArrowLeft, CalendarClock, CarFront, Gauge, PencilLine, Plus, RotateCcw, UserRoundPen } from "lucide-react";
 import { toast } from "sonner";
 import { PageHeader, PageShell, Panel } from "@/components/layout/AppPrimitives";
 import { FiltersBar, FilterDate, FilterSelect } from "@/components/filters/FiltersBar";
@@ -9,6 +9,7 @@ import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { fleetErrorMessage } from "@/features/fleet/api";
 import {
@@ -19,25 +20,33 @@ import {
   type FleetReadingPresence,
 } from "@/features/fleet/filters";
 import {
+  currentFleetResponsibility,
   dateDistanceInDays,
+  fleetResponsibilityHistory,
   mileageRows,
   normalizePlate,
   validateReading,
   vehicleLatestReading,
   type FleetOdometerReading,
+  type FleetResponsibleCandidate,
+  type FleetResponsibilityEvent,
   type FleetVehicle,
 } from "@/features/fleet/model";
 import { defaultCustomFrom, periodMileage, resolveFleetPeriod, todayInParaguay, type FleetPeriodMileage, type FleetPeriodReading } from "@/features/fleet/period";
 import type { FleetPreviewSnapshot } from "@/features/fleet/previewData";
 import { cloneFleetPreviewSnapshot } from "@/features/fleet/previewState";
-import { useAddFleetReading, useCorrectFleetReading, useCreateFleetVehicle, useFleet } from "@/features/fleet/useFleet";
+import { useAddFleetReading, useCorrectFleetReading, useCreateFleetVehicle, useFleet, useSetFleetResponsible } from "@/features/fleet/useFleet";
 import { fleetVehicleReferenceImage } from "@/features/fleet/vehicleImages";
 import { cn } from "@/lib/utils";
 
 const kmFormatter = new Intl.NumberFormat("es-PY", { maximumFractionDigits: 0 });
 const dateFormatter = new Intl.DateTimeFormat("es-PY", { day: "2-digit", month: "short", year: "numeric", timeZone: "UTC" });
+const dateTimeFormatter = new Intl.DateTimeFormat("es-PY", { day: "2-digit", month: "short", year: "numeric", hour: "2-digit", minute: "2-digit" });
 const EMPTY_VEHICLES: FleetVehicle[] = [];
 const EMPTY_READINGS: FleetOdometerReading[] = [];
+const EMPTY_RESPONSIBILITY_EVENTS: FleetResponsibilityEvent[] = [];
+const EMPTY_RESPONSIBLE_CANDIDATES: FleetResponsibleCandidate[] = [];
+const UNASSIGNED_RESPONSIBLE = "__unassigned__";
 type VehicleFilter = "all" | "current" | "pending" | "alerts";
 
 interface FleetComparisonRow {
@@ -47,6 +56,14 @@ interface FleetComparisonRow {
 
 function displayDate(value: string) {
   return dateFormatter.format(new Date(`${value}T00:00:00Z`));
+}
+
+function displayDateTime(value: string) {
+  return dateTimeFormatter.format(new Date(value));
+}
+
+function responsibleName(event: FleetResponsibilityEvent | null | undefined) {
+  return event?.responsible_name_snapshot?.trim() || "-";
 }
 
 function displayKm(value: number | null) {
@@ -92,10 +109,12 @@ export default function Flota({ previewData }: { previewData?: FleetPreviewSnaps
   const createVehicle = useCreateFleetVehicle();
   const addReading = useAddFleetReading();
   const correctReading = useCorrectFleetReading();
+  const setResponsible = useSetFleetResponsible();
   const [selectedVehicleId, setSelectedVehicleId] = useState<string | null>(null);
   const [vehicleDialogOpen, setVehicleDialogOpen] = useState(false);
   const [readingDialogOpen, setReadingDialogOpen] = useState(false);
   const [correcting, setCorrecting] = useState<FleetOdometerReading | null>(null);
+  const [responsibilityDialogOpen, setResponsibilityDialogOpen] = useState(false);
   const [previewSnapshot, setPreviewSnapshot] = useState<FleetPreviewSnapshot | null>(() => previewData ? cloneFleetPreviewSnapshot(previewData) : null);
   const [vehicleSearch, setVehicleSearch] = useState("");
   const [vehicleFilter, setVehicleFilter] = useState<VehicleFilter>("all");
@@ -108,6 +127,8 @@ export default function Flota({ previewData }: { previewData?: FleetPreviewSnaps
   const snapshot = previewSnapshot ?? query.data;
   const vehicles = snapshot?.vehicles ?? EMPTY_VEHICLES;
   const readings = snapshot?.readings ?? EMPTY_READINGS;
+  const responsibilityEvents = snapshot?.responsibilityEvents ?? EMPTY_RESPONSIBILITY_EVENTS;
+  const responsibleCandidates = snapshot?.responsibleCandidates ?? EMPTY_RESPONSIBLE_CANDIDATES;
   const previewActorId = previewData?.vehicles[0]?.created_by ?? "00000000-0000-4000-8000-000000000001";
   const previewActorName = previewData?.vehicles[0]?.created_by_name ?? "Usuario DEMO";
   const period = useMemo(() => resolveFleetPeriod("custom", today, customFrom, customTo), [customFrom, customTo, today]);
@@ -118,6 +139,10 @@ export default function Flota({ previewData }: { previewData?: FleetPreviewSnaps
     vehicle,
     mileage: periodMileage(readings.filter((reading) => reading.vehicle_id === vehicle.id), period),
   })), [activeVehicles, period, readings]);
+  const responsibilityByVehicle = useMemo(() => new Map(activeVehicles.map((vehicle) => [
+    vehicle.id,
+    currentFleetResponsibility(vehicle.id, responsibilityEvents, today),
+  ])), [activeVehicles, responsibilityEvents, today]);
   const filteredVehicles = useMemo(() => {
     const normalizedSearch = vehicleSearch.trim().toLocaleLowerCase("es");
     return activeVehicles.filter((vehicle) => {
@@ -126,7 +151,7 @@ export default function Flota({ previewData }: { previewData?: FleetPreviewSnaps
       const vehicleReadings = readings.filter((reading) => reading.vehicle_id === vehicle.id);
       const hasAlert = status.overdue || mileageRows(vehicleReadings).some((reading) => reading.hasWeeklyGap)
         || vehicleReadings.some((reading) => reading.voided_at !== null);
-      const searchable = `${vehicle.brand} ${vehicleModel(vehicle)} ${vehicle.plate}`.toLocaleLowerCase("es");
+      const searchable = `${vehicle.brand} ${vehicleModel(vehicle)} ${vehicle.plate} ${responsibleName(responsibilityByVehicle.get(vehicle.id))}`.toLocaleLowerCase("es");
       const matchesSearch = !normalizedSearch || searchable.includes(normalizedSearch);
       const matchesFilter = vehicleFilter === "all"
         || (vehicleFilter === "current" && !status.overdue)
@@ -139,7 +164,7 @@ export default function Flota({ previewData }: { previewData?: FleetPreviewSnaps
       );
       return matchesSearch && matchesFilter && matchesDimensions;
     });
-  }, [activeVehicles, brandFilter, modelFilter, period, readingPresence, readings, today, vehicleFilter, vehicleSearch]);
+  }, [activeVehicles, brandFilter, modelFilter, period, readingPresence, readings, responsibilityByVehicle, today, vehicleFilter, vehicleSearch]);
 
   useEffect(() => {
     if (selectedVehicleId && !activeVehicles.some((vehicle) => vehicle.id === selectedVehicleId)) setSelectedVehicleId(null);
@@ -155,6 +180,10 @@ export default function Flota({ previewData }: { previewData?: FleetPreviewSnaps
   const selectedRows = (selectedComparison?.mileage.rows ?? []).slice().reverse();
   const selectedLatest = selectedVehicle ? vehicleLatestReading(selectedVehicle.id, readings) : null;
   const selectedStatus = readingStatus(selectedLatest, today);
+  const selectedResponsibility = selectedVehicleId ? responsibilityByVehicle.get(selectedVehicleId) ?? null : null;
+  const selectedResponsibilityHistory = selectedVehicleId
+    ? fleetResponsibilityHistory(selectedVehicleId, responsibilityEvents)
+    : [];
   const auditRows = selectedReadings
     .filter((reading) => reading.voided_at !== null && period.valid && reading.reading_date >= period.from && reading.reading_date <= period.to)
     .sort((left, right) => right.created_at.localeCompare(left.created_at));
@@ -173,6 +202,7 @@ export default function Flota({ previewData }: { previewData?: FleetPreviewSnaps
     setVehicleDialogOpen(false);
     setReadingDialogOpen(false);
     setCorrecting(null);
+    setResponsibilityDialogOpen(false);
     toast.success("Datos DEMO restablecidos");
   };
 
@@ -322,6 +352,40 @@ export default function Flota({ previewData }: { previewData?: FleetPreviewSnaps
     }
   };
 
+  const handleResponsibleChange = async (values: { responsibleProfileId: string | null; effectiveDate: string }) => {
+    if (!selectedVehicle) return;
+    if (previewData) {
+      const candidate = responsibleCandidates.find((row) => row.id === values.responsibleProfileId) ?? null;
+      setPreviewSnapshot((current) => current ? {
+        ...current,
+        responsibilityEvents: [...current.responsibilityEvents, {
+          id: crypto.randomUUID(),
+          vehicle_id: selectedVehicle.id,
+          responsible_profile_id: candidate?.id ?? null,
+          responsible_name_snapshot: candidate?.nombre ?? null,
+          effective_date: values.effectiveDate,
+          recorded_at: new Date().toISOString(),
+          recorded_by: previewActorId,
+          recorded_by_name: previewActorName,
+        }],
+      } : current);
+      setResponsibilityDialogOpen(false);
+      toast.success("Responsable actualizado en la simulación");
+      return;
+    }
+    try {
+      await setResponsible.mutateAsync({
+        vehicleId: selectedVehicle.id,
+        responsibleProfileId: values.responsibleProfileId,
+        effectiveDate: values.effectiveDate,
+      });
+      setResponsibilityDialogOpen(false);
+      toast.success("Responsable actualizado");
+    } catch (error) {
+      toast.error(fleetErrorMessage(error));
+    }
+  };
+
   const resetFleetFilters = () => {
     setVehicleSearch("");
     setVehicleFilter("all");
@@ -342,7 +406,7 @@ export default function Flota({ previewData }: { previewData?: FleetPreviewSnaps
       title="Flota"
       actions={selectedVehicle
         ? <Button size="sm" onClick={() => setReadingDialogOpen(true)}><Gauge className="h-4 w-4" /> Registrar lectura</Button>
-        : <Button size="sm" onClick={() => setVehicleDialogOpen(true)}><Plus className="h-4 w-4" /> Nuevo vehículo</Button>}
+        : <Button size="sm" aria-label="Nuevo vehículo" className="h-11 px-3 sm:h-9" onClick={() => setVehicleDialogOpen(true)}><Plus className="hidden h-4 w-4 sm:block" /><span className="sm:hidden">+ Nuevo</span><span className="hidden sm:inline">Nuevo vehículo</span></Button>}
     />
 
     {previewData && <div className="flex min-h-10 flex-wrap items-center gap-2 rounded-xl border border-sky-200 bg-sky-50/70 px-3 py-2 text-[12px] text-sky-950">
@@ -361,16 +425,18 @@ export default function Flota({ previewData }: { previewData?: FleetPreviewSnaps
       latest={selectedLatest}
       status={selectedStatus}
       comparison={selectedComparison}
+      responsibility={selectedResponsibility}
+      responsibilityHistory={selectedResponsibilityHistory}
       rows={selectedRows}
       auditRows={auditRows}
       onBack={() => setSelectedVehicleId(null)}
       onCorrect={setCorrecting}
+      onEditResponsible={() => setResponsibilityDialogOpen(true)}
     /> : <>
       <FiltersBar
-        search={{ value: vehicleSearch, onChange: setVehicleSearch, placeholder: "Buscar marca, modelo o chapa" }}
+        search={{ value: vehicleSearch, onChange: setVehicleSearch, placeholder: "Buscar marca, modelo, chapa o responsable" }}
         activeCount={activeFilterCount}
         onClear={resetFleetFilters}
-        mobileContext={period.valid ? `${displayDate(period.from)} - ${displayDate(period.to)}` : "Revisá las fechas"}
         expanded={<>
           <FilterSelect
             label="Marca"
@@ -417,6 +483,7 @@ export default function Flota({ previewData }: { previewData?: FleetPreviewSnaps
         activeVehicleCount={activeVehicles.length}
         readings={readings}
         comparisons={comparisons}
+        responsibilityByVehicle={responsibilityByVehicle}
         today={today}
         onOpen={setSelectedVehicleId}
         onClearFilters={resetFleetFilters}
@@ -426,20 +493,30 @@ export default function Flota({ previewData }: { previewData?: FleetPreviewSnaps
     <VehicleDialog open={vehicleDialogOpen} pending={createVehicle.isPending} today={today} onOpenChange={setVehicleDialogOpen} onSubmit={handleCreateVehicle} />
     <ReadingDialog open={readingDialogOpen} pending={addReading.isPending} today={today} vehicle={selectedVehicle} readings={selectedReadings} onOpenChange={setReadingDialogOpen} onSubmit={handleAddReading} />
     <CorrectionDialog reading={correcting} pending={correctReading.isPending} today={today} readings={selectedReadings} onOpenChange={(open) => !open && setCorrecting(null)} onSubmit={handleCorrection} />
+    <ResponsibilityDialog
+      open={responsibilityDialogOpen}
+      pending={setResponsible.isPending}
+      today={today}
+      current={selectedResponsibility}
+      candidates={responsibleCandidates}
+      onOpenChange={setResponsibilityDialogOpen}
+      onSubmit={handleResponsibleChange}
+    />
   </PageShell>;
 }
 
-function FleetVehicleList({ vehicles, activeVehicleCount, readings, comparisons, today, onOpen, onClearFilters }: {
+function FleetVehicleList({ vehicles, activeVehicleCount, readings, comparisons, responsibilityByVehicle, today, onOpen, onClearFilters }: {
   vehicles: FleetVehicle[];
   activeVehicleCount: number;
   readings: FleetOdometerReading[];
   comparisons: FleetComparisonRow[];
+  responsibilityByVehicle: Map<string, FleetResponsibilityEvent | null>;
   today: string;
   onOpen: (vehicleId: string) => void;
   onClearFilters: () => void;
 }) {
   return <Panel className="overflow-hidden p-0">
-    <div className="border-b px-4 py-3"><InlineSectionHeading title="Vehículos" count={`${vehicles.length} de ${activeVehicleCount}`} /></div>
+    <div className="border-b px-3 py-2 sm:px-4 sm:py-3"><InlineSectionHeading title="Vehículos" count={`${vehicles.length} de ${activeVehicleCount}`} /></div>
     {!activeVehicleCount ? <div className="px-4 py-10 text-center"><CarFront className="mx-auto mb-3 h-8 w-8 text-muted-foreground/60" /><p className="text-[13px] font-medium">Todavía no hay vehículos</p></div>
       : !vehicles.length ? <div className="px-4 py-8 text-center"><p className="text-[13px] font-medium">Sin coincidencias</p><Button variant="ghost" size="sm" className="mt-2" onClick={onClearFilters}>Limpiar filtros</Button></div>
         : <>
@@ -447,18 +524,20 @@ function FleetVehicleList({ vehicles, activeVehicleCount, readings, comparisons,
             const latest = vehicleLatestReading(vehicle.id, readings);
             const status = readingStatus(latest, today);
             const comparison = comparisons.find((row) => row.vehicle.id === vehicle.id);
+            const responsibility = responsibilityByVehicle.get(vehicle.id);
             return <button key={vehicle.id} type="button" className="grid w-full grid-cols-[minmax(0,1fr)_auto] items-center gap-3 px-3 py-3 text-left hover:bg-muted/35" onClick={() => onOpen(vehicle.id)}>
-              <span className="min-w-0"><span className="block truncate text-[12px] font-semibold">{vehicle.brand}{vehicleModel(vehicle) === "-" ? "" : ` · ${vehicleModel(vehicle)}`}</span><span className="mt-0.5 block truncate font-mono text-[10px] text-muted-foreground">{vehicle.plate} · {latest ? `Lectura ${displayDate(latest.reading_date)}` : "Sin lectura"}</span></span>
+              <span className="min-w-0"><span className="block truncate text-[12px] font-semibold">{vehicle.brand}{vehicleModel(vehicle) === "-" ? "" : ` · ${vehicleModel(vehicle)}`}</span><span className="mt-0.5 block truncate font-mono text-[10px] text-muted-foreground">{vehicle.plate} · {responsibleName(responsibility)}</span><span className="mt-0.5 block truncate text-[9px] text-muted-foreground">{latest ? `Lectura ${displayDate(latest.reading_date)}` : "Sin lectura"}</span></span>
               <span className="text-right"><span className="block text-[9px] text-muted-foreground">Km período</span><span className="block text-[11px] font-semibold tabular-nums">{displayKm(periodKm(comparison))}</span><Badge variant="outline" className={cn("mt-1 px-1.5 text-[8px]", status.overdue ? "border-amber-200 bg-amber-50 text-amber-800" : "border-emerald-200 bg-emerald-50 text-emerald-700")}>{status.label}</Badge></span>
             </button>;
           })}</div>
           <div className="hidden overflow-hidden sm:block">
             <Table className="table-fixed">
-              <colgroup><col className="w-[14%]" /><col className="w-[20%]" /><col className="w-[11%]" /><col className="w-[14%]" /><col className="w-[15%]" /><col className="w-[13%]" /><col className="w-[13%]" /></colgroup>
+              <colgroup><col className="w-[12%]" /><col className="w-[16%]" /><col className="w-[10%]" /><col className="w-[17%]" /><col className="w-[12%]" /><col className="w-[14%]" /><col className="w-[10%]" /><col className="w-[9%]" /></colgroup>
               <TableHeader><TableRow className="h-8 hover:bg-transparent">
                 <TableHead className="h-8 whitespace-nowrap px-3 text-[9px]">Marca</TableHead>
                 <TableHead className="h-8 whitespace-nowrap px-2 text-[9px]">Modelo</TableHead>
                 <TableHead className="h-8 whitespace-nowrap px-2 text-[9px]">Chapa</TableHead>
+                <TableHead className="h-8 whitespace-nowrap px-2 text-[9px]">Responsable</TableHead>
                 <TableHead className="h-8 whitespace-nowrap px-1 text-center text-[9px]"><span className="xl:hidden">Último km</span><span className="hidden xl:inline">Último kilometraje</span></TableHead>
                 <TableHead className="h-8 whitespace-nowrap px-1 text-center text-[9px]"><span className="xl:hidden">Fecha lectura</span><span className="hidden xl:inline">Fecha última lectura</span></TableHead>
                 <TableHead className="h-8 whitespace-nowrap px-1 text-center text-[9px]"><span className="xl:hidden">Km período</span><span className="hidden xl:inline">Km del período</span></TableHead>
@@ -468,11 +547,13 @@ function FleetVehicleList({ vehicles, activeVehicleCount, readings, comparisons,
                 const latest = vehicleLatestReading(vehicle.id, readings);
                 const status = readingStatus(latest, today);
                 const comparison = comparisons.find((row) => row.vehicle.id === vehicle.id);
+                const responsibility = responsibilityByVehicle.get(vehicle.id);
                 const openVehicle = () => onOpen(vehicle.id);
                 return <TableRow key={vehicle.id} tabIndex={0} aria-label={`Abrir ${vehicle.brand}, chapa ${vehicle.plate}`} className="h-11 cursor-pointer focus-visible:bg-muted/35" onClick={openVehicle} onKeyDown={(event) => { if (event.key === "Enter" || event.key === " ") { event.preventDefault(); openVehicle(); } }}>
                   <TableCell className="h-11 truncate px-3 py-0 text-[11px] font-semibold" title={vehicle.brand}>{vehicle.brand}</TableCell>
                   <TableCell className="h-11 truncate px-2 py-0 text-[11px]" title={vehicleModel(vehicle)}>{vehicleModel(vehicle)}</TableCell>
                   <TableCell className="h-11 truncate px-2 py-0 font-mono text-[10px] tracking-[0.04em] text-muted-foreground" title={vehicle.plate}>{vehicle.plate}</TableCell>
+                  <TableCell className="h-11 truncate px-2 py-0 text-[11px]" title={responsibleName(responsibility)}>{responsibleName(responsibility)}</TableCell>
                   <TableCell className="h-11 whitespace-nowrap px-1 py-0 text-center text-[11px] tabular-nums">{displayKm(latest?.odometer_km ?? null)}</TableCell>
                   <TableCell className="h-11 whitespace-nowrap px-1 py-0 text-center text-[11px] tabular-nums">{latest ? displayDate(latest.reading_date) : "-"}</TableCell>
                   <TableCell className="h-11 whitespace-nowrap px-1 py-0 text-center text-[11px] font-semibold tabular-nums">{displayKm(periodKm(comparison))}</TableCell>
@@ -485,33 +566,35 @@ function FleetVehicleList({ vehicles, activeVehicleCount, readings, comparisons,
   </Panel>;
 }
 
-function VehicleDetail({ vehicle, latest, status, comparison, rows, auditRows, onBack, onCorrect }: {
+function VehicleDetail({ vehicle, latest, status, comparison, responsibility, responsibilityHistory, rows, auditRows, onBack, onCorrect, onEditResponsible }: {
   vehicle: FleetVehicle;
   latest: FleetOdometerReading | null;
   status: { label: string; overdue: boolean };
   comparison: FleetComparisonRow | undefined;
+  responsibility: FleetResponsibilityEvent | null;
+  responsibilityHistory: FleetResponsibilityEvent[];
   rows: FleetPeriodReading[];
   auditRows: FleetOdometerReading[];
   onBack: () => void;
   onCorrect: (reading: FleetOdometerReading) => void;
+  onEditResponsible: () => void;
 }) {
   const referenceImage = fleetVehicleReferenceImage(vehicle);
   return <Panel className="overflow-hidden p-0">
     <div className="border-b px-4 py-3">
       <Button variant="ghost" size="sm" className="-ml-2 mb-2 max-sm:min-h-11" onClick={onBack}><ArrowLeft className="h-4 w-4" /> Volver a la flota</Button>
       <div className="flex min-w-0 items-start gap-3">
-        {referenceImage && <figure className="w-28 shrink-0 sm:w-36">
-          <img src={referenceImage.imageUrl} alt={referenceImage.alt} className="h-16 w-full rounded-lg border object-cover sm:h-20" loading="lazy" referrerPolicy="no-referrer" />
-          <figcaption className="mt-1 text-[10px] leading-4 text-muted-foreground">
-            {referenceImage.label} · Foto: {referenceImage.author} · <a className="underline decoration-muted-foreground/50 underline-offset-2" href={referenceImage.sourceUrl}>Wikimedia Commons</a> · <a className="underline decoration-muted-foreground/50 underline-offset-2" href={referenceImage.licenseUrl}>{referenceImage.license}</a>
-          </figcaption>
-        </figure>}
+        {referenceImage && <div className="w-28 shrink-0 sm:w-36">
+          <img src={referenceImage.imageUrl} alt={referenceImage.alt} className="h-16 w-full rounded-lg border bg-white object-contain sm:h-20" loading="lazy" />
+        </div>}
         <div className="flex min-w-0 flex-wrap items-center gap-2">
           <h2 className="truncate text-[15px] font-semibold">{vehicle.brand}</h2>
           {vehicleModel(vehicle) !== "-" && <span className="truncate text-[13px] text-muted-foreground">{vehicleModel(vehicle)}</span>}
           {vehicle.model_year && <span className="text-[11px] text-muted-foreground">{vehicle.model_year}</span>}
           <span className="font-mono text-[11px] tracking-[0.08em] text-muted-foreground">{vehicle.plate}</span>
           <Badge variant="outline" className={cn("text-[9px]", status.overdue ? "border-amber-200 bg-amber-50 text-amber-800" : "border-emerald-200 bg-emerald-50 text-emerald-700")}>{status.label}</Badge>
+          <span className="basis-full truncate text-[11px] text-muted-foreground" title={responsibleName(responsibility)}>Responsable: <span className="font-medium text-foreground">{responsibleName(responsibility)}</span></span>
+          <Button variant="outline" size="sm" className="h-8" onClick={onEditResponsible}><UserRoundPen className="h-3.5 w-3.5" /> Cambiar responsable</Button>
         </div>
       </div>
       <dl className="mt-3 grid grid-cols-2 gap-x-4 gap-y-2 rounded-lg bg-muted/45 px-3 py-2 sm:grid-cols-4">
@@ -534,8 +617,31 @@ function VehicleDetail({ vehicle, latest, status, comparison, rows, auditRows, o
         </div>
       </> : <EmptyReadings />}
       {auditRows.length > 0 && <CorrectionHistory rows={auditRows} />}
+      {responsibilityHistory.length > 0 && <ResponsibilityHistory rows={responsibilityHistory} />}
     </div>
   </Panel>;
+}
+
+function ResponsibilityHistory({ rows }: { rows: FleetResponsibilityEvent[] }) {
+  return <div className="space-y-2 border-t pt-3">
+    <InlineSectionHeading title="Responsables" count={`${rows.length}`} />
+    <div className="divide-y rounded-lg border sm:hidden">{rows.map((event) => <article key={event.id} className="px-3 py-2.5 text-[11px]">
+      <div className="flex items-center justify-between gap-3"><span className="truncate font-medium">{event.responsible_name_snapshot ?? "Sin responsable"}</span><span className="shrink-0 text-muted-foreground">{event.effective_date ? displayDate(event.effective_date) : "Fecha no informada"}</span></div>
+      <div className="mt-0.5 truncate text-[10px] text-muted-foreground" title={`${event.recorded_by_name} · ${displayDateTime(event.recorded_at)}`}>{event.recorded_by_name} · {displayDateTime(event.recorded_at)}</div>
+    </article>)}</div>
+    <div className="hidden overflow-hidden rounded-lg border sm:block">
+      <Table className="table-fixed">
+        <colgroup><col className="w-[22%]" /><col className="w-[30%]" /><col className="w-[24%]" /><col className="w-[24%]" /></colgroup>
+        <TableHeader><TableRow><TableHead>Vigente desde</TableHead><TableHead>Responsable</TableHead><TableHead>Registrado por</TableHead><TableHead>Registro</TableHead></TableRow></TableHeader>
+        <TableBody>{rows.map((event) => <TableRow key={event.id} className="h-10">
+          <TableCell className="h-10 whitespace-nowrap py-0 text-[11px]">{event.effective_date ? displayDate(event.effective_date) : "Fecha no informada"}</TableCell>
+          <TableCell className="h-10 truncate py-0 text-[11px] font-medium" title={event.responsible_name_snapshot ?? "Sin responsable"}>{event.responsible_name_snapshot ?? "Sin responsable"}</TableCell>
+          <TableCell className="h-10 truncate py-0 text-[11px] text-muted-foreground" title={event.recorded_by_name}>{event.recorded_by_name}</TableCell>
+          <TableCell className="h-10 whitespace-nowrap py-0 text-[11px] text-muted-foreground">{displayDateTime(event.recorded_at)}</TableCell>
+        </TableRow>)}</TableBody>
+      </Table>
+    </div>
+  </div>;
 }
 
 function CorrectionHistory({ rows }: { rows: FleetOdometerReading[] }) {
@@ -640,6 +746,49 @@ function VehicleDialog({ open, pending, today, onOpenChange, onSubmit }: {
       </div>
       {hasAnyReadingValue && !hasCompleteReading && <p role="alert" className="text-[11px] text-amber-700">Completá fecha y kilometraje, o dejá ambos vacíos.</p>}
       <DialogFooter><Button type="submit" disabled={!valid || pending}>{pending ? "Guardando…" : "Agregar"}</Button></DialogFooter>
+    </form></DialogContent>
+  </Dialog>;
+}
+
+function ResponsibilityDialog({ open, pending, today, current, candidates, onOpenChange, onSubmit }: {
+  open: boolean;
+  pending: boolean;
+  today: string;
+  current: FleetResponsibilityEvent | null;
+  candidates: FleetResponsibleCandidate[];
+  onOpenChange: (open: boolean) => void;
+  onSubmit: (values: { responsibleProfileId: string | null; effectiveDate: string }) => Promise<void>;
+}) {
+  const [responsibleId, setResponsibleId] = useState(UNASSIGNED_RESPONSIBLE);
+  const [effectiveDate, setEffectiveDate] = useState(today);
+  const options = useMemo(() => candidates.filter((candidate, index, rows) => rows.findIndex((row) => row.id === candidate.id) === index), [candidates]);
+  useEffect(() => {
+    if (!open) return;
+    setResponsibleId(current?.responsible_profile_id ?? UNASSIGNED_RESPONSIBLE);
+    setEffectiveDate(today);
+  }, [current, open, today]);
+  const submit = (event: FormEvent) => {
+    event.preventDefault();
+    if (!effectiveDate) return;
+    void onSubmit({
+      responsibleProfileId: responsibleId === UNASSIGNED_RESPONSIBLE ? null : responsibleId,
+      effectiveDate,
+    });
+  };
+  return <Dialog open={open} onOpenChange={onOpenChange}>
+    <DialogContent className="sm:max-w-sm"><form onSubmit={submit} className="space-y-4">
+      <DialogHeader><DialogTitle>Cambiar responsable</DialogTitle></DialogHeader>
+      <Field label="Responsable" htmlFor="fleet-responsible">
+        <Select value={responsibleId} onValueChange={setResponsibleId}>
+          <SelectTrigger id="fleet-responsible"><SelectValue /></SelectTrigger>
+          <SelectContent>
+            <SelectItem value={UNASSIGNED_RESPONSIBLE}>Sin responsable</SelectItem>
+            {options.map((candidate) => <SelectItem key={candidate.id} value={candidate.id}>{candidate.nombre}{candidate.sucursal ? ` · ${candidate.sucursal}` : ""}</SelectItem>)}
+          </SelectContent>
+        </Select>
+      </Field>
+      <Field label="Fecha efectiva" htmlFor="fleet-responsible-date"><Input id="fleet-responsible-date" type="date" value={effectiveDate} onChange={(event) => setEffectiveDate(event.target.value)} /></Field>
+      <DialogFooter><Button type="submit" disabled={!effectiveDate || pending}>{pending ? "Guardando…" : "Guardar cambio"}</Button></DialogFooter>
     </form></DialogContent>
   </Dialog>;
 }
