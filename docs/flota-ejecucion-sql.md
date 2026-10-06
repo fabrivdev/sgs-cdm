@@ -7,6 +7,12 @@ El 06/10/2026 el usuario respondió `listo` después de recibir las dos migracio
 - `supabase/migrations/20261006132000_add_fleet_management.sql`
 - `supabase/migrations/20261006133000_seed_confirmed_fleet_vehicles.sql`
 
+## Corrección del seed de responsables
+
+La primera entrega de `20261006201000_add_fleet_responsibility_history.sql` podía abortar si Hugo Rodas o Ruben Monges no resolvían a un único perfil activo. El archivo corregido trata esas asignaciones como un seed opcional: solo crea la línea de base con fecha `NULL` cuando cuenta autora, chapa y perfil activo son únicos. Con cero o varios candidatos, perfil inactivo o fuente ambigua, omite la asignación y el usuario puede elegir el responsable en la app. No crea ni modifica identidades.
+
+No se presupone que el intento fallido haya revertido todo. El archivo completo es idempotente para una instalación ausente, parcial o ya ejecutada: conserva `BEGIN`/`COMMIT`, usa DDL repetible y evita duplicar la línea de base con `ON CONFLICT DO NOTHING`.
+
 La declaración del usuario no equivale a una verificación autenticada de producción. La migración de esquema no copia ni concede accesos. Las escrituras normales permanecen detrás de RPC con `auth.uid()` y `has_section_access`. El seed administrativo busca exactamente `fabrizio.vega@cdm.com.py` y no registra lecturas iniciales.
 
 Todo cambio posterior de esquema o datos debe usar una migración incremental nueva; no editar ni reejecutar estas migraciones históricas.

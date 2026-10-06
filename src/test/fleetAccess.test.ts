@@ -54,7 +54,7 @@ describe("fleet security and integration contract", () => {
   });
 
   it("keeps responsibility history append-only behind authenticated RPCs", () => {
-    expect(responsibilityMigration).toContain("CREATE TABLE public.fleet_vehicle_responsibility_events");
+    expect(responsibilityMigration).toContain("CREATE TABLE IF NOT EXISTS public.fleet_vehicle_responsibility_events");
     expect(responsibilityMigration).toContain("FOR SELECT TO authenticated");
     expect(responsibilityMigration).toContain("REVOKE INSERT, UPDATE, DELETE ON public.fleet_vehicle_responsibility_events FROM authenticated");
     expect(responsibilityMigration).toContain("v_user_id uuid := public.fleet_assert_write_access()");
@@ -75,5 +75,8 @@ describe("fleet security and integration contract", () => {
     expect(responsibilityMigration).toContain("('AAXR336'::text, 'Ruben Monges'::text)");
     expect(responsibilityMigration).toMatch(/v_seed\.responsible_name,[\s\S]{0,80}NULL,[\s\S]{0,80}v_actor_ids\[1\]/);
     expect(responsibilityMigration).toContain("coalesce(cardinality(v_profile_ids), 0) <> 1");
+    expect(responsibilityMigration).toContain("CONTINUE;");
+    expect(responsibilityMigration).toContain("ON CONFLICT (vehicle_id) WHERE effective_date IS NULL DO NOTHING");
+    expect(responsibilityMigration).not.toMatch(/RAISE EXCEPTION[^;]*(?:Hugo|Ruben|perfil activo|camioneta|fabrizio)/i);
   });
 });

@@ -1,5 +1,9 @@
 # Flota
 
+## Seed opcional de responsables
+
+La asignación inicial de Hugo Rodas y Ruben Monges nunca debe bloquear la instalación. Solo se agrega una línea de base con fecha `NULL` si cuenta autora, chapa y perfil activo resuelven de forma única. Con cero o varios perfiles coincidentes, perfil inactivo o cualquier fuente ambigua, el vehículo queda sin responsable para selección manual. El script incremental es idempotente, no crea identidades y puede reejecutarse sin duplicar baselines.
+
 ## Alcance local
 
 Flota es una sección de Servicios para registrar vehículos por marca y chapa. La chapa se normaliza para impedir duplicados aunque cambien espacios o guiones. La lectura inicial fechada se agrega si está disponible; también puede quedar pendiente, sin inventar fecha ni `0 km`. Las lecturas posteriores conservan fecha, odómetro y autor.

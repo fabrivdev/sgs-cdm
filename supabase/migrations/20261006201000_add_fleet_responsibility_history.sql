@@ -2,7 +2,7 @@
 -- las migraciones ya aplicadas, usuarios, OS ni facturación.
 BEGIN;
 
-CREATE TABLE public.fleet_vehicle_responsibility_events (
+CREATE TABLE IF NOT EXISTS public.fleet_vehicle_responsibility_events (
   id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
   vehicle_id uuid NOT NULL REFERENCES public.fleet_vehicles(id) ON DELETE RESTRICT,
   responsible_profile_id uuid NULL REFERENCES public.profiles(id) ON DELETE SET NULL,
@@ -17,11 +17,11 @@ CREATE TABLE public.fleet_vehicle_responsibility_events (
   )
 );
 
-CREATE UNIQUE INDEX fleet_responsibility_one_baseline_idx
+CREATE UNIQUE INDEX IF NOT EXISTS fleet_responsibility_one_baseline_idx
   ON public.fleet_vehicle_responsibility_events (vehicle_id)
   WHERE effective_date IS NULL;
 
-CREATE INDEX fleet_responsibility_timeline_idx
+CREATE INDEX IF NOT EXISTS fleet_responsibility_timeline_idx
   ON public.fleet_vehicle_responsibility_events (
     vehicle_id,
     effective_date DESC NULLS LAST,
@@ -30,6 +30,9 @@ CREATE INDEX fleet_responsibility_timeline_idx
   );
 
 ALTER TABLE public.fleet_vehicle_responsibility_events ENABLE ROW LEVEL SECURITY;
+
+DROP POLICY IF EXISTS "Authenticated users read fleet responsibilities"
+ON public.fleet_vehicle_responsibility_events;
 
 CREATE POLICY "Authenticated users read fleet responsibilities"
 ON public.fleet_vehicle_responsibility_events FOR SELECT TO authenticated
@@ -138,10 +141,11 @@ REVOKE ALL ON FUNCTION public.fleet_set_vehicle_responsible(uuid, uuid, date) FR
 GRANT EXECUTE ON FUNCTION public.fleet_list_responsible_candidates() TO authenticated;
 GRANT EXECUTE ON FUNCTION public.fleet_set_vehicle_responsible(uuid, uuid, date) TO authenticated;
 
--- Las dos fichas fuente que sí identificaban responsable no informaban fecha
--- de inicio. Se guardan como línea de base sin inventar una fecha. La
--- migración se detiene si chapa, cuenta autora o perfil no resuelven de forma
--- única; nunca crea usuarios ni elige entre homónimos.
+-- Las fichas fuente identificaban estos dos responsables pero no una fecha de
+-- inicio. El seed opcional agrega una línea de base con fecha NULL solamente
+-- cuando cuenta autora, chapa y perfil activo resuelven de forma única. Si
+-- alguna fuente falta o es ambigua, deja el vehículo sin responsable para que
+-- el usuario lo elija en la app. Nunca crea identidades ni bloquea el esquema.
 DO $$
 DECLARE
   v_actor_ids uuid[];
@@ -155,7 +159,7 @@ BEGIN
   WHERE lower(coalesce(u.email, '')) = 'fabrizio.vega@cdm.com.py';
 
   IF coalesce(cardinality(v_actor_ids), 0) <> 1 THEN
-    RAISE EXCEPTION 'Se requiere exactamente la cuenta fabrizio.vega@cdm.com.py.';
+    RETURN;
   END IF;
 
   FOR v_seed IN
@@ -169,10 +173,6 @@ BEGIN
     FROM public.fleet_vehicles v
     WHERE v.plate_normalized = v_seed.plate_normalized;
 
-    IF coalesce(cardinality(v_vehicle_ids), 0) <> 1 THEN
-      RAISE EXCEPTION 'No se encontró una única camioneta con chapa %.', v_seed.plate_normalized;
-    END IF;
-
     SELECT array_agg(p.id ORDER BY p.id)
     INTO v_profile_ids
     FROM public.profiles p
@@ -184,8 +184,9 @@ BEGIN
         OR EXISTS (SELECT 1 FROM auth.users u WHERE u.id = p.id)
       );
 
-    IF coalesce(cardinality(v_profile_ids), 0) <> 1 THEN
-      RAISE EXCEPTION 'No se encontró un único perfil activo para %.', v_seed.responsible_name;
+    IF coalesce(cardinality(v_vehicle_ids), 0) <> 1
+       OR coalesce(cardinality(v_profile_ids), 0) <> 1 THEN
+      CONTINUE;
     END IF;
 
     INSERT INTO public.fleet_vehicle_responsibility_events (
@@ -195,20 +196,15 @@ BEGIN
       effective_date,
       recorded_by,
       recorded_by_name
-    )
-    SELECT
+    ) VALUES (
       v_vehicle_ids[1],
       v_profile_ids[1],
       v_seed.responsible_name,
       NULL,
       v_actor_ids[1],
       public.fleet_actor_name(v_actor_ids[1])
-    WHERE NOT EXISTS (
-      SELECT 1
-      FROM public.fleet_vehicle_responsibility_events e
-      WHERE e.vehicle_id = v_vehicle_ids[1]
-        AND e.effective_date IS NULL
-    );
+    )
+    ON CONFLICT (vehicle_id) WHERE effective_date IS NULL DO NOTHING;
   END LOOP;
 END;
 $$;
