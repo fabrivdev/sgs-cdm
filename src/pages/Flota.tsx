@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState, type FormEvent, type ReactNode } from "react";
+import { useEffect, useMemo, useRef, useState, type FormEvent, type ReactNode } from "react";
 import { AlertTriangle, ArrowLeft, CalendarClock, CarFront, Gauge, PencilLine, Plus, RotateCcw, UserRoundPen } from "lucide-react";
 import { toast } from "sonner";
 import { PageHeader, PageShell, Panel } from "@/components/layout/AppPrimitives";
@@ -9,6 +9,7 @@ import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { ResponsiveDrawer, ResponsiveDrawerBody, ResponsiveDrawerFooter, ResponsiveDrawerHeader } from "@/components/ui/responsive-drawer";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { fleetErrorMessage } from "@/features/fleet/api";
@@ -206,12 +207,12 @@ export default function Flota({ previewData }: { previewData?: FleetPreviewSnaps
     toast.success("Datos DEMO restablecidos");
   };
 
-  const handleCreateVehicle = async (values: { brand: string; model: string | null; plate: string; readingDate: string | null; odometerKm: number | null }) => {
+  const handleCreateVehicle = async (values: { brand: string; model: string | null; plate: string; readingDate: string | null; odometerKm: number | null }): Promise<boolean> => {
     if (previewData) {
       const plateNormalized = normalizePlate(values.plate);
       if (vehicles.some((vehicle) => vehicle.plate_normalized === plateNormalized)) {
         toast.error("Ya existe un vehículo con esa chapa.");
-        return;
+        return false;
       }
       const vehicleId = crypto.randomUUID();
       const now = new Date().toISOString();
@@ -252,7 +253,7 @@ export default function Flota({ previewData }: { previewData?: FleetPreviewSnaps
       setSelectedVehicleId(vehicleId);
       setVehicleDialogOpen(false);
       toast.success("Vehículo agregado a la simulación");
-      return;
+      return true;
     }
     try {
       const vehicleId = await createVehicle.mutateAsync({
@@ -265,13 +266,15 @@ export default function Flota({ previewData }: { previewData?: FleetPreviewSnaps
       setSelectedVehicleId(vehicleId);
       setVehicleDialogOpen(false);
       toast.success("Vehículo agregado");
+      return true;
     } catch (error) {
       toast.error(fleetErrorMessage(error));
+      return false;
     }
   };
 
-  const handleAddReading = async (values: { readingDate: string; odometerKm: number }) => {
-    if (!selectedVehicle) return;
+  const handleAddReading = async (values: { readingDate: string; odometerKm: number }): Promise<boolean> => {
+    if (!selectedVehicle) return false;
     if (previewData) {
       setPreviewSnapshot((current) => current ? {
         ...current,
@@ -293,14 +296,16 @@ export default function Flota({ previewData }: { previewData?: FleetPreviewSnaps
       } : current);
       setReadingDialogOpen(false);
       toast.success("Lectura agregada a la simulación");
-      return;
+      return true;
     }
     try {
       await addReading.mutateAsync({ vehicleId: selectedVehicle.id, ...values });
       setReadingDialogOpen(false);
       toast.success("Lectura registrada");
+      return true;
     } catch (error) {
       toast.error(fleetErrorMessage(error));
+      return false;
     }
   };
 
@@ -703,51 +708,78 @@ function ReadingRow({ reading, onCorrect }: { reading: FleetPeriodReading; onCor
   </TableRow>;
 }
 
-function VehicleDialog({ open, pending, today, onOpenChange, onSubmit }: {
+export function VehicleDialog({ open, pending, today, onOpenChange, onSubmit }: {
   open: boolean;
   pending: boolean;
   today: string;
   onOpenChange: (open: boolean) => void;
-  onSubmit: (values: { brand: string; model: string | null; plate: string; readingDate: string | null; odometerKm: number | null }) => Promise<void>;
+  onSubmit: (values: { brand: string; model: string | null; plate: string; readingDate: string | null; odometerKm: number | null }) => Promise<boolean>;
 }) {
   const [brand, setBrand] = useState("");
   const [model, setModel] = useState("");
   const [plate, setPlate] = useState("");
   const [readingDate, setReadingDate] = useState("");
   const [odometer, setOdometer] = useState("");
-  useEffect(() => {
-    if (!open) return;
+  const [submitting, setSubmitting] = useState(false);
+  const submittingRef = useRef(false);
+  const reset = () => {
     setBrand(""); setModel(""); setPlate(""); setReadingDate(""); setOdometer("");
-  }, [open, today]);
+  };
+  const busy = pending || submitting;
   const hasAnyReadingValue = Boolean(readingDate || odometer !== "");
   const hasCompleteReading = Boolean(readingDate && odometer !== "" && Number(odometer) >= 0);
   const valid = Boolean(brand.trim() && normalizePlate(plate).length >= 3 && (!hasAnyReadingValue || hasCompleteReading));
-  const submit = (event: FormEvent) => {
+  const submit = async (event: FormEvent) => {
     event.preventDefault();
-    if (!valid) return;
-    void onSubmit({
-      brand: brand.trim(),
-      model: model.trim() || null,
-      plate: plate.trim().toUpperCase(),
-      readingDate: hasCompleteReading ? readingDate : null,
-      odometerKm: hasCompleteReading ? Number(odometer) : null,
-    });
+    if (!valid || busy || submittingRef.current) return;
+    submittingRef.current = true;
+    setSubmitting(true);
+    try {
+      const saved = await onSubmit({
+        brand: brand.trim(),
+        model: model.trim() || null,
+        plate: plate.trim().toUpperCase(),
+        readingDate: hasCompleteReading ? readingDate : null,
+        odometerKm: hasCompleteReading ? Number(odometer) : null,
+      });
+      if (saved) reset();
+    } finally {
+      submittingRef.current = false;
+      setSubmitting(false);
+    }
   };
-  return <Dialog open={open} onOpenChange={onOpenChange}>
-    <DialogContent className="sm:max-w-md"><form onSubmit={submit} className="space-y-4">
-      <DialogHeader><DialogTitle>Nuevo vehículo</DialogTitle><DialogDescription>Marca y chapa son obligatorias. Modelo y lectura inicial son opcionales.</DialogDescription></DialogHeader>
-      <div className="grid gap-3 sm:grid-cols-2">
-        <Field label="Marca" htmlFor="fleet-brand"><Input id="fleet-brand" value={brand} onChange={(event) => setBrand(event.target.value)} autoComplete="off" /></Field>
+  const dismiss = (next: boolean) => {
+    if (busy) return;
+    onOpenChange(next);
+  };
+  const cancel = () => {
+    if (busy) return;
+    reset();
+    onOpenChange(false);
+  };
+  return <ResponsiveDrawer open={open} onOpenChange={dismiss} size="sm">
+    <ResponsiveDrawerHeader>
+      <h2 className="pr-8 text-[14px] font-semibold">Nuevo vehículo</h2>
+      <p className="mt-1 text-[12px] text-muted-foreground">Marca y chapa son obligatorias. Modelo y lectura inicial son opcionales.</p>
+    </ResponsiveDrawerHeader>
+    <ResponsiveDrawerBody>
+      <form id="fleet-vehicle-form" onSubmit={submit} className="space-y-4">
+      <fieldset disabled={busy} className="grid gap-3 sm:grid-cols-2">
+        <Field label="Marca" htmlFor="fleet-brand"><Input id="fleet-brand" value={brand} onChange={(event) => setBrand(event.target.value)} autoComplete="off" autoFocus /></Field>
         <Field label="Modelo" htmlFor="fleet-model"><Input id="fleet-model" value={model} onChange={(event) => setModel(event.target.value)} autoComplete="off" /></Field>
         <Field label="Chapa" htmlFor="fleet-plate"><Input id="fleet-plate" value={plate} onChange={(event) => setPlate(event.target.value.toUpperCase())} autoComplete="off" /></Field>
         <div className="sm:col-span-2 mt-1 text-[10px] font-semibold uppercase tracking-[0.08em] text-muted-foreground">Lectura inicial · opcional</div>
         <Field label="Fecha" htmlFor="fleet-initial-date"><Input id="fleet-initial-date" type="date" max={today} value={readingDate} onChange={(event) => setReadingDate(event.target.value)} /></Field>
         <Field label="Kilometraje" htmlFor="fleet-initial-km"><Input id="fleet-initial-km" type="number" min={0} step={1} value={odometer} onChange={(event) => setOdometer(event.target.value)} /></Field>
-      </div>
+      </fieldset>
       {hasAnyReadingValue && !hasCompleteReading && <p role="alert" className="text-[11px] text-amber-700">Completá fecha y kilometraje, o dejá ambos vacíos.</p>}
-      <DialogFooter><Button type="submit" disabled={!valid || pending}>{pending ? "Guardando…" : "Agregar"}</Button></DialogFooter>
-    </form></DialogContent>
-  </Dialog>;
+      </form>
+    </ResponsiveDrawerBody>
+    <ResponsiveDrawerFooter>
+      <Button type="button" variant="outline" onClick={cancel} disabled={busy}>Cancelar</Button>
+      <Button type="submit" form="fleet-vehicle-form" disabled={!valid || busy}>{busy ? "Guardando…" : "Agregar"}</Button>
+    </ResponsiveDrawerFooter>
+  </ResponsiveDrawer>;
 }
 
 function ResponsibilityDialog({ open, pending, today, current, candidates, onOpenChange, onSubmit }: {
@@ -793,40 +825,75 @@ function ResponsibilityDialog({ open, pending, today, current, candidates, onOpe
   </Dialog>;
 }
 
-function ReadingDialog({ open, pending, today, vehicle, readings, onOpenChange, onSubmit }: {
+export function ReadingDialog({ open, pending, today, vehicle, readings, onOpenChange, onSubmit }: {
   open: boolean;
   pending: boolean;
   today: string;
   vehicle: FleetVehicle | null;
   readings: FleetOdometerReading[];
   onOpenChange: (open: boolean) => void;
-  onSubmit: (values: { readingDate: string; odometerKm: number }) => Promise<void>;
+  onSubmit: (values: { readingDate: string; odometerKm: number }) => Promise<boolean>;
 }) {
   const [readingDate, setReadingDate] = useState(today);
   const [odometer, setOdometer] = useState("");
+  const [submitting, setSubmitting] = useState(false);
+  const submittingRef = useRef(false);
+  const vehicleIdRef = useRef(vehicle?.id ?? null);
+  const reset = () => { setReadingDate(today); setOdometer(""); };
   useEffect(() => {
-    if (!open) return;
-    setReadingDate(today); setOdometer("");
-  }, [open, today]);
+    const nextVehicleId = vehicle?.id ?? null;
+    if (vehicleIdRef.current === nextVehicleId) return;
+    vehicleIdRef.current = nextVehicleId;
+    setReadingDate(today);
+    setOdometer("");
+  }, [today, vehicle?.id]);
+  const busy = pending || submitting;
   const hasActiveReading = readings.some((reading) => reading.voided_at === null);
   const numericKm = Number(odometer);
   const issue = readingDate && odometer !== "" && Number.isFinite(numericKm)
     ? validateReading(readings, readingDate, numericKm)
     : null;
-  const submit = (event: FormEvent) => {
+  const submit = async (event: FormEvent) => {
     event.preventDefault();
-    if (!vehicle || issue || odometer === "" || numericKm < 0) return;
-    void onSubmit({ readingDate, odometerKm: numericKm });
+    if (!vehicle || issue || odometer === "" || numericKm < 0 || busy || submittingRef.current) return;
+    submittingRef.current = true;
+    setSubmitting(true);
+    try {
+      const saved = await onSubmit({ readingDate, odometerKm: numericKm });
+      if (saved) reset();
+    } finally {
+      submittingRef.current = false;
+      setSubmitting(false);
+    }
   };
-  return <Dialog open={open} onOpenChange={onOpenChange}>
-    <DialogContent className="sm:max-w-sm"><form onSubmit={submit} className="space-y-4">
-      <DialogHeader><DialogTitle>{hasActiveReading ? "Registrar lectura" : "Registrar lectura inicial"}</DialogTitle><DialogDescription>{vehicle ? `${vehicle.brand} · ${vehicle.plate}` : "Seleccioná un vehículo."}</DialogDescription></DialogHeader>
-      <Field label="Fecha" htmlFor="fleet-reading-date"><Input id="fleet-reading-date" type="date" max={today} value={readingDate} onChange={(event) => setReadingDate(event.target.value)} /></Field>
-      <Field label="Odómetro" htmlFor="fleet-reading-km"><Input id="fleet-reading-km" type="number" min={0} step={1} value={odometer} onChange={(event) => setOdometer(event.target.value)} /></Field>
-      {issue && <p role="alert" className="text-[12px] text-amber-700">{issue.message}</p>}
-      <DialogFooter><Button type="submit" disabled={!vehicle || Boolean(issue) || odometer === "" || pending}>{pending ? "Guardando…" : "Registrar"}</Button></DialogFooter>
-    </form></DialogContent>
-  </Dialog>;
+  const dismiss = (next: boolean) => {
+    if (busy) return;
+    onOpenChange(next);
+  };
+  const cancel = () => {
+    if (busy) return;
+    reset();
+    onOpenChange(false);
+  };
+  return <ResponsiveDrawer open={open} onOpenChange={dismiss} size="sm">
+    <ResponsiveDrawerHeader>
+      <h2 className="pr-8 text-[14px] font-semibold">{hasActiveReading ? "Registrar lectura" : "Registrar lectura inicial"}</h2>
+      <p className="mt-1 text-[12px] text-muted-foreground">{vehicle ? `${vehicle.brand} · ${vehicle.plate}` : "Seleccioná un vehículo."}</p>
+    </ResponsiveDrawerHeader>
+    <ResponsiveDrawerBody>
+      <form id="fleet-reading-form" onSubmit={submit} className="space-y-4">
+        <fieldset disabled={busy} className="space-y-4">
+          <Field label="Fecha" htmlFor="fleet-reading-date"><Input id="fleet-reading-date" type="date" max={today} value={readingDate} onChange={(event) => setReadingDate(event.target.value)} autoFocus /></Field>
+          <Field label="Odómetro" htmlFor="fleet-reading-km"><Input id="fleet-reading-km" type="number" min={0} step={1} value={odometer} onChange={(event) => setOdometer(event.target.value)} /></Field>
+        </fieldset>
+        {issue && <p role="alert" className="text-[12px] text-amber-700">{issue.message}</p>}
+      </form>
+    </ResponsiveDrawerBody>
+    <ResponsiveDrawerFooter>
+      <Button type="button" variant="outline" onClick={cancel} disabled={busy}>Cancelar</Button>
+      <Button type="submit" form="fleet-reading-form" disabled={!vehicle || Boolean(issue) || odometer === "" || busy}>{busy ? "Guardando…" : "Registrar"}</Button>
+    </ResponsiveDrawerFooter>
+  </ResponsiveDrawer>;
 }
 
 function CorrectionDialog({ reading, pending, today, readings, onOpenChange, onSubmit }: {
