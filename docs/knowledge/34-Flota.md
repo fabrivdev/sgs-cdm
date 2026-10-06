@@ -38,6 +38,8 @@ La UI incorpora cinco assets generados locales para las 15 unidades confirmadas,
 
 ## Presentación vigente
 
+En teléfono, el alta de vehículo reutiliza el patrón nativo de creación de Trabajos y Administración: botón `sm`, ancho táctil compacto de 44 px, icono `Plus` visible y texto oculto. No se fuerza altura adicional ni se muestra un botón ancho con `+ Nuevo`.
+
 La pantalla principal queda limitada a una lista de ancho completo y filtros. No muestra indicadores, paneles laterales, pestañas, gráficos ni comparaciones de facturación. Cada fila de escritorio/tablet ocupa una sola línea y separa Marca, Modelo, Chapa, Responsable, Último kilometraje, Fecha última lectura, Km del período y Estado; hacer clic en la fila abre el detalle sin una acción redundante. `Más filtros` contiene únicamente Marca, Modelo dependiente de la marca y Lecturas en el período (Todas/Con/Sin), además de los filtros primarios existentes.
 
 El detalle es compacto y contiene únicamente identidad, imagen cuando existe, responsable editable, último kilometraje, fecha de última lectura, kilómetros del período, cobertura, lecturas, correcciones e historial de responsables. Los contadores de Vehículos, Lecturas, Correcciones y Responsables comparten la fila del encabezado; no se presentan como subtítulo. Distinguir siempre el odómetro acumulado del recorrido del período. Una ausencia se muestra como `-` o `Sin intervalo`; no se convierte en cero. En teléfono se permite la agrupación compacta prevista por la regla transversal, sin convertir cada registro en una tarjeta grande.

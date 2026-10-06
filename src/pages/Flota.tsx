@@ -406,7 +406,7 @@ export default function Flota({ previewData }: { previewData?: FleetPreviewSnaps
       title="Flota"
       actions={selectedVehicle
         ? <Button size="sm" onClick={() => setReadingDialogOpen(true)}><Gauge className="h-4 w-4" /> Registrar lectura</Button>
-        : <Button size="sm" aria-label="Nuevo vehículo" className="h-11 px-3 sm:h-9" onClick={() => setVehicleDialogOpen(true)}><Plus className="hidden h-4 w-4 sm:block" /><span className="sm:hidden">+ Nuevo</span><span className="hidden sm:inline">Nuevo vehículo</span></Button>}
+        : <Button size="sm" aria-label="Nuevo vehículo" className="max-sm:w-11 max-sm:px-0" onClick={() => setVehicleDialogOpen(true)}><Plus className="h-4 w-4 sm:mr-1.5" /><span className="hidden sm:inline">Nuevo vehículo</span></Button>}
     />
 
     {previewData && <div className="flex min-h-10 flex-wrap items-center gap-2 rounded-xl border border-sky-200 bg-sky-50/70 px-3 py-2 text-[12px] text-sky-950">
