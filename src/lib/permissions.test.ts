@@ -21,6 +21,11 @@ describe("matriz de permisos", () => {
     expect(firstAccessibleRoute(["parque"], ["jefatura"], false, ["parque.importaciones"])).toBe("/parque-importaciones");
   });
 
+  it("registra Flota como sección propia de Servicios", () => {
+    expect(SECTION_ROUTES).toContainEqual({ id: "servicios.flota", module: "servicios", route: "/servicios/flota" });
+    expect(firstAccessibleRoute(["servicios"], ["jefatura"], false, ["servicios.flota"])).toBe("/servicios/flota");
+  });
+
   it("no publica las vistas retiradas como secciones funcionales", () => {
     const sectionIds = SECTION_ROUTES.map((section) => section.id);
     expect(sectionIds).not.toContain("servicios.agenda");

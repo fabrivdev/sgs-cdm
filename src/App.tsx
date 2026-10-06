@@ -16,6 +16,8 @@ const Auth = lazy(() => import("./pages/Auth"));
 const Planificador = lazy(() => import("./pages/Planificador"));
 const Calendario = lazy(() => import("./pages/Calendario"));
 const OrdenesServicio = lazy(() => import("./pages/OrdenesServicio"));
+const Flota = lazy(() => import("./pages/Flota"));
+const FlotaPreview = import.meta.env.DEV ? lazy(() => import("./pages/FlotaPreview")) : null;
 const Ventas = lazy(() => import("./pages/Ventas"));
 const Comisiones = lazy(() => import("./pages/Comisiones"));
 const ParqueClientes = lazy(() => import("./pages/ParqueClientes"));
@@ -49,6 +51,7 @@ const App = () => (
             <Suspense fallback={<LoadingScreen />}>
             <Routes>
               <Route path="/auth" element={<Auth />} />
+              {FlotaPreview && <Route path="/preview/flota" element={<FlotaPreview />} />}
               <Route
                 element={
                   <ProtectedRoute>
@@ -69,6 +72,10 @@ const App = () => (
                       <OrdenesServicio />
                     </ProtectedRoute>
                   }
+                />
+                <Route
+                  path="/servicios/flota"
+                  element={<ProtectedRoute requireModulo="servicios" requireSection="servicios.flota"><Flota /></ProtectedRoute>}
                 />
                 <Route
                   path="/dashboard"

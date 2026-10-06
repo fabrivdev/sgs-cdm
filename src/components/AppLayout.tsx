@@ -19,6 +19,7 @@ import {
   ClipboardList,
   Ship,
   BadgeDollarSign,
+  CarFront,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
@@ -77,6 +78,7 @@ const navGroups: NavGroup[] = [
       { to: "/trabajos", label: "Trabajos", icon: Wrench, section: "servicios.trabajos" },
       { to: "/calendario", label: "Calendario", icon: CalendarDays, section: "servicios.calendario" },
       { to: "/servicios/ordenes", label: "Órdenes de servicio", icon: ListChecks, section: "servicios.ordenes", managementOnly: true },
+      { to: "/servicios/flota", label: "Flota", icon: CarFront, section: "servicios.flota" },
       { to: "/comisiones", label: "Comisiones", icon: HandCoins, section: "servicios.comisiones", adminOnly: true },
     ],
   },
@@ -181,7 +183,7 @@ function ModuloNavGroup({
   );
 }
 
-export function AppLayout({ children }: { children?: React.ReactNode }) {
+export function AppLayout({ children, preview }: { children?: React.ReactNode; preview?: { modulo: string; profileName: string; levelLabel: string } }) {
   const { profile, isAdmin, hasModuloAccess, hasSectionAccess, can, signOut, roles, moduloAccess } = useAuth();
   const unseen = useUnseen();
   const location = useLocation();
@@ -190,10 +192,10 @@ export function AppLayout({ children }: { children?: React.ReactNode }) {
   // Un grupo solo aparece si el usuario tiene acceso a ese modulo; las vistas
   // ejecutivas exigen ademas la capacidad correspondiente.
   const visibleGroups = navGroups
-    .filter((group) => hasModuloAccess(group.modulo))
+    .filter((group) => preview ? group.modulo === preview.modulo : hasModuloAccess(group.modulo))
     .map((group) => ({
       ...group,
-      items: group.items.filter((it) => hasSectionAccess(it.section) && !(it.managementOnly && !can("servicios:analizar")) && !(it.adminOnly && !isAdmin)),
+      items: preview ? group.items : group.items.filter((it) => hasSectionAccess(it.section) && !(it.managementOnly && !can("servicios:analizar")) && !(it.adminOnly && !isAdmin)),
     }))
     .filter((group) => group.items.length > 0);
 
@@ -211,7 +213,8 @@ export function AppLayout({ children }: { children?: React.ReactNode }) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [location.pathname]);
 
-  const initials = (profile?.nombre ?? "?")
+  const profileName = preview?.profileName ?? profile?.nombre ?? "-";
+  const initials = profileName
     .split(" ")
     .map((p) => p[0])
     .filter(Boolean)
@@ -219,7 +222,7 @@ export function AppLayout({ children }: { children?: React.ReactNode }) {
     .join("")
     .toUpperCase();
 
-  const nivelActual = nivelLabel(roles[0], moduloAccess);
+  const nivelActual = preview?.levelLabel ?? nivelLabel(roles[0], moduloAccess);
 
   // El sidebar de escritorio se despliega solo al acercar el puntero (o el
   // foco de teclado) y se retrae al salir. No hay boton de colapsar.
@@ -308,7 +311,7 @@ export function AppLayout({ children }: { children?: React.ReactNode }) {
                     {initials}
                   </div>
                   <div className="hidden flex-col items-start text-left leading-tight md:flex">
-                    <span className="text-[12px] font-medium">{profile?.nombre ?? "—"}</span>
+                    <span className="text-[12px] font-medium">{profileName}</span>
                     <span className="text-[10px] text-muted-foreground">
                       {nivelActual}
                       {profile?.sucursal ? ` · ${profile.sucursal}` : ""}
@@ -319,7 +322,7 @@ export function AppLayout({ children }: { children?: React.ReactNode }) {
               <DropdownMenuContent align="end" className="w-56">
                 <DropdownMenuLabel>
                   <div className="flex flex-col">
-                    <span className="text-[13px] font-medium">{profile?.nombre ?? "—"}</span>
+                    <span className="text-[13px] font-medium">{profileName}</span>
                     <span className="text-[11px] font-normal text-muted-foreground">
                       {nivelActual}
                       {profile?.sucursal ? ` · ${profile.sucursal}` : ""}
@@ -333,7 +336,7 @@ export function AppLayout({ children }: { children?: React.ReactNode }) {
                     Administración
                   </DropdownMenuItem>
                 )}
-                <DropdownMenuItem onClick={signOut}>
+                <DropdownMenuItem onClick={preview ? undefined : signOut}>
                   <LogOut className="mr-2 h-4 w-4" />
                   Cerrar sesión
                 </DropdownMenuItem>

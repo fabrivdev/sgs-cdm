@@ -1,0 +1,30 @@
+{
+  "status": "user_reported_applied_read_only_verification_pending",
+  "actor": "Fabrizio",
+  "actorEmail": "fabrizio.vega@cdm.com.py",
+  "decisionLog": [
+    "El usuario indicó hacer caso al identificador para los dos conflictos de chapa.",
+    "Se eligieron AAXR-334 y AAXR-336; se descartaron AASB-691 e IPG-474.",
+    "No se convierte 0 ni el indicio 120 sin fecha en una lectura inicial."
+  ],
+  "schemaNote": "El catálogo persiste marca, modelo, año y chapa. Los campos de imagen quedan nulos hasta recibir URL, fuente y licencia verificadas.",
+  "imageStatus": "verified_ui_references_cover_all_15_by_family_and_body_database_fields_remain_null",
+  "confirmed": [
+    { "brand": "MAXUS", "plate": "AANS-673", "model": "T60 CONFORT 4X4", "year": 2023, "initialReadingDate": null, "initialOdometerKm": null },
+    { "brand": "MAXUS", "plate": "AANS-680", "model": "T60 CONFORT 4X4", "year": 2023, "initialReadingDate": null, "initialOdometerKm": null },
+    { "brand": "ISUZU", "plate": "AAXR-323", "model": "D-MAX", "year": 2025, "initialReadingDate": null, "initialOdometerKm": null },
+    { "brand": "ISUZU", "plate": "AAMY-981", "model": "D-MAX", "year": 2023, "initialReadingDate": null, "initialOdometerKm": null },
+    { "brand": "ISUZU", "plate": "AAXR-306", "model": "D-MAX", "year": 2025, "initialReadingDate": null, "initialOdometerKm": null },
+    { "brand": "MITSUBISHI", "plate": "AASJ-681", "model": "L200 TRITON SPORT GL 4X4", "year": 2023, "initialReadingDate": null, "initialOdometerKm": null, "sourceOdometerHintKm": 120, "sourceOdometerHintUsed": false },
+    { "brand": "ISUZU", "plate": "AAXR-327", "model": "D-MAX", "year": 2025, "initialReadingDate": null, "initialOdometerKm": null },
+    { "brand": "ISUZU", "plate": "AAXR-308", "model": "D-MAX", "year": 2025, "initialReadingDate": null, "initialOdometerKm": null },
+    { "brand": "ISUZU", "plate": "AAXR-333", "model": "D-MAX", "year": 2026, "initialReadingDate": null, "initialOdometerKm": null },
+    { "brand": "ISUZU", "plate": "AAON-294", "model": "D-MAX 4X4 C/S", "year": 2023, "initialReadingDate": null, "initialOdometerKm": null },
+    { "brand": "ISUZU", "plate": "AAMY-984", "model": "D-MAX", "year": 2023, "initialReadingDate": null, "initialOdometerKm": null },
+    { "brand": "ISUZU", "plate": "AAXR-325", "model": "D-MAX", "year": 2025, "initialReadingDate": null, "initialOdometerKm": null, "normalizationNote": "La fuente decía ISUZU D-MAX." },
+    { "brand": "ISUZU", "plate": "AAXR-330", "model": "D-MAX", "year": 2026, "initialReadingDate": null, "initialOdometerKm": null },
+    { "brand": "ISUZU", "plate": "AAXR-334", "model": "D-MAX", "year": 2025, "responsible": "Hugo Rodas", "initialReadingDate": null, "initialOdometerKm": null },
+    { "brand": "ISUZU", "plate": "AAXR-336", "model": "D-MAX", "year": 2026, "responsible": "Ruben Monges", "initialReadingDate": null, "initialOdometerKm": null }
+  ],
+  "rejectedPlateCandidates": ["AASB-691", "IPG-474"]
+}

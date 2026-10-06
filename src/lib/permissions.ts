@@ -6,6 +6,7 @@ export const SECTION_ROUTES = [
   { id: "servicios.trabajos", module: "servicios", route: "/trabajos" },
   { id: "servicios.calendario", module: "servicios", route: "/calendario" },
   { id: "servicios.ordenes", module: "servicios", route: "/servicios/ordenes" },
+  { id: "servicios.flota", module: "servicios", route: "/servicios/flota" },
   { id: "servicios.comisiones", module: "servicios", route: "/comisiones" },
   { id: "parque.ventas", module: "parque", route: "/parque-ventas" },
   { id: "parque.clientes", module: "parque", route: "/parque-clientes" },
