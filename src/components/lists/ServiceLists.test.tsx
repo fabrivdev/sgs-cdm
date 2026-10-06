@@ -2,6 +2,7 @@ import { act, cleanup, fireEvent, render, screen, waitFor, within } from "@testi
 import { MemoryRouter } from "react-router-dom";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import Planificador from "@/pages/Planificador";
+import Trabajos from "@/pages/Trabajos";
 import { TrabajosOSTab } from "@/components/trabajos/TrabajosOSTab";
 
 const mocks=vi.hoisted(()=>({tables:{} as Record<string,Record<string,unknown>[]>,errorTable:"",can:vi.fn(),detail:vi.fn(),work:vi.fn(),update:vi.fn(),setFilters:vi.fn(),clearFilters:vi.fn(),sheet:vi.fn((rows:unknown[][])=>({rows})),json:vi.fn((rows:Record<string,unknown>[])=>({rows})),write:vi.fn()}));
@@ -13,6 +14,7 @@ vi.mock("@/contexts/AssistantPageContext",()=>({useAssistantPageContext:()=>({se
 vi.mock("@/components/ServicioFormDialog",()=>({ServicioFormDialog:()=>null}));
 vi.mock("@/components/ServicioDetalleDialog",()=>({ServicioDetalleDialog:(props:unknown)=>{mocks.detail(props);return null;}}));
 vi.mock("@/components/trabajos/ProgramarIntervencionDialog",()=>({ProgramarIntervencionDialog:()=>null}));
+vi.mock("@/components/trabajos/NuevoTrabajoDialog",()=>({NuevoTrabajoDialog:()=>null}));
 vi.mock("@/components/trabajos/TrabajoDetalleDrawer",()=>({TrabajoDetalleDrawer:(props:unknown)=>{mocks.work(props);return null;}}));
 vi.mock("@/integrations/supabase/client",()=>({supabase:{from:(table:string)=>{
   const result=()=>({data:mocks.tables[table]??[],error:table===mocks.errorTable?{message:"Fixture read error"}:null});
@@ -29,11 +31,12 @@ beforeEach(()=>{
   mocks.tables={servicios:[service],profiles:[{id:"T1",nombre:"TÉCNICO UNO",sucursal:"Santa Rita"},{id:"T2",nombre:"TÉCNICO DOS",sucursal:"Katuete"}],clientes:[client],servicio_jornadas:[
     {id:"J1",servicio_id:"S1",fecha:"2026-09-18",estado:"Completado",horas_trabajadas:2.5,observaciones:"OBSERVACIÓN ORIGINAL",tecnico_responsable_id:"T1",auxiliares:[]},
     {id:"J2",servicio_id:"S1",fecha:"2026-09-18",estado:"Completado",horas_trabajadas:0,observaciones:null,tecnico_responsable_id:"T1",auxiliares:[]},
-  ],trabajos:[{id:"W1",codigo:"TR0001",os_numero:order.os_numero,sucursal:"Santa Rita",cliente_id:"C1",descripcion_problema:service.trabajo_descripcion,legacy_servicio_id:"S1"}],ordenes_servicio_importadas:[order]};
+  ],trabajos:[{id:"W1",codigo:"TR0001",os_numero:order.os_numero,sucursal:"Santa Rita",cliente_id:"C1",descripcion_problema:service.trabajo_descripcion,legacy_servicio_id:"S1",prioridad:"media",estado_general:"pendiente"}],ordenes_servicio_importadas:[order]};
 });
 afterEach(()=>{cleanup();vi.unstubAllGlobals();});
 const plan=()=>render(<MemoryRouter initialEntries={["/planificador?semana=all"]}><Planificador/></MemoryRouter>);
 const orders=()=>render(<TrabajosOSTab clientes={[client]} profiles={[]}/>);
+const workPage=()=>render(<MemoryRouter initialEntries={["/trabajos"]}><Trabajos/></MemoryRouter>);
 async function exportRows(label:string){
   const menu=screen.getByRole("button",{name:"Acciones de la sección"});
   expect(screen.getByRole("button",{name:/Más filtros/}).nextElementSibling).toContainElement(menu);
@@ -41,6 +44,18 @@ async function exportRows(label:string){
   await waitFor(()=>expect(mocks.write).toHaveBeenCalled());
 }
 describe("compact operational services lists",()=>{
+  it.each([320,390,639])("uses neutral native row boundaries and clear interaction feedback in Trabajos at %i px",async width=>{
+    viewport.width=width;
+    workPage();
+    const row=await screen.findByRole("button",{name:/OS-01-00000001/});
+    expect(row.parentElement).toHaveClass("max-sm:divide-y","max-sm:divide-border");
+    expect(row).toHaveClass("max-sm:!border-border","max-sm:!bg-transparent","max-sm:px-2","max-sm:py-2","max-sm:hover:!bg-muted/60","max-sm:focus-visible:!bg-muted/60","max-sm:active:!bg-muted");
+    expect(row).toHaveTextContent("Media");
+    expect(row).toHaveTextContent(client.nombre);
+    expect(row).toHaveTextContent(service.trabajo_descripcion);
+    fireEvent.click(row);
+    await waitFor(()=>expect(mocks.work.mock.calls.at(-1)?.[0]).toMatchObject({trabajoId:"W1"}));
+  });
   it.each([320, 390, 639])("uses a phone agenda without hours or total at %i px and opens the exact journey", async width => {
     viewport.width = width;
     plan();

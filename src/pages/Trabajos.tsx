@@ -242,7 +242,7 @@ export default function Trabajos() {
                     <Badge variant="secondary" className="h-5 px-1.5 text-[10px]">{items.length}</Badge>
                   </div>
 
-                  <div className="space-y-1.5 max-sm:space-y-0 max-sm:divide-y">
+                  <div className="space-y-1.5 max-sm:space-y-0 max-sm:divide-y max-sm:divide-border">
                     {items.length === 0 && (
                       <p className="text-[11px] text-muted-foreground/70 text-center py-4">{isPhone ? "No hay trabajos en este estado." : "-"}</p>
                     )}
@@ -276,7 +276,7 @@ export default function Trabajos() {
                           key={t.id}
                           onClick={() => setDetalleId(t.id)}
                           className={cn(
-                            "w-full rounded-md border bg-card px-2 py-1.5 text-left transition-[border-color,background-color] hover:border-primary/40 hover:bg-accent/25 max-sm:rounded-none max-sm:border-0 max-sm:bg-transparent max-sm:px-0 max-sm:py-3",
+                            "w-full rounded-md border bg-card px-2 py-1.5 text-left transition-colors hover:border-primary/40 hover:bg-accent/25 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring max-sm:rounded-none max-sm:border-0 max-sm:!border-border max-sm:!bg-transparent max-sm:px-2 max-sm:py-2 max-sm:hover:!bg-muted/60 max-sm:focus-visible:!bg-muted/60 max-sm:active:!bg-muted",
                             col.color,
                           )}
                         >

@@ -2,6 +2,12 @@
 
 Implementación local revisada el 24/09/2026. Complementa [[24-Condiciones-visuales-ventas]]; no certifica producción ni la revisión de cada ruta.
 
+## Límites de filas en Trabajos — 06/10/2026
+
+Bajo 640 px, las filas planas de `src/pages/Trabajos.tsx` usan separadores neutrales de 1 px a todo el ancho y el mismo padding vertical `py-2` de la tabla nativa. El color del estado no tiñe el fondo ni el divisor móvil; permanece en la prioridad y en el tablero de tablet/escritorio. Hover, foco visible y presión ofrecen un fondo neutral perceptible sin convertir las filas en cards.
+
+Se conservan la agrupación TR/prioridad, cliente y descripción de hasta dos líneas, incluida la altura variable cuando el texto envuelve. No cambian estados, filtros, cálculos, orden, callbacks, permisos ni detalle. La comprobación es de componente/código con datos sintéticos en 320/390/639 px y referencia de captura a 571 px; no acredita navegador, dispositivo físico o producción.
+
 ## Apertura directa de detalles en Parque y Planificador - 01/10/2026
 
 En `src/components/parque/ParqueTab.tsx`, el nombre del cliente abre directamente el `ClientePanel` existente; en `src/pages/Planificador.tsx`, la descripción de la jornada abre directamente `ServicioDetalleDialog`. Se retiró únicamente el popover informativo intermedio y sus botones “Ver cliente”/“Ver jornada”. El clic de la fila conserva el mismo destino, los objetivos principales siguen siendo botones nativos accesibles por teclado y detienen la propagación para evitar una doble apertura. El enlace telefónico, orden, filtros, selección, exportación, identidad de cliente/jornada, permisos y agenda móvil no cambian. Estos listados no implementan arrastre, por lo que no se agregó un gesto alternativo ni lógica de drag/drop.
