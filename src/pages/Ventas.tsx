@@ -426,7 +426,7 @@ function VentasContent({ area }: { area: VentasArea }) {
     : { marcas: [...new Set(machineOptions.map(option => option.marca))].sort(), tipos: [...new Set(machineOptions.map(option => option.tipo_maquina))].sort() };
   return (
     <SalesSectionExportsProvider><PageShell className="sales-workspace">
-      <PageHeader className="sales-page-header" title={copy.title} actions={mobile.active ? <SalesSectionExportMenu /> : undefined} meta={mobile.active ? <SalesMobileRange desde={desde} hasta={hasta} /> : undefined} />
+      <PageHeader className="sales-page-header" title={copy.title} actions={mobile.active ? <SalesSectionExportMenu /> : undefined} meta={mobile.active && area !== "servicios" ? <SalesMobileRange desde={desde} hasta={hasta} /> : undefined} />
       <FiltersBar className="sales-toolbar" secondaryActions={mobile.active ? undefined : <SalesSectionExportMenu />} search={{ value: buscar, onChange: setBuscar, placeholder: copy.search }} activeCount={activeFilters} onClear={() => { setBuscar(""); setSucursal("TODAS"); setTipoTiempo("TODOS"); setMarca(""); setTipoMaquina(""); setPartsBrand(""); setPartsSeller(""); setServiceFilters({}); setServiceFiltersReset(value=>value+1); }} expanded={<>
         {area === "servicios" && <>
           <FilterSelect label="Tipo de tiempo" value={tipoTiempo} onChange={setTipoTiempo} placeholder="Todos" width="w-full" options={[{ value: "TODOS", label: "Todos" }, { value: "Cliente", label: "Cliente" }, { value: "Garantia", label: "Garantía" }, { value: "Interno", label: "Interno" }, { value: "No informado", label: "No informado" }]} />

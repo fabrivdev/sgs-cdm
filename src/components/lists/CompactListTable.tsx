@@ -24,16 +24,16 @@ const visibility = {
 const axis = (align?: SalesColumn<unknown>["align"]) => align === "center" ? "text-center" : align === "right" ? "text-right" : "text-left";
 
 /** Presentation only: callers supply their complete, filtered, ordered rows. */
-export function CompactListTable<T>({ rows, columns, mobileColumns, id, label, sort, onSort, heading, status, onSelect, rowClassName, actions }: {
+export function CompactListTable<T>({ rows, columns, mobileColumns, id, label, sort, onSort, heading, status, onSelect, rowClassName, actions, className }: {
   rows: readonly T[]; columns: readonly CompactListColumn<T>[]; id: (row: T) => string; label: string;
   mobileColumns?: readonly CompactListColumn<T>[];
   sort?: SalesSort; onSort?: (key: string) => void; heading?: (key: string) => ReactNode;
   status?: ReactNode; onSelect?: (row: T) => void; rowClassName?: (row: T) => string;
-  actions?: { width: string; render: (row: T) => ReactNode };
+  actions?: { width: string; render: (row: T) => ReactNode }; className?: string;
 }) {
   const phone = useIsMobile(640);
   const displayedColumns = phone && mobileColumns ? mobileColumns : columns;
-  return <Table className="compact-list-table table-fixed" aria-label={label}
+  return <Table className={cn("compact-list-table table-fixed", className)} aria-label={label}
     containerClassName={scrollTableClass(rows.length)}>
     <colgroup>{displayedColumns.map(column => <col key={column.key} className={cn(column.width, column.hiddenBelow && visibility[column.hiddenBelow][0])} />)}
       {actions && <col className={actions.width} />}</colgroup>

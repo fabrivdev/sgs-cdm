@@ -26,4 +26,9 @@
   .service-orders-workspace .mobile-kpi-strip:has(> :nth-child(5)) > div:nth-child(n + 4) {
     grid-column: span 3;
   }
+
+  .service-orders-workspace .productivity-panel > div:first-child {
+    min-height: 44px;
+    padding: 0 8px;
+  }
 }

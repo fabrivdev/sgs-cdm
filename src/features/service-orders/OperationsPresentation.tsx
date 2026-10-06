@@ -3,8 +3,8 @@ import { Badge } from "@/components/ui/badge";
 import { cn } from "@/lib/utils";
 
 /** The same bordered, compact surface used by the existing operational lists. */
-export function OperationsPanel({ title, actions, children, padded = false }: { title?: string; actions?: ReactNode; children: ReactNode; padded?: boolean }) {
-  return <section className="min-w-0 overflow-hidden rounded-xl border bg-card max-sm:rounded-none max-sm:border-x-0">
+export function OperationsPanel({ title, actions, children, padded = false, className }: { title?: string; actions?: ReactNode; children: ReactNode; padded?: boolean; className?: string }) {
+  return <section className={cn("min-w-0 overflow-hidden rounded-xl border bg-card max-sm:rounded-none max-sm:border-x-0", className)}>
     {(title || actions) && <div className="flex min-h-10 items-center justify-between gap-2 border-b px-3 py-2">
       {title && <h2 className="min-w-0 text-[12px] font-semibold">{title}</h2>}{actions}
     </div>}

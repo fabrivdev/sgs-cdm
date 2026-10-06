@@ -60,6 +60,17 @@ beforeEach(() => {
 afterEach(() => { cleanup(); vi.useRealTimers(); vi.unstubAllGlobals(); rpc.mockReset(); });
 
 describe("Ventas machine request ownership", () => {
+  it("hides only the Services header range on mobile while preserving date filters and navigation", () => {
+    const page = render(<Ventas area="servicios" />);
+    expect(document.querySelector(".sales-mobile-range")).not.toBeInTheDocument();
+    const dates = Array.from(document.querySelectorAll<HTMLInputElement>('input[type="date"]'));
+    expect(dates.map(input => input.value)).toEqual(["2026-01-01", "2026-10-03"]);
+    for (const name of ["Períodos", "Resumen", "Detalle"]) expect(screen.getByRole("button", { name })).toBeVisible();
+
+    page.rerender(<Ventas area="maquinas" />);
+    expect(document.querySelector(".sales-mobile-range")).toHaveTextContent("01 ene. 2026 — 03 oct. 2026");
+  });
+
   it("offers actual secondary filters in Ventas de Repuestos instead of only repeating the toolbar", () => {
     render(<Ventas area="repuestos" />);
     const trigger = screen.getByRole("button", { name: "Más filtros" });

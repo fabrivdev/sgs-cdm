@@ -80,6 +80,8 @@ El usuario eligió una composición continua y armónica, con menos contenedores
 
 `SalesMobileProvider` contiene solamente estado de presentación. Los panoramas mantienen su registro de exportación aunque otra vista esté visible; el explorador se monta al entrar a Resumen/Detalle, sin consultar análisis ocultos. Rangos, fuentes financieras, permisos y exportadores no cambian. La nueva navegación no acredita que las demás secciones ya adopten esta composición. No hay SQL nuevo, datos de producción consultados ni sincronización de Obsidian en este worktree sin configuración local. Revisión visual local con fixtures y limitaciones registradas en `design-qa.md`.
 
+Excepción puntual confirmada el 06/10/2026: Ventas de Servicios oculta en teléfono la fila de rango situada bajo el título para reducir espacio repetido; las fechas continúan en los filtros y no cambian datos, métricas, navegación ni escritorio. Máquinas y Repuestos mantienen el rango móvil. No generalizar esta excepción a otras vistas.
+
 ## Encabezado móvil compartido
 
 `src/components/AppLayout.tsx` aplica el encabezado a todas las rutas que usan ese layout, no solamente a Ventas. Bajo 768 px agrupa el logo original con «SIG CDM», mantiene menú solo con icono a la izquierda y campana/perfil a la derecha. Altura de 56 px, logo de 28 px y tres áreas táctiles de 44 × 44 px; son medidas explícitas para no reducirlas cuando la raíz tipográfica cambia a 14 px desde 640 px. A partir de 768 px se conservan los tamaños relativos y la información de usuario de escritorio.

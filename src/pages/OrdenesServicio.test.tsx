@@ -295,7 +295,7 @@ describe("orders workspace", () => {
     const before = productivityCard()!.textContent!.trim();
     workLogs = [...workLogs, demoWorkLog([demoWorkEntry({ id: "NEW_BAD", hora_fin: null })], "OS-NEW")];
     rendered.rerender(<MemoryRouter><OrdenesServicio /></MemoryRouter>);
-    expect(screen.getByRole("alert")).toHaveTextContent("1 incidencia · Revisar");
+    expect(screen.getByRole("button", { name: "1 incidencia · Revisar" })).toBeVisible();
     expect(productivityCard()!.textContent!.trim()).toBe(before);
     expect(screen.getByRole("meter", { name: "Meta de TECNICO UNO" })).toHaveAttribute("aria-valuenow", "10");
     workLogs = workLogs.slice(0, 2);
@@ -438,7 +438,14 @@ describe("orders workspace", () => {
     expect(screen.queryByRole("heading", { name: "Por técnico" }) !== null).toBe(width >= 640);
     expect(within(group).getByRole("button", { name: "Activos" })).toHaveAttribute("aria-pressed", "true");
     expect(within(group).getByRole("button", { name: "Todos" })).toHaveAttribute("aria-pressed", "false");
-    expect(screen.getByRole("table", { name: "Productividad por técnico" })).not.toHaveTextContent("TECNICO DOS");
+    const productivityTable = screen.getByRole("table", { name: "Productividad por técnico" });
+    expect(productivityTable).not.toHaveTextContent("TECNICO DOS");
+    if (width < 640) {
+      for (const name of ["Técnico", "OS", "Horas", "Meta", "%"]) expect(within(productivityTable).getByRole("columnheader", { name: new RegExp(name) })).toBeVisible();
+      expect(productivityTable).toHaveClass("max-sm:min-w-[440px]");
+      const technician = within(productivityTable).getByRole("button", { name: /TECNICO UNO · 1 OS/ });
+      expect(technician).toHaveTextContent(/^TECNICO UNO$/);
+    }
     expect(mocks.set).toHaveBeenLastCalledWith(expect.objectContaining({ estado_tecnicos: "activos" }));
   });
   it("filters active/inactive/unmatched technicians consistently in KPIs, periods and exports", async () => {
@@ -460,7 +467,7 @@ describe("orders workspace", () => {
     table = within(screen.getByRole("table", { name: "Productividad por técnico" }));
     expect(table.getAllByRole("row")).toHaveLength(3);
     expect(table.getByText("TECNICO SIN FICHA")).toBeVisible();
-    expect(table.getAllByText("1 OS · Inactivo")).toHaveLength(2);
+    expect(table.getAllByRole("button", { name: /1 OS · Inactivo/ })).toHaveLength(2);
     expect(table.queryByText("Sin ficha", { exact: true })).not.toBeInTheDocument();
     kpis = within(screen.getByRole("region", { name: "Indicadores" }));
     expect(kpis.getByText("60", { exact: true })).toBeVisible(); // before Sep 16 deactivation
@@ -499,7 +506,10 @@ describe("orders workspace", () => {
     expect(detail.getByText("Facturación no disponible.")).toBeVisible();
   });
   it("keeps KPI strips in orders and productivity while compliance focuses on the matrix", () => {
+    mocks.width = 320;
     setup();
+    const orderKpis = Array.from(screen.getByRole("region", { name: "Indicadores" }).querySelectorAll(".kpi-item > div:first-child > span:first-child")).map(item => item.textContent);
+    expect(orderKpis).toEqual(["Órdenes", "Abiertas", "Cerradas", "% de cierre", "Días de cierre (prom.)"]);
     for (const name of ["Órdenes", "Productividad", "Cumplimiento"]) {
       tab(name);
       if (name === "Cumplimiento") {

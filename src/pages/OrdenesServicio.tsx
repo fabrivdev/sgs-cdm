@@ -174,9 +174,8 @@ export function OrdersWorkspace() {
             : !workReady ? <p role="status" className="py-6 text-center text-[12px] text-muted-foreground">Cargando jornadas trabajadas…</p>
               : <>
                 <ProductivityTable rows={productivity.tecnicos} period={productivity.period} onSelect={selectTechnician} status={technicianStatus} onStatusChange={setTechnicianStatus}
-                  issuesAction={productivityPartial ? <div role={billingFailed ? undefined : "alert"} className="inline-flex min-h-8 shrink-0 items-center gap-1 rounded-full bg-amber-50 px-2 text-[12px] text-amber-800">
-                    <CircleAlert className="h-3.5 w-3.5 shrink-0" />
-                    <Button variant="ghost" size="sm" onClick={() => setSelectedTechnician("__issues__")}>{productivity.issues.length} {productivity.issues.length === 1 ? "incidencia" : "incidencias"} · Revisar</Button>
+                  issuesAction={productivityPartial ? <div role={billingFailed ? undefined : "alert"} className="shrink-0">
+                    <Button variant="ghost" size="sm" aria-label={`${productivity.issues.length} ${productivity.issues.length === 1 ? "incidencia" : "incidencias"} · Revisar`} className="min-h-11 gap-1 rounded-md bg-amber-50 px-2 text-[11px] text-amber-800 hover:bg-amber-100 hover:text-amber-900" onClick={() => setSelectedTechnician("__issues__")}><CircleAlert className="h-3.5 w-3.5 shrink-0" />{productivity.issues.length} · Revisar</Button>
                   </div> : undefined} />
                 <OperationalEvolution rows={productivityPeriods} worked onPeriod={(from, to) => setFilters(previous => ({ ...previous, dateFrom: from, dateTo: to }))} />
               </>}

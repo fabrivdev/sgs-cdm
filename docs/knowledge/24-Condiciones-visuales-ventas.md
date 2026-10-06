@@ -164,6 +164,8 @@ Evidencia: inspección visual de la versión publicada como línea base y revisi
 
 Ajuste posterior sobre captura móvil: Períodos usa un solo encabezado del panel, sin segundo título ni borde interior; los controles de columnas/orden pasan al encabezado de la tabla. Encabezados compactos conservan 44 px táctiles, igual que búsqueda, filtros y menú de sección en teléfonos. Ventas muestra explícitamente el rango consultado junto al título en móvil (rango general, no el recorte de selección de una fila). Se conservan colapsado, selección de períodos, detalle, totales y exportaciones. Verificación local con fixture de MaquinasPanorama y componentes compartidos; no es validación del despliegue productivo. No requiere SQL.
 
+Excepción confirmada el 06/10/2026: Ventas de Servicios no repite el rango general debajo del título en teléfono. Desde/Hasta permanecen disponibles en filtros y conservan exactamente el mismo estado, consulta y cálculo; Períodos/Resumen/Detalle, indicadores y escritorio tampoco cambian. Ventas de Máquinas y Repuestos conservan su rango móvil. Es un ajuste de jerarquía y espacio de una sola vista, sin extender la ocultación a otras áreas.
+
 ## Contenido real de M�s filtros - 06/10/2026
 
 En escritorio, M�s filtros contiene dimensiones secundarias reales y no repite Per�odo r�pido, Desde, Hasta, Agrupar ni Sucursal cuando esos controles caben en la barra. `FiltersBar.children` conserva la fila primaria y `expanded` contiene los secundarios. Si no hay secundarios respaldados y nada desborda, el acceso se oculta en escritorio; en m�vil o ante desborde, los primarios siguen accesibles. No se inventan dimensiones para mantener visible el bot�n.
