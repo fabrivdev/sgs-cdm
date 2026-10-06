@@ -43,6 +43,8 @@ import {
   mapBranchTransferSheet,
   mapStockSheet,
   parseSpreadsheetXml,
+  persistMayorFile,
+  readMayorPreflightFile,
   readXmlFileText,
   prepareNewSystemImportBundle,
   reconcileCanonicalClientes,
@@ -79,6 +81,9 @@ import {
   type SalesOrderDiagnostics,
   type SyntheticKardexDiagnostics,
   type PurchaseInvoiceDiagnostics,
+  type MayorPreflight,
+  type MayorPersistResult,
+  type MayorRpcClient,
   syntheticValueDiffersFromBalance,
   TOTVS_FILE_KIND_LABELS,
   detectTotvsFileKind,
@@ -95,6 +100,7 @@ interface DetectedFile {
 }
 
 interface Preview {
+  mayor: MayorPreflight[];
   productos: CanonicalProductRow[];
   stock: CanonicalStockRow[];
   stockMaquinas: CanonicalMachineStockRow[];
@@ -126,6 +132,28 @@ interface Preview {
   branchTransferDuplicatesSkipped: number;
   bundleFiles: { facturacion: { fileName: string; xmlText: string }; ordenesServicio: { fileName: string; xmlText: string }; productos: { fileName: string; xmlText: string } } | null;
   faltaParaTrio: string[];
+}
+
+function hasPersistablePreview(preview: Preview) {
+  return Boolean(
+    preview.mayor.length
+    || preview.bundleFiles
+    || preview.productos.length
+    || preview.stock.length
+    || preview.stockMaquinas.length
+    || preview.machineRegistryRows.length
+    || preview.pedidos.length
+    || preview.solicitudes.length
+    || preview.clientesNuevos.length
+    || preview.clientesActualizados.length
+    || preview.kardex.length
+    || preview.dispatchRows.length
+    || preview.salesOrders.length
+    || preview.syntheticKardex.length
+    || preview.purchaseInvoices.length
+    || preview.suppliers.length
+    || preview.branchTransfers.length
+  );
 }
 
 type KardexRpcResult = {
@@ -252,6 +280,7 @@ export function ImportarTotvsTab({ onChanged }: { onChanged: () => void }) {
 
     setBusy(true);
     try {
+      const mayor: MayorPreflight[] = [];
       const productos: CanonicalProductRow[] = [];
       const stock: CanonicalStockRow[] = [];
       let stockMaquinas: CanonicalMachineStockRow[] = [];
@@ -272,6 +301,10 @@ export function ImportarTotvsTab({ onChanged }: { onChanged: () => void }) {
 
       for (const { file, kind } of usableFiles) {
         try {
+          if (kind === "mayor") {
+            mayor.push(await readMayorPreflightFile(file, file.name));
+            continue;
+          }
           const xmlText = await readXmlFileText(file);
 
           if (kind === "os") {
@@ -428,6 +461,7 @@ export function ImportarTotvsTab({ onChanged }: { onChanged: () => void }) {
       }
 
       setPreview({
+        mayor,
         productos,
         stock,
         stockMaquinas,
@@ -462,6 +496,7 @@ export function ImportarTotvsTab({ onChanged }: { onChanged: () => void }) {
       });
 
       const partes = [
+        mayor.length ? `${mayor.reduce((sum, item) => sum + item.movementRows, 0)} movimientos de Mayor (preflight)` : null,
         bundleFiles ? "OS + Facturación" : null,
         productos.length ? `${productos.length} productos` : null,
         stock.length ? `${stock.length} filas de stock` : null,
@@ -523,6 +558,18 @@ export function ImportarTotvsTab({ onChanged }: { onChanged: () => void }) {
       let branchTransfersInsertadas = 0;
       let branchTransfersActualizadas = 0;
       let branchTransfersSinCambios = 0;
+      const mayorResultados: MayorPersistResult[] = [];
+
+      const mayorFiles = usableFiles.filter((item) => item.kind === "mayor").map((item) => item.file);
+      if (mayorFiles.length !== preview.mayor.length) {
+        throw new Error("Los archivos del Mayor cambiaron después del preflight; volvé a leerlos antes de confirmar.");
+      }
+      for (const file of mayorFiles) {
+        mayorResultados.push(await persistMayorFile({
+          file,
+          client: supabase as unknown as MayorRpcClient,
+        }));
+      }
 
       const newSystemBundle = preview.bundleFiles
         ? prepareNewSystemImportBundle({
@@ -946,6 +993,9 @@ export function ImportarTotvsTab({ onChanged }: { onChanged: () => void }) {
       }
 
       const partes = [
+        mayorResultados.length
+          ? `${mayorResultados.reduce((sum, item) => sum + item.preflight.movementRows, 0)} movimientos de Mayor (${mayorResultados.reduce((sum, item) => sum + item.insertadas, 0)} nuevos, ${mayorResultados.reduce((sum, item) => sum + item.sinCambios, 0)} sin cambios, ${mayorResultados.reduce((sum, item) => sum + item.cuarentena, 0)} en cuarentena)`
+          : null,
         preview.bundleFiles
           ? `${facturacionLineas} líneas de facturación y ${ordenesServicio} OS vigentes${
               ordenesServicioArchivadas ? `; ${ordenesServicioArchivadas} OS ausentes archivadas` : ""
@@ -999,7 +1049,7 @@ export function ImportarTotvsTab({ onChanged }: { onChanged: () => void }) {
             reporte por el nombre del archivo: órdenes de servicio, facturación, productos, stock de repuestos y de máquinas, el reporte
             general de maquinarias como respaldo de chasis, pedidos y solicitudes de compra, pedidos de venta,
             importaciones-despacho, clientes, proveedores, facturas de compra, transferencias entre sucursales en tránsito,
-            Kardex analítico y Kardex sintético valorizado. Los archivos de respaldo con sufijo _original se ignoran.
+            Kardex analítico, Kardex sintético valorizado y Libro Mayor. Los archivos de respaldo con sufijo _original se ignoran.
           </p>
         </div>
 
@@ -1104,6 +1154,9 @@ export function ImportarTotvsTab({ onChanged }: { onChanged: () => void }) {
         {preview && (
           <div className="space-y-3 rounded-md border p-3">
             <div className="flex flex-wrap gap-2 text-[12px]">
+              {preview.mayor.map((item) => (
+                <Badge key={item.sourceFileName} variant="secondary">{item.movementRows.toLocaleString("es-PY")} movimientos de Mayor</Badge>
+              ))}
               {preview.bundleFiles && <Badge variant="secondary">OS + Facturación listas para cruzar</Badge>}
               {preview.productos.length > 0 && <Badge variant="secondary">{preview.productos.length} productos</Badge>}
               {preview.stock.length > 0 && <Badge variant="secondary">{preview.stock.length} filas de stock</Badge>}
@@ -1137,6 +1190,22 @@ export function ImportarTotvsTab({ onChanged }: { onChanged: () => void }) {
               {preview.suppliers.length > 0 && <Badge variant="secondary">{preview.suppliers.length} proveedores</Badge>}
               {preview.branchTransfers.length > 0 && <Badge variant="secondary">{preview.branchTransfers.length} transferencias en tránsito</Badge>}
             </div>
+            {preview.mayor.map((item) => (
+              <div key={item.sourceFileName} className="space-y-1 rounded border border-amber-200 bg-amber-50/50 p-2 text-[11px]">
+                <p className="font-medium text-foreground">{item.sourceFileName}</p>
+                <p className="text-muted-foreground">
+                  Preflight: {item.movementRows.toLocaleString("es-PY")} movimientos de {item.sourceRows.toLocaleString("es-PY")} filas; {item.footerRows} totalizadores excluidos. Cobertura {item.from ?? "sin fecha"} a {item.to ?? "sin fecha"}; {item.branches} sucursales, {item.accounts} cuentas, {item.costCenters} centros de costo y {item.openings} aperturas.
+                </p>
+                <p className="text-muted-foreground">
+                  SALDO01 = PYG y SALDO02 = USD. {Object.entries(item.tpsldo).map(([code, totals]) => `TPSLDO=${code}: ${totals.rows.toLocaleString("es-PY")} filas, ${totals.amountPyg.toLocaleString("es-PY")} PYG, ${totals.amountUsd.toLocaleString("es-PY")} USD`).join(" · ")}.
+                </p>
+                <p className="text-muted-foreground">
+                  Faltantes: {item.missing.account} cuenta, {item.missing.accountDescription} descripción, {item.missing.costCenter.toLocaleString("es-PY")} centro de costo, {item.missing.origin.toLocaleString("es-PY")} origen. Duplicados de clave candidata: {item.duplicateCandidateKeys}. Inconsistencias de signo: {item.signViolations.type1Negative + item.signViolations.type2Positive}.
+                </p>
+                {item.warnings.map((warning) => <p key={warning} className="text-amber-700">{warning}</p>)}
+                <p className="font-medium text-amber-800">Preflight completado. Al confirmar se cargará por lotes al staging del Mayor; las cuentas sin código quedarán en cuarentena y TPSLDO=9 seguirá separado.</p>
+              </div>
+            ))}
             {preview.machineStockChassis.unresolvedPlaceholders > 0 && (
               <p className="text-[11px] text-amber-700">
                 {preview.machineStockChassis.unresolvedPlaceholders} máquinas mantienen un chasis incompleto porque el reporte general no trae uno utilizable.
@@ -1196,9 +1265,11 @@ export function ImportarTotvsTab({ onChanged }: { onChanged: () => void }) {
               completa chasis faltantes o sustituidos por el modelo mediante CODPRO exacto; no agrega al stock máquinas que no estén en la foto.
               Productos, pedidos y solicitudes se actualizan sin duplicar. Clientes agrega los nuevos y corrige los existentes por código/RUC sin cambiar su ID.
             </p>
-            <Button type="button" size="sm" onClick={confirmar} disabled={busy}>
-              Confirmar importación
-            </Button>
+            {hasPersistablePreview(preview) && (
+              <Button type="button" size="sm" onClick={confirmar} disabled={busy}>
+                Confirmar importación
+              </Button>
+            )}
           </div>
         )}
       </CardContent>
