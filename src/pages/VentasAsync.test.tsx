@@ -1,5 +1,5 @@
 import { StrictMode } from "react";
-import { act, cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { act, cleanup, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { MaquinasDashboardResponse } from "@/components/ventas/MaquinasVentas";
 import Ventas from "./Ventas";
@@ -10,6 +10,7 @@ vi.mock("@/hooks/useAuth", () => ({ useAuth: () => ({ can: () => false }) }));
 vi.mock("@/hooks/use-mobile", () => ({ useIsMobile: () => viewport.mobile }));
 // The area-change test only needs the services boundary; machine reports and filters stay real.
 vi.mock("@/components/ventas/ServiciosPanorama", () => ({ ServiciosPanorama: () => <div>Panorama de servicios</div> }));
+vi.mock("@/components/ventas/RepuestosVentas", () => ({ RepuestosVentas: () => <div>Ventas de repuestos</div> }));
 
 type RpcResult = { data: MaquinasDashboardResponse | null; error: { message: string } | null };
 function deferred() {
@@ -59,6 +60,19 @@ beforeEach(() => {
 afterEach(() => { cleanup(); vi.useRealTimers(); vi.unstubAllGlobals(); rpc.mockReset(); });
 
 describe("Ventas machine request ownership", () => {
+  it("keeps the real shared filters available in Ventas de Repuestos", () => {
+    render(<Ventas area="repuestos" />);
+    const trigger = screen.getByRole("button", { name: "Más filtros" });
+    expect(trigger).toHaveAttribute("aria-expanded", "false");
+    fireEvent.click(trigger);
+    const panel = screen.getByRole("dialog");
+    expect(trigger).toHaveAttribute("aria-expanded", "true");
+    expect(within(panel).getByText("Período rápido")).toBeInTheDocument();
+    expect(within(panel).getByText("Desde")).toBeInTheDocument();
+    expect(within(panel).getByText("Hasta")).toBeInTheDocument();
+    expect(within(panel).getByText("Sucursal")).toBeInTheDocument();
+  });
+
   it.each([true, false])("keeps latest KPIs and periods when older success arrives last (mobile: %s)", async mobile => {
     viewport.mobile = mobile;
     render(<Ventas area="maquinas" />);

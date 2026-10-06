@@ -1,14 +1,30 @@
-import { ReactNode, useEffect, useLayoutEffect, useRef, useState } from "react";
+import { Fragment, ReactNode, isValidElement, useEffect, useId, useLayoutEffect, useRef, useState } from "react";
 import { Card } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Search, SlidersHorizontal, X } from "lucide-react";
-import { Sheet, SheetContent, SheetHeader, SheetTitle } from "@/components/ui/sheet";
+import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle } from "@/components/ui/sheet";
 import { cn } from "@/lib/utils";
 import { filterLabel as labelCls, controlHeight, controlText } from "@/lib/ui-classes";
 
 const ctrl = `${controlHeight} ${controlText}`;
+
+/**
+ * React considers a Fragment an element even when every branch inside it is
+ * null/false. Inspect those children before offering an additional-filter
+ * panel; section actions live beside the trigger and are not panel content.
+ */
+function hasFilterContent(node: ReactNode): boolean {
+  if (node == null || typeof node === "boolean") return false;
+  if (typeof node === "string") return node.trim().length > 0;
+  if (typeof node === "number") return true;
+  if (Array.isArray(node)) return node.some(hasFilterContent);
+  if (isValidElement(node) && node.type === Fragment) {
+    return hasFilterContent((node.props as { children?: ReactNode }).children);
+  }
+  return true;
+}
 
 /**
  * Oculta por completo los campos que no entran en la fila (en vez de dejarlos
@@ -98,13 +114,14 @@ export function FiltersBar({
   className?: string;
 }) {
   const [panelOpen, setPanelOpen] = useState(false);
+  const panelId = useId();
   const rowRef = useRef<HTMLDivElement>(null);
   useOverflowHiding(rowRef);
 
   const [searchDraft, setSearchDraft] = useState(search?.value ?? "");
   const searchValue = search?.value;
   const searchOnChange = useRef(search?.onChange);
-  const hasControls = !!children || !!actions || !!secondaryActions || !!expanded || (activeCount > 0 && !!onClear);
+  const hasAdditionalFilters = hasFilterContent(children) || hasFilterContent(expanded);
 
   useEffect(() => {
     searchOnChange.current = search?.onChange;
@@ -180,13 +197,15 @@ export function FiltersBar({
         </div>
 
         <div className="flex shrink-0 items-end gap-0 sm:gap-2 sm:pl-2">
-          {hasControls && (
+          {hasAdditionalFilters && (
               <Button
                 type="button"
                 variant={activeCount > 0 ? "secondary" : "outline"}
                 size="sm"
                 className={cn(ctrl, "relative shrink-0 gap-1 whitespace-nowrap max-sm:h-11 max-sm:w-11 max-sm:border-0 max-sm:bg-transparent max-sm:px-0 max-sm:shadow-none")}
                 onClick={() => setPanelOpen(true)}
+                aria-expanded={panelOpen}
+                aria-controls={panelId}
                 aria-label="Más filtros"
               >
                 <SlidersHorizontal className="h-3.5 w-3.5" />
@@ -201,11 +220,13 @@ export function FiltersBar({
       {/* Panel lateral de filtros */}
       <Sheet open={panelOpen} onOpenChange={setPanelOpen}>
         <SheetContent
+          id={panelId}
           side="right"
           className="flex w-[min(92vw,380px)] flex-col gap-0 p-0 [&_[data-filter-field]]:!w-full [&_[data-filter-field]]:!min-w-0"
         >
           <SheetHeader className="border-b px-4 py-3 text-left">
             <SheetTitle className="text-[14px]">Filtros</SheetTitle>
+            <SheetDescription className="sr-only">Filtros adicionales de la sección</SheetDescription>
           </SheetHeader>
           <div className="min-h-0 flex-1 space-y-3 overflow-y-auto px-4 py-4">
             {children && <div className="flex flex-col gap-3">{children}</div>}

@@ -1,3 +1,4 @@
+import {Fragment} from 'react';
 import {cleanup,fireEvent,render,screen} from '@testing-library/react';
 import {afterEach,describe,expect,it,vi} from 'vitest';
 import {FiltersBar,FilterSelect} from './FiltersBar';
@@ -18,5 +19,35 @@ describe('compact mobile filter bar',()=>{
   expect(screen.getByRole('dialog')).toHaveTextContent('Marca');
   expect(screen.queryAllByRole('button',{name:'Exportación'})).toHaveLength(0);
   expect(screen.getAllByRole('button',{name:'Exportación',hidden:true})).toHaveLength(1);
+ });
+
+ it.each([
+  ['without filter children', undefined],
+  ['with false', false],
+  ['with null', null],
+  ['with an empty fragment', <Fragment>{false}{null}{undefined}</Fragment>],
+  ['with nested empty fragments', <><Fragment>{false}</Fragment>{null}</>],
+  ['with blank text', <> {'   '} </>],
+ ])('does not show an empty filter panel %s',(_label,children)=>{
+  render(<FiltersBar search={{value:'',onChange:vi.fn()}} secondaryActions={<button>Exportación</button>}>{children}</FiltersBar>);
+  expect(screen.queryByRole('button',{name:'Más filtros'})).not.toBeInTheDocument();
+  expect(screen.getByRole('button',{name:'Exportación'})).toBeInTheDocument();
+ });
+
+ it('recognizes useful content inside nested fragments and exposes the drawer state',()=>{
+  render(<FiltersBar search={{value:'',onChange:vi.fn()}}><><Fragment><FilterSelect label="Marca" value="all" onChange={()=>{}} placeholder="Todas" options={[{value:'all',label:'Todas'}]}/></Fragment></></FiltersBar>);
+  const filters=screen.getByRole('button',{name:'Más filtros'});
+  expect(filters).toHaveAttribute('aria-expanded','false');
+  expect(filters).toHaveAttribute('aria-controls');
+  fireEvent.click(filters);
+  expect(filters).toHaveAttribute('aria-expanded','true');
+  expect(screen.getByRole('dialog')).toHaveTextContent('Marca');
+  fireEvent.click(screen.getByRole('button',{name:'Close'}));
+  expect(filters).toHaveAttribute('aria-expanded','false');
+ });
+
+ it('does not count an empty expanded fragment as additional filters',()=>{
+  render(<FiltersBar search={{value:'',onChange:vi.fn()}} activeCount={1} onClear={vi.fn()} expanded={<>{false}{null}</>} secondaryActions={<button>Exportación</button>}/>);
+  expect(screen.queryByRole('button',{name:'Más filtros'})).not.toBeInTheDocument();
  });
 });
