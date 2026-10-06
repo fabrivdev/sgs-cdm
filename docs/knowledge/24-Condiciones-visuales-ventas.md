@@ -164,7 +164,15 @@ Evidencia: inspección visual de la versión publicada como línea base y revisi
 
 Ajuste posterior sobre captura móvil: Períodos usa un solo encabezado del panel, sin segundo título ni borde interior; los controles de columnas/orden pasan al encabezado de la tabla. Encabezados compactos conservan 44 px táctiles, igual que búsqueda, filtros y menú de sección en teléfonos. Ventas muestra explícitamente el rango consultado junto al título en móvil (rango general, no el recorte de selección de una fila). Se conservan colapsado, selección de períodos, detalle, totales y exportaciones. Verificación local con fixture de MaquinasPanorama y componentes compartidos; no es validación del despliegue productivo. No requiere SQL.
 
-## Restablecimiento y respuestas de filtros — 03/10/2026
+## Contenido real de M�s filtros - 06/10/2026
+
+En escritorio, M�s filtros contiene dimensiones secundarias reales y no repite Per�odo r�pido, Desde, Hasta, Agrupar ni Sucursal cuando esos controles caben en la barra. `FiltersBar.children` conserva la fila primaria y `expanded` contiene los secundarios. Si no hay secundarios respaldados y nada desborda, el acceso se oculta en escritorio; en m�vil o ante desborde, los primarios siguen accesibles. No se inventan dimensiones para mantener visible el bot�n.
+
+Ventas de Repuestos agrega Marca y Vendedor. Ambos se aplican en servidor antes de indicadores, per�odos/comparaciones, res�menes, paginaci�n y Excel mediante `ventas_repuestos_panorama_filtros_v1` y `ventas_repuestos_listado_filtros_v1`. Sin esos filtros se conservan las RPC anteriores. Requiere aplicar manualmente `20261006120000_add_parts_sales_advanced_filters.sql`; commit o build no aplican SQL ni validan producci�n.
+
+Validaci�n local: componentes cubren contenido �til frente a fragmentos vac�os/falsy y preservan accesibilidad; PGlite 0.5.8 ejecut� la migraci�n completa con datos ficticios y verific� Marca/Vendedor, comparaciones, paginaci�n y exportaci�n. Stock proyectado verifica que sus secundarios afectan las filas completas, los cuatro KPI y el archivo exportado. La revisi�n no us� la app ni navegador y no consult� datos productivos.
+
+## Restablecimiento y respuestas de filtros - 03/10/2026
 
 `FiltersBar.tsx` conserva los 250 ms de espera al escribir, pero cancela la búsqueda pendiente al limpiar con la X, restablecer desde el panel, recibir un valor externo o desmontarse. El borrador no vuelve a publicar el texto anterior sobre el valor controlado. El restablecimiento del panel también descarta texto todavía no enviado, aunque la búsqueda del padre ya esté vacía. No cambia campos, disposición, fechas predeterminadas ni cálculos.
 

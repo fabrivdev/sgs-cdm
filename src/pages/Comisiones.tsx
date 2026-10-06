@@ -750,26 +750,28 @@ export default function Comisiones() {
             onClear={clearFilters}
             meta={`${detailOrders.length} OS`}
             secondaryActions={orderTable.action && !loading && !loadError && !schemaMissing ? <TableExportButton options={exportOptions} /> : undefined}
+            expanded={<>
+              <FilterMultiSelect
+                label="Estado OS"
+                values={osStateFilters}
+                onChange={setOsStateFilters}
+                placeholder="Todos"
+                width="w-full"
+                options={osStateOptions}
+              />
+              <FilterMultiSelect
+                label="Técnico"
+                values={technicianFilters}
+                onChange={setTechnicianFilters}
+                placeholder="Todos"
+                width="w-full"
+                options={technicianOptions.map((technician) => ({ value: technician, label: technician }))}
+              />
+            </>}
           >
             <QuickPeriodFilter from={from} to={to} onChange={(nextFrom, nextTo) => { setFrom(nextFrom); setTo(nextTo); }} />
             <FilterDate label="Desde" value={from} onChange={setFrom} max={to} />
             <FilterDate label="Hasta" value={to} onChange={setTo} min={from} />
-            <FilterMultiSelect
-              label="Estado OS"
-              values={osStateFilters}
-              onChange={setOsStateFilters}
-              placeholder="Todos"
-              width="w-[145px]"
-              options={osStateOptions}
-            />
-            <FilterMultiSelect
-              label="Técnico"
-              values={technicianFilters}
-              onChange={setTechnicianFilters}
-              placeholder="Todos"
-              width="w-[210px]"
-              options={technicianOptions.map((technician) => ({ value: technician, label: technician }))}
-            />
           </FiltersBar>
 
           <TabsContent value="cerradas" className="space-y-3">{resumenPanel}{ordenesPanel}</TabsContent>

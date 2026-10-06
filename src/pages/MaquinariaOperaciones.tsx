@@ -1164,6 +1164,13 @@ export default function MaquinariaOperaciones() {
       activeCount={activeCount}
       onClear={clearFilters}
       meta={`${rows.length} ${importsView ? "importaciones" : "líneas"}`}
+      expanded={<>
+        <FilterSelect label="Modelo" value={modelo} onChange={setModelo} placeholder="Modelo" width="w-full" options={[{ value: "TODOS", label: "Todos" }, ...modeloOptions.map(value => ({ value, label: value }))]} />
+        {importsView && <FilterSelect label="Vínculo con NP" value={vinculoNp} onChange={setVinculoNp} placeholder="Vínculo con NP" width="w-full" options={[{ value: "TODOS", label: "Todos" }, { value: "VINCULADA", label: "Con NP vinculada" }, { value: "SIN_NP", label: "Sin NP vinculada" }]} />}
+        {!importsView && (
+          <FilterSelect label="Condición" value={condicion} onChange={setCondicion} placeholder="Condición" width="w-full" options={[{ value: "TODOS", label: "Todas" }, ...Object.entries(CONDITION_LABEL).map(([value, label]) => ({ value, label }))]} />
+        )}
+      </>}
     >
       {!importsView && (
         <FilterSelect
@@ -1217,11 +1224,6 @@ export default function MaquinariaOperaciones() {
       )}
       <FilterSelect label="Marca" value={marca} onChange={(value) => { setMarca(value); setModelo("TODOS"); }} placeholder="Marca" width="w-[130px]" options={[{ value: "TODOS", label: "Todas" }, ...marcaOptions.map((value) => ({ value, label: value }))]} />
       <FilterSelect label="Tipo de máquina" value={tipoMaquina} onChange={(value) => { setTipoMaquina(value); setModelo("TODOS"); }} placeholder="Tipo de máquina" width="w-[170px]" options={[{ value: "TODOS", label: "Todos" }, ...tipoOptions.map(value => ({ value, label: value }))]} />
-      <FilterSelect label="Modelo" value={modelo} onChange={setModelo} placeholder="Modelo" width="w-[210px]" options={[{ value: "TODOS", label: "Todos" }, ...modeloOptions.map(value => ({ value, label: value }))]} />
-      {importsView && <FilterSelect label="Vínculo con NP" value={vinculoNp} onChange={setVinculoNp} placeholder="Vínculo con NP" width="w-[150px]" options={[{ value: "TODOS", label: "Todos" }, { value: "VINCULADA", label: "Con NP vinculada" }, { value: "SIN_NP", label: "Sin NP vinculada" }]} />}
-      {!importsView && (
-        <FilterSelect label="Condición" value={condicion} onChange={setCondicion} placeholder="Condición" width="w-[130px]" options={[{ value: "TODOS", label: "Todas" }, ...Object.entries(CONDITION_LABEL).map(([value, label]) => ({ value, label }))]} />
-      )}
     </FiltersBar>
     <Panel className="p-0">
       {operationsQuery.isError ? <div className="p-8 text-center text-[12px] text-destructive">Aplicá la migración SQL de operaciones para habilitar esta sección.</div> :

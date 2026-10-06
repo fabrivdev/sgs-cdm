@@ -140,7 +140,10 @@ describe("orders workspace", () => {
     expect(mocks.set).toHaveBeenLastCalledWith(expect.objectContaining({ fecha_desde: "2026-01-01", productividad_desde: "2026-07-01", productividad_hasta: "2026-09-25" }));
     mocks.width = width;
     rendered.rerender(<MemoryRouter><OrdenesServicio /></MemoryRouter>);
-    expect(screen.getByText("Productividad · 01/07/2026 — 25/09/2026")).toBeVisible();
+    const heading = screen.getByRole("heading", { name: "Órdenes de servicio" });
+    const range = screen.getByText("Productividad · 01/07/2026 — 25/09/2026");
+    expect(range).toBeVisible();
+    expect(heading.parentElement).toContainElement(range);
     expect(mocks.billing).toHaveBeenLastCalledWith(["01-00000001"], "2026-09-25", true);
     fireEvent.click(screen.getByRole("button", { name: "Histórico en Órdenes" }));
     expect(screen.getByRole("tab", { name: "Órdenes" })).toHaveAttribute("aria-selected", "true");
@@ -236,7 +239,11 @@ describe("orders workspace", () => {
     mocks.width = width;
     workLogs[0].entries[0].fecha_inicio = null;
     setup(); tab("Productividad"); technicianStatus("Todos");
-    expect(screen.getByRole("alert")).toHaveTextContent("1 incidencia · Revisar");
+    const issueReview = screen.getByRole("button", { name: "1 incidencia · Revisar" });
+    expect(screen.getByRole("alert")).toContainElement(issueReview);
+    const productivityTable = screen.getByRole("table", { name: "Productividad por técnico" });
+    expect(productivityTable.closest("section")?.firstElementChild).toContainElement(issueReview);
+    if (width >= 640) expect(productivityTable.closest("section")?.firstElementChild).toContainElement(screen.getByRole("heading", { name: "Por técnico" }));
     expect(screen.queryByText(/registros pendientes|Productividad sin calcular/)).not.toBeInTheDocument();
     expect(screen.getByText("Productividad", { selector: ".kpi-item span" }).closest(".kpi-item")).not.toHaveTextContent("Parcial");
     expect(screen.getByRole("meter", { name: "Meta de TECNICO DOS" })).toBeVisible();
@@ -427,7 +434,7 @@ describe("orders workspace", () => {
     expect(within(group).getAllByRole("button")).toHaveLength(3);
     expect(within(group).queryByRole("button", { name: "Sin ficha" })).not.toBeInTheDocument();
     expect(screen.getAllByRole("tablist")).toHaveLength(1);
-    expect(group.parentElement?.nextElementSibling).toContainElement(screen.getByRole("table", { name: "Productividad por técnico" }));
+    expect(group.closest("section")).toContainElement(screen.getByRole("table", { name: "Productividad por técnico" }));
     expect(screen.queryByRole("heading", { name: "Por técnico" }) !== null).toBe(width >= 640);
     expect(within(group).getByRole("button", { name: "Activos" })).toHaveAttribute("aria-pressed", "true");
     expect(within(group).getByRole("button", { name: "Todos" })).toHaveAttribute("aria-pressed", "false");

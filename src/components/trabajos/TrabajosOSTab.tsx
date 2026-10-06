@@ -17,7 +17,10 @@ import { toast } from "sonner";
 import { cn } from "@/lib/utils";
 
 const PAGE = 1000;
-async function cargarTodo<T>(qb: any): Promise<T[]> {
+type PagedQuery<T> = {
+  range: (from: number, to: number) => PromiseLike<{ data: T[] | null; error: unknown }>;
+};
+async function cargarTodo<T>(qb: PagedQuery<T>): Promise<T[]> {
   let from = 0;
   const all: T[] = [];
   while (true) {
@@ -113,21 +116,24 @@ export function TrabajosOSTab({
     try {
       const [osRows, tRows] = await Promise.all([
         cargarTodo<OSRow>(
-          (supabase.from("ordenes_servicio_importadas" as any)
+          (supabase.from("ordenes_servicio_importadas" as never)
             .select("os_numero, trabajo_id, cliente_nombre, fecha_abierta_os, fecha_emision_factura, factura, marca, nro_chasis, responsable, cod_mecanico, problema, tipo_tiempo, servicios_cantidad, servicios_valor_unitario, servicios_valor, repuesto_valor, km_cantidad, km_valor_unitario, kilometro_valor, terceros_valor, situacion_os, situacion_facturacion")
             .not("trabajo_id", "is", null)
-            .order("fecha_abierta_os", { ascending: false }) as any),
+            .order("fecha_abierta_os", { ascending: false }) as unknown as PagedQuery<OSRow>),
         ),
         cargarTodo<TrabajoLite>(
-          supabase.from("trabajos").select("id, codigo, os_numero, sucursal, cliente_id, descripcion_problema"),
+          supabase.from("trabajos").select("id, codigo, os_numero, sucursal, cliente_id, descripcion_problema") as unknown as PagedQuery<TrabajoLite>,
         ),
       ]);
       setOs(osRows);
       setTrabajos(tRows);
       setLoadError(false);
-    } catch (e: any) {
+    } catch (e: unknown) {
       setLoadError(true);
-      toast.error(e?.message ?? "Error cargando OS");
+      const message = typeof e === "object" && e !== null && "message" in e && typeof e.message === "string"
+        ? e.message
+        : "Error cargando OS";
+      toast.error(message);
     } finally {
       setLoading(false);
     }
@@ -225,19 +231,21 @@ export function TrabajosOSTab({
         activeCount={activosCount}
         onClear={limpiar}
         meta={`${filtered.length} OS · Total ${fmtMoney(totales.total)} · ${fmtNum(totales.horas)} h`}
+        expanded={<>
+          <FilterMultiSelect
+            label="Sit. OS" values={fSitOs} onChange={setFSitOs} placeholder="Todas" width="w-full"
+            options={sitOsOpts.map(s => ({ value: s, label: s }))}
+          />
+          <FilterMultiSelect
+            label="Sit. Fact." values={fSitFac} onChange={setFSitFac} placeholder="Todas" width="w-full"
+            options={sitFacOpts.map(s => ({ value: s, label: s }))}
+          />
+        </>}
       >
         <QuickPeriodFilter from={fDesde} to={fHasta} onChange={(nextFrom, nextTo) => { setFDesde(nextFrom); setFHasta(nextTo); }} />
         <FilterMultiSelect
           label="Sucursal" values={fSucursales} onChange={setFSucursales} placeholder="Todas" width="w-[150px]"
           options={SUCURSALES.map(s => ({ value: s, label: s }))}
-        />
-        <FilterMultiSelect
-          label="Sit. OS" values={fSitOs} onChange={setFSitOs} placeholder="Todas" width="w-[150px]"
-          options={sitOsOpts.map(s => ({ value: s, label: s }))}
-        />
-        <FilterMultiSelect
-          label="Sit. Fact." values={fSitFac} onChange={setFSitFac} placeholder="Todas" width="w-[150px]"
-          options={sitFacOpts.map(s => ({ value: s, label: s }))}
         />
         <FilterDate label="Desde" value={fDesde} onChange={setFDesde} title="Fecha apertura OS desde" max={fHasta || undefined} />
         <FilterDate label="Hasta" value={fHasta} onChange={setFHasta} title="Fecha apertura OS hasta" min={fDesde || undefined} />

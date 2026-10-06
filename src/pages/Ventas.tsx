@@ -27,6 +27,7 @@ import { serviceSalesError } from "@/lib/serviceSalesError";
 import { money as formatMoney } from "@/components/dashboard/utils";
 import { SERVICE_FILTER_FIELDS, serviceFiltersKey, type ServiceSalesFilters } from "@/components/ventas/serviceSalesFilters";
 import { ServiceSalesTextFilter } from "@/components/ventas/ServiceSalesTextFilter";
+import { partsSellerName } from "@/lib/partsSellerName";
 
 export type VentasArea = "servicios" | "repuestos" | "maquinas";
 type ExplorerView = "facturas" | "clientes" | "analisis" | "resumen" | "tecnicos" | "maquinas";
@@ -297,6 +298,8 @@ function VentasContent({ area }: { area: VentasArea }) {
   const [periodMode, setPeriodMode] = useState<PeriodMode>("mes");
   const [marca, setMarca] = useState("");
   const [tipoMaquina, setTipoMaquina] = useState("");
+  const [partsBrand, setPartsBrand] = useState("");
+  const [partsSeller, setPartsSeller] = useState("");
   const [serviceFilters, setServiceFilters] = useState<ServiceSalesFilters>({});
   const [serviceFiltersReset, setServiceFiltersReset] = useState(0);
   const serviceFilterKey = serviceFiltersKey(serviceFilters);
@@ -305,6 +308,8 @@ function VentasContent({ area }: { area: VentasArea }) {
   }, []);
   const [machineOptions, setMachineOptions] = useState<{marca: string; tipo_maquina: string}[]>([]);
   const [machineOptionsError, setMachineOptionsError] = useState("");
+  const [partsSellerOptions, setPartsSellerOptions] = useState<string[]>([]);
+  const [partsOptionsError, setPartsOptionsError] = useState("");
   useEffect(() => {
     if (area !== "servicios") return;
     let alive = true;
@@ -314,6 +319,29 @@ function VentasContent({ area }: { area: VentasArea }) {
     });
     return () => { alive = false; };
   }, [area]);
+  useEffect(() => {
+    if (area !== "repuestos") return;
+    let alive = true;
+    setPartsOptionsError("");
+    (supabase as any).rpc("ventas_repuestos_listado_v3", {
+      p_desde: desde,
+      p_hasta: hasta,
+      p_sucursal: sucursal === "TODAS" ? null : sucursal,
+      p_buscar: null,
+      p_vista: "vendedores",
+      p_orden: "vendedor",
+      p_direccion: "asc",
+      p_exportar: true,
+    }).then(({ data: response, error: optionsError }: any) => {
+      if (!alive) return;
+      const sellers = Array.isArray(response?.filas)
+        ? response.filas.map((row: { vendedor?: unknown }) => typeof row.vendedor === "string" ? row.vendedor : "").filter(Boolean)
+        : [];
+      setPartsSellerOptions([...new Set<string>(sellers)]);
+      if (optionsError) setPartsOptionsError(optionsError.message ?? "No se pudieron cargar los vendedores.");
+    });
+    return () => { alive = false; };
+  }, [area, desde, hasta, sucursal]);
   const [tipoTiempo, setTipoTiempo] = useState("TODOS");
   const [selectedPeriod, setSelectedPeriod] = useState<string | null>(null);
   const [serviciosSummary, setServiciosSummary] = useState<ServiciosSummary | null>(null);
@@ -352,7 +380,7 @@ function VentasContent({ area }: { area: VentasArea }) {
     void load();
     return () => { loadRequest.current += 1; };
   }, [load]);
-  useEffect(() => { setSelectedPeriod(null); setServiciosSummary(null); }, [area, desde, hasta, periodMode, sucursal, tipoTiempo, marca, tipoMaquina, serviceFilterKey]);
+  useEffect(() => { setSelectedPeriod(null); setServiciosSummary(null); }, [area, desde, hasta, periodMode, sucursal, tipoTiempo, marca, tipoMaquina, partsBrand, partsSeller, serviceFilterKey]);
 
   const weekStart = useMemo(() => startOfWeek(now, { weekStartsOn: 1 }), [now]);
   const previousWeekStart = useMemo(() => subWeeks(weekStart, 1), [weekStart]);
@@ -385,7 +413,7 @@ function VentasContent({ area }: { area: VentasArea }) {
     return { desde: selectedPeriod > desde ? selectedPeriod : desde, hasta: periodEndIso < hasta ? periodEndIso : hasta };
   }, [selectedPeriod, desde, hasta, periodMode]);
   const copy = AREA_COPY[area];
-  const activeFilters = Number(sucursal !== "TODAS") + Number(Boolean(buscar)) + Number(area === "servicios" && tipoTiempo !== "TODOS") + Number((area === "servicios" || area === "maquinas") && Boolean(marca)) + Number((area === "servicios" || area === "maquinas") && Boolean(tipoMaquina)) + (area === "servicios" ? Object.keys(JSON.parse(serviceFilterKey)).length : 0);
+  const activeFilters = Number(sucursal !== "TODAS") + Number(Boolean(buscar)) + Number(area === "servicios" && tipoTiempo !== "TODOS") + Number((area === "servicios" || area === "maquinas") && Boolean(marca)) + Number((area === "servicios" || area === "maquinas") && Boolean(tipoMaquina)) + Number(area === "repuestos" && Boolean(partsBrand)) + Number(area === "repuestos" && Boolean(partsSeller)) + (area === "servicios" ? Object.keys(JSON.parse(serviceFilterKey)).length : 0);
   
   const summary = area === "servicios" ? serviciosSummary : area === "maquinas" ? maquinasData?.resumen : data;
   const averageValue = area === "maquinas"
@@ -399,27 +427,35 @@ function VentasContent({ area }: { area: VentasArea }) {
   return (
     <SalesSectionExportsProvider><PageShell className="sales-workspace">
       <PageHeader className="sales-page-header" title={copy.title} actions={mobile.active ? <SalesSectionExportMenu /> : undefined} meta={mobile.active ? <SalesMobileRange desde={desde} hasta={hasta} /> : undefined} />
-      <FiltersBar className="sales-toolbar" secondaryActions={mobile.active ? undefined : <SalesSectionExportMenu />} search={{ value: buscar, onChange: setBuscar, placeholder: copy.search }} activeCount={activeFilters} onClear={() => { setBuscar(""); setSucursal("TODAS"); setTipoTiempo("TODOS"); setMarca(""); setTipoMaquina(""); setServiceFilters({}); setServiceFiltersReset(value=>value+1); }}>
+      <FiltersBar className="sales-toolbar" secondaryActions={mobile.active ? undefined : <SalesSectionExportMenu />} search={{ value: buscar, onChange: setBuscar, placeholder: copy.search }} activeCount={activeFilters} onClear={() => { setBuscar(""); setSucursal("TODAS"); setTipoTiempo("TODOS"); setMarca(""); setTipoMaquina(""); setPartsBrand(""); setPartsSeller(""); setServiceFilters({}); setServiceFiltersReset(value=>value+1); }} expanded={<>
+        {area === "servicios" && <>
+          <FilterSelect label="Tipo de tiempo" value={tipoTiempo} onChange={setTipoTiempo} placeholder="Todos" width="w-full" options={[{ value: "TODOS", label: "Todos" }, { value: "Cliente", label: "Cliente" }, { value: "Garantia", label: "Garantía" }, { value: "Interno", label: "Interno" }, { value: "No informado", label: "No informado" }]} />
+          <FilterSelect label="Marca" value={marca || "TODAS"} onChange={v => setMarca(v === "TODAS" ? "" : v)} placeholder="Todas" width="w-full" options={[{value:"TODAS",label:"Todas"}, ...dimensionOptions.marcas.map(value=>({value,label:value}))]} />
+          <FilterSelect label="Tipo de máquina" value={tipoMaquina || "TODOS"} onChange={v => setTipoMaquina(v === "TODOS" ? "" : v)} placeholder="Todos" width="w-full" options={[{value:"TODOS",label:"Todos"}, ...dimensionOptions.tipos.map(value=>({value,label:value}))]} />
+          {SERVICE_FILTER_FIELDS.map(([key,label]) => <ServiceSalesTextFilter key={`${key}-${serviceFiltersReset}`} label={label} value={serviceFilters[key] ?? ""} onChange={value=>changeServiceFilter(key,value)} />)}
+          <FilterSelect label="Componente" value={serviceFilters.componente || "TODOS"} onChange={v=>changeServiceFilter("componente",v === "TODOS" ? "" : v)} placeholder="Todos" width="w-full" options={[{value:"TODOS",label:"Todos"}, ...["Servicio","Kilometraje","Repuestos","Terceros"].map(value=>({value,label:value === "Servicio" ? "Mano de obra" : value}))]} />
+          <FilterSelect label="Origen" value={serviceFilters.origen || "TODOS"} onChange={v=>changeServiceFilter("origen",v === "TODOS" ? "" : v)} placeholder="Todos" width="w-full" options={[{value:"TODOS",label:"Todos"},{value:"historico",label:"Histórico"},{value:"actual",label:"Actual"}]} />
+          <FilterSelect label="Documento" value={serviceFilters.documento || "TODOS"} onChange={v=>changeServiceFilter("documento",v === "TODOS" ? "" : v)} placeholder="Todos" width="w-full" options={[{value:"TODOS",label:"Todos"},{value:"factura",label:"Factura"},{value:"nc",label:"Nota de crédito"}]} />
+          <FilterSelect label="Vínculo OS" value={serviceFilters.vinculo || "TODOS"} onChange={v=>changeServiceFilter("vinculo",v === "TODOS" ? "" : v)} placeholder="Todos" width="w-full" options={[{value:"TODOS",label:"Todos"},{value:"con_os",label:"Con OS"},{value:"sin_os",label:"Sin OS"}]} />
+        </>}
+        {area === "maquinas" && <>
+          <FilterSelect label="Marca" value={marca || "TODAS"} onChange={v => setMarca(v === "TODAS" ? "" : v)} placeholder="Todas" width="w-full" options={[{value:"TODAS",label:"Todas"}, ...dimensionOptions.marcas.map(value=>({value,label:value}))]} />
+          <FilterSelect label="Tipo de máquina" value={tipoMaquina || "TODOS"} onChange={v => setTipoMaquina(v === "TODOS" ? "" : v)} placeholder="Todos" width="w-full" options={[{value:"TODOS",label:"Todos"}, ...dimensionOptions.tipos.map(value=>({value,label:value}))]} />
+        </>}
+        {area === "repuestos" && <>
+          <FilterSelect label="Marca" value={partsBrand || "TODAS"} onChange={value => setPartsBrand(value === "TODAS" ? "" : value)} placeholder="Todas" width="w-full" options={[{ value: "TODAS", label: "Todas" }, { value: "CLAAS", label: "CLAAS" }, { value: "HORSCH", label: "HORSCH" }, { value: "OTROS", label: "Otros" }]} />
+          <FilterSelect label="Vendedor" value={partsSeller || "TODOS"} onChange={value => setPartsSeller(value === "TODOS" ? "" : value)} placeholder="Todos" width="w-full" options={[{ value: "TODOS", label: "Todos" }, ...partsSellerOptions.map(value => ({ value, label: partsSellerName(value) }))]} />
+        </>}
+      </>}>
         <FilterCustom label="Período rápido" width="w-[190px]"><select value={activeDatePreset} onChange={(event) => applyDatePreset(event.target.value)} className="h-8 w-full rounded-md border border-input bg-background px-2 text-[12px]"><option value="">Personalizado</option>{datePresets.map((preset) => <option key={preset.key} value={preset.key}>{preset.label}</option>)}</select></FilterCustom>
         <FilterDate label="Desde" value={desde} onChange={setDesde} max={hasta} /><FilterDate label="Hasta" value={hasta} onChange={setHasta} min={desde} />
         <PeriodSelector value={periodMode} onChange={setPeriodMode} disabledModes={disabledGranularities} />
         <FilterSelect label="Sucursal" value={sucursal} onChange={setSucursal} placeholder="Todas" options={[{ value: "TODAS", label: "Todas" }, ...SUCURSALES.map((value) => ({ value, label: value }))]} />
-        {area === "servicios" && <FilterSelect label="Tipo de tiempo" value={tipoTiempo} onChange={setTipoTiempo} placeholder="Todos" options={[{ value: "TODOS", label: "Todos" }, { value: "Cliente", label: "Cliente" }, { value: "Garantia", label: "Garantía" }, { value: "Interno", label: "Interno" }, { value: "No informado", label: "No informado" }]} />}
-        {(area === "servicios" || area === "maquinas") && <>
-          <FilterSelect label="Marca" value={marca || "TODAS"} onChange={v => setMarca(v === "TODAS" ? "" : v)} placeholder="Todas" options={[{value:"TODAS",label:"Todas"}, ...dimensionOptions.marcas.map(value=>({value,label:value}))]} />
-          <FilterSelect label="Tipo de máquina" value={tipoMaquina || "TODOS"} onChange={v => setTipoMaquina(v === "TODOS" ? "" : v)} placeholder="Todos" options={[{value:"TODOS",label:"Todos"}, ...dimensionOptions.tipos.map(value=>({value,label:value}))]} />
-        </>}
-        {area === "servicios" && <>
-          {SERVICE_FILTER_FIELDS.map(([key,label]) => <ServiceSalesTextFilter key={`${key}-${serviceFiltersReset}`} label={label} value={serviceFilters[key] ?? ""} onChange={value=>changeServiceFilter(key,value)} />)}
-          <FilterSelect label="Componente" value={serviceFilters.componente || "TODOS"} onChange={v=>changeServiceFilter("componente",v === "TODOS" ? "" : v)} placeholder="Todos" options={[{value:"TODOS",label:"Todos"}, ...["Servicio","Kilometraje","Repuestos","Terceros"].map(value=>({value,label:value === "Servicio" ? "Mano de obra" : value}))]} />
-          <FilterSelect label="Origen" value={serviceFilters.origen || "TODOS"} onChange={v=>changeServiceFilter("origen",v === "TODOS" ? "" : v)} placeholder="Todos" options={[{value:"TODOS",label:"Todos"},{value:"historico",label:"Histórico"},{value:"actual",label:"Actual"}]} />
-          <FilterSelect label="Documento" value={serviceFilters.documento || "TODOS"} onChange={v=>changeServiceFilter("documento",v === "TODOS" ? "" : v)} placeholder="Todos" options={[{value:"TODOS",label:"Todos"},{value:"factura",label:"Factura"},{value:"nc",label:"Nota de crédito"}]} />
-          <FilterSelect label="Vínculo OS" value={serviceFilters.vinculo || "TODOS"} onChange={v=>changeServiceFilter("vinculo",v === "TODOS" ? "" : v)} placeholder="Todos" options={[{value:"TODOS",label:"Todos"},{value:"con_os",label:"Con OS"},{value:"sin_os",label:"Sin OS"}]} />
-        </>}
       </FiltersBar>
       <SalesMobileTabs selectedPeriod={selectedPeriod} desde={explorerRange.desde} hasta={explorerRange.hasta} onClear={() => setSelectedPeriod(null)} />
       {area === "servicios" && machineOptionsError && <p role="alert" className="text-xs text-destructive">{machineOptionsError}</p>}
-      {area === "repuestos" ? <RepuestosVentas desde={desde} hasta={hasta} sucursal={sucursal} buscar={buscar} periodMode={periodMode} selectedPeriod={selectedPeriod} onSelectPeriod={setSelectedPeriod} /> : error ? <ErrorState description={error} onRetry={() => void load()} /> : <>
+      {area === "repuestos" && partsOptionsError && <p role="alert" className="text-xs text-destructive">{partsOptionsError}</p>}
+      {area === "repuestos" ? <RepuestosVentas desde={desde} hasta={hasta} sucursal={sucursal} buscar={buscar} marca={partsBrand} vendedor={partsSeller} periodMode={periodMode} selectedPeriod={selectedPeriod} onSelectPeriod={setSelectedPeriod} /> : error ? <ErrorState description={error} onRetry={() => void load()} /> : <>
         {mobile.active ? <SalesMobileSummary billing={loading || !summary ? "—" : usd.format(summary.total)} quantityLabel={area === "servicios" ? "OS" : "Unidades"} quantityTitle={area === "servicios" ? "Órdenes de servicio" : "Unidades netas"} quantity={loading || !summary ? "—" : (area === "servicios" ? serviciosSummary?.ordenes ?? 0 : maquinasData?.resumen.netas ?? 0).toLocaleString("es-PY")} clients={loading || !summary ? "—" : summary.clientes.toLocaleString("es-PY")} /> :
           <KpiStrip><KpiItem label="Facturado" value={loading || !summary ? "—" : usd.format(summary?.total ?? 0)} icon={<Receipt />} /><KpiItem label={area === "servicios" ? "Órdenes de servicio" : area === "maquinas" ? "Unidades netas" : "Facturas"} value={loading || !summary ? "—" : (area === "servicios" ? serviciosSummary?.ordenes ?? 0 : area === "maquinas" ? maquinasData?.resumen.netas ?? 0 : data?.facturas ?? 0).toLocaleString("es-PY")} icon={<FileText />} /><KpiItem label={area === "maquinas" ? "Clientes facturados" : "Clientes"} value={loading || !summary ? "—" : (summary?.clientes ?? 0).toLocaleString("es-PY")} icon={<Users />} /><KpiItem label={area === "servicios" ? "Promedio por OS" : area === "maquinas" ? "Promedio por unidad neta" : "Promedio por factura"} value={loading || !summary ? "—" : usd.format(averageValue)} /></KpiStrip>}
         <SalesMobileAverage label={area === "servicios" ? "Promedio por OS · rango general" : "Promedio por unidad neta · rango general"} value={loading || !summary ? "—" : usd.format(averageValue)} />

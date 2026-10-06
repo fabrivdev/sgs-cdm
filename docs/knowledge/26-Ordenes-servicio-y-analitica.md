@@ -244,6 +244,14 @@ Regla vigente que reemplaza el selector histórico de cuatro opciones: **Todos /
 
 Comprobaciones locales: pruebas de clasificación complementaria (Activos + Inactivos = Todos), estado inicial en 320/768/1280, indicadores/exportación con ambos tipos de inactivos, ausencia de meta inventada y población financiera consistente. Revisión en navegador a 320 px con componentes reales y datos ficticios: tres botones compactos, Activos inicial, cambio a Inactivos sin desbordamiento. No requiere SQL ni acredita despliegue o sincronización de Obsidian.
 
+## Jerarquía compacta de Productividad — 06/10/2026
+
+Ajuste exclusivamente visual de `OrdenesServicio.tsx`: cuando el rango solicitado incluye el histórico anterior al sistema nuevo, «Productividad · desde — hasta» comparte la fila del título «Órdenes de servicio» y puede envolver debajo en anchos estrechos. «Histórico en Órdenes» conserva su acción y queda como acceso independiente; no cambia el rango solicitado ni el tramo medible.
+
+La acción «N incidencias · Revisar» se presenta en el encabezado de `ProductivityTable.tsx`, junto a «Por técnico» y al selector Todos/Activos/Inactivos; se alinea a la derecha cuando hay ancho y envuelve dentro del mismo encabezado cuando no lo hay. Conserva el mismo conjunto `productivity.issues`, el drawer `__issues__` y el anuncio accesible. Las advertencias de facturación siguen separadas y una coincidencia de ambas no duplica regiones de alerta. No se modificaron horas, metas, eficiencia, filtros, fuentes, exportaciones, permisos ni callbacks.
+
+Validación local sólo por código: 73/73 pruebas de `OrdenesServicio.test.tsx` en ejecución secuencial, con relaciones de contenedor verificadas a 320/768/1280 px y callbacks de histórico/revisión; ESLint focal sin errores. La captura se usó como referencia de composición, sin navegar la aplicación. No requiere SQL ni acredita despliegue, datos productivos o sincronización de Obsidian.
+
 ## Rangos rápidos, altura de listas y lectura anual — 29/09/2026
 
 `QuickPeriodFilter.tsx` ofrece Personalizado, Semana actual/anterior/anterior + actual, Este mes, Últimos 6/12 meses y Este año en los filtros con dos fechas de Órdenes, Comisiones, historial OS de Trabajos e historial de máquina. Una edición manual de fechas deja el selector en Personalizado. En Órdenes, los períodos actuales terminan hoy para no añadir capacidad futura a Productividad; las opciones de más de un mes agrupan por mes. Ventas y Dashboard conservan sus selectores existentes. Las fechas de formularios, disponibilidad y cortes únicos no son filtros de período y no cambian.

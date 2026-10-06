@@ -24,7 +24,7 @@ import { useSalesSectionExport } from "./SalesSectionExports";
 import { SalesSortButton } from "./SalesTableControls";
 import type { SalesColumn, SalesSort } from "./salesTableInteraction";
 
-type Filters = { desde: string; hasta: string; sucursal: string; buscar: string };
+type Filters = { desde: string; hasta: string; sucursal: string; buscar: string; marca: string; vendedor: string };
 export type PartsMetrics = {
   facturado: number; ventas: number; notas_credito: number; clientes: number;
   documentos: number; documentos_nc: number; lineas: number; unidades_netas: number | null;
@@ -61,6 +61,16 @@ const brand = (value?: string) => value === "CLAAS" || value === "HORSCH" ? valu
 function params(filters: Filters) {
   return { p_desde: filters.desde, p_hasta: filters.hasta, p_sucursal: filters.sucursal === "TODAS" ? null : filters.sucursal, p_buscar: filters.buscar.trim() || null };
 }
+function hasAdvancedFilters(filters: Filters) {
+  return Boolean(filters.marca || filters.vendedor);
+}
+function reportParams(filters: Filters) {
+  return {
+    ...params(filters),
+    p_marca: filters.marca || null,
+    p_vendedor: filters.vendedor || null,
+  };
+}
 async function rpc<T>(name: string, args: Record<string, unknown>, signal: AbortSignal): Promise<T> {
   const result = await (supabase as any).rpc(name, args).abortSignal(signal);
   if (result.error) {
@@ -72,8 +82,11 @@ async function rpc<T>(name: string, args: Record<string, unknown>, signal: Abort
   return result.data as T;
 }
 function useOverview(filters: Filters, mode: PeriodMode) {
-  return useQuery({ queryKey: ["ventas-repuestos-panorama-v2", params(filters), mode],
-    queryFn: ({ signal }) => rpc<PartsOverview>("ventas_repuestos_panorama_v2", { ...params(filters), p_agrupacion: mode }, signal),
+  const filtered = hasAdvancedFilters(filters);
+  const name = filtered ? "ventas_repuestos_panorama_filtros_v1" : "ventas_repuestos_panorama_v2";
+  const args = filtered ? reportParams(filters) : params(filters);
+  return useQuery({ queryKey: [name, args, mode],
+    queryFn: ({ signal }) => rpc<PartsOverview>(name, { ...args, p_agrupacion: mode }, signal),
     enabled: validRange(filters), retry: false, staleTime: 60_000, refetchOnWindowFocus: false });
 }
 function State({ loading, error, retry }: { loading?: boolean; error?: Error | null; retry?: () => void }) {
@@ -196,11 +209,14 @@ function Listing({ filters, view }: { filters: Filters; view: "vendedores" | "cl
   const [sort, setSort] = useState<SalesSort>({ key: view === "detalle" ? "fecha" : "facturado", direction: "desc" });
   const toggleSort = (key: string) => setSort(prev => ({ key, direction: prev.key === key && prev.direction === "asc" ? "desc" : "asc" }));
   const columns = listingColumns(view, 0);
+  const filtered = hasAdvancedFilters(filters);
+  const reportName = filtered ? "ventas_repuestos_listado_filtros_v1" : "ventas_repuestos_listado_v3";
+  const reportArgs = filtered ? reportParams(filters) : params(filters);
   const exportController = useRef<AbortController | null>(null);
   useEffect(() => () => exportController.current?.abort(), []);
-  const query = useInfiniteQuery({ queryKey: ["ventas-repuestos-listado-v3", params(filters), view, sort],
+  const query = useInfiniteQuery({ queryKey: [reportName, reportArgs, view, sort],
     initialPageParam: 1,
-    queryFn: ({ pageParam, signal }) => rpc<PartsListing>("ventas_repuestos_listado_v3", { ...params(filters), p_vista: view, p_pagina: pageParam, p_por_pagina: 50, p_orden: sort.key, p_direccion: sort.direction }, signal),
+    queryFn: ({ pageParam, signal }) => rpc<PartsListing>(reportName, { ...reportArgs, p_vista: view, p_pagina: pageParam, p_por_pagina: 50, p_orden: sort.key, p_direccion: sort.direction }, signal),
     getNextPageParam: (last: PartsListing) => last.pagina < last.paginas ? last.pagina + 1 : undefined,
     enabled: validRange(filters), retry: false, staleTime: 60_000, refetchOnWindowFocus: false });
   const sentinel = useRef<HTMLTableRowElement | null>(null);
@@ -215,10 +231,10 @@ function Listing({ filters, view }: { filters: Filters; view: "vendedores" | "cl
   useSalesSectionExport({ id: `ventas-repuestos-${view}.xlsx`, label: `Exportar ${{ vendedores: "Vendedores", clientes: "Clientes", repuestos: "Repuestos", detalle: "Detalle" }[view]}`,
     disabled: query.isFetching || !!query.error || !query.data?.pages[0]?.total,
     onSelect: async () => {
-      const args = { ...params(filters), p_vista: view, p_orden: sort.key, p_direccion: sort.direction, p_exportar: true };
+      const args = { ...reportArgs, p_vista: view, p_orden: sort.key, p_direccion: sort.direction, p_exportar: true };
       const controller = new AbortController(); exportController.current = controller;
       try {
-        const full = await rpc<PartsListing>("ventas_repuestos_listado_v3", args, controller.signal);
+        const full = await rpc<PartsListing>(reportName, args, controller.signal);
         if (full.filas.length !== full.total) throw new Error("La exportación está incompleta. No se generó un archivo parcial.");
         const { exportSalesTable } = await import("./salesTableExport");
         if (controller.signal.aborted) throw new Error("La exportación fue cancelada.");
@@ -246,17 +262,17 @@ function Listing({ filters, view }: { filters: Filters; view: "vendedores" | "cl
     </tbody>
   </Table></div>;
 }
-export function RepuestosVentas({ desde, hasta, sucursal, buscar, periodMode, selectedPeriod, onSelectPeriod }: Filters & {
+export function RepuestosVentas({ desde, hasta, sucursal, buscar, marca, vendedor, periodMode, selectedPeriod, onSelectPeriod }: Filters & {
   periodMode: PeriodMode; selectedPeriod: string | null; onSelectPeriod: (value: string | null) => void;
 }) {
-  const filters = { desde, hasta, sucursal, buscar };
+  const filters = { desde, hasta, sucursal, buscar, marca, vendedor };
   const range = partsRange(filters, selectedPeriod, periodMode);
   const focused = { ...filters, ...range };
   const panorama = useOverview(filters, periodMode);
   const overview = useOverview(focused, periodMode); // Misma clave sin selección: React Query comparte la petición.
   const mobile = useSalesMobile();
   const [view, setView] = useSalesExplorerView<View>("resumen", "detalle");
-  useEffect(() => { onSelectPeriod(null); }, [buscar, onSelectPeriod]);
+  useEffect(() => { onSelectPeriod(null); }, [buscar, marca, onSelectPeriod, vendedor]);
   const history = useQuery({ queryKey: ["ventas-repuestos-estado-historico"],
     queryFn: ({ signal }) => rpc<{ cargado: boolean; notas_credito_verificadas: boolean }>("ventas_repuestos_estado_historico_v1", {}, signal),
     enabled: validRange(filters), retry: false, staleTime: 60_000, refetchOnWindowFocus: false });

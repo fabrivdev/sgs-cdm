@@ -115,10 +115,11 @@ export function OrdersWorkspace() {
 
   return <PageShell className="service-orders-workspace">
     <Tabs value={tab} onValueChange={setTab} className="min-w-0 space-y-3">
-      <PageHeader title="Órdenes de servicio" actions={phone && !blocked ? <SalesSectionExportMenu /> : undefined}
+      <PageHeader title="Órdenes de servicio" titleAccessory={!blocked && tab === "productividad" && workPeriod.includesLegacy && workEligible
+        ? <span role="status" className="text-[12px] font-normal leading-5 text-muted-foreground">Productividad · {operationsDate(workPeriod.from)} — {operationsDate(workPeriod.to)}</span>
+        : undefined} actions={phone && !blocked ? <SalesSectionExportMenu /> : undefined}
         tabs={<TabsList aria-label="Vistas de órdenes de servicio"><TabsTrigger value="ordenes">Órdenes</TabsTrigger><TabsTrigger value="productividad">Productividad</TabsTrigger><TabsTrigger value="cumplimiento">Cumplimiento</TabsTrigger></TabsList>} />
-      {!blocked && tab === "productividad" && workPeriod.includesLegacy && workEligible && <div role="status" className="flex flex-wrap items-center gap-x-3 gap-y-1 text-[12px] text-muted-foreground">
-        <span>Productividad · {operationsDate(workPeriod.from)} — {operationsDate(workPeriod.to)}</span>
+      {!blocked && tab === "productividad" && workPeriod.includesLegacy && workEligible && <div className="flex min-h-0 items-center text-[12px]">
         <button type="button" onClick={() => setTab("ordenes")} className="min-h-11 text-primary hover:underline sm:min-h-0">Histórico en Órdenes</button>
       </div>}
       {!blocked && tab !== "cumplimiento" && <KpiStrip>
@@ -156,15 +157,12 @@ export function OrdersWorkspace() {
         <FilterMultiSelect label="Sucursal" values={filters.fSucursales} onChange={v => change("fSucursales", v)} options={SUCURSALES.map(value => ({ value, label: value }))} />
       </FiltersBar>
       {!valid ? <p role="alert" className="text-sm text-destructive">Seleccioná un rango de fechas válido.</p> : query.isError ? <div role="alert" className="space-y-2 text-sm"><p>No se pudieron cargar todas las fuentes. No se muestran resultados parciales.</p><Button variant="outline" size="sm" onClick={() => query.refetch()}>Reintentar</Button></div> : blocked ? <p role="status" className="py-8 text-center text-sm text-muted-foreground">Cargando órdenes y actividad…</p> : <>
-        {(billingFailed || (tab === "productividad" && productivityPartial)) && <div role="alert" className="flex flex-wrap gap-2 text-[12px] text-amber-800">
-          {billingFailed && <div className="inline-flex min-h-9 items-center gap-1 rounded-full bg-amber-50 px-2.5">
+        {billingFailed && <div role="alert" className="flex flex-wrap gap-2 text-[12px] text-amber-800">
+          <div className="inline-flex min-h-9 items-center gap-1 rounded-full bg-amber-50 px-2.5">
             <CircleAlert className="h-3.5 w-3.5 shrink-0" /><span>{billingWarning(financial.error)}</span>
             <Button variant="ghost" size="sm" onClick={() => financial.refetch()}>Reintentar</Button>
-          </div>}
-          {tab === "productividad" && productivityPartial && <div className="inline-flex min-h-9 items-center gap-1 rounded-full bg-amber-50 px-2.5">
-            <CircleAlert className="h-3.5 w-3.5 shrink-0" />
-            <Button variant="ghost" size="sm" onClick={() => setSelectedTechnician("__issues__")}>{productivity.issues.length} {productivity.issues.length === 1 ? "incidencia" : "incidencias"} · Revisar</Button>
-          </div>}
+          </div>
+          {tab === "productividad" && productivityPartial && <span className="sr-only">{productivity.issues.length} {productivity.issues.length === 1 ? "incidencia" : "incidencias"} · Revisar</span>}
         </div>}
         <TabsContent value="ordenes" className="min-w-0 space-y-3">
           <OrdersTable rows={financialRows} billingLoading={billingLoading} billingFailed={billingFailed} from={filters.dateFrom} to={filters.dateTo} />
@@ -175,7 +173,11 @@ export function OrdersWorkspace() {
             : work.isError ? <div role="alert" className="text-[12px]">No se pudieron cargar las jornadas trabajadas.<Button variant="ghost" size="sm" onClick={() => work.refetch()}>Reintentar</Button></div>
             : !workReady ? <p role="status" className="py-6 text-center text-[12px] text-muted-foreground">Cargando jornadas trabajadas…</p>
               : <>
-                <ProductivityTable rows={productivity.tecnicos} period={productivity.period} onSelect={selectTechnician} status={technicianStatus} onStatusChange={setTechnicianStatus} />
+                <ProductivityTable rows={productivity.tecnicos} period={productivity.period} onSelect={selectTechnician} status={technicianStatus} onStatusChange={setTechnicianStatus}
+                  issuesAction={productivityPartial ? <div role={billingFailed ? undefined : "alert"} className="inline-flex min-h-8 shrink-0 items-center gap-1 rounded-full bg-amber-50 px-2 text-[12px] text-amber-800">
+                    <CircleAlert className="h-3.5 w-3.5 shrink-0" />
+                    <Button variant="ghost" size="sm" onClick={() => setSelectedTechnician("__issues__")}>{productivity.issues.length} {productivity.issues.length === 1 ? "incidencia" : "incidencias"} · Revisar</Button>
+                  </div> : undefined} />
                 <OperationalEvolution rows={productivityPeriods} worked onPeriod={(from, to) => setFilters(previous => ({ ...previous, dateFrom: from, dateTo: to }))} />
               </>}
         </TabsContent>

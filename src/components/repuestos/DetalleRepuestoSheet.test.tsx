@@ -78,8 +78,9 @@ describe("compact part history sheet", () => {
   it("retains narrow-screen secondary values in hover and the complete typed export", async () => {
     setup(); const first = cells()[0]; expect(first[2]).toHaveClass("hidden", "sm:table-cell"); expect(first[4]).toHaveClass("hidden", "sm:table-cell");
     expect(first[1]).toHaveAttribute("title", "000001 · CLIENTE ALFA · P. unit.: $ 8,44");
-    const filters = screen.getByRole("button", { name: /Más filtros/ }); const actions = screen.getByRole("button", { name: "Acciones de la sección" });
-    expect(filters.nextElementSibling).toContainElement(actions);
+    const actions = screen.getByRole("button", { name: "Acciones de la sección" });
+    expect(screen.queryByRole("button", { name: /Más filtros/ })).not.toBeInTheDocument();
+    expect(actions).toBeInTheDocument();
     fireEvent.keyDown(actions, { key: "Enter" }); fireEvent.click(await screen.findByRole("menuitem", { name: "Exportar Historial de facturas" }));
     await waitFor(() => expect(mocks.export).toHaveBeenCalled()); const exported = mocks.export.mock.calls[0][0];
     expect(exported.rows).toHaveLength(3); expect(exported.rows[0]).toEqual(converted);

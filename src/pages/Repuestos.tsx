@@ -154,10 +154,12 @@ export default function Repuestos() {
           { id: "branches", label: "Exportar stock por sucursal", disabled: matrizQuery.isFetching || matrizQuery.isError || !rows.length, onSelect: () => exportar("sucursales") },
           { id: "history", label: "Exportar informe maestro de stock + ventas (marcas)", disabled: matrizQuery.isFetching || matrizQuery.isError, onSelect: () => exportar("historico") },
         ]} /> : undefined}
+        expanded={<>
+          <FilterMultiSelect label="Familia" values={filtros.familias} onChange={(familias) => setFiltros((current) => ({ ...current, familias }))} placeholder="Todas" width="w-full" options={(familiasQuery.data ?? []).map((value) => ({ value, label: value }))} />
+          <FilterMultiSelect label="Existencia" values={filtros.estadosStock} onChange={(estadosStock) => setFiltros((current) => ({ ...current, estadosStock: estadosStock as StockFiltros["estadosStock"] }))} placeholder="Todos" width="w-full" options={[{ value: "con_stock", label: "Con stock" }, { value: "sin_stock", label: "Sin stock" }]} />
+        </>}
       >
         <FilterMultiSelect label="Marca" values={filtros.marcas} onChange={(marcas) => setFiltros((current) => ({ ...current, marcas }))} placeholder="Todas" width="w-[140px]" options={MARCAS.map((value) => ({ value, label: value }))} />
-        <FilterMultiSelect label="Familia" values={filtros.familias} onChange={(familias) => setFiltros((current) => ({ ...current, familias }))} placeholder="Todas" width="w-[180px]" options={(familiasQuery.data ?? []).map((value) => ({ value, label: value }))} />
-        <FilterMultiSelect label="Existencia" values={filtros.estadosStock} onChange={(estadosStock) => setFiltros((current) => ({ ...current, estadosStock: estadosStock as StockFiltros["estadosStock"] }))} placeholder="Todos" width="w-[140px]" options={[{ value: "con_stock", label: "Con stock" }, { value: "sin_stock", label: "Sin stock" }]} />
       </FiltersBar>
 
       <Card className="overflow-hidden">

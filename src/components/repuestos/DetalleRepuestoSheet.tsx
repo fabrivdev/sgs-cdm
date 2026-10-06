@@ -1,6 +1,6 @@
 import { useSectionTable } from "@/components/exports/useSectionTable";
 import { SectionActionsMenu } from "@/components/exports/SectionActionsMenu";
-import { FiltersBar, FilterCustom } from "@/components/filters/FiltersBar";
+import { FiltersBar } from "@/components/filters/FiltersBar";
 import type { SalesColumn, SalesSort } from "@/components/ventas/salesTableInteraction";
 import type { VentaRepuestoHistorial } from "@/hooks/useRepuestos";
 import { useEffect, useMemo, useState } from "react";
@@ -806,8 +806,7 @@ export function DetalleRepuestoSheet({
               {(tab==="ventas"||tab==="sucursales") && <FiltersBar
                 search={{value:tableSearch,onChange:setTableSearch,placeholder:"Buscar en esta tabla…"}}
                 activeCount={Number(!!term)} onClear={()=>setTableSearch("")}
-                secondaryActions={<SectionActionsMenu options={activeAction?[activeAction]:[]}/>}
-                expanded={<FilterCustom label="Buscar en esta tabla"><Input value={tableSearch} onChange={e=>setTableSearch(e.target.value)} /></FilterCustom>}/>}
+                secondaryActions={<SectionActionsMenu options={activeAction?[activeAction]:[]}/>}/>}
               <TabsContent value="sucursales" className="mt-0 min-h-0 flex-1 overflow-hidden data-[state=inactive]:hidden">
                 <div className="h-full overflow-auto">
                   <Table className="table-fixed" aria-label="Stock y ventas por sucursal">

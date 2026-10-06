@@ -7444,6 +7444,23 @@ export type Database = {
         }
         Returns: Json
       }
+      ventas_repuestos_listado_filtros_v1: {
+        Args: {
+          p_buscar?: string
+          p_desde: string
+          p_direccion?: string
+          p_exportar?: boolean
+          p_hasta: string
+          p_marca?: string
+          p_orden?: string
+          p_pagina?: number
+          p_por_pagina?: number
+          p_sucursal?: string
+          p_vendedor?: string
+          p_vista?: string
+        }
+        Returns: Json
+      }
       ventas_repuestos_movimientos_v1: {
         Args: {
           p_buscar: string
@@ -7492,6 +7509,33 @@ export type Database = {
           vendedor: string
         }[]
       }
+      ventas_repuestos_movimientos_filtrados_v1: {
+        Args: {
+          p_buscar: string
+          p_desde: string
+          p_hasta: string
+          p_marca: string
+          p_sucursal: string
+          p_vendedor: string
+        }
+        Returns: {
+          cantidad: number
+          cliente: string
+          codigo: string
+          codigo_fabricante: string
+          descripcion: string
+          documento: string
+          es_nota_credito: boolean
+          factura: string
+          fecha: string
+          id: string
+          importe: number
+          marca: string
+          metodologia: string
+          sucursal: string
+          vendedor: string
+        }[]
+      }
       ventas_repuestos_normalizar_vendedor: {
         Args: { p_nombre: string }
         Returns: string
@@ -7513,6 +7557,18 @@ export type Database = {
           p_desde: string
           p_hasta: string
           p_sucursal?: string
+        }
+        Returns: Json
+      }
+      ventas_repuestos_panorama_filtros_v1: {
+        Args: {
+          p_agrupacion?: string
+          p_buscar?: string
+          p_desde: string
+          p_hasta: string
+          p_marca?: string
+          p_sucursal?: string
+          p_vendedor?: string
         }
         Returns: Json
       }

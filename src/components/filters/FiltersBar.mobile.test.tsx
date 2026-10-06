@@ -37,6 +37,7 @@ describe('compact mobile filter bar',()=>{
  it('recognizes useful content inside nested fragments and exposes the drawer state',()=>{
   render(<FiltersBar search={{value:'',onChange:vi.fn()}}><><Fragment><FilterSelect label="Marca" value="all" onChange={()=>{}} placeholder="Todas" options={[{value:'all',label:'Todas'}]}/></Fragment></></FiltersBar>);
   const filters=screen.getByRole('button',{name:'Más filtros'});
+  expect(filters).toHaveClass('sm:hidden');
   expect(filters).toHaveAttribute('aria-expanded','false');
   expect(filters).toHaveAttribute('aria-controls');
   fireEvent.click(filters);
@@ -49,5 +50,21 @@ describe('compact mobile filter bar',()=>{
  it('does not count an empty expanded fragment as additional filters',()=>{
   render(<FiltersBar search={{value:'',onChange:vi.fn()}} activeCount={1} onClear={vi.fn()} expanded={<>{false}{null}</>} secondaryActions={<button>Exportación</button>}/>);
   expect(screen.queryByRole('button',{name:'Más filtros'})).not.toBeInTheDocument();
+ });
+
+ it('separates desktop secondary filters from mobile primary controls',()=>{
+  render(<FiltersBar
+    search={{value:'',onChange:vi.fn()}}
+    expanded={<FilterSelect label="Vendedor" value="all" onChange={()=>{}} placeholder="Todos" options={[{value:'all',label:'Todos'}]}/>}
+  >
+    <FilterSelect label="Sucursal" value="all" onChange={()=>{}} placeholder="Todas" options={[{value:'all',label:'Todas'}]}/>
+  </FiltersBar>);
+  const filters=screen.getByRole('button',{name:'Más filtros'});
+  expect(filters).not.toHaveClass('sm:hidden');
+  fireEvent.click(filters);
+  const panel=screen.getByRole('dialog');
+  expect(panel.querySelector('[data-primary-filter-panel]')).toHaveClass('sm:hidden');
+  expect(panel.querySelector('[data-primary-filter-panel]')).toHaveTextContent('Sucursal');
+  expect(panel.querySelector('[data-expanded-filter-panel]')).toHaveTextContent('Vendedor');
  });
 });

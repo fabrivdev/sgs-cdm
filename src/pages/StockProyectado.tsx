@@ -37,6 +37,10 @@ export default function StockProyectado() {
   const [q, setQ] = useState("");
   const [brand, setBrand] = useState("all");
   const [type, setType] = useState("all");
+  const [model, setModel] = useState("all");
+  const [projectedState, setProjectedState] = useState("all");
+  const [purchaseOrders, setPurchaseOrders] = useState("all");
+  const [pendingSales, setPendingSales] = useState("all");
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -58,6 +62,7 @@ export default function StockProyectado() {
   const options = useMemo(() => ({
     brands: [...new Set(rows.map((row) => row.marca))].sort(),
     types: [...new Set(rows.map((row) => row.tipo))].sort(),
+    models: [...new Set(rows.map((row) => row.modelo))].sort(),
   }), [rows]);
 
   const filtered = useMemo(() => {
@@ -65,10 +70,18 @@ export default function StockProyectado() {
     return rows.filter((row) => {
       if (brand !== "all" && row.marca !== brand) return false;
       if (type !== "all" && row.tipo !== type) return false;
+      if (model !== "all" && row.modelo !== model) return false;
+      if (projectedState === "negative" && row.stock_proyectado >= 0) return false;
+      if (projectedState === "zero" && row.stock_proyectado !== 0) return false;
+      if (projectedState === "positive" && row.stock_proyectado <= 0) return false;
+      if (purchaseOrders === "with" && row.pedidos_compra <= 0) return false;
+      if (purchaseOrders === "without" && row.pedidos_compra !== 0) return false;
+      if (pendingSales === "with" && row.ventas_pendientes <= 0) return false;
+      if (pendingSales === "without" && row.ventas_pendientes !== 0) return false;
       return !term || [row.marca, row.tipo, row.modelo]
         .some((value) => value.toLocaleUpperCase("es").includes(term));
     });
-  }, [brand, q, rows, type]);
+  }, [brand, model, pendingSales, projectedState, purchaseOrders, q, rows, type]);
 
   const totals = useMemo(() => projectedStockTotals(filtered), [filtered]);
   const columns: SalesColumn<ProjectedMachineStockRow>[] = [
@@ -115,8 +128,13 @@ export default function StockProyectado() {
       ) : String(column.value(row) ?? "—"),
     };
   });
-  const activeCount = (q ? 1 : 0) + (brand !== "all" ? 1 : 0) + (type !== "all" ? 1 : 0);
-  const clear = () => { setQ(""); setBrand("all"); setType("all"); };
+  const activeCount = (q ? 1 : 0) + (brand !== "all" ? 1 : 0) + (type !== "all" ? 1 : 0)
+    + (model !== "all" ? 1 : 0) + (projectedState !== "all" ? 1 : 0)
+    + (purchaseOrders !== "all" ? 1 : 0) + (pendingSales !== "all" ? 1 : 0);
+  const clear = () => {
+    setQ(""); setBrand("all"); setType("all"); setModel("all");
+    setProjectedState("all"); setPurchaseOrders("all"); setPendingSales("all");
+  };
 
   return (
     <div className={pageShell}>
@@ -134,6 +152,19 @@ export default function StockProyectado() {
           activeCount={activeCount}
           onClear={clear}
           secondaryActions={can("datos:exportar") ? <SectionActionsMenu options={table.action ? [table.action] : []} /> : undefined}
+          expanded={<>
+            <FilterSelect label="Modelo" value={model} onChange={setModel} placeholder="Modelo" width="w-full" options={[{ value: "all", label: "Todos" }, ...options.models.map((value) => ({ value, label: value }))]} />
+            <FilterSelect label="Stock proyectado" value={projectedState} onChange={setProjectedState} placeholder="Todos" width="w-full" options={[
+              { value: "all", label: "Todos" }, { value: "negative", label: "Negativo" },
+              { value: "zero", label: "En cero" }, { value: "positive", label: "Positivo" },
+            ]} />
+            <FilterSelect label="Órdenes de compra" value={purchaseOrders} onChange={setPurchaseOrders} placeholder="Todas" width="w-full" options={[
+              { value: "all", label: "Todas" }, { value: "with", label: "Con OC" }, { value: "without", label: "Sin OC" },
+            ]} />
+            <FilterSelect label="Ventas pendientes" value={pendingSales} onChange={setPendingSales} placeholder="Todas" width="w-full" options={[
+              { value: "all", label: "Todas" }, { value: "with", label: "Con pendientes" }, { value: "without", label: "Sin pendientes" },
+            ]} />
+          </>}
         >
           <FilterDate label="Fecha de corte" min={PROJECTED_STOCK_START} max={today()} value={cutoff} onChange={setCutoff} />
           <FilterSelect label="Marca" value={brand} onChange={setBrand} placeholder="Marca" options={[{ value: "all", label: "Todas" }, ...options.brands.map((value) => ({ value, label: value }))]} />

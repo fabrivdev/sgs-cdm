@@ -3,9 +3,11 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 import { cleanup, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { RepuestosVentas, type PartsListing, type PartsOverview } from "./RepuestosVentas";
+import { SalesSectionExportMenu, SalesSectionExportsProvider } from "./SalesSectionExports";
 const { rpc } = vi.hoisted(() => ({ rpc: vi.fn() }));
 vi.mock("@/integrations/supabase/client", () => ({ supabase: { rpc } }));
 vi.mock("@/hooks/useAuth", () => ({ useAuth: () => ({ can: () => true }) }));
+vi.mock("./salesTableExport", () => ({ exportSalesTable: vi.fn() }));
 afterEach(() => { cleanup(); rpc.mockReset(); });
 const summary = { facturado: 125, ventas: 150, notas_credito: -25, clientes: 1, documentos: 2, documentos_nc: 1, lineas: 3, unidades_netas: 2 };
 const overview: PartsOverview = {
@@ -20,15 +22,15 @@ const detail: PartsListing = { total: 3, pagina: 1, paginas: 1, total_periodo: 1
 ] };
 function mockRpc() {
   rpc.mockImplementation((name: string, args: Record<string, unknown>) => ({ abortSignal: () => Promise.resolve({ error: null,
-    data: name === "ventas_repuestos_estado_historico_v1" ? { cargado: true, notas_credito_verificadas: true } : name === "ventas_repuestos_panorama_v2" ? overview
-       : args.p_vista === "detalle" ? detail : { ...detail, filas: [{ ...summary, id: "g1", cliente: "Cliente A", vendedor: "000007 – CARLOS JAVIER BENITEZ ZARZA", codigo: "REP1", codigo_fabricante: "FAB1", descripcion: "Rodamiento", marca: "CLAAS", abc: "A", anterior: 50, ultima: "2026-08-10" }] },
+    data: name === "ventas_repuestos_estado_historico_v1" ? { cargado: true, notas_credito_verificadas: true } : name.includes("panorama") ? overview
+       : args.p_vista === "detalle" ? detail : { ...detail, filas: [{ ...summary, id: "g1", cliente: "Cliente A", vendedor: "000007 - CARLOS JAVIER BENITEZ ZARZA", codigo: "REP1", codigo_fabricante: "FAB1", descripcion: "Rodamiento", marca: "CLAAS", abc: "A", anterior: 50, ultima: "2026-08-10" }] },
   }) }));
 }
-function Harness({ desde = "2026-01-01", hasta = "2026-09-15" }: { desde?: string; hasta?: string }) {
+function Harness({ desde = "2026-01-01", hasta = "2026-09-15", marca = "", vendedor = "" }: { desde?: string; hasta?: string; marca?: string; vendedor?: string }) {
   const [selected, setSelected] = useState<string | null>(null);
-  return <RepuestosVentas desde={desde} hasta={hasta} sucursal="TODAS" buscar="" periodMode="mes" selectedPeriod={selected} onSelectPeriod={setSelected} />;
+  return <RepuestosVentas desde={desde} hasta={hasta} sucursal="TODAS" buscar="" marca={marca} vendedor={vendedor} periodMode="mes" selectedPeriod={selected} onSelectPeriod={setSelected} />;
 }
-function setup(props?: { desde?: string; hasta?: string }) {
+function setup(props?: { desde?: string; hasta?: string; marca?: string; vendedor?: string }) {
   mockRpc();
   const client = new QueryClient({ defaultOptions: { queries: { retry: false }, mutations: { retry: false } } });
   return render(<QueryClientProvider client={client}><Harness {...props} /></QueryClientProvider>);
@@ -89,6 +91,25 @@ describe("Ventas de Repuestos", () => {
     expect(summaryHeads).toEqual(periodHeads);
     expect(screen.getByText("Total del período")).toBeInTheDocument();
     expect(within(tables[0]).getAllByRole("row")).toHaveLength(3); // Cabecera, período y total.
+  });
+  it("aplica Marca y Vendedor antes de panorama, listados paginados y exportación", async () => {
+    mockRpc();
+    const client = new QueryClient({ defaultOptions: { queries: { retry: false }, mutations: { retry: false } } });
+    render(<QueryClientProvider client={client}><SalesSectionExportsProvider><SalesSectionExportMenu/><Harness marca="CLAAS" vendedor="CARLOS BENITEZ" /></SalesSectionExportsProvider></QueryClientProvider>);
+    await screen.findByText("CLAAS");
+    expect(rpc).toHaveBeenCalledWith("ventas_repuestos_panorama_filtros_v1", expect.objectContaining({
+      p_marca: "CLAAS", p_vendedor: "CARLOS BENITEZ",
+    }));
+    fireEvent.click(screen.getByRole("button", { name: "Detalle" }));
+    await screen.findByText("REP2");
+    expect(rpc).toHaveBeenCalledWith("ventas_repuestos_listado_filtros_v1", expect.objectContaining({
+      p_marca: "CLAAS", p_vendedor: "CARLOS BENITEZ", p_vista: "detalle", p_pagina: 1,
+    }));
+    fireEvent.keyDown(screen.getByRole("button", { name: "Acciones de la sección" }), { key: "Enter" });
+    fireEvent.click(await screen.findByRole("menuitem", { name: "Exportar Detalle" }));
+    await waitFor(() => expect(rpc).toHaveBeenCalledWith("ventas_repuestos_listado_filtros_v1", expect.objectContaining({
+      p_marca: "CLAAS", p_vendedor: "CARLOS BENITEZ", p_vista: "detalle", p_exportar: true,
+    })));
   });
   it("detalle plano: dos líneas repiten la factura, con ambos códigos y NC", async () => {
     setup(); fireEvent.click(screen.getByRole("button", { name: "Detalle" }));

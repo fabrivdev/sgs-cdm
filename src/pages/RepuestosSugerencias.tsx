@@ -622,6 +622,34 @@ export default function RepuestosSugerencias() {
         activeCount={Number(Boolean(filters.buscar)) + Number(brands.length > 0) + Number(Boolean(filters.segmentos?.length)) + Number(Boolean(filters.estados?.length)) + Number(Boolean(filters.soloSugeridos))}
         onClear={() => { setBrands([]); setFilters({ buscar: "", segmentos: [], estados: [], soloSugeridos: false }); setPage(1); }}
         secondaryActions={can("datos:exportar") ? <SectionActionsMenu busy={exportMutation.isPending} options={[{ id: "excel", label: "Exportar sugerencias", disabled: liveQuery.isFetching || !!liveQuery.error || !liveQuery.data?.total_filtrado, onSelect: () => exportMutation.mutate() }]} /> : undefined}
+        expanded={<>
+          <FilterMultiSelect
+            label="Segmento"
+            values={filters.segmentos ?? []}
+            onChange={(segmentos) => { setFilters((current) => ({ ...current, segmentos: segmentos.length === segmentOptions.length ? [] : segmentos })); setPage(1); }}
+            placeholder="Todos los segmentos"
+            options={segmentOptions.map((segmento) => ({ value: segmento, label: segmento }))}
+            width="w-full"
+          />
+          <FilterMultiSelect
+            label="Estado de datos"
+            values={filters.estados ?? []}
+            onChange={(estados) => { setFilters((current) => ({ ...current, estados: estados.length === 3 ? [] : estados })); setPage(1); }}
+            placeholder="Todos los estados"
+            options={[
+              { value: "LISTO", label: "Con historial reciente" },
+              { value: "CODIGO_NUEVO_SIN_HISTORIAL", label: "Nuevos sin historial" },
+              { value: "SIN_VENTAS_RECIENTES", label: "Anteriores sin ventas 24m" },
+            ]}
+            width="w-full"
+          />
+          <FilterCustom label="Sugerencia" width="w-full">
+            <label className="flex h-8 items-center gap-2 rounded-md border px-3 text-[12px] font-medium">
+              <Checkbox checked={filters.soloSugeridos} onCheckedChange={(checked) => { setFilters((current) => ({ ...current, soloSugeridos: checked === true })); setPage(1); }} />
+              Solo con sugerencia
+            </label>
+          </FilterCustom>
+        </>}
       >
         <FilterMultiSelect
           label="Marca"
@@ -641,33 +669,6 @@ export default function RepuestosSugerencias() {
           onChange={(value) => { setAnalysisDate(value); setPage(1); }}
           width="w-[150px]"
         />
-        <FilterMultiSelect
-          label="Segmento"
-          values={filters.segmentos ?? []}
-          onChange={(segmentos) => { setFilters((current) => ({ ...current, segmentos: segmentos.length === segmentOptions.length ? [] : segmentos })); setPage(1); }}
-          placeholder="Todos los segmentos"
-          options={segmentOptions.map((segmento) => ({ value: segmento, label: segmento }))}
-          width="w-[180px]"
-        />
-
-        <FilterMultiSelect
-          label="Estado de datos"
-          values={filters.estados ?? []}
-          onChange={(estados) => { setFilters((current) => ({ ...current, estados: estados.length === 3 ? [] : estados })); setPage(1); }}
-          placeholder="Todos los estados"
-          options={[
-            { value: "LISTO", label: "Con historial reciente" },
-            { value: "CODIGO_NUEVO_SIN_HISTORIAL", label: "Nuevos sin historial" },
-            { value: "SIN_VENTAS_RECIENTES", label: "Anteriores sin ventas 24m" },
-          ]}
-          width="w-[220px]"
-        />
-        <FilterCustom label="Sugerencia" width="w-[170px]">
-          <label className="flex h-8 items-center gap-2 rounded-md border px-3 text-[12px] font-medium">
-            <Checkbox checked={filters.soloSugeridos} onCheckedChange={(checked) => { setFilters((current) => ({ ...current, soloSugeridos: checked === true })); setPage(1); }} />
-            Solo con sugerencia
-          </label>
-        </FilterCustom>
       </FiltersBar>
 
       <Card className="overflow-hidden">

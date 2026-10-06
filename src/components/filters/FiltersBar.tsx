@@ -31,6 +31,7 @@ function hasFilterContent(node: ReactNode): boolean {
  * cortados a la mitad). Siguen disponibles en el panel lateral "Filtros".
  */
 function useOverflowHiding(ref: React.RefObject<HTMLDivElement>) {
+  const [hasOverflow, setHasOverflow] = useState(false);
   useLayoutEffect(() => {
     const el = ref.current;
     if (!el) return;
@@ -45,12 +46,14 @@ function useOverflowHiding(ref: React.RefObject<HTMLDivElement>) {
           item.classList.add("hidden");
         }
       });
+      setHasOverflow(hide);
     };
     apply();
     const ro = new ResizeObserver(() => apply());
     ro.observe(el);
     return () => ro.disconnect();
   });
+  return hasOverflow;
 }
 
 
@@ -116,12 +119,14 @@ export function FiltersBar({
   const [panelOpen, setPanelOpen] = useState(false);
   const panelId = useId();
   const rowRef = useRef<HTMLDivElement>(null);
-  useOverflowHiding(rowRef);
+  const hasOverflow = useOverflowHiding(rowRef);
 
   const [searchDraft, setSearchDraft] = useState(search?.value ?? "");
   const searchValue = search?.value;
   const searchOnChange = useRef(search?.onChange);
-  const hasAdditionalFilters = hasFilterContent(children) || hasFilterContent(expanded);
+  const hasPrimaryFilters = hasFilterContent(children);
+  const hasExpandedFilters = hasFilterContent(expanded);
+  const hasFilterPanel = hasPrimaryFilters || hasExpandedFilters;
 
   useEffect(() => {
     searchOnChange.current = search?.onChange;
@@ -197,12 +202,16 @@ export function FiltersBar({
         </div>
 
         <div className="flex shrink-0 items-end gap-0 sm:gap-2 sm:pl-2">
-          {hasAdditionalFilters && (
+          {hasFilterPanel && (
               <Button
                 type="button"
                 variant={activeCount > 0 ? "secondary" : "outline"}
                 size="sm"
-                className={cn(ctrl, "relative shrink-0 gap-1 whitespace-nowrap max-sm:h-11 max-sm:w-11 max-sm:border-0 max-sm:bg-transparent max-sm:px-0 max-sm:shadow-none")}
+                className={cn(
+                  ctrl,
+                  "relative shrink-0 gap-1 whitespace-nowrap max-sm:h-11 max-sm:w-11 max-sm:border-0 max-sm:bg-transparent max-sm:px-0 max-sm:shadow-none",
+                  !hasExpandedFilters && !hasOverflow && "sm:hidden",
+                )}
                 onClick={() => setPanelOpen(true)}
                 aria-expanded={panelOpen}
                 aria-controls={panelId}
@@ -229,8 +238,15 @@ export function FiltersBar({
             <SheetDescription className="sr-only">Filtros adicionales de la sección</SheetDescription>
           </SheetHeader>
           <div className="min-h-0 flex-1 space-y-3 overflow-y-auto px-4 py-4">
-            {children && <div className="flex flex-col gap-3">{children}</div>}
-            {expanded && <div className="flex flex-col gap-3">{expanded}</div>}
+            {hasPrimaryFilters && (
+              <div
+                data-primary-filter-panel={hasOverflow ? "overflow" : "mobile"}
+                className={cn("flex flex-col gap-3", !hasOverflow && "sm:hidden")}
+              >
+                {children}
+              </div>
+            )}
+            {hasExpandedFilters && <div data-expanded-filter-panel className="flex flex-col gap-3">{expanded}</div>}
             {actions && <div className="flex flex-col gap-2 border-t pt-3 sm:hidden">{actions}</div>}
           </div>
 

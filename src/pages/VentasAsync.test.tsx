@@ -60,17 +60,17 @@ beforeEach(() => {
 afterEach(() => { cleanup(); vi.useRealTimers(); vi.unstubAllGlobals(); rpc.mockReset(); });
 
 describe("Ventas machine request ownership", () => {
-  it("keeps the real shared filters available in Ventas de Repuestos", () => {
+  it("offers actual secondary filters in Ventas de Repuestos instead of only repeating the toolbar", () => {
     render(<Ventas area="repuestos" />);
     const trigger = screen.getByRole("button", { name: "Más filtros" });
     expect(trigger).toHaveAttribute("aria-expanded", "false");
     fireEvent.click(trigger);
     const panel = screen.getByRole("dialog");
     expect(trigger).toHaveAttribute("aria-expanded", "true");
-    expect(within(panel).getByText("Período rápido")).toBeInTheDocument();
-    expect(within(panel).getByText("Desde")).toBeInTheDocument();
-    expect(within(panel).getByText("Hasta")).toBeInTheDocument();
-    expect(within(panel).getByText("Sucursal")).toBeInTheDocument();
+    expect(panel.querySelector("[data-primary-filter-panel]")).toHaveClass("sm:hidden");
+    const secondary = panel.querySelector("[data-expanded-filter-panel]")!;
+    expect(within(secondary as HTMLElement).getByText("Marca")).toBeInTheDocument();
+    expect(within(secondary as HTMLElement).getByText("Vendedor")).toBeInTheDocument();
   });
 
   it.each([true, false])("keeps latest KPIs and periods when older success arrives last (mobile: %s)", async mobile => {

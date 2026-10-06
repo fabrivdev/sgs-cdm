@@ -7,11 +7,14 @@ export function PageShell({ children, className }: { children: ReactNode; classN
   return <main className={cn("w-full min-w-0 space-y-3 px-4 py-3 sm:px-5 sm:py-4 lg:px-6", className)}>{children}</main>;
 }
 
-export function PageHeader({ title, actions, tabs, meta, className }: { title: ReactNode; actions?: ReactNode; tabs?: ReactNode; meta?: ReactNode; className?: string }) {
+export function PageHeader({ title, titleAccessory, actions, tabs, meta, className }: { title: ReactNode; titleAccessory?: ReactNode; actions?: ReactNode; tabs?: ReactNode; meta?: ReactNode; className?: string }) {
   const phone = useIsMobile(640);
   if (phone) return <header className={cn("min-w-0 space-y-1", className)}>
     <div className="flex min-w-0 items-center justify-between gap-2">
-      <h1 className="min-w-0 break-words text-[18px] font-semibold leading-6 tracking-[-0.02em]">{title}</h1>
+      <div className="flex min-w-0 flex-wrap items-baseline gap-x-2 gap-y-0.5">
+        <h1 className="min-w-0 break-words text-[18px] font-semibold leading-6 tracking-[-0.02em]">{title}</h1>
+        {titleAccessory}
+      </div>
       {actions && <div className="flex shrink-0 items-center gap-1 [&_button]:min-h-11">{actions}</div>}
     </div>
     {meta && <div className={metaText}>{meta}</div>}
@@ -20,7 +23,10 @@ export function PageHeader({ title, actions, tabs, meta, className }: { title: R
   return <header className={cn("flex min-h-8 min-w-0 flex-col justify-center gap-1", className)}>
     <div className="flex min-w-0 flex-col gap-1 sm:flex-row sm:flex-wrap sm:items-center sm:justify-between sm:gap-x-3">
       <div className="min-w-0 sm:min-w-32 sm:flex-1">
-        <h1 className="truncate text-[18px] font-semibold leading-6 tracking-[-0.02em]">{title}</h1>
+        <div className="flex min-w-0 flex-wrap items-baseline gap-x-2 gap-y-0.5">
+          <h1 className="truncate text-[18px] font-semibold leading-6 tracking-[-0.02em]">{title}</h1>
+          {titleAccessory}
+        </div>
         {meta && <div className={metaText}>{meta}</div>}
       </div>
       {(tabs || actions) && <div className="ml-auto flex max-w-full shrink-0 items-center gap-2">{tabs}{actions}</div>}

@@ -137,3 +137,11 @@ identidad se concilian en una sola fila del reporte.
 
 Tiempos y conciliación en producción se verifican después de aplicar el SQL y
 completar el archivo. Commit/push no ejecutan migraciones ni cargan notas de crédito.
+
+## Marca y vendedor en Más filtros - 06/10/2026
+
+Marca y Vendedor son filtros secundarios reales de Ventas de Repuestos. La interfaz obtiene vendedores desde la vista agregada existente y conserva sus valores canónicos; Marca usa las categorías ya producidas por `ventas_repuestos_movimientos_v2`. No se filtra solamente la página cargada.
+
+La migración `20261006120000_add_parts_sales_advanced_filters.sql` agrega variantes filtradas de movimientos, panorama y listado. Los filtros se aplican sobre movimientos antes de KPI, períodos, comparaciones, resúmenes, orden global, paginación y exportación. Las RPC anteriores quedan intactas y siguen usándose cuando Marca/Vendedor están vacíos. La variante de listado mantiene Detalle, Clientes, Repuestos y Vendedores, incluido `p_exportar=true`; el helper de movimientos no se concede a clientes autenticados.
+
+`scripts/verify-parts-sales-filters-pglite.mjs` ejecuta la migración completa en PostgreSQL aislado y comprueba agregados, comparaciones anterior/año anterior, dos páginas, exportación completa y la identidad `Sin vendedor`. `scripts/verify-parts-sales-filters-sql.mjs` conserva verificaciones estáticas de orden y permisos. Estas pruebas no aplican SQL ni acreditan datos o esquema productivos.
