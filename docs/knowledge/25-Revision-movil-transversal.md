@@ -60,6 +60,14 @@ Implementación local:
 
 Validación: pruebas de presentación, permisos, selección, orden y exportación; navegador local con componentes reales y datos sintéticos. Capturas/mediciones representativas a 320/390 px y comprobaciones a 768/1280 px; pruebas de frontera 639/640 px. No hay SQL nuevo, cambios de datos comerciales, consultas productivas ni certificación de todos los formularios en hardware táctil. `design-qa.md` registra resultados y limitaciones. Este worktree carece de `obsidian-sync.local`, del índice y del mapa de conocimiento: se consultaron sus equivalentes del repositorio principal como contexto, sin copiar ni adelantar el checkpoint del atlas y sin acreditar sincronización de la bóveda.
 
+## Armonización local del 07/10/2026: lotes 2 a 4
+
+Las altas de Máquinas y Administración usan la acción principal del encabezado y conservan sus formularios existentes; las altas/credenciales de Administración y el seguimiento de Pedidos usan `ResponsiveDrawer`. Solicitudes mantiene su diálogo breve. No cambian payloads, permisos, validaciones ni callbacks.
+
+`KpiStrip` distribuye exactamente cinco indicadores en dos filas equilibradas 3 + 2 sin ocultarlos. Flota conserva su pantalla exclusivamente como lista y agrupa cada vehículo en dos niveles; la ausencia de lectura aparece una vez. Órdenes agrupa OS/cliente, equipo y técnicos/horas/km en tres niveles sin perder datos ni selección. Administración cambia de fila móvil a tabla exactamente en 640 px. Calendario adopta el gutter compartido, pero conserva la excepción de la cuadrícula mensual y sus agendas. Sugerencias de Repuestos muestra sus dos acciones del encabezado como objetivos táctiles con nombre accesible bajo 640 px.
+
+La matriz completa de rutas, cambios, excepciones y estados pendientes está en `docs/mobile-harmonization-matrix-2026-10-07.md`. La comprobación disponible es de código y pruebas locales; no hubo navegador, capturas, dispositivo físico ni producción autenticada. Por ello todas las filas continúan pendientes de aprobación visual en 320/390/639/640/768/1280 px, incluidos carga, vacío, error, permisos y drawers. No se agregó SQL ni se modificaron consultas, cálculos o exportadores.
+
 ## Historial de etapas anteriores
 
 ## Calendario

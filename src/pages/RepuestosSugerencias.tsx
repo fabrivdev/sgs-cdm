@@ -449,10 +449,10 @@ export default function RepuestosSugerencias() {
         title="Sugerencia de compra"
         actions={(
           <div className="flex items-center gap-2">
-            <Button variant="outline" size="sm" className="h-8 text-[12px]" onClick={() => setConfigOpen(true)} disabled={brands.length !== 1} title={brands.length !== 1 ? "Elegí una sola marca para editar sus parámetros" : undefined}>
-              <Settings2 className="mr-1 h-3.5 w-3.5" />Parámetros
+            <Button variant="outline" size="sm" className="h-8 text-[12px] max-sm:w-11 max-sm:px-0" aria-label="Parámetros" onClick={() => setConfigOpen(true)} disabled={brands.length !== 1} title={brands.length !== 1 ? "Elegí una sola marca para editar sus parámetros" : undefined}>
+              <Settings2 className="h-3.5 w-3.5 sm:mr-1" /><span className="max-sm:sr-only">Parámetros</span>
             </Button>
-            <Button variant="outline" size="sm" className="h-8 w-8 p-0" onClick={() => setHistoryOpen(true)} aria-label="Ver modelo e historial">
+            <Button variant="outline" size="sm" className="h-8 w-8 p-0 max-sm:w-11" onClick={() => setHistoryOpen(true)} aria-label="Ver modelo e historial">
               <Info className="h-3.5 w-3.5" />
             </Button>
           </div>

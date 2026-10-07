@@ -729,7 +729,7 @@ export default function Admin() {
             </div>
           </Card>
 
-          <Card className="hidden overflow-hidden md:block">
+          <Card className="hidden overflow-hidden sm:block">
             <Table containerClassName={scrollTableClass(filteredProfiles.length)}>
               <TableHeader className="sticky top-0 z-10 bg-card">
                 <TableRow>
@@ -794,7 +794,7 @@ export default function Admin() {
             </Table>
           </Card>
 
-          <div className="divide-y overflow-hidden rounded-md border md:hidden">
+          <div className="divide-y overflow-hidden rounded-md border sm:hidden">
             {filteredProfiles.map((profile) => (
               <div key={profile.id} className="px-3 py-1">
                 <div className="flex min-w-0 items-center justify-between gap-2">

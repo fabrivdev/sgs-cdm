@@ -39,6 +39,7 @@ import { useAssistantPageContext } from "@/contexts/AssistantPageContext";
 import { PageHeader } from "@/components/layout/AppPrimitives";
 import { useIsMobile } from "@/hooks/use-mobile";
 import { MobileAgenda, type AgendaDay } from "@/components/calendar/MobileAgenda";
+import { pageShellWide } from "@/lib/ui-classes";
 
 interface Servicio {
   id: string;
@@ -538,7 +539,7 @@ export default function Calendario() {
 
   return (
     <div className={cn(
-      "w-full space-y-3 px-3 py-3 sm:px-4 lg:px-5",
+      pageShellWide,
       vista === "mes" && "md:flex md:h-[calc(100svh-48px)] md:flex-col md:gap-2 md:space-y-0 md:overflow-hidden md:py-2",
     )}>
       <PageHeader
