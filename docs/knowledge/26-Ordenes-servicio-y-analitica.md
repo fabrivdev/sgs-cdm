@@ -1,5 +1,11 @@
 # Órdenes de servicio y futura analítica transversal
 
+## Barra de Productividad a todo el ancho móvil - 07/10/2026
+
+Esta decisión posterior sustituye sólo en teléfono la presentación `Técnico | Productividad` en celdas separadas. La fila combina el nombre y el porcentaje en una cabecera horizontal y coloca debajo un riel de ancho completo. `ProductivityProgress` mantiene el valor real en `aria-valuenow`/`aria-valuetext`, limita visualmente el relleno al 100% del riel cuando la meta es superada y conserva el porcentaje numérico superior a 100% como texto. Una meta ausente continúa indeterminada (`—`), sin barra y sin inventar cero.
+
+El gris claro del riel proviene del token `muted`; distingue la capacidad no alcanzada del relleno `primary` y no codifica error o parcialidad. El fondo general de la aplicación usa el token `background` ligeramente gris frente a los paneles `card` blancos. No se cambian esos tokens ni los colores semánticos en este ajuste. El nombre sigue abriendo el detalle del técnico y conserva su objetivo táctil, contexto accesible, filtros, orden y exportación. Desde 640 px permanecen las columnas anteriores.
+
 ## Densidad telefónica de Órdenes y Cumplimiento - 07/10/2026
 
 Bajo 640 px, la lista de Órdenes usa tres señales: OS + cliente como identidad, horas como comparación y estado como acción. Marca/modelo, cantidad y nombres de técnicos y km se consultan en el drawer existente. Las columnas de tablet/escritorio, la búsqueda, el orden por campos ocultos y el Excel completo no cambian.

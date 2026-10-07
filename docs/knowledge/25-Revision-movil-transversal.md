@@ -1,5 +1,11 @@
 # Revisión móvil transversal
 
+## Productividad móvil: nombre, porcentaje y barra de fila completa - 07/10/2026
+
+La instrucción visual más reciente reemplaza bajo 640 px la separación de Productividad en dos columnas. Cada fila usa una primera línea con el nombre del técnico a la izquierda y su porcentaje real a la derecha; el medidor ocupa una segunda línea con todo el ancho útil de la fila. El relleno sigue limitado a la proporción calculada y no se estira a 100% para completar el riel.
+
+El riel conserva `bg-muted` como contraste del tramo no alcanzado y el relleno conserva `bg-primary`; ese gris no representa error, parcialidad ni una fuente incompleta. Cuando falta meta se muestra `—` y no se renderiza medidor ni `0%`. El nombre mantiene el acceso al detalle, el contexto accesible de OS/inactivo/parcial y los campos completos de orden/exportación. Tablet y escritorio no cambian. Sin SQL, consultas, permisos ni panel gerencial.
+
 Implementación local revisada el 24/09/2026. Complementa [[24-Condiciones-visuales-ventas]]; no certifica producción ni la revisión de cada ruta.
 
 ## Jerarquía final de filas telefónicas - 07/10/2026

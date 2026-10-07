@@ -1,5 +1,13 @@
 # Matriz de armonización móvil — 07/10/2026
 
+## Ajuste puntual posterior: barra de Productividad
+
+| Ruta / sección | Cambio bajo 640 px | Conservado | Evidencia requerida |
+| --- | --- | --- | --- |
+| `/servicios/ordenes` - Productividad | Nombre y porcentaje en la primera línea; riel `bg-muted` de ancho completo debajo y relleno `bg-primary` según el porcentaje real | Meta ausente sin barra/0%, detalle del técnico, accesibilidad, orden, Excel y escritorio/tablet | Prueba DOM del ancho, porcentaje menor a 100%, meta ausente y callback; verificación visual de overflow sigue pendiente |
+
+La tonalidad gris general proviene de los tokens vigentes `background` y `muted`, no de un estado de datos. Este ajuste no cambia colores semánticos, consultas, cálculos, permisos, SQL, panel gerencial ni otras vistas.
+
 Estado: inventario transversal de código y pruebas locales. No es una aprobación visual ni certifica producción.
 
 ## Alcance y método

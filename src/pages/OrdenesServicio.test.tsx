@@ -500,12 +500,20 @@ describe("orders workspace", () => {
     expect(productivityTable).not.toHaveTextContent("TECNICO DOS");
     if (width < 640) {
       expect(screen.queryByRole("group", { name: "Estado de técnicos" })).not.toBeInTheDocument();
-      expect(within(productivityTable).getAllByRole("columnheader")).toHaveLength(2);
-      expect(within(productivityTable).getByRole("columnheader", { name: "Técnico" })).toBeVisible();
-      expect(within(productivityTable).getByRole("columnheader", { name: "Productividad" })).toBeVisible();
+      expect(within(productivityTable).getAllByRole("columnheader")).toHaveLength(1);
+      expect(within(productivityTable).getByRole("columnheader", { name: "Técnico / Productividad" })).toBeVisible();
       expect(productivityTable).not.toHaveClass("max-sm:min-w-[440px]");
       const technician = within(productivityTable).getByRole("button", { name: /TECNICO UNO · 1 OS/ });
       expect(technician).toHaveTextContent(/^TECNICO UNO$/);
+      const row = technician.closest("tr")!;
+      expect(within(row).getAllByRole("cell")).toHaveLength(1);
+      const meter = within(row).getByRole("meter", { name: "Meta de TECNICO UNO" });
+      expect(meter).toHaveClass("w-full");
+      const percentage = Number(meter.getAttribute("aria-valuenow"));
+      expect(meter.firstElementChild).toHaveStyle({ width: `${percentage}%` });
+      expect(meter.firstElementChild).not.toHaveStyle({ width: "100%" });
+      expect(meter.previousElementSibling).toContainElement(technician);
+      expect(meter.previousElementSibling).toHaveTextContent("2,9%");
       fireEvent.click(screen.getByRole("button", { name: "Más filtros" }));
       const status = within(screen.getByRole("dialog")).getByRole("combobox", { name: "Estado de técnicos" });
       expect(status).toHaveClass("h-11");

@@ -40,11 +40,11 @@ export function ProductivityTable({ rows, onSelect, status, onStatusChange, peri
   const visible = (hasGoal ? columns.slice(0, 5) : [{ ...columns[0], width: "w-[60%]" }, { ...columns[1], width: "w-[20%]" }, { ...columns[2], width: "w-[20%]" }])
     .map(column => compact && ["horas", "meta"].includes(column.key) ? { ...column, label: column.key === "horas" ? "Horas" : "Meta (h)" } : column);
   const mobile: CompactListColumn<ProductivityTechnicianRow>[] = [
-    { ...columns[0], width: "w-[64%]", render: r => {
+    { ...columns[0], width: "w-full", label: "Técnico / Productividad", render: r => {
       const context = `${r.totalOS} OS${technicianState(r) ? ` · ${technicianState(r)}` : ""}${r.incomplete ? " · Parcial" : ""}`;
-      return <button type="button" aria-label={`${r.tecnico} · ${context}`} title={`${r.tecnico} · ${context}`} className="flex min-h-11 w-full min-w-0 items-center text-left" onClick={() => onSelect(r.tecnico)}><span className="block min-w-0 truncate">{r.tecnico}</span></button>;
+      return <ProductivityProgress hours={r.horas} target={r.horasDisponibles} label={`Meta de ${r.tecnico}`} partial={r.incomplete}
+        header={<button type="button" aria-label={`${r.tecnico} · ${context}`} title={`${r.tecnico} · ${context}`} className="block min-h-11 max-w-full truncate text-left hover:text-primary focus-visible:ring-2 focus-visible:ring-ring" onClick={() => onSelect(r.tecnico)}>{r.tecnico}</button>} />;
     } },
-    { ...columns[4], width: "w-[36%]", label: "Productividad", render: r => <ProductivityProgress hours={r.horas} target={r.horasDisponibles} label={`Meta de ${r.tecnico}`} partial={r.incomplete} stacked /> },
   ];
   return <OperationsPanel className="productivity-panel" title={phone ? undefined : "Por técnico"} actions={!phone ?
     <div className="flex min-w-0 flex-1 flex-wrap items-center justify-end gap-2 max-sm:flex-nowrap max-sm:gap-1.5">
