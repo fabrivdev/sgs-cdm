@@ -10,7 +10,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { scrollTableClass } from "@/components/ventas/TableScroll";
 import { Badge } from "@/components/ui/badge";
-import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { ResponsiveDrawer, ResponsiveDrawerBody, ResponsiveDrawerFooter, ResponsiveDrawerHeader } from "@/components/ui/responsive-drawer";
 import { MODULOS, MODULO_LABELS, ROLES, ROLE_LABELS, SUCURSALES, nivelLabel, type AssignableRole, type Modulo, type Role, type Sucursal } from "@/lib/constants";
 import { cn } from "@/lib/utils";
 import { toast } from "sonner";
@@ -1018,12 +1018,12 @@ export default function Admin() {
         </TabsContent>
       </Tabs>
 
-      <Dialog open={createOpen} onOpenChange={(open) => { if (!busy) setCreateOpen(open); }}>
-        <DialogContent className="flex max-h-[90dvh] max-w-lg flex-col" aria-describedby={undefined}>
-          <DialogHeader>
-            <DialogTitle>{createWithAccess ? "Nuevo usuario" : "Nuevo operativo de Servicios"}</DialogTitle>
-          </DialogHeader>
-          <div className="grid min-h-0 gap-4 overflow-y-auto py-2 sm:grid-cols-2">
+      <ResponsiveDrawer open={createOpen} onOpenChange={(open) => { if (!busy) setCreateOpen(open); }} size="md">
+          <ResponsiveDrawerHeader>
+            <h2 className="text-[16px] font-semibold">{createWithAccess ? "Nuevo usuario" : "Nuevo operativo de Servicios"}</h2>
+          </ResponsiveDrawerHeader>
+          <ResponsiveDrawerBody>
+          <div className="grid gap-4 sm:grid-cols-2">
             <div className="space-y-1.5 sm:col-span-2">
               <Label htmlFor="new-person-name" className="text-[12px]">Nombre y apellido</Label>
               <Input id="new-person-name" value={nombre} onChange={(event) => setNombre(event.target.value)} disabled={busy} autoFocus />
@@ -1064,19 +1064,18 @@ export default function Admin() {
               </Select>
             </div>
           </div>
-          <DialogFooter>
+          </ResponsiveDrawerBody>
+          <ResponsiveDrawerFooter>
             <Button variant="outline" onClick={() => setCreateOpen(false)} disabled={busy}>Cancelar</Button>
             <Button onClick={() => crearUsuario(createWithAccess)} disabled={busy}>{busy ? "Creando…" : createWithAccess ? "Crear usuario" : "Crear operativo"}</Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
+          </ResponsiveDrawerFooter>
+      </ResponsiveDrawer>
 
-      <Dialog open={!!credUser} onOpenChange={(open) => !open && setCredUser(null)}>
-        <DialogContent className="max-h-[90dvh] max-w-md overflow-y-auto">
-          <DialogHeader>
-            <DialogTitle>{credUser && emailByProfile(credUser) ? "Editar acceso" : "Agregar acceso"} — {credUser?.nombre}</DialogTitle>
-          </DialogHeader>
-          <div className="space-y-3 py-2">
+      <ResponsiveDrawer open={!!credUser} onOpenChange={(open) => !open && setCredUser(null)} size="sm">
+          <ResponsiveDrawerHeader>
+            <h2 className="text-[16px] font-semibold">{credUser && emailByProfile(credUser) ? "Editar acceso" : "Agregar acceso"} — {credUser?.nombre}</h2>
+          </ResponsiveDrawerHeader>
+          <ResponsiveDrawerBody className="space-y-3">
             <div className="space-y-1.5">
               <Label className="text-[12px]">Email</Label>
               <Input type="email" value={credEmail} onChange={(e) => setCredEmail(e.target.value)} />
@@ -1107,13 +1106,12 @@ export default function Admin() {
                 Este proyecto publicado todavía no tiene desplegada la migración que permite vincular una cuenta nueva a un técnico ya existente.
               </p>
             )}
-          </div>
-          <DialogFooter>
+          </ResponsiveDrawerBody>
+          <ResponsiveDrawerFooter>
             <Button variant="outline" onClick={() => setCredUser(null)}>Cancelar</Button>
             <Button onClick={guardarCred} disabled={credBusy}>{credBusy ? "Guardando..." : "Guardar"}</Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
+          </ResponsiveDrawerFooter>
+      </ResponsiveDrawer>
 
       <Sheet open={!!sectionUser} onOpenChange={(open) => !open && setSectionUser(null)}>
         <SheetContent side="right" className="w-full overflow-y-auto sm:max-w-xl">

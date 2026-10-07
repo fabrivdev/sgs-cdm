@@ -4,10 +4,12 @@ import { ParqueTab, type ParqueFacturacionEstado } from "@/components/parque/Par
 import { MaquinasTab, type MaquinasResumen } from "@/components/parque/MaquinasTab";
 import { StockMaquinasTab, type StockMaquinasResumen } from "@/components/parque/StockMaquinasTab";
 import { ClientePanel } from "@/components/parque/ClientePanel";
-import { Tractor, CheckCircle2, PackageCheck, Users, Sparkles, RefreshCw } from "lucide-react";
+import { Tractor, CheckCircle2, PackageCheck, Users, Sparkles, RefreshCw, Plus } from "lucide-react";
 import { pageShell } from "@/lib/ui-classes";
 import { KpiItem, KpiStrip, PageHeader } from "@/components/layout/AppPrimitives";
 import type { KpiResult } from "@/lib/contacto-utils";
+import { Button } from "@/components/ui/button";
+import { useAuth } from "@/hooks/useAuth";
 
 const METRICAS_VACIAS: KpiResult = {
   totalMaquinas: 0,
@@ -22,6 +24,8 @@ const METRICAS_VACIAS: KpiResult = {
 };
 
 export default function ParqueClientes() {
+  const { can } = useAuth();
+  const canManagePark = can("parque:gestionar");
   const location = useLocation();
   const [clienteAbierto, setClienteAbierto] = useState<string | null>(null);
   const [panelOpen, setPanelOpen] = useState(false);
@@ -35,6 +39,7 @@ export default function ParqueClientes() {
   });
   const [stockResumen, setStockResumen] = useState<StockMaquinasResumen>({ total: 0, nuevas: 0, usadas: 0, marcas: 0 });
   const [refreshCounter, setRefreshCounter] = useState(0);
+  const [newMachineOpen, setNewMachineOpen] = useState(false);
   const vistaParque = location.pathname === "/parque-stock" ? "stock" : location.pathname === "/parque-maquinas" ? "maquinas" : "clientes";
 
   const handleChanged = () => {
@@ -91,7 +96,15 @@ export default function ParqueClientes() {
 
   return (
     <div className={pageShell}>
-      <PageHeader title={vistaParque === "clientes" ? "Clientes del parque" : vistaParque === "maquinas" ? "Máquinas del parque" : "Stock de máquinas"} />
+      <PageHeader
+        title={vistaParque === "clientes" ? "Clientes del parque" : vistaParque === "maquinas" ? "Máquinas del parque" : "Stock de máquinas"}
+        actions={vistaParque === "maquinas" && canManagePark ? (
+          <Button size="sm" aria-label="Nueva máquina" onClick={() => setNewMachineOpen(true)} className="max-sm:w-11 max-sm:px-0">
+            <Plus className="h-4 w-4 sm:mr-1" />
+            <span className="max-sm:sr-only">Nueva máquina</span>
+          </Button>
+        ) : undefined}
+      />
 
       <KpiStrip mobilePrimary={vistaParque === "stock" ? [0, 3] : [0, 1]} className="sm:grid-cols-2 xl:grid-cols-4">
         {cards.map((c) => (
@@ -109,7 +122,13 @@ export default function ParqueClientes() {
             onFacturacionEstadoChange={setFacturacionEstado}
           />
         ) : vistaParque === "maquinas" ? (
-          <MaquinasTab key={refreshCounter} onOpenCliente={handleOpenCliente} onResumenChange={setMaquinasResumen} />
+          <MaquinasTab
+            key={refreshCounter}
+            onOpenCliente={handleOpenCliente}
+            onResumenChange={setMaquinasResumen}
+            newMachineOpen={newMachineOpen}
+            onNewMachineOpenChange={setNewMachineOpen}
+          />
         ) : (
           <StockMaquinasTab key={refreshCounter} onResumenChange={setStockResumen} />
         )}

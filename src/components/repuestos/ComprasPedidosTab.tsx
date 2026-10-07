@@ -22,13 +22,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
-import {
-  Dialog,
-  DialogContent,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle,
-} from "@/components/ui/dialog";
+import { ResponsiveDrawer, ResponsiveDrawerBody, ResponsiveDrawerFooter, ResponsiveDrawerHeader } from "@/components/ui/responsive-drawer";
 import {
   Select,
   SelectContent,
@@ -519,15 +513,14 @@ export function ComprasPedidosTab() {
         </div>
       </div>
 
-      <Dialog open={canManageParts && editing !== null} onOpenChange={(open) => !open && setEditing(null)}>
-        <DialogContent>
-          <DialogHeader>
-            <DialogTitle>
+      <ResponsiveDrawer open={canManageParts && editing !== null} onOpenChange={(open) => !open && setEditing(null)} size="sm">
+          <ResponsiveDrawerHeader>
+            <h2 className="pr-4 text-[16px] font-semibold">
               Seguimiento — Pedido {editing?.nro_pedido} ({editing?.sucursal})
-            </DialogTitle>
-          </DialogHeader>
+            </h2>
+          </ResponsiveDrawerHeader>
 
-          <div className="space-y-3">
+          <ResponsiveDrawerBody className="space-y-3">
             <div className="space-y-1.5">
               <Label>Estado</Label>
               <Select
@@ -573,18 +566,17 @@ export function ComprasPedidosTab() {
                 rows={3}
               />
             </div>
-          </div>
+          </ResponsiveDrawerBody>
 
-          <DialogFooter>
+          <ResponsiveDrawerFooter>
             <Button type="button" variant="outline" onClick={() => setEditing(null)} disabled={saving}>
               Cancelar
             </Button>
             <Button type="button" onClick={guardar} disabled={saving}>
               Guardar
             </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
+          </ResponsiveDrawerFooter>
+      </ResponsiveDrawer>
     </div>
   );
 }

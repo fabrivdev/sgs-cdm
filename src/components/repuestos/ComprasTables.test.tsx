@@ -89,7 +89,11 @@ describe("purchase table presentation",()=>{
     expect(exported[0]).toMatchObject({"N° solicitud":"000003","Código fabricante":"000123",Unidad:"UN",Cantidad:1.25,Total:10.55,Pedido:"Santa Rita-000010"});
   });
   it("keeps editing and ambiguous linking restricted to the existing permission",async()=>{
-    setup(); fireEvent.click(screen.getByRole("button",{name:"Editar"})); expect(await screen.findByRole("dialog")).toHaveTextContent("Seguimiento — Pedido 000010"); cleanup();
+    vi.stubGlobal("innerWidth",320); setup(); fireEvent.click(screen.getByRole("button",{name:"Editar"}));
+    const tracking=await screen.findByRole("dialog");
+    await waitFor(()=>expect(tracking).toHaveClass("h-[92dvh]","flex-col"));
+    expect(tracking).toHaveTextContent("Seguimiento — Pedido 000010");
+    expect(screen.getByRole("button",{name:"Guardar"}).parentElement).toHaveClass("max-sm:[&_button]:min-h-11"); cleanup();
     mocks.can.mockReturnValue(false); setup(); expect(screen.queryByRole("button",{name:"Editar"})).toBeNull(); expect(screen.queryByRole("button",{name:"Acciones de la sección"})).toBeNull(); cleanup();
     mocks.can.mockReturnValue(true); mocks.orders.mockReturnValue(query([order,{...order,nroPedido:"000011"}])); setup("requests");
     fireEvent.click(screen.getByRole("button",{name:"Ítems de la solicitud 000003 (Santa Rita)"})); fireEvent.click(screen.getByRole("button",{name:"Vincular (2)"}));

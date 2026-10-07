@@ -7,7 +7,7 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { CompactListInfo, CompactListTable, type CompactListColumn } from "@/components/lists/CompactListTable";
 import { MobileRecord } from "@/components/lists/MobileRecord";
-import { ArrowRightLeft, Plus } from "lucide-react";
+import { ArrowRightLeft } from "lucide-react";
 import { MarcaBadge } from "@/components/StatusBadges";
 import { SUCURSALES, type Sucursal } from "@/lib/constants";
 import { FiltersBar, FilterSelect, FilterCustom } from "@/components/filters/FiltersBar";
@@ -94,9 +94,13 @@ export type MaquinasResumen = {
 export function MaquinasTab({
   onOpenCliente,
   onResumenChange,
+  newMachineOpen = false,
+  onNewMachineOpenChange,
 }: {
   onOpenCliente?: (id: string) => void;
   onResumenChange?: (resumen: MaquinasResumen) => void;
+  newMachineOpen?: boolean;
+  onNewMachineOpenChange?: (open: boolean) => void;
 }) {
   const { can } = useAuth();
   const canManagePark = can("parque:gestionar");
@@ -111,7 +115,6 @@ export function MaquinasTab({
   }), [rawMaquinas, catalog.data]);
   const [clientes, setClientes] = useState<Cliente[]>([]);
   const [transferMaquina, setTransferMaquina] = useState<MaquinaParaTransferir | null>(null);
-  const [nuevaMaquinaOpen, setNuevaMaquinaOpen] = useState(false);
 
   const [q, setQ] = useState("");
   const [fSucursal, setFSucursal] = useState("all");
@@ -325,13 +328,6 @@ export function MaquinasTab({
         onClear={limpiar}
         meta={`${ordenadas.length} máquina${ordenadas.length !== 1 ? "s" : ""}`}
         secondaryActions={canExport ? <SectionActionsMenu options={[{ id: "excel", label: "Exportar máquinas", disabled: loading || loadError || !ordenadas.length, onSelect: exportar }]} /> : undefined}
-        actions={
-          <div className="flex items-center gap-2">
-            {canManagePark && <Button size="sm" onClick={() => setNuevaMaquinaOpen(true)} className="h-9 shrink-0 px-3">
-              <Plus className="mr-1 h-4 w-4" /> Nueva
-            </Button>}
-          </div>
-        }
         expanded={
           <div className="flex flex-col gap-3">
             <FilterCustom label="Año desde" width="w-full">
@@ -431,8 +427,8 @@ export function MaquinasTab({
         }}
       />}
       {canManagePark && <NuevaMaquinaDialog
-        open={nuevaMaquinaOpen}
-        onOpenChange={setNuevaMaquinaOpen}
+        open={newMachineOpen}
+        onOpenChange={onNewMachineOpenChange ?? (() => undefined)}
         onCreated={cargar}
       />}
     </div>

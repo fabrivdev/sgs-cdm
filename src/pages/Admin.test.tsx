@@ -21,7 +21,7 @@ vi.mock("@/components/exports/TableExportButton", () => ({ TableExportButton: ()
 vi.mock("@/components/filters/FiltersBar", () => ({ FiltersBar: () => null }));
 
 beforeEach(() => { vi.clearAllMocks(); canManage.value = true; parametersAccess.value = false; createPerson.mockResolvedValue(undefined); goalRead.mockResolvedValue({ value: 160, warning: null }); goalSave.mockResolvedValue(undefined); });
-afterEach(cleanup);
+afterEach(() => { cleanup(); vi.unstubAllGlobals(); });
 
 describe("Administración: controles de permisos en teléfono", () => {
   it("mantiene objetivos táctiles de 44 px y expone el estado de cada módulo", () => {
@@ -99,10 +99,12 @@ describe("Administración: alta de operativos sin acceso", () => {
     expect(navigation).not.toHaveTextContent("Configuración");
   });
   it("mantiene el alta dentro del viewport con cuerpo desplazable", async () => {
+    vi.stubGlobal("innerWidth", 390);
     await openCreation();
     fireEvent.click(screen.getByRole("switch", { name: "Acceso al sistema" }));
-    expect(screen.getByRole("dialog")).toHaveClass("max-h-[90dvh]", "flex-col");
-    expect(screen.getByLabelText("Nombre y apellido").parentElement?.parentElement).toHaveClass("min-h-0", "overflow-y-auto");
+    await waitFor(() => expect(screen.getByRole("dialog")).toHaveClass("h-[92dvh]", "flex-col"));
+    expect(screen.getByLabelText("Nombre y apellido").closest(".overflow-y-auto")).toHaveClass("min-h-0", "overflow-y-auto");
+    expect(screen.getByRole("button", { name: "Cancelar" }).parentElement).toHaveClass("max-sm:[&_button]:min-h-11");
     expect(screen.getByRole("button", { name: "Crear usuario" })).toBeVisible();
   });
   it("abre por defecto sin correo ni contraseña y con nivel Operativo", async () => {
