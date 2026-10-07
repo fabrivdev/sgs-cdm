@@ -5,7 +5,7 @@ import { MaquinasTab, type MaquinasResumen } from "@/components/parque/MaquinasT
 import { StockMaquinasTab, type StockMaquinasResumen } from "@/components/parque/StockMaquinasTab";
 import { ClientePanel } from "@/components/parque/ClientePanel";
 import { Tractor, CheckCircle2, PackageCheck, Users, Sparkles, RefreshCw, Plus } from "lucide-react";
-import { pageShell } from "@/lib/ui-classes";
+import { mobileHeaderCreateButton, pageShell } from "@/lib/ui-classes";
 import { KpiItem, KpiStrip, PageHeader } from "@/components/layout/AppPrimitives";
 import type { KpiResult } from "@/lib/contacto-utils";
 import { Button } from "@/components/ui/button";
@@ -99,7 +99,7 @@ export default function ParqueClientes() {
       <PageHeader
         title={vistaParque === "clientes" ? "Clientes del parque" : vistaParque === "maquinas" ? "Máquinas del parque" : "Stock de máquinas"}
         actions={vistaParque === "maquinas" && canManagePark ? (
-          <Button size="sm" aria-label="Nueva máquina" onClick={() => setNewMachineOpen(true)} className="max-sm:w-11 max-sm:px-0">
+          <Button size="sm" aria-label="Nueva máquina" onClick={() => setNewMachineOpen(true)} className={mobileHeaderCreateButton}>
             <Plus className="h-4 w-4 sm:mr-1" />
             <span className="max-sm:sr-only">Nueva máquina</span>
           </Button>

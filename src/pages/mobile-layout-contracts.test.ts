@@ -16,7 +16,11 @@ describe("mobile layout contracts", () => {
     const admin = source("Admin.tsx");
     expect(admin).toContain('<Card className="hidden overflow-hidden sm:block">');
     expect(admin).toContain('<div className="divide-y overflow-hidden rounded-md border sm:hidden">');
+    expect(admin).toContain('className="line-clamp-2 break-words text-[13px] font-medium leading-5"');
+    expect(admin).toContain('title={PRESENCE_LABELS[presenceForProfile(profile).state]}');
+    expect(admin).toContain('<span className="sr-only">Estado: {PRESENCE_LABELS[presenceForProfile(profile).state]}</span>');
     expect(admin).not.toContain('<Card className="hidden overflow-hidden md:block">');
+    expect(admin).not.toContain("max-sm:whitespace-normal max-sm:break-words max-sm:text-[13px] max-sm:leading-5");
   });
 
   it("keeps suggestion header actions accessible and touch-sized on phones", () => {

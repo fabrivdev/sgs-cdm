@@ -1,15 +1,30 @@
 import { readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
+import { mobileHeaderCreateButton } from "@/lib/ui-classes";
 
 const fleetPage = readFileSync("src/pages/Flota.tsx", "utf8");
 const workPage = readFileSync("src/pages/Trabajos.tsx", "utf8");
+const adminPage = readFileSync("src/pages/Admin.tsx", "utf8");
+const parkPage = readFileSync("src/pages/ParqueClientes.tsx", "utf8");
+const operationsPage = readFileSync("src/pages/MaquinariaOperaciones.tsx", "utf8");
 
-describe("fleet create button", () => {
-  it("reuses the compact native mobile create pattern", () => {
-    const nativeClasses = 'className="max-sm:w-11 max-sm:px-0"';
+describe("mobile header create buttons", () => {
+  it("keeps a transparent 44 px target with explicit interaction states only on phones", () => {
+    expect(mobileHeaderCreateButton.split(" ").every((token) => token.startsWith("max-sm:"))).toBe(true);
+    expect(mobileHeaderCreateButton).toContain("max-sm:h-11");
+    expect(mobileHeaderCreateButton).toContain("max-sm:w-11");
+    expect(mobileHeaderCreateButton).toContain("max-sm:bg-transparent");
+    expect(mobileHeaderCreateButton).toContain("max-sm:text-foreground");
+    expect(mobileHeaderCreateButton).toContain("max-sm:hover:bg-primary/10");
+    expect(mobileHeaderCreateButton).toContain("max-sm:focus-visible:ring-primary");
+    expect(mobileHeaderCreateButton).toContain("max-sm:disabled:bg-transparent");
+  });
 
-    expect(workPage).toContain(nativeClasses);
-    expect(fleetPage).toContain(nativeClasses);
+  it("applies one shared treatment to every page-header creation flow", () => {
+    [workPage, fleetPage, adminPage, parkPage, operationsPage].forEach((source) => {
+      expect(source).toContain("mobileHeaderCreateButton");
+      expect(source).not.toContain('className="max-sm:w-11 max-sm:px-0"');
+    });
     expect(fleetPage).toContain('aria-label="Nuevo vehículo"');
     expect(fleetPage).toContain('<Plus className="h-4 w-4 sm:mr-1.5" />');
     expect(fleetPage).toContain('<span className="hidden sm:inline">Nuevo vehículo</span>');

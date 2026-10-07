@@ -43,6 +43,7 @@ import { useQueryClient } from "@tanstack/react-query";
 import { presenceSnapshot, type PresenceState, type UserPresenceRow } from "@/lib/userPresence";
 import { formatDistanceToNow } from "date-fns";
 import { es } from "date-fns/locale";
+import { mobileHeaderCreateButton } from "@/lib/ui-classes";
 
 interface Profile {
   id: string;
@@ -653,7 +654,7 @@ export default function Admin() {
         <PageHeader
           title="Administración"
           actions={adminTab === "equipo" && canManageAdmin ? (
-            <Button size="sm" aria-label="Nuevo usuario" onClick={() => setCreateOpen(true)} className="max-sm:w-11 max-sm:px-0">
+            <Button size="sm" aria-label="Nuevo usuario" onClick={() => setCreateOpen(true)} className={mobileHeaderCreateButton}>
               <UserPlus className="h-4 w-4 sm:mr-2" />
               <span className="hidden sm:inline">Nuevo usuario</span>
             </Button>
@@ -798,12 +799,12 @@ export default function Admin() {
             {filteredProfiles.map((profile) => (
               <div key={profile.id} className="px-3 py-1">
                 <div className="flex min-w-0 items-center justify-between gap-2">
-                  <div className="min-w-0 flex-1">
-                    <div className="truncate text-sm font-medium max-sm:whitespace-normal max-sm:break-words max-sm:text-[13px] max-sm:leading-5" title={profile.nombre}>{profile.nombre}</div>
+                  <div className="min-w-0 flex-1 pr-1">
+                    <div className="line-clamp-2 break-words text-[13px] font-medium leading-5" title={profile.nombre}>{profile.nombre}</div>
                   </div>
-                  <span className="inline-flex shrink-0 items-center gap-1.5 text-xs text-muted-foreground">
-                    <span className={cn("h-2 w-2 rounded-full", PRESENCE_DOT[presenceForProfile(profile).state])} />
-                    {PRESENCE_LABELS[presenceForProfile(profile).state]}
+                  <span className="inline-flex shrink-0 items-center text-muted-foreground" title={PRESENCE_LABELS[presenceForProfile(profile).state]}>
+                    <span aria-hidden="true" className={cn("h-2 w-2 rounded-full", PRESENCE_DOT[presenceForProfile(profile).state])} />
+                    <span className="sr-only">Estado: {PRESENCE_LABELS[presenceForProfile(profile).state]}</span>
                   </span>
                   <Button variant="ghost" size="icon" className="h-11 w-11 shrink-0" aria-label={`Ver ficha de ${profile.nombre}`} onClick={() => setSectionUser(profile)}>
                     <Eye className="h-4 w-4" />

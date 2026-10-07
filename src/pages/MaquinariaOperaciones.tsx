@@ -40,7 +40,7 @@ import { useMachineCatalog } from "@/hooks/useMachineCatalog";
 import { cargarTodo } from "@/hooks/useCatalogos";
 import { catalogLineKey, exactCatalogName, normalizeNpCode, reconcileCatalogLine, reviewCatalogLine, upperMachineText, validMachineDate } from "@/lib/machineOrderValidation";
 import { DetailSection, DocumentRow, EntityCard, KeyValueGrid, KeyValueItem } from "@/components/maquinaria/MachineDetailPrimitives";
-import { pageShell } from "@/lib/ui-classes";
+import { mobileHeaderCreateButton, pageShell } from "@/lib/ui-classes";
 import { cn } from "@/lib/utils";
 import { MACHINE_SUBGROUPS, canonicalMachineSubgroup } from "@/lib/machineModels";
 import { legacyMachineBrand, machineBrandClass as brandClass, machineBrandStyle, normalizeMachineBrand, visibleMachineBrand } from "@/lib/machineBrands";
@@ -1131,8 +1131,8 @@ export default function MaquinariaOperaciones() {
     <PageHeader
       title={importsView ? "Importación de máquinas" : "Operaciones de máquinas"}
       actions={importsView
-        ? <Button size="sm" aria-label="Nueva importación" className="max-sm:w-11 max-sm:px-0" onClick={() => { setEditingImport(null); setImportFormOpen(true); }}><Plus className="h-4 w-4 sm:mr-1.5" /><span className="hidden sm:inline">Nueva importación</span></Button>
-        : <Button size="sm" aria-label="Nuevo pedido" className="max-sm:w-11 max-sm:px-0" onClick={() => { setEditingOperationId(null); setNewOpen(true); }}><Plus className="h-4 w-4 sm:mr-1.5" /><span className="hidden sm:inline">Nuevo pedido</span></Button>}
+        ? <Button size="sm" aria-label="Nueva importación" className={mobileHeaderCreateButton} onClick={() => { setEditingImport(null); setImportFormOpen(true); }}><Plus className="h-4 w-4 sm:mr-1.5" /><span className="hidden sm:inline">Nueva importación</span></Button>
+        : <Button size="sm" aria-label="Nuevo pedido" className={mobileHeaderCreateButton} onClick={() => { setEditingOperationId(null); setNewOpen(true); }}><Plus className="h-4 w-4 sm:mr-1.5" /><span className="hidden sm:inline">Nuevo pedido</span></Button>}
     />
     {!importsView && confirmedBillingQuery.isError && <div role="alert" className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-red-200 bg-red-50/70 px-3 py-2.5 text-red-800">
       <div className="flex min-w-0 items-start gap-2"><AlertTriangle className="mt-0.5 h-4 w-4 shrink-0" /><div><div className="text-[12px] font-semibold">Facturación no disponible</div><div className="text-[11px]">No se pudieron confirmar las ventas por chasis. Los estados quedan sin clasificar y la exportación se bloquea para no informar pendientes incorrectos.</div></div></div>

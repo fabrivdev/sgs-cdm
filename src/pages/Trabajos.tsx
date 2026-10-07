@@ -16,7 +16,7 @@ import { FilterMultiSelect, matchesMulti } from "@/components/filters/FilterMult
 import { EmptyState } from "@/components/EmptyState";
 import { KanbanSkeleton } from "@/components/LoadingSkeletons";
 import { parseISO, format } from "date-fns";
-import { pageShellWide } from "@/lib/ui-classes";
+import { mobileHeaderCreateButton, pageShellWide } from "@/lib/ui-classes";
 import { PageHeader } from "@/components/layout/AppPrimitives";
 import { useAuth } from "@/hooks/useAuth";
 import { useIsMobile } from "@/hooks/use-mobile";
@@ -181,7 +181,7 @@ export default function Trabajos() {
   return (
     <div className={pageShellWide}>
       <PageHeader title="Trabajos" actions={
-          <Button size="sm" aria-label="Nuevo trabajo" className="max-sm:w-11 max-sm:px-0" onClick={() => setOpenNuevo(true)}>
+          <Button size="sm" aria-label="Nuevo trabajo" className={mobileHeaderCreateButton} onClick={() => setOpenNuevo(true)}>
             <Plus className="h-4 w-4 sm:mr-1.5" /><span className="hidden sm:inline">Nuevo trabajo</span>
           </Button>
       } />

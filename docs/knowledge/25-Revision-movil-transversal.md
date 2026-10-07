@@ -68,6 +68,10 @@ Las altas de Máquinas y Administración usan la acción principal del encabezad
 
 La matriz completa de rutas, cambios, excepciones y estados pendientes está en `docs/mobile-harmonization-matrix-2026-10-07.md`. La comprobación disponible es de código y pruebas locales; no hubo navegador, capturas, dispositivo físico ni producción autenticada. Por ello todas las filas continúan pendientes de aprobación visual en 320/390/639/640/768/1280 px, incluidos carga, vacío, error, permisos y drawers. No se agregó SQL ni se modificaron consultas, cálculos o exportadores.
 
+Corrección posterior de QA: las acciones de alta ubicadas en `PageHeader` mantienen un objetivo táctil de 44 × 44 px bajo 640 px, pero usan superficie transparente e icono de alto contraste en reposo. Hover y foco aplican un tinte/anillo primario y el estado deshabilitado conserva la semántica base. Desde 640 px mantienen texto, relleno y jerarquía de acción principal. La regla compartida alcanza Nuevo trabajo, Nuevo vehículo, Nuevo usuario, Nueva máquina, Nuevo pedido y Nueva importación; no modifica acciones textuales de detalle ni pies de drawer.
+
+En Equipo y accesos de Administración, la fila de teléfono reserva el ancho principal al nombre y lo limita a dos líneas, con el valor completo en `title`. La presencia conserva el punto visible, el estado completo accesible y su `title`, pero no compite con la identidad como texto lateral; la ficha mantiene su botón de 44 × 44 px y el mismo callback. Desde 640 px continúa la tabla sin cambios.
+
 ## Historial de etapas anteriores
 
 ## Calendario
