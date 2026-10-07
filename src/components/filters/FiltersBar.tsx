@@ -251,10 +251,10 @@ export function FiltersBar({
           </div>
 
           <div className="flex items-center justify-between border-t px-4 py-3">
-            <Button variant="ghost" size="sm" onClick={clearFilters} disabled={!onClear || activeCount === 0}>
+            <Button variant="ghost" size="sm" className="max-sm:min-h-11" onClick={clearFilters} disabled={!onClear || activeCount === 0}>
               <X className="mr-1 h-3.5 w-3.5" /> Limpiar{activeCount > 0 ? ` (${activeCount})` : ""}
             </Button>
-            <Button size="sm" onClick={() => setPanelOpen(false)}>Aplicar</Button>
+            <Button size="sm" className="max-sm:min-h-11" onClick={() => setPanelOpen(false)}>Aplicar</Button>
           </div>
 
         </SheetContent>

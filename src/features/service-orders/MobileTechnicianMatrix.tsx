@@ -29,13 +29,13 @@ export function MobileTechnicianMatrix({ data, metric, onMetricChange }: {
   return <>
     <div className="flex items-center justify-between gap-2 border-b px-3 py-2">
       <div className="flex min-w-0 items-center gap-1">
-        <Button variant="ghost" size="icon" className="h-9 w-9 shrink-0" aria-label="Período anterior" disabled={index === 0} onClick={() => setSelectedIndex(index - 1)}><ChevronLeft className="h-4 w-4" /></Button>
+        <Button variant="ghost" size="icon" className="h-11 w-11 shrink-0" aria-label="Período anterior" disabled={index === 0} onClick={() => setSelectedIndex(index - 1)}><ChevronLeft className="h-4 w-4" /></Button>
         <span className="min-w-[72px] text-center text-[12px] font-medium">{bucketLabels[bucket] ?? bucket}</span>
-        <Button variant="ghost" size="icon" className="h-9 w-9 shrink-0" aria-label="Período siguiente" disabled={index === buckets.length - 1} onClick={() => setSelectedIndex(index + 1)}><ChevronRight className="h-4 w-4" /></Button>
+        <Button variant="ghost" size="icon" className="h-11 w-11 shrink-0" aria-label="Período siguiente" disabled={index === buckets.length - 1} onClick={() => setSelectedIndex(index + 1)}><ChevronRight className="h-4 w-4" /></Button>
       </div>
       <div role="group" aria-label="Medida de la matriz" className="inline-flex overflow-hidden rounded-md border text-[11px]">
-        <button type="button" aria-pressed={metric === "trabajos"} className={`min-h-9 px-2 ${metric === "trabajos" ? "bg-primary text-primary-foreground" : "bg-background"}`} onClick={() => onMetricChange("trabajos")}>Trabajos</button>
-        <button type="button" aria-pressed={metric === "horas"} className={`min-h-9 border-l px-2 ${metric === "horas" ? "bg-primary text-primary-foreground" : "bg-background"}`} onClick={() => onMetricChange("horas")}>Horas</button>
+        <button type="button" aria-pressed={metric === "trabajos"} className={`min-h-11 px-2 ${metric === "trabajos" ? "bg-primary text-primary-foreground" : "bg-background"}`} onClick={() => onMetricChange("trabajos")}>Trabajos</button>
+        <button type="button" aria-pressed={metric === "horas"} className={`min-h-11 border-l px-2 ${metric === "horas" ? "bg-primary text-primary-foreground" : "bg-background"}`} onClick={() => onMetricChange("horas")}>Horas</button>
       </div>
     </div>
     <div className="flex flex-wrap gap-x-3 gap-y-1 border-b px-3 py-2 text-[10px] text-muted-foreground">

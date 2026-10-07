@@ -767,8 +767,13 @@ describe("orders workspace", () => {
     fireEvent.change(dates[0], { target: { value: "2026-09-10" } });
     fireEvent.change(dates[1], { target: { value: "2026-09-25" } });
     expect(screen.getByText("1 prog.")).toBeVisible();
-    fireEvent.click(screen.getByRole("button", { name: "Período anterior" }));
-    fireEvent.click(screen.getByRole("button", { name: "Período anterior" }));
+    const previous = screen.getByRole("button", { name: "Período anterior" });
+    expect(previous).toHaveClass("h-11", "w-11");
+    expect(screen.getByRole("button", { name: "Período siguiente" })).toHaveClass("h-11", "w-11");
+    expect(screen.getByRole("button", { name: "Trabajos" })).toHaveClass("min-h-11");
+    expect(screen.getByRole("button", { name: "Horas" })).toHaveClass("min-h-11");
+    fireEvent.click(previous);
+    fireEvent.click(previous);
     expect(screen.getByRole("meter", { name: "Trabajos cumplidos de TECNICO UNO" })).toHaveAttribute("aria-valuetext", "1 de 2 trabajos cumplidos");
   });
   it("never exposes stale figures or exports after source errors", () => {

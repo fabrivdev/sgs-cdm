@@ -1,6 +1,6 @@
 import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import Admin from "./Admin";
+import Admin, { ModuloChips } from "./Admin";
 
 const { createPerson, canManage, success, errorToast, invalidateQueries, goalRead, goalSave, parametersAccess } = vi.hoisted(() => ({ createPerson: vi.fn(), canManage: { value: true }, success: vi.fn(), errorToast: vi.fn(), invalidateQueries: vi.fn(), goalRead: vi.fn(), goalSave: vi.fn(), parametersAccess: { value: false } }));
 vi.mock("@tanstack/react-query", () => ({ useQueryClient: () => ({ invalidateQueries }) }));
@@ -22,6 +22,23 @@ vi.mock("@/components/filters/FiltersBar", () => ({ FiltersBar: () => null }));
 
 beforeEach(() => { vi.clearAllMocks(); canManage.value = true; parametersAccess.value = false; createPerson.mockResolvedValue(undefined); goalRead.mockResolvedValue({ value: 160, warning: null }); goalSave.mockResolvedValue(undefined); });
 afterEach(cleanup);
+
+describe("Administración: controles de permisos en teléfono", () => {
+  it("mantiene objetivos táctiles de 44 px y expone el estado de cada módulo", () => {
+    const onToggle = vi.fn();
+    render(<ModuloChips activos={["servicios"]} editable onToggle={onToggle} />);
+
+    const servicios = screen.getByRole("button", { name: "Servicios" });
+    const parque = screen.getByRole("button", { name: "Parque" });
+    expect(servicios).toHaveClass("max-sm:min-h-11");
+    expect(servicios).toHaveAttribute("aria-pressed", "true");
+    expect(parque).toHaveClass("max-sm:min-h-11");
+    expect(parque).toHaveAttribute("aria-pressed", "false");
+
+    fireEvent.click(parque);
+    expect(onToggle).toHaveBeenCalledWith("parque", true);
+  });
+});
 async function openCreation() {
   render(<Admin />);
   fireEvent.click(await screen.findByRole("button", { name: "Nuevo usuario" }));

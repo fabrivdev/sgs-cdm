@@ -92,7 +92,7 @@ const normalizeAdminSearch = (value: string) => value
   .toLocaleLowerCase("es")
   .trim();
 
-function ModuloChips({
+export function ModuloChips({
   activos,
   editable,
   onToggle,
@@ -110,9 +110,10 @@ function ModuloChips({
             key={modulo}
             type="button"
             disabled={!editable}
+            aria-pressed={checked}
             onClick={() => onToggle(modulo, !checked)}
             className={cn(
-              "rounded-full border px-2.5 py-0.5 text-[11px] font-medium transition-colors",
+              "inline-flex items-center rounded-full border px-2.5 py-0.5 text-[11px] font-medium transition-colors max-sm:min-h-11",
               checked
                 ? "border-primary bg-primary text-primary-foreground"
                 : "border-muted-foreground/25 text-muted-foreground",
@@ -1195,8 +1196,9 @@ export default function Admin() {
                       key={section.id}
                       type="button"
                       disabled={!canManageAdmin || !sectionUser || !emailByProfile(sectionUser) || isProtectedProfile(sectionUser) || sectionBusy === section.id}
+                      aria-pressed={active}
                       onClick={() => sectionUser && cambiarSeccionAcceso(sectionUser, section, !active)}
-                      className={cn("flex min-h-10 items-center justify-between rounded-lg border px-3 text-left text-[12px] transition-colors", active ? "border-primary/40 bg-primary/5 font-medium text-foreground" : "text-muted-foreground hover:bg-muted/40", (!canManageAdmin || (sectionUser && (!emailByProfile(sectionUser) || isProtectedProfile(sectionUser)))) && "cursor-default")}
+                      className={cn("flex min-h-10 items-center justify-between rounded-lg border px-3 text-left text-[12px] transition-colors max-sm:min-h-11", active ? "border-primary/40 bg-primary/5 font-medium text-foreground" : "text-muted-foreground hover:bg-muted/40", (!canManageAdmin || (sectionUser && (!emailByProfile(sectionUser) || isProtectedProfile(sectionUser)))) && "cursor-default")}
                     >
                       <span>{section.nombre}</span>
                       <span className={cn("h-2.5 w-2.5 rounded-full border", active ? "border-primary bg-primary" : "border-muted-foreground/30")} />

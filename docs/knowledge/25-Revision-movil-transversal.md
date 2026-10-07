@@ -95,3 +95,11 @@ Excepción puntual confirmada el 06/10/2026: Ventas de Servicios oculta en telé
 El botón de menú tiene nombre accesible, estado expandido y mantiene el drawer con las mismas secciones filtradas por permisos. Elegir una sección conserva navegación y cierre; el menú de cuenta conserva Administración según acceso y Cerrar sesión. No cambia autenticación ni concesiones de acceso. `src/components/NotificationsPanel.tsx` adapta botón/contador y limita el ancho del popover con margen de colisión; consultas, marcado de vistas y diálogos de revisión mantienen sus handlers.
 
 Validación local: 8 pruebas nuevas en `src/components/AppLayout.test.tsx`, más 11 pruebas existentes de Ventas móvil; navegación, restricciones de acceso, teclado de cuenta y panel de avisos. Comprobación del encabezado real con fixtures a 320, 390, 767, 768 y 1280 px; compilación y tipos correctos (con librería ES2021 por limitación previa de `replaceAll`). Evidencia y límites en `design-qa.md`. No requiere SQL ni acredita producción, hardware táctil o sincronización con Obsidian.
+
+## Armonización local del 07/10/2026: lote 1
+
+La implementación autorizada comenzó por los objetivos táctiles compartidos, sin cambiar consultas, cálculos, permisos ni presentación de escritorio. Bajo 640 px, el pie de `FiltersBar`, los subcontroles de Ventas y los permisos de Administración alcanzan 44 px; la matriz móvil de Cumplimiento usa el mismo mínimo. Los permisos exponen además su estado con `aria-pressed`. Se mantienen la detección de paneles de filtros vacíos, `aria-expanded`, limpiar, aplicar y los callbacks existentes.
+
+Pruebas focalizadas: 100 casos en cuatro archivos, incluidos controles condicionales de filtros, Ventas, Administración y Órdenes/Cumplimiento. Typecheck, lint de los archivos afectados y compilación de producción correctos. La comprobación de Ventas valida los tokens CSS; no sustituye una medición del render.
+
+No hubo herramienta de navegador disponible para reutilizar una pestaña existente, por lo que las capturas y la revisión visual independiente en 320/390/639/640/768/1280 px quedan pendientes. Este lote no se publica, no ejecuta SQL y no autoriza avanzar a acciones/formularios hasta cerrar esa puerta visual o registrar expresamente su excepción.

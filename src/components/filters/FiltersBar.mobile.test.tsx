@@ -17,6 +17,8 @@ describe('compact mobile filter bar',()=>{
   expect(screen.getAllByRole('button',{name:'Exportación'})).toHaveLength(1);
   fireEvent.click(screen.getByRole('button',{name:'Más filtros'}));
   expect(screen.getByRole('dialog')).toHaveTextContent('Marca');
+  expect(screen.getByRole('button',{name:'Limpiar'})).toHaveClass('max-sm:min-h-11');
+  expect(screen.getByRole('button',{name:'Aplicar'})).toHaveClass('max-sm:min-h-11');
   expect(screen.queryAllByRole('button',{name:'Exportación'})).toHaveLength(0);
   expect(screen.getAllByRole('button',{name:'Exportación',hidden:true})).toHaveLength(1);
  });
