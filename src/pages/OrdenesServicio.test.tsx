@@ -127,6 +127,14 @@ describe("orders workspace", () => {
     const heading = screen.getByRole("heading", { name: "Órdenes de servicio" });
     expect(heading.closest("header")).toContainElement(screen.getByRole("tablist", { name: "Vistas de órdenes de servicio" }));
   });
+  it.each([390, 1280])("keeps section actions beside filters instead of in the header at %i px", async width => {
+    mocks.width = width;
+    setup();
+    const filters = screen.getByRole("button", { name: "Más filtros" });
+    const actions = await screen.findByRole("button", { name: "Acciones de la sección" });
+    expect(actions.closest("header")).toBeNull();
+    expect(filters.parentElement).toContainElement(actions);
+  });
   it("groups phone OS identity into three compact lines without dropping metrics", () => {
     mocks.width = 320;
     setup();
@@ -139,7 +147,7 @@ describe("orders workspace", () => {
     expect(record?.children[2]).toHaveTextContent(/h/);
     expect(record?.children[2]).toHaveTextContent(/km/);
   });
-  it.each([320, 768, 1280])("labels the effective productivity range without changing other views at %i px", width => {
+  it.each([320, 768, 1280])("does not repeat the effective productivity range in the title and keeps its behavior at %i px", width => {
     mocks.width = 1280;
     response.data.data.billing = { "01-00000001": demoBilling() };
     const legacy = demoWorkLog([], "LEGACY");
@@ -152,10 +160,10 @@ describe("orders workspace", () => {
     expect(mocks.set).toHaveBeenLastCalledWith(expect.objectContaining({ fecha_desde: "2026-01-01", productividad_desde: "2026-07-01", productividad_hasta: "2026-09-25" }));
     mocks.width = width;
     rendered.rerender(<MemoryRouter><OrdenesServicio /></MemoryRouter>);
-    const heading = screen.getByRole("heading", { name: "Órdenes de servicio" });
-    const range = screen.getByText("Productividad · 01/07/2026 — 25/09/2026");
-    expect(range).toBeVisible();
-    expect(heading.parentElement).toContainElement(range);
+    expect(screen.queryByText(/Productividad ·/)).not.toBeInTheDocument();
+    const dates = document.querySelectorAll<HTMLInputElement>('input[type="date"]');
+    expect(dates[0]).toHaveValue("2026-01-01");
+    expect(dates[1]).toHaveValue("2026-09-25");
     expect(mocks.billing).toHaveBeenLastCalledWith(["01-00000001"], "2026-09-25", true);
     fireEvent.click(screen.getByRole("button", { name: "Histórico en Órdenes" }));
     expect(screen.getByRole("tab", { name: "Órdenes" })).toHaveAttribute("aria-selected", "true");

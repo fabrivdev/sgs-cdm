@@ -5,8 +5,6 @@
   .sales-workspace > .sales-page-header { order: 0; }
   .sales-page-header > div { flex-direction: row; align-items: flex-start; justify-content: space-between; }
   .sales-page-header h1 { font-size: 18px; line-height: 24px; font-weight: 650; }
-  .sales-mobile-range { display: flex; align-items: center; gap: 7px; font-size: 12px; line-height: 20px; margin-top: 6px; color: hsl(var(--muted-foreground)); white-space: nowrap; }
-  .sales-mobile-range svg { height: 15px; width: 15px; flex-shrink: 0; }
   .sales-workspace > .sales-mobile-summary { order: 1; }
   .sales-mobile-summary { display: grid; grid-template-columns: minmax(0,1.65fr) minmax(0,1fr) minmax(0,.9fr); padding: 10px 0; }
   .sales-mobile-summary > div { min-width: 0; padding: 0 12px; border-left: 1px solid hsl(var(--border)); }

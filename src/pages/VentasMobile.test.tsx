@@ -88,6 +88,14 @@ describe("selected mobile Sales composition", () => {
     await screen.findByRole("table");
     expect(screen.queryByRole("button", { name: "Acciones de la sección" })).not.toBeInTheDocument();
   });
+  it.each([true, false])("keeps the section menu beside filters instead of in the header (mobile: %s)", async mobile => {
+    viewport.mobile = mobile;
+    setup("maquinas");
+    const filters = screen.getByRole("button", { name: "Más filtros" });
+    const actions = await screen.findByRole("button", { name: "Acciones de la sección" });
+    expect(actions.closest("header")).toBeNull();
+    expect(filters.parentElement).toContainElement(actions);
+  });
   it("keeps desktop navigation and all four original KPIs", async () => {
     viewport.mobile = false;
     setup("maquinas");

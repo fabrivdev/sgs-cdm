@@ -20,20 +20,23 @@ La regla de corte es teléfono por debajo de 640 px. La verificación visual pos
 | Gutter propio más estrecho | Calendario | `pageShellWide` compartido | La cuadrícula mensual y `md:py-2` siguen siendo excepciones funcionales |
 | Acciones de 32 px con texto completo | Sugerencia de compra | Icono con nombre accesible y ancho táctil de 44 px bajo 640 | Texto y 32 px visuales se conservan desde 640 px |
 | Divisor/estado ambiguo en filas | Trabajos | Separador neutral y padding de la tabla nativa | Cambio ya existente en el commit local `9702832`; no altera estados |
+| Menú de sección movido entre cabecera y filtros según ancho | Ventas y Órdenes de servicio | Un solo montaje mediante `FiltersBar.secondaryActions` en todos los anchos | La coincidencia visual exacta con la referencia sigue pendiente de acceso a píxeles |
+| Resumen de período aplicado bajo el título | Ventas y Productividad de Órdenes | Se retira la repetición; fechas, consultas, corte histórico y selección de períodos permanecen funcionales | Mes de Calendario y corte de Stock proyectado se conservan como contexto operativo |
+| Altas con color móvil desigual | Planificador y demás altas de cabecera | `mobileHeaderCreateButton` conserva el icono primario de Planificador para todas, solo bajo 640 px | No altera estilo de escritorio, permiso, callback ni formulario |
 
 ## Inventario de rutas y secciones
 
 | Ruta / sección | Patrón y excepción funcional | Resultado de código | Evidencia automatizada local | Evidencia visual |
 | --- | --- | --- | --- | --- |
-| `/servicios/ventas` | Workspace móvil propio de Ventas; rango bajo título oculto sólo aquí | Objetivos secundarios armonizados; filtros, períodos y exportación preservados | Pruebas de Ventas y contrato CSS del lote 1 | Pendiente |
-| `/parque-ventas` | Mismo workspace, con rango móvil visible | Sin desvío accionable adicional | Pruebas existentes de Ventas + contrato CSS | Pendiente |
-| `/repuestos/ventas` | Mismo workspace, con rango móvil visible | Sin desvío accionable adicional | Pruebas existentes de Ventas + contrato CSS | Pendiente |
-| `/` Planificador | Agenda móvil propia, sin horas en la fila; tabla desde 640 px | Sin cambio: la excepción documentada ya está implementada | `ServiceLists.test.tsx` y pruebas existentes | Pendiente |
+| `/servicios/ventas` | Workspace móvil propio de Ventas | Sin rango repetido bajo título; menú de sección junto a filtros; fechas, períodos y exportación preservados | `VentasAsync.test.tsx` y `VentasMobile.test.tsx` | Pendiente |
+| `/parque-ventas` | Mismo workspace de Ventas | Sin rango repetido bajo título; menú de sección junto a filtros | Mismas pruebas de Ventas | Pendiente |
+| `/repuestos/ventas` | Mismo workspace de Ventas | Sin rango repetido bajo título; menú de sección junto a filtros | Mismas pruebas de Ventas | Pendiente |
+| `/` Planificador | Agenda móvil propia, sin horas en la fila; tabla desde 640 px | Alta con estilo compartido; menú ya estaba junto a filtros | `ServiceLists.test.tsx` y contrato de altas | Pendiente |
 | `/trabajos` | Lista plana móvil; tablero en tablet/escritorio | Separadores y densidad ya corregidos en `9702832` | `ServiceLists.test.tsx` | Pendiente |
 | `/calendario` | Mes conserva cuadrícula; Semana/Técnicos usan agenda móvil; consultar no reprograma | Gutter común aplicado sin tocar vistas, arrastre ni callbacks | Contrato de código del lote 4; pruebas previas de agenda compartida | Pendiente |
-| `/servicios/ordenes` — Órdenes | Lista compacta y drawer de detalle | Fila reducida a tres niveles conservando OS, equipo, técnicos, horas y km | 74/74 en `OrdenesServicio.test.tsx` | Pendiente |
-| `/servicios/ordenes` — Productividad | Matriz móvil propia y drawer de técnico | Objetivos de 44 px; sin cambio de cálculo | Incluida en 74/74 de Órdenes | Pendiente |
-| `/servicios/ordenes` — Cumplimiento | Matriz, no lista genérica | Objetivos de 44 px; filtros y datos intactos | Incluida en 74/74 de Órdenes | Pendiente |
+| `/servicios/ordenes` - Órdenes | Lista compacta y drawer de detalle | Menú junto a filtros; fila conserva OS, equipo, técnicos, horas y km | `OrdenesServicio.test.tsx` | Pendiente |
+| `/servicios/ordenes` - Productividad | Matriz móvil propia y drawer de técnico | Sin rango decorativo en el título; fechas y corte histórico intactos | `OrdenesServicio.test.tsx` | Pendiente |
+| `/servicios/ordenes` - Cumplimiento | Matriz, no lista genérica | Menú junto a filtros; objetivos, filtros y datos intactos | `OrdenesServicio.test.tsx` | Pendiente |
 | `/servicios/flota` | Lista solamente; no agregar gráficos | Fila en dos niveles, “Sin lectura” no se duplica; drawers nativos conservados | 8/8 en `FlotaDrawers.test.tsx` | Pendiente |
 | `/comisiones` | OS/cliente/pago/validación agrupados; edición/cálculo conservados | Sin desvío accionable adicional | Pruebas móviles existentes de Comisiones | Pendiente |
 | `/parque-clientes` | Fila compacta y ficha existente | Alta de máquina trasladada al encabezado, sin cambiar destino | 2/2 en `ParqueClientes.test.tsx` y pruebas previas de listas | Pendiente |
@@ -63,6 +66,14 @@ La regla de corte es teléfono por debajo de 640 px. La verificación visual pos
 | Permisos restringidos | Sí | 640 representativo | Sí | Acciones ausentes/deshabilitadas sin espacios muertos |
 | Drawers/formularios | Teclado y scroll pendientes | 768 representativo | Sí | Título, cuerpo, pie, foco, cierre y validación accesibles |
 | Calendario/Planificador | Mes, Semana, Técnicos y agenda | Matriz desde 640 | Matriz completa | Mantener excepciones, identidad de jornadas y ausencia de horas en agenda móvil |
+
+## Validación local del ajuste de jerarquía
+
+- 105 pruebas focalizadas correctas en `VentasAsync.test.tsx`, `VentasMobile.test.tsx`, `OrdenesServicio.test.tsx` y `fleetCreateButton.test.ts`.
+- Typecheck y compilación de producción correctos.
+- ESLint correcto en Ventas, Órdenes y sus pruebas. `Planificador.tsx` conserva cuatro `any` y una advertencia de dependencia de hook que ya existían fuera de las líneas modificadas; no se amplió el alcance para corregirlos.
+- No se abrió la aplicación ni un navegador. La referencia nueva de Library solo estuvo disponible como OCR/caption, no como píxeles; por eso la validación visual y la coincidencia fina de alineación permanecen pendientes.
+- No hubo SQL, consulta a producción ni publicación en Lovable; la publicación Git de este lote se verifica por separado al cierre.
 
 ## Límites
 

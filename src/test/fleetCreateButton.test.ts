@@ -7,6 +7,7 @@ const workPage = readFileSync("src/pages/Trabajos.tsx", "utf8");
 const adminPage = readFileSync("src/pages/Admin.tsx", "utf8");
 const parkPage = readFileSync("src/pages/ParqueClientes.tsx", "utf8");
 const operationsPage = readFileSync("src/pages/MaquinariaOperaciones.tsx", "utf8");
+const plannerPage = readFileSync("src/pages/Planificador.tsx", "utf8");
 
 describe("mobile header create buttons", () => {
   it("keeps a transparent 44 px target with explicit interaction states only on phones", () => {
@@ -14,17 +15,18 @@ describe("mobile header create buttons", () => {
     expect(mobileHeaderCreateButton).toContain("max-sm:h-11");
     expect(mobileHeaderCreateButton).toContain("max-sm:w-11");
     expect(mobileHeaderCreateButton).toContain("max-sm:bg-transparent");
-    expect(mobileHeaderCreateButton).toContain("max-sm:text-foreground");
+    expect(mobileHeaderCreateButton).toContain("max-sm:text-primary");
     expect(mobileHeaderCreateButton).toContain("max-sm:hover:bg-primary/10");
     expect(mobileHeaderCreateButton).toContain("max-sm:focus-visible:ring-primary");
     expect(mobileHeaderCreateButton).toContain("max-sm:disabled:bg-transparent");
   });
 
   it("applies one shared treatment to every page-header creation flow", () => {
-    [workPage, fleetPage, adminPage, parkPage, operationsPage].forEach((source) => {
+    [workPage, fleetPage, adminPage, parkPage, operationsPage, plannerPage].forEach((source) => {
       expect(source).toContain("mobileHeaderCreateButton");
       expect(source).not.toContain('className="max-sm:w-11 max-sm:px-0"');
     });
+    expect(plannerPage).not.toContain('className="max-sm:w-11 max-sm:bg-transparent max-sm:px-0 max-sm:text-primary');
     expect(fleetPage).toContain('aria-label="Nuevo vehículo"');
     expect(fleetPage).toContain('<Plus className="h-4 w-4 sm:mr-1.5" />');
     expect(fleetPage).toContain('<span className="hidden sm:inline">Nuevo vehículo</span>');

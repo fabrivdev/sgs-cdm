@@ -1,5 +1,5 @@
 import { SalesViewSwitcher } from "@/components/ventas/SalesViewSwitcher";
-import { SalesMobileProvider, SalesMobileRange, SalesMobileTabs, SalesMobileSummary, SalesMobileAverage } from "@/components/ventas/SalesMobileWorkspace";
+import { SalesMobileProvider, SalesMobileTabs, SalesMobileSummary, SalesMobileAverage } from "@/components/ventas/SalesMobileWorkspace";
 import { useSalesMobile, useSalesExplorerView } from "@/components/ventas/salesMobileContext";
 import { SalesSectionExportsProvider, SalesSectionExportMenu } from "@/components/ventas/SalesSectionExports";
 /* eslint-disable @typescript-eslint/no-explicit-any -- La RPC queda tipada al regenerar los tipos después de aplicar su migración. */
@@ -426,8 +426,8 @@ function VentasContent({ area }: { area: VentasArea }) {
     : { marcas: [...new Set(machineOptions.map(option => option.marca))].sort(), tipos: [...new Set(machineOptions.map(option => option.tipo_maquina))].sort() };
   return (
     <SalesSectionExportsProvider><PageShell className="sales-workspace">
-      <PageHeader className="sales-page-header" title={copy.title} actions={mobile.active ? <SalesSectionExportMenu /> : undefined} meta={mobile.active && area !== "servicios" ? <SalesMobileRange desde={desde} hasta={hasta} /> : undefined} />
-      <FiltersBar className="sales-toolbar" secondaryActions={mobile.active ? undefined : <SalesSectionExportMenu />} search={{ value: buscar, onChange: setBuscar, placeholder: copy.search }} activeCount={activeFilters} onClear={() => { setBuscar(""); setSucursal("TODAS"); setTipoTiempo("TODOS"); setMarca(""); setTipoMaquina(""); setPartsBrand(""); setPartsSeller(""); setServiceFilters({}); setServiceFiltersReset(value=>value+1); }} expanded={<>
+      <PageHeader className="sales-page-header" title={copy.title} />
+      <FiltersBar className="sales-toolbar" secondaryActions={<SalesSectionExportMenu />} search={{ value: buscar, onChange: setBuscar, placeholder: copy.search }} activeCount={activeFilters} onClear={() => { setBuscar(""); setSucursal("TODAS"); setTipoTiempo("TODOS"); setMarca(""); setTipoMaquina(""); setPartsBrand(""); setPartsSeller(""); setServiceFilters({}); setServiceFiltersReset(value=>value+1); }} expanded={<>
         {area === "servicios" && <>
           <FilterSelect label="Tipo de tiempo" value={tipoTiempo} onChange={setTipoTiempo} placeholder="Todos" width="w-full" options={[{ value: "TODOS", label: "Todos" }, { value: "Cliente", label: "Cliente" }, { value: "Garantia", label: "Garantía" }, { value: "Interno", label: "Interno" }, { value: "No informado", label: "No informado" }]} />
           <FilterSelect label="Marca" value={marca || "TODAS"} onChange={v => setMarca(v === "TODAS" ? "" : v)} placeholder="Todas" width="w-full" options={[{value:"TODAS",label:"Todas"}, ...dimensionOptions.marcas.map(value=>({value,label:value}))]} />

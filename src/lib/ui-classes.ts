@@ -38,7 +38,7 @@ export const controlClass = `${controlHeight} ${controlText}`;
 // pero bajo 640 px la superficie visual se integra con las acciones nativas.
 // El tinte y anillo primarios conservan jerarquía en hover/foco; escritorio
 // mantiene el botón default con texto y relleno.
-export const mobileHeaderCreateButton = "max-sm:h-11 max-sm:w-11 max-sm:bg-transparent max-sm:px-0 max-sm:text-foreground max-sm:shadow-none max-sm:hover:bg-primary/10 max-sm:hover:text-foreground max-sm:focus-visible:bg-primary/10 max-sm:focus-visible:ring-primary max-sm:disabled:bg-transparent";
+export const mobileHeaderCreateButton = "max-sm:h-11 max-sm:w-11 max-sm:bg-transparent max-sm:px-0 max-sm:text-primary max-sm:shadow-none max-sm:hover:bg-primary/10 max-sm:hover:text-primary max-sm:focus-visible:bg-primary/10 max-sm:focus-visible:ring-primary max-sm:disabled:bg-transparent";
 
 
 // Altura estándar de gráficos del dashboard

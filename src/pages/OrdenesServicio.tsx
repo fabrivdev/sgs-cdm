@@ -115,9 +115,7 @@ export function OrdersWorkspace() {
 
   return <PageShell className="service-orders-workspace">
     <Tabs value={tab} onValueChange={setTab} className="min-w-0 space-y-3">
-      <PageHeader title="Órdenes de servicio" titleAccessory={!blocked && tab === "productividad" && workPeriod.includesLegacy && workEligible
-        ? <span role="status" className="text-[12px] font-normal leading-5 text-muted-foreground">Productividad · {operationsDate(workPeriod.from)} — {operationsDate(workPeriod.to)}</span>
-        : undefined} actions={phone && !blocked ? <SalesSectionExportMenu /> : undefined}
+      <PageHeader title="Órdenes de servicio"
         tabs={<TabsList aria-label="Vistas de órdenes de servicio"><TabsTrigger value="ordenes">Órdenes</TabsTrigger><TabsTrigger value="productividad">Productividad</TabsTrigger><TabsTrigger value="cumplimiento">Cumplimiento</TabsTrigger></TabsList>} />
       {!blocked && tab === "productividad" && workPeriod.includesLegacy && workEligible && <div className="flex min-h-0 items-center text-[12px]">
         <button type="button" onClick={() => setTab("ordenes")} className="min-h-11 text-primary hover:underline sm:min-h-0">Histórico en Órdenes</button>
@@ -137,7 +135,7 @@ export function OrdersWorkspace() {
             detail={billingLoading ? "Calculando…" : billingFailed ? undefined : efficiency.incomplete ? `${efficiency.incomplete} OS sin cálculo` : undefined} />,
         ] : null}
       </KpiStrip>}
-      <FiltersBar search={{ value: filters.q, onChange: v => change("q", v), placeholder: tab === "cumplimiento" ? "Cliente, trabajo o TR…" : "OS, cliente o chasis…" }} activeCount={active} onClear={() => setFilters(defaults)} secondaryActions={!phone ? <SalesSectionExportMenu /> : undefined} expanded={<>
+      <FiltersBar search={{ value: filters.q, onChange: v => change("q", v), placeholder: tab === "cumplimiento" ? "Cliente, trabajo o TR…" : "OS, cliente o chasis…" }} activeCount={active} onClear={() => setFilters(defaults)} secondaryActions={!blocked ? <SalesSectionExportMenu /> : undefined} expanded={<>
         <FilterMultiSelect label="Marca" values={filters.fMarcas} onChange={v => change("fMarcas", v)} options={MARCAS.map(value => ({ value, label: value }))} />
         {tab !== "cumplimiento" && <FilterSelect label="Agrupar" placeholder="Período" value={filters.periodMode} onChange={v => change("periodMode", v as OperationsFilters["periodMode"])} options={[{ value: "dia", label: "Día" }, { value: "semana", label: "Semana" }, { value: "mes", label: "Mes" }, { value: "anio", label: "Año" }]} />}
         {tab === "cumplimiento" ? <>

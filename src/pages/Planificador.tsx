@@ -26,7 +26,7 @@ import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
 import { addDays, format, getISOWeek, parseISO, setISOWeek, startOfWeek } from "date-fns";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
-import { pageShellWide } from "@/lib/ui-classes";
+import { mobileHeaderCreateButton, pageShellWide } from "@/lib/ui-classes";
 import { PageHeader } from "@/components/layout/AppPrimitives";
 import { trabajoReferencia, trabajoOsNumero } from "@/lib/trabajos";
 import { resolverCuadrillaJornada } from "@/lib/jornada-cuadrilla";
@@ -593,7 +593,7 @@ export default function Planificador() {
   return (
     <div className={cn(pageShellWide, "max-sm:space-y-2")}>
       <PageHeader title="Planificador" actions={canCreate ? <>
-            <Button size="sm" aria-label="Programar jornada" className="max-sm:w-11 max-sm:bg-transparent max-sm:px-0 max-sm:text-primary max-sm:hover:bg-accent" onClick={() => setOpenProgramar(true)}>
+            <Button size="sm" aria-label="Programar jornada" className={mobileHeaderCreateButton} onClick={() => setOpenProgramar(true)}>
               <CalendarPlus className="h-4 w-4 sm:mr-2" /><span className="hidden sm:inline">Programar jornada</span>
             </Button>
       </> : undefined} />

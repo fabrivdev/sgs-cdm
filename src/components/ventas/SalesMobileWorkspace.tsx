@@ -1,5 +1,5 @@
 import { useState, type ReactNode } from "react";
-import { CalendarDays, X } from "lucide-react";
+import { X } from "lucide-react";
 import { useIsMobile } from "@/hooks/use-mobile";
 import { cn } from "@/lib/utils";
 import { SalesMobileContext, useSalesMobile, type MobileView } from "./salesMobileContext";
@@ -15,10 +15,6 @@ const shortDate = (value: string) => {
   const date = new Date(`${value}T00:00:00`);
   return Number.isNaN(date.getTime()) ? value : new Intl.DateTimeFormat("es-PY", { day: "2-digit", month: "short", year: "numeric" }).format(date);
 };
-export function SalesMobileRange({ desde, hasta }: { desde: string; hasta: string }) {
-  return <span className="sales-mobile-range"><CalendarDays aria-hidden="true" />{shortDate(desde)} — {shortDate(hasta)}</span>;
-}
-
 export function SalesMobileTabs({ selectedPeriod, desde, hasta, onClear }: {
   selectedPeriod: string | null; desde: string; hasta: string; onClear: () => void;
 }) {
