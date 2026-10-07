@@ -78,7 +78,7 @@ export function OrdersTable({ rows, billingLoading = false, billingFailed = fals
     ? <SalesSortButton label={key === "horas" ? "Horas" : "Km"} kind="number" align="center" active={table.sort.key === key} direction={table.sort.direction} onClick={() => table.toggleSort(key)} />
     : table.heading(key);
   const mobile: CompactListColumn<ServicioOSRow>[] = [
-    { ...visible[0], width: "w-[58%]", render: row => <button type="button" className="min-h-11 w-full text-left" aria-label={`Ver OS ${row.os}`} onClick={() => setSelected(row)}><MobileRecord primary={<span className="font-mono text-[11px] text-muted-foreground">OS {row.os}</span>} secondary={row.cliente} /></button> },
+    { ...visible[0], width: "w-[58%]", render: row => <button type="button" className="min-h-11 w-full text-left" aria-label={`Ver OS ${row.os}`} onClick={() => setSelected(row)}><MobileRecord primary={<span className="font-mono text-[11px] text-foreground">OS {row.os}</span>} secondary={<span className="text-foreground">{row.cliente}</span>} /></button> },
     { ...visible[6], label: "Horas", width: "w-[18%]", align: "right", value: row => row.horas,
       render: row => <span className="block text-right text-[12px] font-medium tabular-nums">{number.format(row.horas)} h</span> },
     { ...visible[5], width: "w-[24%]" },

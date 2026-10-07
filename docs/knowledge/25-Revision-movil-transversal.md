@@ -4,7 +4,9 @@
 
 La instrucción visual más reciente reemplaza bajo 640 px la separación de Productividad en dos columnas. Cada fila usa una primera línea con el nombre del técnico a la izquierda y su porcentaje real a la derecha; el medidor ocupa una segunda línea con todo el ancho útil de la fila. El relleno sigue limitado a la proporción calculada y no se estira a 100% para completar el riel.
 
-El riel conserva `bg-muted` como contraste del tramo no alcanzado y el relleno conserva `bg-primary`; ese gris no representa error, parcialidad ni una fuente incompleta. Cuando falta meta se muestra `—` y no se renderiza medidor ni `0%`. El nombre mantiene el acceso al detalle, el contexto accesible de OS/inactivo/parcial y los campos completos de orden/exportación. Tablet y escritorio no cambian. Sin SQL, consultas, permisos ni panel gerencial.
+El riel conserva `bg-muted` como contraste del tramo no alcanzado y el relleno conserva `bg-primary`. Cuando falta meta se muestra `—` y no se renderiza medidor ni `0%`. El nombre mantiene el acceso al detalle, el contexto accesible de OS/inactivo/parcial y los campos completos de orden/exportación. Tablet y escritorio no cambian. Sin SQL, consultas, permisos ni panel gerencial.
+
+La aclaración posterior sobre texto gris corresponde a la lista móvil de Órdenes, no a estas barras. En Órdenes, OS y cliente son identidad principal y usan `text-foreground`; horas ya conserva texto principal y Estado mantiene su color semántico. Encabezados, pie de conteo y mensajes secundarios pueden continuar atenuados. No aplicar esta corrección a estados deshabilitados legítimos ni cambiar colores de Productividad.
 
 Implementación local revisada el 24/09/2026. Complementa [[24-Condiciones-visuales-ventas]]; no certifica producción ni la revisión de cada ruta.
 
