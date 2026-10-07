@@ -2,7 +2,9 @@
 
 ## Densidad de la lista móvil - 07/10/2026
 
-Bajo 640 px, cada vehículo ocupa una fila continua de al menos 56 px y dos niveles: marca/modelo; chapa/responsable/fecha de última lectura cuando existe. Kilómetros del período y estado permanecen a la derecha. `Sin lectura` aparece una sola vez como estado, sin repetir una tercera línea. Abrir la fila conserva el mismo detalle; no se agregan gráficos, cards, consultas ni cálculos. Ocho pruebas focalizadas de Flota pasan, incluida esta estructura y el callback. La revisión visual en los anchos de la matriz transversal sigue pendiente.
+Bajo 640 px, cada vehículo ocupa una fila continua. La identidad conserva marca/modelo, chapa única y responsable en líneas separadas; kilómetros del período y estado permanecen a la derecha. El responsable se mantiene por criterio conservador hasta validar si es contexto diario de despacho. Sólo la fecha de última lectura se retira de la fila y continúa en el detalle, junto con historial y lecturas. `Sin lectura` aparece una sola vez como estado. Abrir la fila conserva el mismo callback y nombre accesible con modelo/chapa; no se agregan gráficos, cards, consultas ni cálculos.
+
+Diez pruebas focalizadas de Flota cubren la estructura, el callback y la presencia de responsable/fecha en el detalle. La revisión visual en 320/390/639/640/768/1280 px sigue pendiente; las pruebas DOM no acreditan truncamiento real, hardware ni producción.
 
 Corrección posterior de QA: en el detalle a 320 px, `Cambiar responsable` usa sólo el icono bajo 640 px, conserva `aria-label` y ocupa 44 × 44 px; desde 640 px mantiene texto y altura compacta. No cambia el diálogo ni su guardado. `Volver a la flota` y los lápices de corrección conservan también objetivos móviles de 44 px. La regresión cubre clases, nombres accesibles y los tres callbacks; la recaptura visual queda a cargo del revisor que mantiene la sesión autenticada.
 

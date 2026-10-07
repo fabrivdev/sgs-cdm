@@ -50,7 +50,7 @@ export function PlannerMobileAgenda<T extends AgendaRow>({ rows, columns, sort, 
               </time>
               <span className="block min-w-0">
                 <span className={cn("block break-words font-semibold [overflow-wrap:anywhere]", bodyText)}>{client(row)}</span>
-                <span className={cn("mt-0.5 line-clamp-2 break-words font-normal text-muted-foreground [overflow-wrap:anywhere]", tableTextDense)}>{row.trabajo_descripcion || "Sin descripción"}</span>
+                <span className={cn("mt-0.5 block truncate font-normal text-muted-foreground", tableTextDense)}>{row.trabajo_descripcion || "Sin descripción"}</span>
                 <span className={cn("mt-1.5 flex flex-wrap items-center gap-x-2 gap-y-1", metaText)}>
                   <span className="break-all">{reference(row)}</span>
                   <EstadoBadge estado={row.estado} className="px-1.5 py-0 text-[10px] leading-4" />

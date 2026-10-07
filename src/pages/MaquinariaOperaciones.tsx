@@ -1287,6 +1287,11 @@ export function OrdersTable({ rows, heading, sort, onSelect, entregaByUnitId, co
     if(key==="entrega"){const state=delivery(row);return state?ENTREGA_LABEL[state]:"—";}
     return formatMoney(row.valor_venta,row.moneda_valor||"USD");
   };
+  const mobileStatus=(row:OrderRow)=>{
+    const deliveryState=delivery(row);
+    if(deliveryState==="NO_DISPONIBLE"||deliveryState==="CANCELADA")return {axis:"Entrega",label:ENTREGA_LABEL[deliveryState],className:entregaClass(deliveryState)};
+    return {axis:"Facturación",label:value("facturacion",row),className:billingStateClass(billing(row),billingLookupStatus)};
+  };
   const columns:CompactListColumn<OrderRow>[]=schema.map(column=>({...column,kind:column.key==="valor"?"number":"text",align:column.key==="valor"?"right":"left",value:r=>value(column.key,r),className:column.key==="np"?"font-mono font-medium":undefined,render:r=>{
     const text=value(column.key,r);
     const deliveryState=delivery(r);
@@ -1295,7 +1300,7 @@ export function OrdersTable({ rows, heading, sort, onSelect, entregaByUnitId, co
   }}));
   return <><div className="hidden items-center justify-between gap-2 px-2 py-1 sm:flex md:hidden"><span className="text-[12px] font-medium">Líneas de pedido</span><select aria-label="Estado visible" value={mobileState} onChange={event=>setMobileState(event.target.value)} className="h-11 min-w-0 rounded-md border bg-background px-2 text-base"><option value="facturacion">Facturación</option><option value="entrega">Entrega</option></select></div>
     <CompactListTable rows={rows} columns={columns} id={r=>r.id} label="Operaciones de máquinas" sort={sort} heading={heading} onSelect={onSelect}
-    mobileColumns={[{ key: "modelo", label: "Pedido", kind: "text", width: "w-auto", value: r => r.modelo, render: r => <MobileRecord primary={r.modelo || r.producto || "Sin modelo"} secondary={<>{formatNpCode(r.np_numero)} · {r.cliente_nombre || "Sin cliente"}</>} context={<><span aria-label={`Facturación: ${value("facturacion", r)}`} className={cn("rounded border px-1.5 py-0.5 text-[10px]", billingStateClass(billing(r),billingLookupStatus))}>{value("facturacion", r)}</span><span aria-label={`Entrega: ${value("entrega", r)}`}>{value("entrega", r)}</span></>} /> }]}
+    mobileColumns={[{ key: "modelo", label: "Pedido", kind: "text", width: "w-auto", value: r => r.modelo, render: r => {const status=mobileStatus(r);return <MobileRecord primary={r.modelo || r.producto || "Sin modelo"} secondary={<><span className="block font-mono">{formatNpCode(r.np_numero)}</span><span className="block truncate">{r.cliente_nombre || "Sin cliente"}</span></>} context={<span aria-label={`${status.axis}: ${status.label}`} className={cn("rounded border px-1.5 py-0.5 text-[10px]",status.className)}>{status.label}</span>} />;} }]}
     actions={{width:"w-11 sm:w-[14%] md:w-[4%] lg:w-[3%]",render:r=><button type="button" aria-label={`Ver NP ${formatNpCode(r.np_numero)}`} title="Ver pedido" className="flex h-11 w-11 max-w-full items-center justify-center rounded-sm focus-visible:ring-2 focus-visible:ring-ring md:h-7 md:w-7" onClick={event=>{event.stopPropagation();onSelect(r);}}><Eye className="h-4 w-4 text-muted-foreground" aria-hidden="true" /></button>}} /></>;
 }
 

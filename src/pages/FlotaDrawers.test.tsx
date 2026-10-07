@@ -121,6 +121,29 @@ describe("formularios laterales de Flota", () => {
     fireEvent.click(row);
     expect(open).toHaveBeenCalledExactlyOnceWith(vehicle.id);
   });
+  it("deja identidad, responsable, kilometraje y estado en la fila móvil y conserva la fecha en el detalle", () => {
+    Object.defineProperty(window, "innerWidth", { configurable: true, writable: true, value: 320 });
+    const open = vi.fn();
+    const responsibility = {
+      id: "responsibility-one", vehicle_id: vehicle.id, responsible_profile_id: "profile-one",
+      responsible_name_snapshot: "Fabrizio Responsable", effective_date: "2026-09-01",
+      recorded_at: "2026-09-01T10:00:00.000Z", recorded_by: "admin", recorded_by_name: "Admin",
+    };
+    render(<FleetVehicleList vehicles={[vehicle]} activeVehicleCount={1} readings={[reading]} comparisons={[]} responsibilityByVehicle={new Map([[vehicle.id, responsibility]])} today={TODAY} onOpen={open} onClearFilters={vi.fn()} />);
+    const row = screen.getByRole("button", { name: /modelo D-Max, chapa AAON 294/ });
+    expect(row).toHaveTextContent("ISUZU · D-Max");
+    expect(row).toHaveTextContent("AAON 294");
+    expect(row).toHaveTextContent("Km período");
+    expect(row).toHaveTextContent("Responsable: Fabrizio Responsable");
+    expect(row).not.toHaveTextContent("15 sept. 2026");
+    fireEvent.click(row);
+    expect(open).toHaveBeenCalledExactlyOnceWith(vehicle.id);
+
+    cleanup();
+    render(<VehicleDetail vehicle={vehicle} latest={reading} status={{ label: "Al día", overdue: false }} comparison={undefined} responsibility={responsibility} responsibilityHistory={[responsibility]} rows={[reading]} auditRows={[]} onBack={vi.fn()} onCorrect={vi.fn()} onEditResponsible={vi.fn()} />);
+    expect(screen.getAllByText("Fabrizio Responsable").length).toBeGreaterThan(0);
+    expect(screen.getAllByText("15 sept. 2026").length).toBeGreaterThan(0);
+  });
   it("usa el drawer lateral nativo con encabezado, cuerpo desplazable, pie y foco inicial", async () => {
     render(<VehicleHarness />);
 

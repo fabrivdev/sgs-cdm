@@ -2,6 +2,20 @@
 
 Implementación local revisada el 24/09/2026. Complementa [[24-Condiciones-visuales-ventas]]; no certifica producción ni la revisión de cada ruta.
 
+## Jerarquía final de filas telefónicas - 07/10/2026
+
+Esta regla posterior prevalece sobre las descripciones anteriores de filas bajo 640 px. Cada fila conserva identidad, una comparación principal y un estado accionable; los datos retirados siguen en el detalle, orden, búsqueda y exportación existentes. Desde 640 px se mantienen las tablas y columnas previas.
+
+- Órdenes muestra OS + cliente, horas y estado. Marca, modelo, técnicos y km permanecen en el drawer.
+- Cumplimiento muestra técnico, porcentaje o `-`, barra cuando existe denominador y una sola excepción: primero `No disponible`, en su ausencia `N programados`. El drawer conserva `x de y`, horas, referencias, trabajos y motivos. La falta de resultados decididos nunca se presenta como `0%`.
+- Planificador conserva el código TR visible y en el nombre accesible; la tarea se limita a una línea y `Jornada n/m` aparece sólo si hay continuidad real. La OS, horas y demás campos siguen en detalle/búsqueda/exportación.
+- Flota muestra marca/modelo, chapa, responsable, km del período y estado de lectura. El responsable se conserva en línea propia hasta validar si es contexto diario de despacho; sólo la fecha de última lectura pasa al detalle existente.
+- Operaciones de máquinas muestra modelo, NP, cliente y un solo badge con eje accesible. `Entrega: No disponible/Cancelada` prevalece como bloqueo; sin bloqueo se muestra `Facturación`. Los dos ejes siguen separados y visibles en el drawer.
+
+Importaciones y Máquinas del parque no se modifican: faltan capturas asentadas con filas reales para autorizar una reducción. Productividad, Trabajos, Equipo/Administración y detalle de Flota tampoco cambian en este lote. No se tocaron filtros, cabeceras, pestañas, cards, sidebar, escritorio, fórmulas, consultas, permisos, exportadores ni SQL.
+
+Evidencia local: pruebas de componentes en `OrdenesServicio.test.tsx`, `ServiceLists.test.tsx`, `FlotaDrawers.test.tsx` y `ParqueListTables.test.tsx`. No se abrió navegador ni aplicación y la QA visual sigue pendiente en 320/390/639/640/768/1280 px. El clon no contiene `00-Inicio.md`, `mapa-negocio.json` ni `obsidian-sync.local`; se contrastaron las normas originales de Obsidian y el código vigente, sin inventar los archivos ausentes ni acreditar sincronización.
+
 ## Límites de filas en Trabajos — 06/10/2026
 
 Bajo 640 px, las filas planas de `src/pages/Trabajos.tsx` usan separadores neutrales de 1 px a todo el ancho y el mismo padding vertical `py-2` de la tabla nativa. El color del estado no tiñe el fondo ni el divisor móvil; permanece en la prioridad y en el tablero de tablet/escritorio. Hover, foco visible y presión ofrecen un fondo neutral perceptible sin convertir las filas en cards.

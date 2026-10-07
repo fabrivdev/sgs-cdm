@@ -156,20 +156,26 @@ describe("orders workspace", () => {
     expect(actions.closest("header")).toBeNull();
     expect(filters.parentElement).toContainElement(actions);
   });
-  it("keeps phone OS identity compact and gives activity its own numeric column", () => {
+  it("keeps phone OS identity, hours and status in the row while the full evidence stays in detail", () => {
     mocks.width = 320;
     setup();
     const open = screen.getByRole("button", { name: "Ver OS 01-00000001" });
     const record = open.querySelector(".mobile-record");
     expect(record?.children).toHaveLength(2);
     expect(record?.children[0]).toHaveTextContent("OS 01-00000001");
-    expect(record?.children[1]).toHaveTextContent(/CLAAS|HORSCH/);
+    expect(record?.children[1]).toHaveTextContent("CLIENTE DEMO");
     const table = within(screen.getByRole("table", { name: "Órdenes de servicio" }));
     const row = within(open.closest("tr")!);
-    expect(table.getByRole("columnheader", { name: "Actividad" })).toBeVisible();
-    expect(row.getByText(/técs?\./)).toBeVisible();
+    expect(table.getByRole("columnheader", { name: "Horas" })).toBeVisible();
+    expect(row.queryByText(/técs?\./)).not.toBeInTheDocument();
     expect(row.getByText(/ h$/)).toBeVisible();
-    expect(row.getByText(/ km$/)).toBeVisible();
+    expect(row.queryByText(/ km$/)).not.toBeInTheDocument();
+    expect(row.queryByText(/CLAAS|HORSCH/)).not.toBeInTheDocument();
+    fireEvent.click(open);
+    const detail = within(screen.getByRole("dialog"));
+    expect(detail.getByText("Marca")).toBeVisible();
+    expect(detail.getByText("Modelo")).toBeVisible();
+    expect(detail.getByText("Km recorridos")).toBeVisible();
   });
   it.each([320, 768, 1280])("does not repeat the effective productivity range in the title and keeps its behavior at %i px", width => {
     mocks.width = 1280;
@@ -404,8 +410,12 @@ describe("orders workspace", () => {
     setup();
     const table = within(screen.getByRole("table", { name: "Órdenes de servicio" }));
     for (const [index, marca] of brands.entries()) {
-      for (const text of table.getAllByText(marca, { exact: true })) {
-        expect(text.parentElement).toHaveClass(...machineBrandClass(marca).split(" "));
+      if (width < 640) {
+        expect(table.queryByText(marca, { exact: true })).not.toBeInTheDocument();
+      } else {
+        for (const text of table.getAllByText(marca, { exact: true })) {
+          expect(text.parentElement).toHaveClass(...machineBrandClass(marca).split(" "));
+        }
       }
       fireEvent.click(screen.getByRole("button", { name: `Ver OS 01-0000000${index + 1}` }));
       const detail = within(screen.getByRole("dialog"));
@@ -701,19 +711,25 @@ describe("orders workspace", () => {
     expect(kpis.getByText("—")).toBeVisible();
     expect(kpis.queryByText("41", { exact: true })).not.toBeInTheDocument();
   });
-  it.each([390, 1280])("shows equipment, technician count, hours and distance in the list at %i px", width => {
+  it.each([390, 1280])("keeps compact phone evidence in detail and full desktop columns at %i px", width => {
     mocks.width = width;
     Object.assign(response.data.data.ordenesServicio[0], { km_cantidad: 300, raw_data: { canonical_model: "TRION 740", tecnicos_participantes: ["TECNICO UNO", "TECNICO DOS"] } });
     setup();
     const table = within(screen.getByRole("table", { name: "Órdenes de servicio" }));
-    expect(table.getByText(/TRION 740/)).toBeVisible();
     expect(table.queryByText(/TECNICO UNO/)).not.toBeInTheDocument();
     if (width < 640) {
-      expect(table.getByText("2 técs.")).toBeVisible();
+      expect(table.queryByText(/TRION 740/)).not.toBeInTheDocument();
+      expect(table.queryByText("2 técs.")).not.toBeInTheDocument();
       expect(table.getByText("10 h")).toBeVisible();
-      expect(table.getByText("300 km")).toBeVisible();
+      expect(table.queryByText("300 km")).not.toBeInTheDocument();
+      fireEvent.click(screen.getByRole("button", { name: "Ver OS 01-00000001" }));
+      const detail = within(screen.getByRole("dialog"));
+      expect(detail.getByText("TRION 740")).toBeVisible();
+      expect(detail.getByText(/TECNICO UNO, TECNICO DOS/)).toBeVisible();
+      expect(detail.getByText("300", { exact: true })).toBeVisible();
     }
     else {
+      expect(table.getByText(/TRION 740/)).toBeVisible();
       expect(table.getByText("2", { exact: true })).toBeVisible();
       expect(table.getByText("300", { exact: true })).toBeVisible();
       expect(table.getByRole("columnheader", { name: /Km recorridos/ })).toBeVisible();
@@ -852,10 +868,27 @@ describe("orders workspace", () => {
     const targetPeriod = within(period).getAllByRole("option")[0] as HTMLOptionElement;
     fireEvent.change(period, { target: { value: targetPeriod.value } });
     fireEvent.change(metric, { target: { value: "horas" } });
-    expect(screen.getAllByText(/h registradas/).length).toBeGreaterThan(0);
+    expect(screen.queryByText(/h registradas/)).not.toBeInTheDocument();
     fireEvent.change(metric, { target: { value: "trabajos" } });
     fireEvent.click(panel.getByRole("button", { name: "Aplicar" }));
     expect(screen.getByRole("meter", { name: "Trabajos cumplidos de TECNICO UNO" })).toHaveAttribute("aria-valuetext", "1 de 2 trabajos cumplidos");
+    fireEvent.click(screen.getByRole("button", { name: "TECNICO UNO" }));
+    const detail = within(screen.getByRole("dialog"));
+    expect(detail.getByText("Horas registradas")).toBeVisible();
+    expect(detail.getByText("Trabajos decididos")).toBeVisible();
+  });
+  it("keeps unavailability indeterminate instead of presenting it as zero compliance", () => {
+    response.data.data.jornadas = [];
+    response.data.data.disponibilidades = [{ id: "ABS1", tecnico_id: "T1", fecha_inicio: "2026-09-10", fecha_fin: "2026-09-10", tipo: "Capacitación", observacion: null, bloquea_agenda: true }];
+    setup(); tab("Cumplimiento");
+    const dates = document.querySelectorAll('input[type="date"]');
+    fireEvent.change(dates[0], { target: { value: "2026-09-10" } });
+    fireEvent.change(dates[1], { target: { value: "2026-09-10" } });
+    const row = screen.getByRole("button", { name: "TECNICO UNO" }).closest('[role="row"]')!;
+    expect(row).toHaveTextContent("No disponible");
+    expect(row).toHaveTextContent("-");
+    expect(within(row).queryByRole("meter")).not.toBeInTheDocument();
+    expect(row).not.toHaveTextContent("0%");
   });
   it("never exposes stale figures or exports after source errors", () => {
     response.isError = true; setup();

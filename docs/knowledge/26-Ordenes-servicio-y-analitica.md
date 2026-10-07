@@ -1,5 +1,13 @@
 # Órdenes de servicio y futura analítica transversal
 
+## Densidad telefónica de Órdenes y Cumplimiento - 07/10/2026
+
+Bajo 640 px, la lista de Órdenes usa tres señales: OS + cliente como identidad, horas como comparación y estado como acción. Marca/modelo, cantidad y nombres de técnicos y km se consultan en el drawer existente. Las columnas de tablet/escritorio, la búsqueda, el orden por campos ocultos y el Excel completo no cambian.
+
+Cumplimiento conserva el mismo cálculo: el denominador incluye sólo trabajos con resultado decidido. La fila muestra porcentaje o `-`, medidor accesible cuando corresponde y una sola excepción prioritaria (`No disponible`; de lo contrario, programados). El drawer conserva porcentaje, `x de y`, programados, horas, referencias y motivos. Ausencia de resultados no equivale a cero.
+
+Validación de componente: `src/pages/OrdenesServicio.test.tsx` cubre 320 px, detalle, campos retirados, exportación previa, excepción prioritaria y el caso indeterminado sin `0%`. No hubo navegador, datos productivos, SQL ni cambios de fórmulas/consultas.
+
 ## Plan actualizado — 25/09/2026
 
 Una sola sección de Servicios con Órdenes, Productividad y Cumplimiento. Ventas no se amplía ni cambia su población financiera. Planificador conserva la agenda móvil sin horas. Comisiones sigue siendo el único espacio de validación/liquidación; consultar indicadores no autoriza pagos o cambios de estado.

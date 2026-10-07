@@ -665,7 +665,7 @@ export default function Planificador() {
 
       {phone ? <PlannerMobileAgenda rows={displayed} columns={columns} sort={list.sort} onSort={list.toggleSort}
         client={s => s.cliente_id ? cliById[s.cliente_id]?.nombre || "Sin cliente" : "Sin cliente"}
-        reference={s => { const ref = refByServicio.get(s.id); return ref?.os ? `OS ${ref.os}` : ref?.ref || "Sin referencia"; }}
+        reference={s => { const ref = refByServicio.get(s.id); return ref?.codigo || (ref?.os ? `OS ${ref.os}` : ref?.ref) || "Sin referencia"; }}
         continuity={s => continuidadByRow.get(`${s.id}-${s.jornada_id ?? s.fecha_programada}`)}
         onSelect={openDetalle} rowClassName={journeyClass} status={listStatus}
       /> : <Card className="overflow-hidden">

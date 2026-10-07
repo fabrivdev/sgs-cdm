@@ -70,6 +70,7 @@ describe("compact operational services lists",()=>{
     expect(screen.queryByRole("table", {name: "Jornadas del Planificador"})).not.toBeInTheDocument();
     expect(screen.queryByText(/Total horas/)).not.toBeInTheDocument();
     expect(agenda).not.toHaveTextContent(/2,5|0 h|Horas|—/);
+    expect(agenda).toHaveTextContent("TR0001");
     expect(within(agenda).getAllByRole("listitem")).toHaveLength(2);
     expect(within(agenda).getByText("Jornada 1/2")).toBeInTheDocument();
     expect(within(agenda).getByText("Jornada 2/2")).toBeInTheDocument();

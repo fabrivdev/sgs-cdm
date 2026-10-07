@@ -78,10 +78,10 @@ export function OrdersTable({ rows, billingLoading = false, billingFailed = fals
     ? <SalesSortButton label={key === "horas" ? "Horas" : "Km"} kind="number" align="center" active={table.sort.key === key} direction={table.sort.direction} onClick={() => table.toggleSort(key)} />
     : table.heading(key);
   const mobile: CompactListColumn<ServicioOSRow>[] = [
-    { ...visible[0], width: "w-[56%]", render: row => <button type="button" className="min-h-11 w-full text-left" aria-label={`Ver OS ${row.os}`} onClick={() => setSelected(row)}><MobileRecord primary={<span className="flex min-w-0 items-baseline gap-1.5"><span className="shrink-0 font-mono text-[11px] text-muted-foreground">OS {row.os}</span><span className="min-w-0 truncate">{row.cliente}</span></span>} secondary={<span className="flex min-w-0 items-center gap-1.5"><MarcaBadge marca={row.marca} className="shrink-0 px-1.5 text-[10px]" /><span className="min-w-0 truncate">{row.modelo || "Sin modelo"}</span></span>} /></button> },
-    { ...visible[6], key: "actividad", label: "Actividad", width: "w-[22%]", align: "right", value: row => row.horas,
-      render: row => <span className="block text-right text-[11px] leading-4 text-muted-foreground"><span className="block">{row.tecnicos.length} {row.tecnicos.length === 1 ? "téc." : "técs."}</span><span className="block text-foreground">{number.format(row.horas)} h</span><span className="block">{number.format(row.km)} km</span></span> },
-    { ...visible[5], width: "w-[22%]" },
+    { ...visible[0], width: "w-[58%]", render: row => <button type="button" className="min-h-11 w-full text-left" aria-label={`Ver OS ${row.os}`} onClick={() => setSelected(row)}><MobileRecord primary={<span className="font-mono text-[11px] text-muted-foreground">OS {row.os}</span>} secondary={row.cliente} /></button> },
+    { ...visible[6], label: "Horas", width: "w-[18%]", align: "right", value: row => row.horas,
+      render: row => <span className="block text-right text-[12px] font-medium tabular-nums">{number.format(row.horas)} h</span> },
+    { ...visible[5], width: "w-[24%]" },
   ];
   return <>
     <OperationsPanel>

@@ -8,6 +8,22 @@ Se contrastaron las rutas activas de `src/App.tsx`, la navegación de `src/compo
 
 La regla de corte es teléfono por debajo de 640 px. La verificación visual posterior debe cubrir 320, 390, 639, 640, 768 y 1280 px, además de texto largo, filtro activo, carga, vacío, error, permisos restringidos y drawer abierto cuando corresponda.
 
+## Implementación de jerarquía de filas - 07/10/2026
+
+Esta tabla prevalece sobre las filas anteriores del inventario para los cinco destinos evaluados.
+
+| Ruta / sección | Resultado bajo 640 px | Conservado fuera de la fila | Estado |
+| --- | --- | --- | --- |
+| `/servicios/ordenes` · Órdenes | OS + cliente; horas; estado | Marca/modelo, técnicos y km en drawer; orden y exportación completos | Implementado y cubierto por componente |
+| `/servicios/ordenes` · Cumplimiento | Técnico; porcentaje/`-` y barra; una excepción prioritaria | `x de y`, horas, programados, refs y motivos en drawer; no convierte ND en 0 | Implementado y cubierto por componente |
+| `/` · Planificador | Fecha, cliente, tarea de una línea, TR, estado y continuidad sólo si `m > 1` | OS, horas y demás evidencia en detalle/búsqueda/exportación | Implementado y cubierto por componente |
+| `/servicios/flota` · lista | Marca/modelo + chapa + responsable en líneas separadas; km del período; estado | Última fecha en detalle; responsable se conserva hasta validar uso diario | Implementado y cubierto por componente |
+| `/parque-operaciones` | Modelo, NP, cliente y un badge con eje: bloqueo de entrega o, sin bloqueo, facturación | Segundo eje y trazabilidad en drawer; no se fusionan estados | Implementado y cubierto por componente |
+| `/parque-importaciones` | Sin cambio | Requiere evidencia visual con datos antes de reducir | Pendiente visual |
+| `/parque-maquinas` | Sin cambio | Requiere evidencia visual con datos antes de reducir | Pendiente visual |
+
+Sin cambio deliberado: Productividad, Trabajos, Equipo/Administración y detalle de Flota. No se modificaron cabeceras, filtros, pestañas, cards, sidebar, escritorio, fórmulas, consultas, permisos, exportaciones ni SQL. La validación fue local y secuencial; no se abrió navegador ni la aplicación y la QA visual permanece pendiente.
+
 ## Actualización posterior: servicios, filtros y Flota
 
 Esta sección prevalece sobre las filas anteriores que describían semana o estados fuera de Filtros y sobre la fila de Órdenes que agrupaba actividad como una tercera línea de identidad.

@@ -79,6 +79,25 @@ describe("Parque and imports compact lists",()=>{
     expect(cells[7]).toHaveClass("hidden");expect(cells[8]).not.toHaveClass("hidden");
     fireEvent.click(screen.getByRole("button",{name:"Ver NP NP0101"}));expect(select).toHaveBeenCalledExactlyOnceWith(row);expect(table.querySelectorAll("td br,td .flex-col")).toHaveLength(0);
   });
+  it("phone orders show one prioritized state without merging billing and delivery",()=>{
+    vi.stubGlobal("innerWidth",390);
+    const row={id:"U1",operacion_id:"OP1",np_numero:"000101",np_fecha:"2026-09-17",cliente_nombre:"CLIENTE CON NOMBRE MUY LARGO",comercial:null,marca:"CLAAS",producto:"COSECHADORAS",modelo:machine.modelo_tipo,cantidad:1,condicion:"NUEVA",abastecimiento:"STOCK",estado_fuente:"FACTURADA",estado_operacion:"FACTURADA",chasis:machine.serie,estado_disponibilidad:"DISPONIBLE",disponibilidad_detalle:null,estado_importacion_fuente:null,eta:null,ata:null,proveedor:null,factura_venta:"FACT 5106",factura_fecha:"2026-09-22",costo_producto:null,valor_venta:111234.56,moneda_valor:"USD",observaciones:null,actualizado_en:"2026-09-18",es_historico:false};
+    const blocked={...row,id:"U2",np_numero:"000102",chasis:"NO-STOCK"};
+    const select=vi.fn();
+    setup(<OrdersTable rows={[row,blocked]} heading={key=>key} onSelect={select} entregaByUnitId={new Map([[row.id,{estado:"FACTURADA",chasis:machine.serie}],[blocked.id,{estado:"FACTURADA",chasis:blocked.chasis}]])} confirmedBillingUnitIds={new Set()} estadoByOperacionId={new Map([[row.operacion_id,"FACTURADA"]])} stockChasisSet={new Set([machine.serie])}/>);
+    const stockedRow=screen.getByRole("button",{name:"Ver NP NP0101"}).closest("tr")!;
+    const blockedRow=screen.getByRole("button",{name:"Ver NP NP0102"}).closest("tr")!;
+    expect(within(stockedRow).getByLabelText("Facturación: Pendiente")).toBeVisible();
+    expect(within(stockedRow).queryByLabelText("Entrega: En stock")).not.toBeInTheDocument();
+    expect(within(blockedRow).getByLabelText("Entrega: No disponible")).toBeVisible();
+    expect(within(blockedRow).queryByLabelText("Facturación: Pendiente")).not.toBeInTheDocument();
+    const identity=stockedRow.querySelector(".mobile-record")!;
+    expect(identity).toHaveTextContent("NP0101");
+    expect(identity).toHaveTextContent("CLIENTE CON NOMBRE MUY LARGO");
+    expect(within(stockedRow).getAllByRole("cell")).toHaveLength(2);
+    fireEvent.click(screen.getByRole("button",{name:"Ver NP NP0102"}));
+    expect(select).toHaveBeenCalledExactlyOnceWith(blocked);
+  });
   it("keeps machine billing unavailable on RPC failure and retries only on demand",async()=>{
     const row={id:"U1",operacion_id:"OP1",np_numero:"000101",np_fecha:"2026-09-17",cliente_nombre:"CLIENTE CON NOMBRE MUY LARGO",comercial:null,marca:"CLAAS",producto:"COSECHADORAS",modelo:machine.modelo_tipo,cantidad:1,condicion:"NUEVA",abastecimiento:"STOCK",estado_fuente:"FACTURADA",estado_operacion:"FACTURADA",chasis:machine.serie,estado_disponibilidad:"DISPONIBLE",disponibilidad_detalle:null,estado_importacion_fuente:null,eta:null,ata:null,proveedor:null,factura_venta:"FACT 5106",factura_fecha:"2026-09-22",costo_producto:null,valor_venta:111234.56,moneda_valor:"USD",observaciones:null,actualizado_en:"2026-09-18",es_historico:false};
     mocks.tables.maquinaria_pedidos_lineas_estado_actual=[row];
