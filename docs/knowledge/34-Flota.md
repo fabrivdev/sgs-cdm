@@ -4,6 +4,8 @@
 
 Bajo 640 px, cada vehículo ocupa una fila continua de al menos 56 px y dos niveles: marca/modelo; chapa/responsable/fecha de última lectura cuando existe. Kilómetros del período y estado permanecen a la derecha. `Sin lectura` aparece una sola vez como estado, sin repetir una tercera línea. Abrir la fila conserva el mismo detalle; no se agregan gráficos, cards, consultas ni cálculos. Ocho pruebas focalizadas de Flota pasan, incluida esta estructura y el callback. La revisión visual en los anchos de la matriz transversal sigue pendiente.
 
+Corrección posterior de QA: en el detalle a 320 px, `Cambiar responsable` usa sólo el icono bajo 640 px, conserva `aria-label` y ocupa 44 × 44 px; desde 640 px mantiene texto y altura compacta. No cambia el diálogo ni su guardado. `Volver a la flota` y los lápices de corrección conservan también objetivos móviles de 44 px. La regresión cubre clases, nombres accesibles y los tres callbacks; la recaptura visual queda a cargo del revisor que mantiene la sesión autenticada.
+
 ## Seed opcional de responsables
 
 La asignación inicial de Hugo Rodas y Ruben Monges nunca debe bloquear la instalación. Solo se agrega una línea de base con fecha `NULL` si cuenta autora, chapa y perfil activo resuelven de forma única. Con cero o varios perfiles coincidentes, perfil inactivo o cualquier fuente ambigua, el vehículo queda sin responsable para selección manual. El script incremental es idempotente, no crea identidades y puede reejecutarse sin duplicar baselines.

@@ -571,7 +571,7 @@ export function FleetVehicleList({ vehicles, activeVehicleCount, readings, compa
   </Panel>;
 }
 
-function VehicleDetail({ vehicle, latest, status, comparison, responsibility, responsibilityHistory, rows, auditRows, onBack, onCorrect, onEditResponsible }: {
+export function VehicleDetail({ vehicle, latest, status, comparison, responsibility, responsibilityHistory, rows, auditRows, onBack, onCorrect, onEditResponsible }: {
   vehicle: FleetVehicle;
   latest: FleetOdometerReading | null;
   status: { label: string; overdue: boolean };
@@ -599,7 +599,7 @@ function VehicleDetail({ vehicle, latest, status, comparison, responsibility, re
           <span className="font-mono text-[11px] tracking-[0.08em] text-muted-foreground">{vehicle.plate}</span>
           <Badge variant="outline" className={cn("text-[9px]", status.overdue ? "border-amber-200 bg-amber-50 text-amber-800" : "border-emerald-200 bg-emerald-50 text-emerald-700")}>{status.label}</Badge>
           <span className="basis-full truncate text-[11px] text-muted-foreground" title={responsibleName(responsibility)}>Responsable: <span className="font-medium text-foreground">{responsibleName(responsibility)}</span></span>
-          <Button variant="outline" size="sm" className="h-8" onClick={onEditResponsible}><UserRoundPen className="h-3.5 w-3.5" /> Cambiar responsable</Button>
+          <Button variant="outline" size="sm" className="h-8 max-sm:h-11 max-sm:w-11 max-sm:p-0" aria-label="Cambiar responsable" onClick={onEditResponsible}><UserRoundPen className="h-3.5 w-3.5" /><span className="max-sm:sr-only">Cambiar responsable</span></Button>
         </div>
       </div>
       <dl className="mt-3 grid grid-cols-2 gap-x-4 gap-y-2 rounded-lg bg-muted/45 px-3 py-2 sm:grid-cols-4">

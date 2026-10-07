@@ -2,7 +2,8 @@ import { useState } from "react";
 import { act, cleanup, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { FleetVehicle } from "@/features/fleet/model";
-import { FleetVehicleList, ReadingDialog, VehicleDialog } from "./Flota";
+import type { FleetPeriodReading } from "@/features/fleet/period";
+import { FleetVehicleList, ReadingDialog, VehicleDetail, VehicleDialog } from "./Flota";
 
 const TODAY = "2026-10-06";
 const vehicle: FleetVehicle = {
@@ -15,6 +16,27 @@ const vehicle: FleetVehicle = {
   created_at: "2026-10-06T10:00:00.000Z",
   created_by: "fabrizio",
   created_by_name: "Fabrizio",
+};
+const reading: FleetPeriodReading = {
+  id: "reading-one",
+  vehicle_id: vehicle.id,
+  reading_date: "2026-09-15",
+  odometer_km: 51256,
+  reading_kind: "weekly",
+  correction_of: null,
+  created_at: "2026-09-15T10:00:00.000Z",
+  created_by: "fabrizio",
+  created_by_name: "Fabrizio",
+  voided_at: null,
+  voided_by: null,
+  voided_by_name: null,
+  void_reason: null,
+  previousReadingDate: "2026-09-08",
+  elapsedDays: 7,
+  travelledKm: 505,
+  countedKm: 505,
+  coverage: "exact",
+  hasWeeklyGap: false,
 };
 
 function deferred<T>() {
@@ -63,6 +85,31 @@ afterEach(() => {
 });
 
 describe("formularios laterales de Flota", () => {
+  it("mantiene las acciones del detalle dentro de objetivos móviles de 44 px", () => {
+    Object.defineProperty(window, "innerWidth", { configurable: true, writable: true, value: 320 });
+    const onBack = vi.fn();
+    const onCorrect = vi.fn();
+    const onEditResponsible = vi.fn();
+    render(<VehicleDetail vehicle={vehicle} latest={reading} status={{ label: "Al día", overdue: false }} comparison={undefined} responsibility={null} responsibilityHistory={[]} rows={[reading]} auditRows={[]} onBack={onBack} onCorrect={onCorrect} onEditResponsible={onEditResponsible} />);
+
+    const back = screen.getByRole("button", { name: "Volver a la flota" });
+    const responsible = screen.getByRole("button", { name: "Cambiar responsable" });
+    const corrections = screen.getAllByRole("button", { name: "Corregir lectura del 15 sept. 2026" });
+    const correct = corrections.find((button) => button.classList.contains("h-11"));
+    const desktopCorrect = corrections.find((button) => button.classList.contains("h-8"));
+    expect(back).toHaveClass("max-sm:min-h-11");
+    expect(responsible).toHaveClass("max-sm:h-11", "max-sm:w-11", "max-sm:p-0");
+    expect(within(responsible).getByText("Cambiar responsable")).toHaveClass("max-sm:sr-only");
+    expect(correct).toHaveClass("h-11", "w-11");
+    expect(desktopCorrect).toHaveClass("h-8", "w-8");
+
+    fireEvent.click(back);
+    fireEvent.click(responsible);
+    fireEvent.click(correct!);
+    expect(onBack).toHaveBeenCalledOnce();
+    expect(onEditResponsible).toHaveBeenCalledOnce();
+    expect(onCorrect).toHaveBeenCalledOnce();
+  });
   it("mantiene la flota como lista compacta y muestra Sin lectura una sola vez", () => {
     const open = vi.fn();
     render(<FleetVehicleList vehicles={[vehicle]} activeVehicleCount={1} readings={[]} comparisons={[]} responsibilityByVehicle={new Map()} today={TODAY} onOpen={open} onClearFilters={vi.fn()} />);
