@@ -510,7 +510,7 @@ export default function Flota({ previewData }: { previewData?: FleetPreviewSnaps
   </PageShell>;
 }
 
-function FleetVehicleList({ vehicles, activeVehicleCount, readings, comparisons, responsibilityByVehicle, today, onOpen, onClearFilters }: {
+export function FleetVehicleList({ vehicles, activeVehicleCount, readings, comparisons, responsibilityByVehicle, today, onOpen, onClearFilters }: {
   vehicles: FleetVehicle[];
   activeVehicleCount: number;
   readings: FleetOdometerReading[];
@@ -530,8 +530,8 @@ function FleetVehicleList({ vehicles, activeVehicleCount, readings, comparisons,
             const status = readingStatus(latest, today);
             const comparison = comparisons.find((row) => row.vehicle.id === vehicle.id);
             const responsibility = responsibilityByVehicle.get(vehicle.id);
-            return <button key={vehicle.id} type="button" className="grid w-full grid-cols-[minmax(0,1fr)_auto] items-center gap-3 px-3 py-3 text-left hover:bg-muted/35" onClick={() => onOpen(vehicle.id)}>
-              <span className="min-w-0"><span className="block truncate text-[12px] font-semibold">{vehicle.brand}{vehicleModel(vehicle) === "-" ? "" : ` · ${vehicleModel(vehicle)}`}</span><span className="mt-0.5 block truncate font-mono text-[10px] text-muted-foreground">{vehicle.plate} · {responsibleName(responsibility)}</span><span className="mt-0.5 block truncate text-[9px] text-muted-foreground">{latest ? `Lectura ${displayDate(latest.reading_date)}` : "Sin lectura"}</span></span>
+            return <button key={vehicle.id} type="button" className="grid min-h-14 w-full grid-cols-[minmax(0,1fr)_auto] items-center gap-3 px-3 py-2 text-left hover:bg-muted/35" onClick={() => onOpen(vehicle.id)}>
+              <span className="min-w-0"><span className="block truncate text-[12px] font-semibold">{vehicle.brand}{vehicleModel(vehicle) === "-" ? "" : ` · ${vehicleModel(vehicle)}`}</span><span className="mt-0.5 block truncate font-mono text-[10px] text-muted-foreground" title={`${vehicle.plate} · ${responsibleName(responsibility)}${latest ? ` · ${displayDate(latest.reading_date)}` : ""}`}>{vehicle.plate} · {responsibleName(responsibility)}{latest ? ` · ${displayDate(latest.reading_date)}` : ""}</span></span>
               <span className="text-right"><span className="block text-[9px] text-muted-foreground">Km período</span><span className="block text-[11px] font-semibold tabular-nums">{displayKm(periodKm(comparison))}</span><Badge variant="outline" className={cn("mt-1 px-1.5 text-[8px]", status.overdue ? "border-amber-200 bg-amber-50 text-amber-800" : "border-emerald-200 bg-emerald-50 text-emerald-700")}>{status.label}</Badge></span>
             </button>;
           })}</div>

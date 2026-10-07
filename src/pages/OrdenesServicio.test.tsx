@@ -127,6 +127,18 @@ describe("orders workspace", () => {
     const heading = screen.getByRole("heading", { name: "Órdenes de servicio" });
     expect(heading.closest("header")).toContainElement(screen.getByRole("tablist", { name: "Vistas de órdenes de servicio" }));
   });
+  it("groups phone OS identity into three compact lines without dropping metrics", () => {
+    mocks.width = 320;
+    setup();
+    const open = screen.getByRole("button", { name: "Ver OS 01-00000001" });
+    const record = open.querySelector(".mobile-record");
+    expect(record?.children).toHaveLength(3);
+    expect(record?.children[0]).toHaveTextContent("OS 01-00000001");
+    expect(record?.children[1]).toHaveTextContent(/CLAAS|HORSCH/);
+    expect(record?.children[2]).toHaveTextContent(/técnico/);
+    expect(record?.children[2]).toHaveTextContent(/h/);
+    expect(record?.children[2]).toHaveTextContent(/km/);
+  });
   it.each([320, 768, 1280])("labels the effective productivity range without changing other views at %i px", width => {
     mocks.width = 1280;
     response.data.data.billing = { "01-00000001": demoBilling() };

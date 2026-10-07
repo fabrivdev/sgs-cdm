@@ -1,5 +1,9 @@
 # Flota
 
+## Densidad de la lista móvil - 07/10/2026
+
+Bajo 640 px, cada vehículo ocupa una fila continua de al menos 56 px y dos niveles: marca/modelo; chapa/responsable/fecha de última lectura cuando existe. Kilómetros del período y estado permanecen a la derecha. `Sin lectura` aparece una sola vez como estado, sin repetir una tercera línea. Abrir la fila conserva el mismo detalle; no se agregan gráficos, cards, consultas ni cálculos. Ocho pruebas focalizadas de Flota pasan, incluida esta estructura y el callback. La revisión visual en los anchos de la matriz transversal sigue pendiente.
+
 ## Seed opcional de responsables
 
 La asignación inicial de Hugo Rodas y Ruben Monges nunca debe bloquear la instalación. Solo se agrega una línea de base con fecha `NULL` si cuenta autora, chapa y perfil activo resuelven de forma única. Con cero o varios perfiles coincidentes, perfil inactivo o cualquier fuente ambigua, el vehículo queda sin responsable para selección manual. El script incremental es idempotente, no crea identidades y puede reejecutarse sin duplicar baselines.

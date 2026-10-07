@@ -39,8 +39,9 @@ export function KpiStrip({ children, className, mobilePrimary }: { children: Rea
   const mobile = useIsMobile(640);
   const items = Children.toArray(children);
   if (mobile) {
-    return <section aria-label="Indicadores" className={cn("mobile-kpi-strip grid min-w-0 gap-x-3 gap-y-2 border-y py-2", items.length === 3 ? "grid-cols-3" : "grid-cols-2")}>
-      {items.map((item, index) => <div key={index} data-priority={mobilePrimary?.includes(index) ? "primary" : undefined} className="min-w-0 [&_.kpi-item]:p-0">{item}</div>)}
+    const layout = items.length === 3 ? "grid-cols-3" : items.length === 5 ? "grid-cols-6" : "grid-cols-2";
+    return <section aria-label="Indicadores" className={cn("mobile-kpi-strip grid min-w-0 gap-x-3 gap-y-2 border-y py-2", layout)}>
+      {items.map((item, index) => <div key={index} data-priority={mobilePrimary?.includes(index) ? "primary" : undefined} className={cn("min-w-0 [&_.kpi-item]:p-0", items.length === 5 && (index < 3 ? "col-span-2" : "col-span-3"))}>{item}</div>)}
     </section>;
   }
   return <section className={cn("grid grid-cols-2 min-h-[64px] overflow-hidden rounded-xl border bg-card max-sm:[&>*]:border-b max-sm:[&>*:nth-child(odd)]:border-r max-sm:[&>*:last-child:nth-child(odd)]:col-span-2 sm:grid-cols-none sm:grid-flow-col sm:auto-cols-fr sm:divide-x", className)}>{children}</section>;

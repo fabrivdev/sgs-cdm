@@ -28,6 +28,17 @@ describe('explicit mobile KPI hierarchy', () => {
   const {container} = render(<KpiStrip>{items}</KpiStrip>);
   expect(container.querySelector('details')).toBeNull();
  });
+ it('packs five mobile KPIs into two balanced rows without hiding any item', () => {
+  const five = [...items, <KpiItem key="fifth" label="Días" value="4"/>];
+  const {container} = render(<KpiStrip>{five}</KpiStrip>);
+  const strip = container.querySelector('.mobile-kpi-strip');
+  expect(strip).toHaveClass('grid-cols-6');
+  const cells = Array.from(strip?.children ?? []);
+  expect(cells).toHaveLength(5);
+  cells.slice(0,3).forEach(cell => expect(cell).toHaveClass('col-span-2'));
+  cells.slice(3).forEach(cell => expect(cell).toHaveClass('col-span-3'));
+  expect(screen.getByText('Días')).toBeVisible();
+ });
  it('leaves all desktop indicators in their original grid', () => {
   state.mobile = false;
   const {container} = render(<KpiStrip mobilePrimary={[0,3]} className="xl:grid-cols-4">{items}</KpiStrip>);

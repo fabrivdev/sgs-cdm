@@ -1,8 +1,8 @@
 import { useState } from "react";
-import { act, cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { act, cleanup, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { FleetVehicle } from "@/features/fleet/model";
-import { ReadingDialog, VehicleDialog } from "./Flota";
+import { FleetVehicleList, ReadingDialog, VehicleDialog } from "./Flota";
 
 const TODAY = "2026-10-06";
 const vehicle: FleetVehicle = {
@@ -63,6 +63,17 @@ afterEach(() => {
 });
 
 describe("formularios laterales de Flota", () => {
+  it("mantiene la flota como lista compacta y muestra Sin lectura una sola vez", () => {
+    const open = vi.fn();
+    render(<FleetVehicleList vehicles={[vehicle]} activeVehicleCount={1} readings={[]} comparisons={[]} responsibilityByVehicle={new Map()} today={TODAY} onOpen={open} onClearFilters={vi.fn()} />);
+    const row = screen.getByRole("button", { name: /ISUZU/ });
+    expect(row).toHaveClass("min-h-14", "py-2");
+    expect(within(row).getAllByText("Sin lectura")).toHaveLength(1);
+    expect(row).toHaveTextContent("AAON 294");
+    expect(row).toHaveTextContent("Km período");
+    fireEvent.click(row);
+    expect(open).toHaveBeenCalledExactlyOnceWith(vehicle.id);
+  });
   it("usa el drawer lateral nativo con encabezado, cuerpo desplazable, pie y foco inicial", async () => {
     render(<VehicleHarness />);
 

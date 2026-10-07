@@ -286,7 +286,11 @@ Este clon no incluye `obsidian-sync.local`, scripts de sincronización ni mapa/�
 
 La tabla «Por período» de Productividad incluye Eficiencia en escritorio y en la línea compacta móvil; el Excel «Horas por período» la exporta como porcentaje numérico. Usa `billingEfficiencyByPeriod` sobre las OS cerradas de la población financiera ya filtrada y asigna cada OS al mes/semana/día/año de `fechaOperacion` (cierre OS; apertura sólo cuando falta cierre), con la misma razón ponderada de la card. No divide horas facturadas entre horas-persona ni atribuye facturación a la fecha de una jornada. Una OS sin conciliación completa deja desconocido (`—`) únicamente su período; una consulta financiera pendiente o fallida deja todos los períodos desconocidos. Los estados «Parcial» de jornadas siguen separados. Pruebas locales de agrupación, faltantes, exportación y vista móvil; no requiere SQL ni acredita datos productivos.
 
-## Cumplimiento centrado en la matriz — 29/09/2026
+## Densidad de la fila móvil de Órdenes - 07/10/2026
+
+Bajo 640 px, la fila de Órdenes agrupa en tres niveles la identidad OS/cliente, la marca/modelo y el contexto de técnicos/horas/km. Conserva la marca compartida, el estado separado, la selección de la OS, búsqueda, orden, ficha y exportación. No enumera técnicos ni añade datos inferidos. La regresión de página cubre los tres niveles y las métricas dentro de las 74 pruebas focalizadas correctas. Es validación de DOM y código, no aprobación visual ni verificación productiva.
+
+## Cumplimiento centrado en la matriz - 29/09/2026
 
 En `OrdenesServicio.tsx`, Cumplimiento muestra sólo filtros y matriz de técnicos por período; omite las tres cards superiores y elimina «Más análisis» y sus informes/exportaciones de esta vista por pedido posterior. Los componentes y cálculos compartidos no se borran del repositorio. `MatrizTécnicosDías` conserva en escritorio/tablet sucursales, técnicos, estados combinados, no disponibilidad, horas/trabajos y el detalle al pasar por una celda. `MobileTechnicianMatrix.tsx` usa los mismos `blocks`, `buckets`, `cells` y `refs` de `useOperationsModel.ts`, con un período por vez y detalle táctil por técnico; no calcula otra población ni altera conteos.
 
