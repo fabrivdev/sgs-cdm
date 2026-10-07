@@ -1,4 +1,4 @@
-export type TotvsFileKind = "os" | "facturacion" | "facturas_compra" | "productos" | "stock" | "stock_maquinas" | "maquinarias" | "pedidos" | "pedidos_venta" | "solicitudes" | "clientes" | "proveedores" | "kardex" | "kardex_sintetico" | "despacho" | "transferencias_transito" | "mayor";
+export type TotvsFileKind = "os" | "facturacion" | "facturas_compra" | "productos" | "stock" | "stock_maquinas" | "maquinarias" | "pedidos" | "pedidos_venta" | "solicitudes" | "clientes" | "proveedores" | "kardex" | "kardex_sintetico" | "despacho" | "transferencias_transito" | "mayor" | "cuentas_cobrar";
 
 export const TOTVS_FILE_KIND_LABELS: Record<TotvsFileKind, string> = {
   os: "Órdenes de servicio",
@@ -18,6 +18,7 @@ export const TOTVS_FILE_KIND_LABELS: Record<TotvsFileKind, string> = {
   despacho: "Importaciones - Despacho",
   transferencias_transito: "Transferencias entre sucursales en tránsito",
   mayor: "Libro Mayor",
+  cuentas_cobrar: "Cuentas por cobrar a la fecha",
 };
 
 function normalizeFileName(name: string) {
@@ -27,6 +28,7 @@ function normalizeFileName(name: string) {
 export function detectTotvsFileKind(fileName: string): TotvsFileKind | "ignorar" {
   const name = normalizeFileName(fileName);
   if (/(?:^|[_\-\s])original(?:[_.\-\s]|$)/.test(name)) return "ignorar";
+  if (name.includes("cuentas_por_cobrar_a_la_fecha") || name.includes("cuentas por cobrar a la fecha")) return "cuentas_cobrar";
   if (name.includes("mayor_contable") || name.includes("mayor contable")) return "mayor";
   if (name.includes("ordenes_de_servicio") || name.includes("ordenes de servicio")) return "os";
   if (name.includes("pedidos-de-venta") || name.includes("pedidos_de_venta") || name.includes("pedidos de venta")) return "pedidos_venta";

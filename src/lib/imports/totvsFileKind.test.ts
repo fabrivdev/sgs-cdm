@@ -16,6 +16,7 @@ describe("detectTotvsFileKind", () => {
 
   it("detecta las fuentes nuevas y excluye respaldos original", () => {
     expect(detectTotvsFileKind("mayor_contable_2_monedas_140624.xml")).toBe("mayor");
+    expect(detectTotvsFileKind("cuentas_por_cobrar_a_la_fecha_114844.xml")).toBe("cuentas_cobrar");
     expect(detectTotvsFileKind("importaciones---despacho-161515.xml")).toBe("despacho");
     expect(detectTotvsFileKind("pedidos-de-venta-161834.xml")).toBe("pedidos_venta");
     expect(detectTotvsFileKind("facturas_-_ncp_-_ndp_-_compras_085710.xml")).toBe("facturas_compra");

@@ -44,7 +44,9 @@ import {
   mapStockSheet,
   parseSpreadsheetXml,
   persistMayorFile,
+  persistReceivablesFile,
   readMayorPreflightFile,
+  readReceivablesPreflightFile,
   readXmlFileText,
   prepareNewSystemImportBundle,
   reconcileCanonicalClientes,
@@ -84,6 +86,9 @@ import {
   type MayorPreflight,
   type MayorPersistResult,
   type MayorRpcClient,
+  type ReceivablesPreflight,
+  type ReceivablesPersistResult,
+  type ReceivablesRpcClient,
   syntheticValueDiffersFromBalance,
   TOTVS_FILE_KIND_LABELS,
   detectTotvsFileKind,
@@ -97,10 +102,12 @@ const KIND_LABELS = TOTVS_FILE_KIND_LABELS;
 interface DetectedFile {
   file: File;
   kind: FileKind | "ignorar";
+  cutoffDate?: string;
 }
 
 interface Preview {
   mayor: MayorPreflight[];
+  receivables: ReceivablesPreflight[];
   productos: CanonicalProductRow[];
   stock: CanonicalStockRow[];
   stockMaquinas: CanonicalMachineStockRow[];
@@ -137,6 +144,7 @@ interface Preview {
 function hasPersistablePreview(preview: Preview) {
   return Boolean(
     preview.mayor.length
+    || preview.receivables.length
     || preview.bundleFiles
     || preview.productos.length
     || preview.stock.length
@@ -246,7 +254,10 @@ export function ImportarTotvsTab({ onChanged }: { onChanged: () => void }) {
       const existingNames = new Set(prev.map((d) => d.file.name));
       const nuevos = xmlFiles
         .filter((file) => !existingNames.has(file.name))
-        .map((file) => ({ file, kind: detectTotvsFileKind(file.name) }));
+        .map((file) => {
+          const kind = detectTotvsFileKind(file.name);
+          return { file, kind, cutoffDate: kind === "cuentas_cobrar" ? "" : undefined };
+        });
       return [...prev, ...nuevos];
     });
     setPreview(null);
@@ -258,7 +269,14 @@ export function ImportarTotvsTab({ onChanged }: { onChanged: () => void }) {
   };
 
   const setKind = (name: string, kind: DetectedFile["kind"]) => {
-    setDetected((prev) => prev.map((d) => (d.file.name === name ? { ...d, kind } : d)));
+    setDetected((prev) => prev.map((d) => (d.file.name === name
+      ? { ...d, kind, cutoffDate: kind === "cuentas_cobrar" ? d.cutoffDate ?? "" : undefined }
+      : d)));
+    setPreview(null);
+  };
+
+  const setCutoffDate = (name: string, cutoffDate: string) => {
+    setDetected((prev) => prev.map((d) => (d.file.name === name ? { ...d, cutoffDate } : d)));
     setPreview(null);
   };
 
@@ -277,10 +295,16 @@ export function ImportarTotvsTab({ onChanged }: { onChanged: () => void }) {
       toast.error("Asigná al menos un archivo a alguno de los tipos disponibles.");
       return;
     }
+    const missingCutoff = usableFiles.find((item) => item.kind === "cuentas_cobrar" && !item.cutoffDate);
+    if (missingCutoff) {
+      toast.error(`Confirmá la fecha de corte de ${missingCutoff.file.name}. No se infiere desde la fecha del archivo.`);
+      return;
+    }
 
     setBusy(true);
     try {
       const mayor: MayorPreflight[] = [];
+      const receivables: ReceivablesPreflight[] = [];
       const productos: CanonicalProductRow[] = [];
       const stock: CanonicalStockRow[] = [];
       let stockMaquinas: CanonicalMachineStockRow[] = [];
@@ -299,10 +323,17 @@ export function ImportarTotvsTab({ onChanged }: { onChanged: () => void }) {
       let facturacionTexto: { fileName: string; xmlText: string } | null = null;
       let productosTexto: { fileName: string; xmlText: string } | null = null;
 
-      for (const { file, kind } of usableFiles) {
+      for (const { file, kind, cutoffDate } of usableFiles) {
         try {
           if (kind === "mayor") {
             mayor.push(await readMayorPreflightFile(file, file.name));
+            continue;
+          }
+          if (kind === "cuentas_cobrar") {
+            receivables.push(await readReceivablesPreflightFile(file, file.name, {
+              cutoffDate: cutoffDate ?? "",
+              sourceLastModified: file.lastModified,
+            }));
             continue;
           }
           const xmlText = await readXmlFileText(file);
@@ -462,6 +493,7 @@ export function ImportarTotvsTab({ onChanged }: { onChanged: () => void }) {
 
       setPreview({
         mayor,
+        receivables,
         productos,
         stock,
         stockMaquinas,
@@ -497,6 +529,7 @@ export function ImportarTotvsTab({ onChanged }: { onChanged: () => void }) {
 
       const partes = [
         mayor.length ? `${mayor.reduce((sum, item) => sum + item.movementRows, 0)} movimientos de Mayor (preflight)` : null,
+        receivables.length ? `${receivables.reduce((sum, item) => sum + item.documentRows, 0)} cuotas de cuentas por cobrar (preflight)` : null,
         bundleFiles ? "OS + Facturación" : null,
         productos.length ? `${productos.length} productos` : null,
         stock.length ? `${stock.length} filas de stock` : null,
@@ -559,6 +592,7 @@ export function ImportarTotvsTab({ onChanged }: { onChanged: () => void }) {
       let branchTransfersActualizadas = 0;
       let branchTransfersSinCambios = 0;
       const mayorResultados: MayorPersistResult[] = [];
+      const receivablesResultados: ReceivablesPersistResult[] = [];
 
       const mayorFiles = usableFiles.filter((item) => item.kind === "mayor").map((item) => item.file);
       if (mayorFiles.length !== preview.mayor.length) {
@@ -568,6 +602,18 @@ export function ImportarTotvsTab({ onChanged }: { onChanged: () => void }) {
         mayorResultados.push(await persistMayorFile({
           file,
           client: supabase as unknown as MayorRpcClient,
+        }));
+      }
+
+      const receivablesFiles = usableFiles.filter((item) => item.kind === "cuentas_cobrar");
+      if (receivablesFiles.length !== preview.receivables.length) {
+        throw new Error("Los archivos de cuentas por cobrar cambiaron después del preflight; volvé a leerlos antes de confirmar.");
+      }
+      for (const item of receivablesFiles) {
+        receivablesResultados.push(await persistReceivablesFile({
+          file: item.file,
+          client: supabase as unknown as ReceivablesRpcClient,
+          cutoffDate: item.cutoffDate ?? "",
         }));
       }
 
@@ -996,6 +1042,9 @@ export function ImportarTotvsTab({ onChanged }: { onChanged: () => void }) {
         mayorResultados.length
           ? `${mayorResultados.reduce((sum, item) => sum + item.preflight.movementRows, 0)} movimientos de Mayor (${mayorResultados.reduce((sum, item) => sum + item.insertadas, 0)} nuevos, ${mayorResultados.reduce((sum, item) => sum + item.sinCambios, 0)} sin cambios, ${mayorResultados.reduce((sum, item) => sum + item.cuarentena, 0)} en cuarentena)`
           : null,
+        receivablesResultados.length
+          ? `${receivablesResultados.reduce((sum, item) => sum + item.preflight.documentRows, 0)} cuotas de cuentas por cobrar (${receivablesResultados.reduce((sum, item) => sum + item.insertadas, 0)} nuevas, ${receivablesResultados.reduce((sum, item) => sum + item.sinCambios, 0)} sin cambios)`
+          : null,
         preview.bundleFiles
           ? `${facturacionLineas} líneas de facturación y ${ordenesServicio} OS vigentes${
               ordenesServicioArchivadas ? `; ${ordenesServicioArchivadas} OS ausentes archivadas` : ""
@@ -1049,7 +1098,7 @@ export function ImportarTotvsTab({ onChanged }: { onChanged: () => void }) {
             reporte por el nombre del archivo: órdenes de servicio, facturación, productos, stock de repuestos y de máquinas, el reporte
             general de maquinarias como respaldo de chasis, pedidos y solicitudes de compra, pedidos de venta,
             importaciones-despacho, clientes, proveedores, facturas de compra, transferencias entre sucursales en tránsito,
-            Kardex analítico, Kardex sintético valorizado y Libro Mayor. Los archivos de respaldo con sufijo _original se ignoran.
+            Kardex analítico, Kardex sintético valorizado, Libro Mayor y cuentas por cobrar a la fecha. Los archivos de respaldo con sufijo _original se ignoran.
           </p>
         </div>
 
@@ -1122,6 +1171,17 @@ export function ImportarTotvsTab({ onChanged }: { onChanged: () => void }) {
                     <SelectItem value="ignorar">Ignorar</SelectItem>
                   </SelectContent>
                 </Select>
+                {d.kind === "cuentas_cobrar" && (
+                  <label className="flex items-center gap-1.5 text-[11px] text-muted-foreground">
+                    Corte confirmado
+                    <input
+                      type="date"
+                      value={d.cutoffDate ?? ""}
+                      onChange={(event) => setCutoffDate(d.file.name, event.target.value)}
+                      className="h-7 rounded-md border bg-background px-2 text-[12px] text-foreground"
+                    />
+                  </label>
+                )}
                 <Button type="button" variant="ghost" size="icon" className="h-7 w-7" onClick={() => removeFile(d.file.name)}>
                   <X className="h-3.5 w-3.5" />
                 </Button>
@@ -1156,6 +1216,9 @@ export function ImportarTotvsTab({ onChanged }: { onChanged: () => void }) {
             <div className="flex flex-wrap gap-2 text-[12px]">
               {preview.mayor.map((item) => (
                 <Badge key={item.sourceFileName} variant="secondary">{item.movementRows.toLocaleString("es-PY")} movimientos de Mayor</Badge>
+              ))}
+              {preview.receivables.map((item) => (
+                <Badge key={item.sourceFileName} variant="secondary">{item.documentRows.toLocaleString("es-PY")} cuotas por cobrar</Badge>
               ))}
               {preview.bundleFiles && <Badge variant="secondary">OS + Facturación listas para cruzar</Badge>}
               {preview.productos.length > 0 && <Badge variant="secondary">{preview.productos.length} productos</Badge>}
@@ -1204,6 +1267,25 @@ export function ImportarTotvsTab({ onChanged }: { onChanged: () => void }) {
                 </p>
                 {item.warnings.map((warning) => <p key={warning} className="text-amber-700">{warning}</p>)}
                 <p className="font-medium text-amber-800">Preflight completado. Al confirmar se cargará por lotes al staging del Mayor; las cuentas sin código quedarán en cuarentena y TPSLDO=9 seguirá separado.</p>
+              </div>
+            ))}
+            {preview.receivables.map((item) => (
+              <div key={item.sourceFileName} className="space-y-1 rounded border border-amber-200 bg-amber-50/50 p-2 text-[11px]">
+                <p className="font-medium text-foreground">{item.sourceFileName}</p>
+                <p className="text-muted-foreground">
+                  Corte confirmado {item.cutoffDate}: {item.documentRows.toLocaleString("es-PY")} cuotas, {item.documents.toLocaleString("es-PY")} documentos, {item.clients.toLocaleString("es-PY")} clientes y moneda {item.currencies.join(", ")}.
+                </p>
+                <p className="text-muted-foreground">
+                  Facturas NF USD con saldo positivo: {item.eligiblePendingUsd.toLocaleString("es-PY", { minimumFractionDigits: 2, maximumFractionDigits: 2 })} USD. Vencido antes del corte: {item.overdueUsd.toLocaleString("es-PY", { minimumFractionDigits: 2, maximumFractionDigits: 2 })} USD; vence hoy: {item.dueTodayUsd.toLocaleString("es-PY", { minimumFractionDigits: 2, maximumFractionDigits: 2 })} USD; futuro: {item.futureUsd.toLocaleString("es-PY", { minimumFractionDigits: 2, maximumFractionDigits: 2 })} USD.
+                </p>
+                <p className="text-muted-foreground">
+                  El KPI usa el SALDO actual de cada NF, que ya refleja lo aplicado en el reporte fuente; no vuelve a descontar RA ni NCC. {item.zeroBalanceRows} filas con saldo cero y {item.negativeBalanceRows} negativas se conservan fuera de mora.
+                </p>
+                <p className="text-muted-foreground">
+                  RA significa cobro anticipado de cliente: {item.customerAdvanceRows} filas suman {item.customerAdvanceBalance.toLocaleString("es-PY", { minimumFractionDigits: 2, maximumFractionDigits: 2 })} USD y se informan por separado. Cobertura de aplicacion RA: {item.customerAdvanceApplicationCoverage}.
+                </p>
+                {item.warnings.map((warning) => <p key={warning} className="text-amber-700">{warning}</p>)}
+                <p className="font-medium text-amber-800">Preflight solamente. Confirmar requiere la migración preparada; no aplica SQL desde esta pantalla.</p>
               </div>
             ))}
             {preview.machineStockChassis.unresolvedPlaceholders > 0 && (
