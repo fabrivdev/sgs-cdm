@@ -25,6 +25,18 @@
 | Administración, Calendario, Compras y solicitudes auxiliares | Ninguno adicional respaldado cuando todos los primarios caben | Escritorio oculta el disparador; móvil/desborde conserva acceso a primarios. |
 | Detalle de repuesto | Ninguno adicional respaldado | Se elimina el panel que duplicaba la misma búsqueda visible. |
 
+## Selectores rápidos en teléfono - 07/10/2026
+
+Bajo 640 px, los selectores que cambian el subconjunto o período visible y no son navegación de sección se muestran dentro de `Más filtros`: semana de Planificador, estado visible de Trabajos, estado de técnicos de Productividad y período/medida de Cumplimiento. No se duplican fuera del panel. Órdenes/Productividad/Cumplimiento permanecen como pestañas visibles porque cambian de sección, no son filtros.
+
+Limpiar restablece también estos valores a sus defaults. El conteo activo incluye estado/período/medida cuando difieren del valor inicial. Se conservan fechas, sucursal, búsqueda con debounce, `aria-expanded`, Aplicar y las variantes de escritorio. La revisión de incidencias de Productividad se ofrece como acción útil dentro del panel móvil cuando existe; no se fabrica contenido para justificar `Más filtros`.
+
+## Borrado único de la búsqueda compartida - 07/10/2026
+
+`FiltersBar` mantiene su botón propio `Limpiar búsqueda`, con nombre accesible y borrado inmediato mediante el callback existente. Como ese control ya cubre la función, el mismo input oculta exclusivamente la decoración nativa de cancelación de los navegadores WebKit/Chromium para no mostrar dos cruces. La regla está acotada por la clase `filters-bar-search`: los otros `input[type="search"]` que no dibujan una acción propia conservan el cancelador nativo.
+
+No cambian el debounce de 250 ms, el estado controlado, filtros activos, limpieza general, fechas, sucursal, permisos ni callbacks. Las dos variantes responsive montadas por `FiltersBar` aplican el mismo contrato; en cada una existe un solo botón custom adyacente. La comprobación fue de componente, CSS compilado y respuesta HTTP local, sin navegador ni validación de producción.
+
 ## Ventas de Repuestos
 
 La migración local `20261006120000_add_parts_sales_advanced_filters.sql` agrega variantes filtradas de movimientos, panorama y listado. Las RPC anteriores quedan intactas y se siguen usando sin Marca/Vendedor. El helper de movimientos no se concede a clientes autenticados; las RPC públicas conservan la comprobación de acceso de `repuestos.ventas`.

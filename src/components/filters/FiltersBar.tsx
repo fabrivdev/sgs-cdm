@@ -165,7 +165,7 @@ export function FiltersBar({
         value={searchDraft}
         onChange={(e) => setSearchDraft(e.target.value)}
         placeholder={mobile ? "Buscar…" : search?.placeholder ?? "Buscar…"}
-        className={cn(ctrl, "pl-7 pr-7", mobile && "h-9 text-base")}
+        className={cn(ctrl, "filters-bar-search pl-7 pr-7", mobile && "h-9 text-base")}
       />
       {searchDraft && (
         <button

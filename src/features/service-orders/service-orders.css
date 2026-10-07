@@ -16,19 +16,25 @@
     background: hsl(var(--card));
   }
 
-  /* Five OS indicators form two balanced rows; other views keep three. */
-  .service-orders-workspace .mobile-kpi-strip:has(> :nth-child(5)) {
-    grid-template-columns: repeat(6, minmax(0, 1fr));
+  /* Keep a stable three-column rhythm: five indicators become 3 + 2. */
+  .service-orders-workspace .service-orders-kpis {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    column-gap: 8px;
+    row-gap: 4px;
+    padding-block: 6px;
   }
-  .service-orders-workspace .mobile-kpi-strip:has(> :nth-child(5)) > div {
-    grid-column: span 2;
+  .service-orders-workspace .service-orders-kpis > div {
+    grid-column: auto;
   }
-  .service-orders-workspace .mobile-kpi-strip:has(> :nth-child(5)) > div:nth-child(n + 4) {
-    grid-column: span 3;
+  .service-orders-workspace .service-orders-kpis .kpi-item {
+    gap: 0;
   }
-
-  .service-orders-workspace .productivity-panel > div:first-child {
-    min-height: 44px;
-    padding: 0 8px;
+  .service-orders-workspace .service-orders-kpis .kpi-item > div:first-child {
+    min-height: 14px;
+    font-size: 10px;
+    line-height: 14px;
+  }
+  .service-orders-workspace .service-orders-kpis .kpi-item > div:nth-child(2) {
+    line-height: 20px;
   }
 }

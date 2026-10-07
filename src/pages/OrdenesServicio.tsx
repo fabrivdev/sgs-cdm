@@ -2,7 +2,7 @@ import { useEffect, useMemo, useState } from "react";
 import { ClipboardList, Clock3, CircleCheck, CircleAlert, Target, Percent, CalendarDays } from "lucide-react";
 import { PageHeader, PageShell, KpiStrip, KpiItem } from "@/components/layout/AppPrimitives";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
-import { FiltersBar, FilterDate, FilterSelect } from "@/components/filters/FiltersBar";
+import { FiltersBar, FilterCustom, FilterDate, FilterSelect } from "@/components/filters/FiltersBar";
 import { QuickPeriodFilter } from "@/components/filters/QuickPeriodFilter";
 import { FilterMultiSelect } from "@/components/filters/FilterMultiSelect";
 import { Button } from "@/components/ui/button";
@@ -53,6 +53,7 @@ export function OrdersWorkspace() {
   const [technicianStatus, setTechnicianStatus] = useState<TechnicianStatus>("activos");
   const [selectedTechnician, setSelectedTechnician] = useState<string | null>(null);
   const [matrixMetric, setMatrixMetric] = useState<"trabajos" | "horas">("trabajos");
+  const [complianceBucket, setComplianceBucket] = useState("");
   const defaults = useMemo<OperationsFilters>(() => ({ ...defaultServiceOrdersPeriod(today), periodMode: "mes", q: "", fSucursales: [], fMarcas: [], fTiposTiempo: [], fEstadosTrabajo: [], fTécnicos: [], fResponsablesOS: [], fEstadosOS: [], fOSRubros: [] }), [today]);
   const [filters, setFilters] = useState(defaults);
   const change = <K extends keyof OperationsFilters>(key: K, value: OperationsFilters[K]) => setFilters(previous => ({ ...previous, [key]: value }));
@@ -65,6 +66,11 @@ export function OrdersWorkspace() {
   const model = useOperationsModel(blocked ? emptyOperationsData : query.data?.data ?? emptyOperationsData,
     valid ? modelFilters : { ...modelFilters, dateFrom: defaults.dateFrom, dateTo: defaults.dateTo }, matrixMetric, today, tab === "productividad" ? technicianStatus : "todos");
   const data = model.serviciosDashboardData;
+  const complianceBuckets = model.matrizTécnicosDías.buckets;
+  const defaultComplianceBucket = complianceBuckets.includes(model.matrizTécnicosDías.currentBucketKey ?? "")
+    ? model.matrizTécnicosDías.currentBucketKey ?? ""
+    : complianceBuckets.at(-1) ?? "";
+  const visibleComplianceBucket = complianceBuckets.includes(complianceBucket) ? complianceBucket : defaultComplianceBucket;
   const workPeriod = productivityPeriod(filters.dateFrom, filters.dateTo);
   const workEligible = Boolean(workPeriod.from && workPeriod.to);
   const work = useWorkLog(filters.dateFrom, filters.dateTo, !blocked && tab === "productividad" && workEligible);
@@ -99,7 +105,9 @@ export function OrdersWorkspace() {
   const productivityPeriods = useMemo(() => productivity.evolucion.map((row, index) => ({ ...row, eficiencia: periodEfficiency[index] })),
     [productivity.evolucion, periodEfficiency]);
   const active = [filters.dateFrom !== defaults.dateFrom || filters.dateTo !== defaults.dateTo, filters.q, ...filters.fSucursales, ...filters.fMarcas,
-    ...(tab === "cumplimiento" ? [...filters.fEstadosTrabajo, ...filters.fTécnicos] : [...filters.fTiposTiempo, ...filters.fEstadosOS, ...filters.fResponsablesOS, ...filters.fOSRubros])].filter(Boolean).length;
+    ...(tab === "cumplimiento"
+      ? [...filters.fEstadosTrabajo, ...filters.fTécnicos, matrixMetric !== "trabajos", visibleComplianceBucket !== defaultComplianceBucket]
+      : [...filters.fTiposTiempo, ...filters.fEstadosOS, ...filters.fResponsablesOS, ...filters.fOSRubros, tab === "productividad" && technicianStatus !== "activos"])].filter(Boolean).length;
   useEffect(() => {
     setPageFilters({ seccion: tab, fecha_desde: filters.dateFrom, fecha_hasta: filters.dateTo, agrupacion: modelFilters.periodMode, busqueda: filters.q,
       sucursales: filters.fSucursales, marcas: filters.fMarcas,
@@ -112,6 +120,12 @@ export function OrdersWorkspace() {
     return clearPageFilters;
   }, [filters, modelFilters.periodMode, tab, technicianStatus, workPeriod.from, workPeriod.to, setPageFilters, clearPageFilters]);
   const selectTechnician = (name: string) => setSelectedTechnician(name);
+  const clearFilters = () => {
+    setFilters(defaults);
+    setTechnicianStatus("activos");
+    setMatrixMetric("trabajos");
+    setComplianceBucket("");
+  };
 
   return <PageShell className="service-orders-workspace">
     <Tabs value={tab} onValueChange={setTab} className="min-w-0 space-y-3">
@@ -120,13 +134,13 @@ export function OrdersWorkspace() {
       {!blocked && tab === "productividad" && workPeriod.includesLegacy && workEligible && <div className="flex min-h-0 items-center text-[12px]">
         <button type="button" onClick={() => setTab("ordenes")} className="min-h-11 text-primary hover:underline sm:min-h-0">Histórico en Órdenes</button>
       </div>}
-      {!blocked && tab !== "cumplimiento" && <KpiStrip>
+      {!blocked && tab !== "cumplimiento" && <KpiStrip className="service-orders-kpis">
         {tab === "ordenes" ? [
           <KpiItem key="total" label="Órdenes" value={data.totalOS} icon={<ClipboardList />} />,
           <KpiItem key="abiertas" label={compact ? "Abiertas" : "Abiertas / sin cierre"} value={data.abiertas} tone="info" icon={<Clock3 />} />,
           <KpiItem key="cerradas" label="Cerradas" value={data.cerradas} tone="positive" icon={<CircleCheck />} />,
-          <KpiItem key="cierre" label="% de cierre" value={closure.percentage === null ? "—" : `${decimal.format(closure.percentage)}%`} tone="positive" icon={<Percent />} />,
-          <KpiItem key="dias" label={compact && !phone ? "Días prom." : "Días de cierre (prom.)"} value={closure.averageDays === null ? "—" : decimal.format(closure.averageDays)} icon={<CalendarDays />} />,
+          <KpiItem key="cierre" label={phone ? "% cierre" : "% de cierre"} value={closure.percentage === null ? "—" : `${decimal.format(closure.percentage)}%`} tone="positive" icon={<Percent />} />,
+          <KpiItem key="dias" label={compact ? "Días prom." : "Días de cierre (prom.)"} value={closure.averageDays === null ? "—" : decimal.format(closure.averageDays)} icon={<CalendarDays />} />,
         ] : tab === "productividad" ? [
           <KpiItem key="horas" label="Horas-persona" value={workReady ? decimal.format(productivity.horasPersona) : "—"} icon={<Clock3 />} />,
           <KpiItem key="meta" label="Meta disponible" value={workReady && productivity.capacidad.horasDisponibles > 0 ? decimal.format(productivity.capacidad.horasDisponibles) : "—"} icon={<Target />} />,
@@ -135,7 +149,16 @@ export function OrdersWorkspace() {
             detail={billingLoading ? "Calculando…" : billingFailed ? undefined : efficiency.incomplete ? `${efficiency.incomplete} OS sin cálculo` : undefined} />,
         ] : null}
       </KpiStrip>}
-      <FiltersBar search={{ value: filters.q, onChange: v => change("q", v), placeholder: tab === "cumplimiento" ? "Cliente, trabajo o TR…" : "OS, cliente o chasis…" }} activeCount={active} onClear={() => setFilters(defaults)} secondaryActions={!blocked ? <SalesSectionExportMenu /> : undefined} expanded={<>
+      <FiltersBar search={{ value: filters.q, onChange: v => change("q", v), placeholder: tab === "cumplimiento" ? "Cliente, trabajo o TR…" : "OS, cliente o chasis…" }} activeCount={active} onClear={clearFilters} secondaryActions={!blocked ? <SalesSectionExportMenu /> : undefined}
+        actions={phone && tab === "productividad" && productivityPartial ? <Button type="button" variant="ghost" size="sm" className="min-h-11 w-full justify-start gap-2 text-amber-800" onClick={() => setSelectedTechnician("__issues__")}><CircleAlert className="h-3.5 w-3.5" />Revisar {productivity.issues.length} {productivity.issues.length === 1 ? "incidencia" : "incidencias"}</Button> : undefined}
+        expanded={<>
+        {tab === "productividad" && <div className="sm:hidden">
+          <FilterCustom label="Estado de técnicos" width="w-full"><select aria-label="Estado de técnicos" value={technicianStatus} onChange={event => setTechnicianStatus(event.target.value as TechnicianStatus)} className="h-11 w-full rounded-md border border-input bg-background px-3 text-base"><option value="activos">Activos</option><option value="todos">Todos</option><option value="inactivos">Inactivos</option></select></FilterCustom>
+        </div>}
+        {tab === "cumplimiento" && <div className="space-y-3 sm:hidden">
+          {complianceBuckets.length > 0 && <FilterCustom label="Período visible" width="w-full"><select aria-label="Período visible de cumplimiento" value={visibleComplianceBucket} onChange={event => setComplianceBucket(event.target.value)} className="h-11 w-full rounded-md border border-input bg-background px-3 text-base">{complianceBuckets.map(bucket => <option key={bucket} value={bucket}>{model.matrizTécnicosDías.bucketLabels[bucket] ?? bucket}</option>)}</select></FilterCustom>}
+          <FilterCustom label="Medida" width="w-full"><select aria-label="Medida de cumplimiento" value={matrixMetric} onChange={event => setMatrixMetric(event.target.value as "trabajos" | "horas")} className="h-11 w-full rounded-md border border-input bg-background px-3 text-base"><option value="trabajos">Trabajos</option><option value="horas">Horas</option></select></FilterCustom>
+        </div>}
         <FilterMultiSelect label="Marca" values={filters.fMarcas} onChange={v => change("fMarcas", v)} options={MARCAS.map(value => ({ value, label: value }))} />
         {tab !== "cumplimiento" && <FilterSelect label="Agrupar" placeholder="Período" value={filters.periodMode} onChange={v => change("periodMode", v as OperationsFilters["periodMode"])} options={[{ value: "dia", label: "Día" }, { value: "semana", label: "Semana" }, { value: "mes", label: "Mes" }, { value: "anio", label: "Año" }]} />}
         {tab === "cumplimiento" ? <>
@@ -160,7 +183,6 @@ export function OrdersWorkspace() {
             <CircleAlert className="h-3.5 w-3.5 shrink-0" /><span>{billingWarning(financial.error)}</span>
             <Button variant="ghost" size="sm" onClick={() => financial.refetch()}>Reintentar</Button>
           </div>
-          {tab === "productividad" && productivityPartial && <span className="sr-only">{productivity.issues.length} {productivity.issues.length === 1 ? "incidencia" : "incidencias"} · Revisar</span>}
         </div>}
         <TabsContent value="ordenes" className="min-w-0 space-y-3">
           <OrdersTable rows={financialRows} billingLoading={billingLoading} billingFailed={billingFailed} from={filters.dateFrom} to={filters.dateTo} />
@@ -180,8 +202,8 @@ export function OrdersWorkspace() {
         </TabsContent>
         <TabsContent value="cumplimiento" className="min-w-0">
           <ComplianceDetailExport data={model.matrizTécnicosDías} />
-          <OperationsPanel title="Matriz de técnicos por período" padded={!phone}>
-            {phone ? <MobileTechnicianMatrix key={`${filters.dateFrom}:${filters.dateTo}:${complianceMode}`} data={model.matrizTécnicosDías} metric={matrixMetric} onMetricChange={setMatrixMetric} />
+          <OperationsPanel title={phone ? undefined : "Matriz de técnicos por período"} padded={!phone}>
+            {phone ? <MobileTechnicianMatrix key={`${filters.dateFrom}:${filters.dateTo}:${complianceMode}`} data={model.matrizTécnicosDías} metric={matrixMetric} bucket={visibleComplianceBucket} />
               : <MatrizTécnicosDías concise key={`${filters.dateFrom}:${filters.dateTo}:${complianceMode}:${model.matrizTécnicosDías.overLimit}:${model.matrizTécnicosDías.blocks.length}`} data={model.matrizTécnicosDías} currentBucketKey={model.matrizTécnicosDías.currentBucketKey} metric={matrixMetric} onMetricChange={setMatrixMetric} onSelectTecnico={id => change("fTécnicos", [id])} onSelectSucursal={s => change("fSucursales", [s])} />}
           </OperationsPanel>
         </TabsContent>

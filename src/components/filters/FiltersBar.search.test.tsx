@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { act, cleanup, fireEvent, render, screen } from "@testing-library/react";
+import { act, cleanup, fireEvent, render, screen, within } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { FiltersBar } from "./FiltersBar";
 
@@ -49,6 +49,24 @@ afterEach(() => {
 });
 
 describe("FiltersBar controlled search", () => {
+  it("uses one accessible custom clear control per responsive search and suppresses the native cancel", () => {
+    render(<SearchHarness initial="CLAAS" />);
+
+    const inputs = screen.getAllByRole("searchbox", { hidden: true });
+    const clearButtons = screen.getAllByRole("button", { name: /^Limpiar b.squeda$/, hidden: true });
+
+    expect(inputs).toHaveLength(2);
+    expect(clearButtons).toHaveLength(inputs.length);
+    for (const input of inputs) {
+      expect(input).toHaveClass("filters-bar-search");
+      expect(within(input.parentElement!).getAllByRole("button", { name: /^Limpiar b.squeda$/, hidden: true })).toHaveLength(1);
+    }
+
+    fireEvent.click(clearButtons[0]);
+    expectValue("");
+    expect(changed).toHaveBeenCalledExactlyOnceWith("");
+  });
+
   it("debounces typing for 250 ms and commits only the latest draft", () => {
     render(<SearchHarness />);
     type("CLA");

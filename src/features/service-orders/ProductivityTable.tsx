@@ -40,16 +40,13 @@ export function ProductivityTable({ rows, onSelect, status, onStatusChange, peri
   const visible = (hasGoal ? columns.slice(0, 5) : [{ ...columns[0], width: "w-[60%]" }, { ...columns[1], width: "w-[20%]" }, { ...columns[2], width: "w-[20%]" }])
     .map(column => compact && ["horas", "meta"].includes(column.key) ? { ...column, label: column.key === "horas" ? "Horas" : "Meta (h)" } : column);
   const mobile: CompactListColumn<ProductivityTechnicianRow>[] = [
-    { ...columns[0], width: "w-[38%]", render: r => {
+    { ...columns[0], width: "w-[64%]", render: r => {
       const context = `${r.totalOS} OS${technicianState(r) ? ` · ${technicianState(r)}` : ""}${r.incomplete ? " · Parcial" : ""}`;
       return <button type="button" aria-label={`${r.tecnico} · ${context}`} title={`${r.tecnico} · ${context}`} className="flex min-h-11 w-full min-w-0 items-center text-left" onClick={() => onSelect(r.tecnico)}><span className="block min-w-0 truncate">{r.tecnico}</span></button>;
     } },
-    { ...columns[1], width: "w-[10%]", label: "OS" },
-    { ...columns[2], width: "w-[14%]", label: "Horas", render: r => number.format(r.horas) },
-    { ...columns[3], width: "w-[14%]", label: "Meta", render: r => r.horasDisponibles > 0 ? number.format(r.horasDisponibles) : "—" },
-    { ...columns[4], width: "w-[24%]", label: "%", render: r => <ProductivityProgress hours={r.horas} target={r.horasDisponibles} label={`Meta de ${r.tecnico}`} partial={r.incomplete} stacked /> },
+    { ...columns[4], width: "w-[36%]", label: "Productividad", render: r => <ProductivityProgress hours={r.horas} target={r.horasDisponibles} label={`Meta de ${r.tecnico}`} partial={r.incomplete} stacked /> },
   ];
-  return <OperationsPanel className="productivity-panel" title={phone ? undefined : "Por técnico"} actions={
+  return <OperationsPanel className="productivity-panel" title={phone ? undefined : "Por técnico"} actions={!phone ?
     <div className="flex min-w-0 flex-1 flex-wrap items-center justify-end gap-2 max-sm:flex-nowrap max-sm:gap-1.5">
       <div role="group" aria-label="Estado de técnicos" className="inline-flex min-w-0 overflow-hidden rounded-md border text-[11px] max-sm:flex-1 sm:shrink-0">
         {statuses.map(([value, label]) => <button key={value} type="button" aria-pressed={status === value} onClick={() => onStatusChange(value)}
@@ -57,7 +54,7 @@ export function ProductivityTable({ rows, onSelect, status, onStatusChange, peri
       </div>
       {issuesAction}
     </div>
-  }>
-    <CompactListTable className="max-sm:min-w-[440px]" rows={table.ordered} columns={visible} mobileColumns={mobile} id={r => r.tecnico} label="Productividad por técnico" sort={table.sort} onSort={table.toggleSort} status={!rows.length ? "Sin técnicos para estos filtros." : undefined} />
+    : undefined}>
+    <CompactListTable rows={table.ordered} columns={visible} mobileColumns={mobile} id={r => r.tecnico} label="Productividad por técnico" sort={table.sort} onSort={table.toggleSort} status={!rows.length ? "Sin técnicos para estos filtros." : undefined} />
   </OperationsPanel>;
 }

@@ -40,7 +40,7 @@ export function KpiStrip({ children, className, mobilePrimary }: { children: Rea
   const items = Children.toArray(children);
   if (mobile) {
     const layout = items.length === 3 ? "grid-cols-3" : items.length === 5 ? "grid-cols-6" : "grid-cols-2";
-    return <section aria-label="Indicadores" className={cn("mobile-kpi-strip grid min-w-0 gap-x-3 gap-y-2 border-y py-2", layout)}>
+    return <section aria-label="Indicadores" className={cn("mobile-kpi-strip grid min-w-0 gap-x-3 gap-y-2 border-y py-2", layout, className)}>
       {items.map((item, index) => <div key={index} data-priority={mobilePrimary?.includes(index) ? "primary" : undefined} className={cn("min-w-0 [&_.kpi-item]:p-0", items.length === 5 && (index < 3 ? "col-span-2" : "col-span-3"))}>{item}</div>)}
     </section>;
   }

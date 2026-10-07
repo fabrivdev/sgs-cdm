@@ -53,6 +53,13 @@ describe("compact operational services lists",()=>{
     expect(row).toHaveTextContent("Media");
     expect(row).toHaveTextContent(client.nombre);
     expect(row).toHaveTextContent(service.trabajo_descripcion);
+    expect(screen.queryByRole("navigation", {name:"Estado de los trabajos"})).not.toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", {name:/Más filtros/}));
+    const panel = within(screen.getByRole("dialog"));
+    const state = panel.getByRole("combobox", {name:"Estado visible de trabajos"});
+    expect(state).toHaveClass("h-11");
+    expect(within(state).getAllByRole("option")).toHaveLength(6);
+    fireEvent.click(panel.getByRole("button", {name:"Aplicar"}));
     fireEvent.click(row);
     await waitFor(()=>expect(mocks.work.mock.calls.at(-1)?.[0]).toMatchObject({trabajoId:"W1"}));
   });
@@ -92,15 +99,23 @@ describe("compact operational services lists",()=>{
       expect.objectContaining({"ID Jornada":"J2", Horas:0}),
     ]);
   });
-  it("phone navigates weeks and shows a true empty state, keeping failures distinct", async () => {
+  it("phone keeps week navigation inside Filters and shows a true empty state", async () => {
     viewport.width = 390;
     render(<MemoryRouter initialEntries={["/planificador?semana=38"]}><Planificador/></MemoryRouter>);
     await screen.findByRole("list", {name:"Jornadas del Planificador"});
     const agenda = within(screen.getByRole("region", {name:"Agenda del Planificador"}));
-    fireEvent.click(agenda.getByRole("button", {name:"Semana siguiente"}));
-    expect(agenda.getByText(/Semana 39/)).toBeInTheDocument();
+    expect(agenda.queryByRole("button", {name:"Semana siguiente"})).not.toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", {name:/Más filtros/}));
+    let filters = within(screen.getByRole("dialog"));
+    expect(filters.getByRole("button", {name:"Semana siguiente"})).toHaveClass("h-11", "w-11");
+    fireEvent.click(filters.getByRole("button", {name:"Semana siguiente"}));
+    fireEvent.click(filters.getByRole("button", {name:"Aplicar"}));
     expect(screen.getByText("No hay jornadas con estos filtros.")).toBeInTheDocument();
-    fireEvent.click(agenda.getByRole("button", {name:"Semana anterior"}));
+    fireEvent.click(screen.getByRole("button", {name:/Más filtros/}));
+    filters = within(screen.getByRole("dialog"));
+    expect(filters.getByRole("button", {name:"Semana anterior"})).toHaveClass("h-11", "w-11");
+    fireEvent.click(filters.getByRole("button", {name:"Semana anterior"}));
+    fireEvent.click(filters.getByRole("button", {name:"Aplicar"}));
     expect(await screen.findByRole("list", {name:"Jornadas del Planificador"})).toBeInTheDocument();
   });
   it("phone does not hide a failed load behind an empty agenda", async () => {

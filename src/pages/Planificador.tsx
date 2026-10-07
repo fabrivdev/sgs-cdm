@@ -619,20 +619,21 @@ export default function Planificador() {
           options={tecnicosSolo.map(p => ({ value: p.id, label: p.nombre }))}
         />
         <FilterCustom label="Semana" width="w-[230px]">
-          <div className="flex h-8 overflow-hidden rounded-md border bg-background">
+          <div className="flex h-11 overflow-hidden rounded-md border bg-background sm:h-8">
             <Button
               type="button"
               variant="ghost"
               size="icon"
-              className="h-8 w-8 shrink-0 rounded-none border-r"
+              className="h-11 w-11 shrink-0 rounded-none border-r sm:h-8 sm:w-8"
               onClick={() => moverSemana(-1)}
               disabled={fSemana !== "all" && Number(fSemana) <= 1}
+              aria-label="Semana anterior"
               title="Semana anterior"
             >
               <ChevronLeft className="h-4 w-4" />
             </Button>
             <Select value={fSemana} onValueChange={setFSemana}>
-              <SelectTrigger className="h-8 min-w-0 flex-1 rounded-none border-0 px-2 text-[12px] shadow-none focus:ring-0">
+              <SelectTrigger className="h-11 min-w-0 flex-1 rounded-none border-0 px-2 text-base shadow-none focus:ring-0 sm:h-8 sm:text-[12px]">
                 <SelectValue placeholder="Semana" />
               </SelectTrigger>
               <SelectContent className="max-h-[280px] min-w-[--radix-select-trigger-width]">
@@ -648,9 +649,10 @@ export default function Planificador() {
               type="button"
               variant="ghost"
               size="icon"
-              className="h-8 w-8 shrink-0 rounded-none border-l"
+              className="h-11 w-11 shrink-0 rounded-none border-l sm:h-8 sm:w-8"
               onClick={() => moverSemana(1)}
               disabled={fSemana !== "all" && Number(fSemana) >= 53}
+              aria-label="Semana siguiente"
               title="Semana siguiente"
             >
               <ChevronRight className="h-4 w-4" />
@@ -662,13 +664,6 @@ export default function Planificador() {
 
 
       {phone ? <PlannerMobileAgenda rows={displayed} columns={columns} sort={list.sort} onSort={list.toggleSort}
-        navigation={<div className="flex min-w-0 items-center justify-between gap-1">
-          <span className="text-[12px] font-medium" aria-live="polite">{fSemana === "all" ? "Todas las semanas" : `Semana ${fSemana}${fSemana === currentWeek ? " · actual" : ""}`}</span>
-          <div className="flex shrink-0">
-            <Button size="icon" variant="ghost" className="h-11 w-11" aria-label="Semana anterior" onClick={() => moverSemana(-1)} disabled={fSemana !== "all" && Number(fSemana) <= 1}><ChevronLeft className="h-4 w-4" /></Button>
-            <Button size="icon" variant="ghost" className="h-11 w-11" aria-label="Semana siguiente" onClick={() => moverSemana(1)} disabled={fSemana !== "all" && Number(fSemana) >= 53}><ChevronRight className="h-4 w-4" /></Button>
-          </div>
-        </div>}
         client={s => s.cliente_id ? cliById[s.cliente_id]?.nombre || "Sin cliente" : "Sin cliente"}
         reference={s => { const ref = refByServicio.get(s.id); return ref?.os ? `OS ${ref.os}` : ref?.ref || "Sin referencia"; }}
         continuity={s => continuidadByRow.get(`${s.id}-${s.jornada_id ?? s.fecha_programada}`)}

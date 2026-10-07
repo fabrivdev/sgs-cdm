@@ -55,6 +55,7 @@ const columns: SalesColumn<ServicioOSRow>[] = [
 ];
 export function OrdersTable({ rows, billingLoading = false, billingFailed = false, from = "1900-01-01", to = "2999-12-31" }: { rows: ServicioOSRow[]; billingLoading?: boolean; billingFailed?: boolean; from?: string; to?: string }) {
   const compact = useIsMobile(1024);
+  const phone = useIsMobile(640);
   const [selectedKey, setSelectedKey] = useState<string | null>(null);
   const selected = rows.find(row => row.key === selectedKey) ?? null;
   const setSelected = (row: ServicioOSRow | null) => setSelectedKey(row?.key ?? null);
@@ -77,13 +78,15 @@ export function OrdersTable({ rows, billingLoading = false, billingFailed = fals
     ? <SalesSortButton label={key === "horas" ? "Horas" : "Km"} kind="number" align="center" active={table.sort.key === key} direction={table.sort.direction} onClick={() => table.toggleSort(key)} />
     : table.heading(key);
   const mobile: CompactListColumn<ServicioOSRow>[] = [
-    { ...visible[0], width: "w-[72%]", render: row => <button type="button" className="min-h-11 w-full text-left" aria-label={`Ver OS ${row.os}`} onClick={() => setSelected(row)}><MobileRecord primary={<span className="flex min-w-0 items-baseline gap-1.5"><span className="shrink-0 font-mono text-[11px] text-muted-foreground">OS {row.os}</span><span className="min-w-0 truncate">{row.cliente}</span></span>} secondary={<span className="flex min-w-0 items-center gap-1.5"><MarcaBadge marca={row.marca} className="shrink-0 px-1.5 text-[10px]" /><span className="min-w-0 truncate">{row.modelo || "Sin modelo"}</span></span>} context={<span>{row.tecnicos.length} {row.tecnicos.length === 1 ? "técnico" : "técnicos"} · {number.format(row.horas)} h · {number.format(row.km)} km</span>} /></button> },
-    { ...visible[5], width: "w-[28%]" },
+    { ...visible[0], width: "w-[56%]", render: row => <button type="button" className="min-h-11 w-full text-left" aria-label={`Ver OS ${row.os}`} onClick={() => setSelected(row)}><MobileRecord primary={<span className="flex min-w-0 items-baseline gap-1.5"><span className="shrink-0 font-mono text-[11px] text-muted-foreground">OS {row.os}</span><span className="min-w-0 truncate">{row.cliente}</span></span>} secondary={<span className="flex min-w-0 items-center gap-1.5"><MarcaBadge marca={row.marca} className="shrink-0 px-1.5 text-[10px]" /><span className="min-w-0 truncate">{row.modelo || "Sin modelo"}</span></span>} /></button> },
+    { ...visible[6], key: "actividad", label: "Actividad", width: "w-[22%]", align: "right", value: row => row.horas,
+      render: row => <span className="block text-right text-[11px] leading-4 text-muted-foreground"><span className="block">{row.tecnicos.length} {row.tecnicos.length === 1 ? "téc." : "técs."}</span><span className="block text-foreground">{number.format(row.horas)} h</span><span className="block">{number.format(row.km)} km</span></span> },
+    { ...visible[5], width: "w-[22%]" },
   ];
   return <>
     <OperationsPanel>
-    <CompactListTable<ServicioOSRow> rows={table.ordered} columns={visible} mobileColumns={mobile} id={r => r.key} label="Órdenes de servicio" heading={heading} sort={table.sort} onSelect={row => setSelected(row)} status={!rows.length ? "Sin órdenes para estos filtros." : undefined} />
-    <div className="flex h-9 items-center justify-between border-t px-3 text-[11px] text-muted-foreground"><span>{rows.length} órdenes</span><CompactListOrderMenu label="órdenes" columns={columns} sort={table.sort} onSort={table.toggleSort} /></div>
+    <CompactListTable<ServicioOSRow> rows={table.ordered} columns={visible} mobileColumns={mobile} id={r => r.key} label="Órdenes de servicio" heading={phone ? undefined : heading} sort={table.sort} onSelect={row => setSelected(row)} status={!rows.length ? "Sin órdenes para estos filtros." : undefined} />
+    <div className="flex min-h-9 items-center justify-between border-t px-3 text-[11px] text-muted-foreground"><span>{rows.length} órdenes</span>{phone && <CompactListOrderMenu label="órdenes" columns={columns} sort={table.sort} onSort={table.toggleSort} />}</div>
     </OperationsPanel>
     <ResponsiveDrawer open={Boolean(selected)} onOpenChange={open => !open && setSelected(null)}>
       <ResponsiveDrawerHeader><div className="flex flex-wrap items-center gap-2"><h2 className="text-[14px] font-semibold">OS {selected?.os}</h2>{selected && <OperationsStatus value={selected.estadoOS} />}</div><p className="mt-1 text-[12px] text-muted-foreground">{selected?.cliente}</p></ResponsiveDrawerHeader>

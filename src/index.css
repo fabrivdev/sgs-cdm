@@ -138,6 +138,20 @@
 }
 
 @layer components {
+  /* FiltersBar supplies its own accessible clear button. Hide only the native
+     cancel control on that shared search field so Chromium does not draw a second X. */
+  .filters-bar-search::-webkit-search-cancel-button {
+    display: none;
+    appearance: none;
+    -webkit-appearance: none;
+  }
+
+  .filters-bar-search::-ms-clear {
+    display: none;
+    width: 0;
+    height: 0;
+  }
+
   .row-pendiente { @apply border-l-2 border-l-amber-400; }
   .row-iniciado { @apply border-l-2 border-l-blue-500; }
   .row-completado { @apply border-l-2 border-l-primary; }

@@ -34,7 +34,28 @@ afterEach(() => { cleanup(); vi.useRealTimers(); vi.unstubAllGlobals(); });
 const setup = () => render(<MemoryRouter><OrdenesServicio /></MemoryRouter>);
 const tab = (name: string) => fireEvent.mouseDown(screen.getByRole("tab", { name }), { button: 0, ctrlKey: false });
 const currentMonth = () => fireEvent.change(document.querySelectorAll<HTMLInputElement>('input[type="date"]')[0], { target: { value: "2026-09-01" } });
-const technicianStatus = (name: string) => fireEvent.click(within(screen.getByRole("group", { name: "Estado de técnicos" })).getByRole("button", { name }));
+const technicianStatus = (name: "Todos" | "Activos" | "Inactivos") => {
+  if (mocks.width < 640) {
+    fireEvent.click(screen.getByRole("button", { name: "Más filtros" }));
+    const panel = within(screen.getByRole("dialog"));
+    fireEvent.change(panel.getByRole("combobox", { name: "Estado de técnicos" }), { target: { value: name.toLowerCase() } });
+    fireEvent.click(panel.getByRole("button", { name: "Aplicar" }));
+    return;
+  }
+  fireEvent.click(within(screen.getByRole("group", { name: "Estado de técnicos" })).getByRole("button", { name }));
+};
+const reviewIssues = () => {
+  if (mocks.width < 640) {
+    fireEvent.click(screen.getByRole("button", { name: "Más filtros" }));
+    const panel = within(screen.getByRole("dialog"));
+    const action = panel.getByRole("button", { name: /Revisar \d+ incidencias?/ });
+    fireEvent.click(action);
+    return action;
+  }
+  const action = screen.getByRole("button", { name: /incidencias? · Revisar/ });
+  fireEvent.click(action);
+  return action;
+};
 describe("orders workspace", () => {
   it("defaults to July through today, keeps manual dates, and resets the whole filter set", async () => {
     mocks.width = 1280;
@@ -135,17 +156,20 @@ describe("orders workspace", () => {
     expect(actions.closest("header")).toBeNull();
     expect(filters.parentElement).toContainElement(actions);
   });
-  it("groups phone OS identity into three compact lines without dropping metrics", () => {
+  it("keeps phone OS identity compact and gives activity its own numeric column", () => {
     mocks.width = 320;
     setup();
     const open = screen.getByRole("button", { name: "Ver OS 01-00000001" });
     const record = open.querySelector(".mobile-record");
-    expect(record?.children).toHaveLength(3);
+    expect(record?.children).toHaveLength(2);
     expect(record?.children[0]).toHaveTextContent("OS 01-00000001");
     expect(record?.children[1]).toHaveTextContent(/CLAAS|HORSCH/);
-    expect(record?.children[2]).toHaveTextContent(/técnico/);
-    expect(record?.children[2]).toHaveTextContent(/h/);
-    expect(record?.children[2]).toHaveTextContent(/km/);
+    const table = within(screen.getByRole("table", { name: "Órdenes de servicio" }));
+    const row = within(open.closest("tr")!);
+    expect(table.getByRole("columnheader", { name: "Actividad" })).toBeVisible();
+    expect(row.getByText(/técs?\./)).toBeVisible();
+    expect(row.getByText(/ h$/)).toBeVisible();
+    expect(row.getByText(/ km$/)).toBeVisible();
   });
   it.each([320, 768, 1280])("does not repeat the effective productivity range in the title and keeps its behavior at %i px", width => {
     mocks.width = 1280;
@@ -259,11 +283,20 @@ describe("orders workspace", () => {
     mocks.width = width;
     workLogs[0].entries[0].fecha_inicio = null;
     setup(); tab("Productividad"); technicianStatus("Todos");
-    const issueReview = screen.getByRole("button", { name: "1 incidencia · Revisar" });
-    expect(screen.getByRole("alert")).toContainElement(issueReview);
     const productivityTable = screen.getByRole("table", { name: "Productividad por técnico" });
-    expect(productivityTable.closest("section")?.firstElementChild).toContainElement(issueReview);
-    if (width >= 640) expect(productivityTable.closest("section")?.firstElementChild).toContainElement(screen.getByRole("heading", { name: "Por técnico" }));
+    if (width < 640) {
+      expect(screen.queryByRole("alert")).not.toBeInTheDocument();
+      expect(screen.queryByRole("button", { name: /incidencia · Revisar/ })).not.toBeInTheDocument();
+      fireEvent.click(screen.getByRole("button", { name: "Más filtros" }));
+      const panel = within(screen.getByRole("dialog"));
+      expect(panel.getByRole("button", { name: "Revisar 1 incidencia" })).toBeVisible();
+      fireEvent.click(panel.getByRole("button", { name: "Aplicar" }));
+    } else {
+      const issueReview = screen.getByRole("button", { name: "1 incidencia · Revisar" });
+      expect(screen.getByRole("alert")).toContainElement(issueReview);
+      expect(productivityTable.closest("section")?.firstElementChild).toContainElement(issueReview);
+      expect(productivityTable.closest("section")?.firstElementChild).toContainElement(screen.getByRole("heading", { name: "Por técnico" }));
+    }
     expect(screen.queryByText(/registros pendientes|Productividad sin calcular/)).not.toBeInTheDocument();
     expect(screen.getByText("Productividad", { selector: ".kpi-item span" }).closest(".kpi-item")).not.toHaveTextContent("Parcial");
     expect(screen.getByRole("meter", { name: "Meta de TECNICO DOS" })).toBeVisible();
@@ -281,7 +314,7 @@ describe("orders workspace", () => {
   it("shows both original clocks when different orders overlap, not empty artificial hours", () => {
     workLogs.push(demoWorkLog([demoWorkEntry({ id: "OVERLAP", hora_inicio: "09:30", hora_fin: "11:15" })], "02-00000003"));
     setup(); tab("Productividad");
-    fireEvent.click(screen.getByRole("button", { name: /incidencia · Revisar/ }));
+    reviewIssues();
     const drawer = screen.getByRole("dialog");
     expect(drawer).toHaveTextContent("Incidencias de jornadas");
     expect(drawer).toHaveTextContent("Horarios superpuestos");
@@ -309,6 +342,7 @@ describe("orders workspace", () => {
     expect(screen.getByText("Horas-persona", { selector: ".kpi-item span" }).closest(".kpi-item")).toHaveTextContent("1");
   });
   it("alerts automatically when refreshed work introduces an incident without removing valid productivity", () => {
+    mocks.width = 768;
     const rendered = setup(); currentMonth(); tab("Productividad");
     expect(screen.queryByRole("alert")).not.toBeInTheDocument();
     const productivityCard = () => screen.getByText("Productividad", { selector: ".kpi-item span" }).closest(".kpi-item");
@@ -392,7 +426,7 @@ describe("orders workspace", () => {
     mocks.width = width; setup();
     const table = screen.getByRole("table", { name: "Órdenes de servicio" });
     expect(within(table).getAllByRole("row")).toHaveLength(3);
-    expect(within(table).getAllByRole("columnheader")).toHaveLength(width < 640 ? 2 : 8);
+    expect(within(table).getAllByRole("columnheader")).toHaveLength(width < 640 ? 3 : 8);
     expect(screen.queryByText("01/09/2026 — 25/09/2026")).not.toBeInTheDocument();
     expect(screen.queryByText("Estado, tipo y sucursal")).not.toBeInTheDocument();
     expect(within(table).queryByText("TECNICO UNO")).not.toBeInTheDocument();
@@ -450,21 +484,29 @@ describe("orders workspace", () => {
   it.each([320, 768, 1280])("uses a single compact technician header, not another navigation row, at %i px", width => {
     mocks.width = width;
     setup(); tab("Productividad");
-    const group = screen.getByRole("group", { name: "Estado de técnicos" });
-    expect(within(group).getAllByRole("button")).toHaveLength(3);
-    expect(within(group).queryByRole("button", { name: "Sin ficha" })).not.toBeInTheDocument();
     expect(screen.getAllByRole("tablist")).toHaveLength(1);
-    expect(group.closest("section")).toContainElement(screen.getByRole("table", { name: "Productividad por técnico" }));
     expect(screen.queryByRole("heading", { name: "Por técnico" }) !== null).toBe(width >= 640);
-    expect(within(group).getByRole("button", { name: "Activos" })).toHaveAttribute("aria-pressed", "true");
-    expect(within(group).getByRole("button", { name: "Todos" })).toHaveAttribute("aria-pressed", "false");
     const productivityTable = screen.getByRole("table", { name: "Productividad por técnico" });
     expect(productivityTable).not.toHaveTextContent("TECNICO DOS");
     if (width < 640) {
-      for (const name of ["Técnico", "OS", "Horas", "Meta", "%"]) expect(within(productivityTable).getByRole("columnheader", { name: new RegExp(name) })).toBeVisible();
-      expect(productivityTable).toHaveClass("max-sm:min-w-[440px]");
+      expect(screen.queryByRole("group", { name: "Estado de técnicos" })).not.toBeInTheDocument();
+      expect(within(productivityTable).getAllByRole("columnheader")).toHaveLength(2);
+      expect(within(productivityTable).getByRole("columnheader", { name: "Técnico" })).toBeVisible();
+      expect(within(productivityTable).getByRole("columnheader", { name: "Productividad" })).toBeVisible();
+      expect(productivityTable).not.toHaveClass("max-sm:min-w-[440px]");
       const technician = within(productivityTable).getByRole("button", { name: /TECNICO UNO · 1 OS/ });
       expect(technician).toHaveTextContent(/^TECNICO UNO$/);
+      fireEvent.click(screen.getByRole("button", { name: "Más filtros" }));
+      const status = within(screen.getByRole("dialog")).getByRole("combobox", { name: "Estado de técnicos" });
+      expect(status).toHaveClass("h-11");
+      expect(status).toHaveValue("activos");
+    } else {
+      const group = screen.getByRole("group", { name: "Estado de técnicos" });
+      expect(within(group).getAllByRole("button")).toHaveLength(3);
+      expect(within(group).queryByRole("button", { name: "Sin ficha" })).not.toBeInTheDocument();
+      expect(group.closest("section")).toContainElement(productivityTable);
+      expect(within(group).getByRole("button", { name: "Activos" })).toHaveAttribute("aria-pressed", "true");
+      expect(within(group).getByRole("button", { name: "Todos" })).toHaveAttribute("aria-pressed", "false");
     }
     expect(mocks.set).toHaveBeenLastCalledWith(expect.objectContaining({ estado_tecnicos: "activos" }));
   });
@@ -529,7 +571,8 @@ describe("orders workspace", () => {
     mocks.width = 320;
     setup();
     const orderKpis = Array.from(screen.getByRole("region", { name: "Indicadores" }).querySelectorAll(".kpi-item > div:first-child > span:first-child")).map(item => item.textContent);
-    expect(orderKpis).toEqual(["Órdenes", "Abiertas", "Cerradas", "% de cierre", "Días de cierre (prom.)"]);
+    expect(orderKpis).toEqual(["Órdenes", "Abiertas", "Cerradas", "% cierre", "Días prom."]);
+    expect(screen.getByRole("region", { name: "Indicadores" })).toHaveClass("service-orders-kpis");
     for (const name of ["Órdenes", "Productividad", "Cumplimiento"]) {
       tab(name);
       if (name === "Cumplimiento") {
@@ -597,7 +640,10 @@ describe("orders workspace", () => {
     setup(); tab("Productividad");
     expect(screen.getAllByRole("alert")).toHaveLength(1);
     expect(screen.getByRole("alert")).toHaveTextContent("actualización");
-    expect(screen.getByRole("alert")).toHaveTextContent("1 incidencia · Revisar");
+    expect(screen.getByRole("alert")).not.toHaveTextContent("incidencia");
+    fireEvent.click(screen.getByRole("button", { name: "Más filtros" }));
+    expect(within(screen.getByRole("dialog")).getByRole("button", { name: "Revisar 1 incidencia" })).toBeVisible();
+    fireEvent.click(within(screen.getByRole("dialog")).getByRole("button", { name: "Aplicar" }));
     expect(screen.getByText("Eficiencia", { selector: ".kpi-item span" }).closest(".kpi-item")).toHaveTextContent("—");
     expect(screen.getByText("Eficiencia", { selector: ".kpi-item span" }).closest(".kpi-item")).not.toHaveTextContent("OS sin cálculo");
     fireEvent.click(screen.getByRole("button", { name: "Reintentar" }));
@@ -662,7 +708,11 @@ describe("orders workspace", () => {
     const table = within(screen.getByRole("table", { name: "Órdenes de servicio" }));
     expect(table.getByText(/TRION 740/)).toBeVisible();
     expect(table.queryByText(/TECNICO UNO/)).not.toBeInTheDocument();
-    if (width < 640) expect(table.getByText("2 técnicos · 10 h · 300 km")).toBeVisible();
+    if (width < 640) {
+      expect(table.getByText("2 técs.")).toBeVisible();
+      expect(table.getByText("10 h")).toBeVisible();
+      expect(table.getByText("300 km")).toBeVisible();
+    }
     else {
       expect(table.getByText("2", { exact: true })).toBeVisible();
       expect(table.getByText("300", { exact: true })).toBeVisible();
@@ -695,7 +745,7 @@ describe("orders workspace", () => {
     fireEvent.click(screen.getByRole("button", { name: "TECNICO UNO" }));
     const detail = within(screen.getByRole("dialog"));
     expect(detail.getAllByText(/TR-DEMO1/)).toHaveLength(2);
-    expect(detail.getByText("ND · Capacitación")).toBeVisible();
+    expect(detail.getByText("No disponible · Capacitación")).toBeVisible();
   });
   it("uses complete week columns for a month and day columns for a selected week", () => {
     mocks.width = 1280;
@@ -786,14 +836,25 @@ describe("orders workspace", () => {
     const dates = document.querySelectorAll('input[type="date"]');
     fireEvent.change(dates[0], { target: { value: "2026-09-10" } });
     fireEvent.change(dates[1], { target: { value: "2026-09-25" } });
-    expect(screen.getByText("1 prog.")).toBeVisible();
-    const previous = screen.getByRole("button", { name: "Período anterior" });
-    expect(previous).toHaveClass("h-11", "w-11");
-    expect(screen.getByRole("button", { name: "Período siguiente" })).toHaveClass("h-11", "w-11");
-    expect(screen.getByRole("button", { name: "Trabajos" })).toHaveClass("min-h-11");
-    expect(screen.getByRole("button", { name: "Horas" })).toHaveClass("min-h-11");
-    fireEvent.click(previous);
-    fireEvent.click(previous);
+    expect(screen.getByText("1 programado")).toBeVisible();
+    expect(screen.queryByRole("button", { name: "Período anterior" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Período siguiente" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Trabajos" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Horas" })).not.toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: "Más filtros" }));
+    const panel = within(screen.getByRole("dialog"));
+    const period = panel.getByRole("combobox", { name: "Período visible de cumplimiento" });
+    const metric = panel.getByRole("combobox", { name: "Medida de cumplimiento" });
+    expect(period).toHaveClass("h-11");
+    expect(metric).toHaveClass("h-11");
+    expect(within(metric).getByRole("option", { name: "Trabajos" })).toBeInTheDocument();
+    expect(within(metric).getByRole("option", { name: "Horas" })).toBeInTheDocument();
+    const targetPeriod = within(period).getAllByRole("option")[0] as HTMLOptionElement;
+    fireEvent.change(period, { target: { value: targetPeriod.value } });
+    fireEvent.change(metric, { target: { value: "horas" } });
+    expect(screen.getAllByText(/h registradas/).length).toBeGreaterThan(0);
+    fireEvent.change(metric, { target: { value: "trabajos" } });
+    fireEvent.click(panel.getByRole("button", { name: "Aplicar" }));
     expect(screen.getByRole("meter", { name: "Trabajos cumplidos de TECNICO UNO" })).toHaveAttribute("aria-valuetext", "1 de 2 trabajos cumplidos");
   });
   it("never exposes stale figures or exports after source errors", () => {

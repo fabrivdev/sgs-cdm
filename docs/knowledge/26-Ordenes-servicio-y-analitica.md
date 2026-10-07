@@ -298,7 +298,17 @@ En `OrdenesServicio.tsx`, Cumplimiento muestra sólo filtros y matriz de técnic
 
 La matriz permanece bajo `servicios.ordenes`, cuya ruta exige perfiles admin/gerencia. `servicios.trabajos` tiene otro alcance de acceso: mover el análisis allí no es un mero cambio visual y no se realizó. No se modificaron permisos, consultas, jornadas ni reglas de cumplimiento. Las pruebas de la página cubren presentación móvil/escritorio, detalle, agrupación automática, columnas vacías y ausencia de informes secundarios; no acreditan despliegue ni datos de producción. Este clon no tiene `00-Inicio.md`, `mapa-negocio.json` ni `obsidian-sync.local`, por lo que esta nota no confirma sincronización de Obsidian.
 
-### Lectura de cumplimiento por celda — 29/09/2026
+## Corrección móvil de Órdenes, Productividad y Cumplimiento - 07/10/2026
+
+Bajo 640 px, los cinco indicadores de Órdenes se muestran en tres columnas uniformes: tres en la primera fila y dos en la segunda. La fila operativa deja de apilar técnicos/horas/km como una tercera línea dentro de la identidad: conserva OS/cliente y marca/modelo, añade una columna Actividad para cantidad de técnicos, horas y km, y mantiene Estado separado. La ficha, el orden por campos completos y la exportación no cambian.
+
+Productividad presenta sólo Técnico y Productividad en la tabla móvil y elimina el `min-width` que forzaba desplazamiento horizontal. El porcentaje y medidor conservan en su nombre accesible las horas realizadas y la meta; pulsar el técnico abre sus jornadas completas. Todos/Activos/Inactivos y la revisión de incidencias se ubican en `Más filtros` en teléfono. La incidencia no se repite como alerta exterior; escritorio conserva grupo, alerta y columnas anteriores.
+
+Cumplimiento no muestra flechas de período ni botones Trabajos/Horas fuera del panel en teléfono. Ambos selectores están dentro de `Más filtros` con altura táctil de 44 px. La matriz usa encabezados Técnico/Cumplimiento, un solo bucket seleccionado y texto explícito en lugar de `prog.`/`ND`; el drawer mantiene referencias, estados y razones de no disponibilidad. No se alteran `matrixCompletion`, denominadores, agrupación automática, jornadas, permisos, impresión ni exportación.
+
+Pruebas locales: 76 casos de `OrdenesServicio.test.tsx`, incluidos 320/390/639/640/768/1280, filtros, drawers y escritorio; 18 casos de listas operativas cubren Planificador/Trabajos relacionados. La validación es de DOM y código, no medición de píxeles ni aprobación visual.
+
+### Lectura de cumplimiento por celda - 29/09/2026
 
 `matrixCompletion.ts` calcula `realizadas / (realizadas + noRealizadas)` por técnico y bucket de `useOperationsModel.ts`; cada registro es una jornada de agenda, no una TR única deduplicada. `noRealizadas` incluye jornadas canceladas y pendientes vencidas según el mismo corte temporal vigente. La barra usa verde para la parte cumplida y ámbar para la no cumplida; porcentaje y fracción numérica evitan depender sólo del color. Los programados futuros y la no disponibilidad permanecen visibles aparte, sin entrar al denominador. Un bucket sólo programado, sólo ND o vacío no equivale a 0%: no muestra porcentaje; 0% exige al menos un trabajo con resultado no cumplido.
 

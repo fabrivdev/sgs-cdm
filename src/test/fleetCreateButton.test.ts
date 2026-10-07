@@ -30,6 +30,9 @@ describe("mobile header create buttons", () => {
     expect(fleetPage).toContain('aria-label="Nuevo vehículo"');
     expect(fleetPage).toContain('<Plus className="h-4 w-4 sm:mr-1.5" />');
     expect(fleetPage).toContain('<span className="hidden sm:inline">Nuevo vehículo</span>');
+    expect(fleetPage).toContain('aria-label="Registrar lectura" className={mobileHeaderCreateButton}');
+    expect(fleetPage).toContain('<Gauge className="h-4 w-4 sm:mr-1.5" />');
+    expect(fleetPage).toContain('<span className="hidden sm:inline">Registrar lectura</span>');
     expect(fleetPage).not.toContain('className="h-11 px-3 sm:h-9"');
     expect(fleetPage).not.toContain('<span className="sm:hidden">+ Nuevo</span>');
   });

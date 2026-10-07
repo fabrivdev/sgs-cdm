@@ -8,6 +8,23 @@ Se contrastaron las rutas activas de `src/App.tsx`, la navegación de `src/compo
 
 La regla de corte es teléfono por debajo de 640 px. La verificación visual posterior debe cubrir 320, 390, 639, 640, 768 y 1280 px, además de texto largo, filtro activo, carga, vacío, error, permisos restringidos y drawer abierto cuando corresponda.
 
+## Actualización posterior: servicios, filtros y Flota
+
+Esta sección prevalece sobre las filas anteriores que describían semana o estados fuera de Filtros y sobre la fila de Órdenes que agrupaba actividad como una tercera línea de identidad.
+
+| Ruta / sección | Causa confirmada | Resultado local | Prueba | QA visual |
+| --- | --- | --- | --- | --- |
+| `/servicios/ordenes` · Órdenes | Cinco KPI no respetaban tres columnas; actividad apilada en identidad | KPI 3 + 2 en tres columnas uniformes; fila con Identidad/Actividad/Estado | `OrdenesServicio.test.tsx` | Pendiente 320/390/639 y frontera 640 |
+| `/servicios/ordenes` · Productividad | `min-width: 440px`, cinco microcolumnas y estado/incidencia exteriores | Técnico/Productividad sin scroll forzado; estado e incidencias dentro de Filtros; drawer conserva jornadas | `OrdenesServicio.test.tsx` | Pendiente, incluido overflow real |
+| `/servicios/ordenes` · Cumplimiento | Período y Trabajos/Horas duplicados sobre la matriz; abreviaturas crípticas | Selectores dentro de Filtros; copia explícita y un período visible | `OrdenesServicio.test.tsx` | Pendiente con filtros y detalle abiertos |
+| `/` Planificador | Semana y flechas repetidas sobre la agenda | Selector y navegación semanal sólo dentro de Filtros bajo 640 px | `ServiceLists.test.tsx` | Pendiente |
+| `/trabajos` | Seis estados ocupaban dos filas como navegación aparente | Lista desplegable de estado dentro de Filtros bajo 640 px | `ServiceLists.test.tsx` | Pendiente |
+| `/servicios/flota` · detalle | `Registrar lectura` era la rama del encabezado que no consumía la regla compartida | Objetivo 44 × 44, icono móvil, nombre accesible y texto desde 640 px | `fleetCreateButton.test.ts`, `FlotaDrawers.test.tsx` | Captura localizada por OCR; píxeles y recaptura pendientes |
+
+La regla de este ajuste no modifica el panel gerencial: conserva cuatro indicadores visibles por sección; no se fuerza desde aquí una grilla móvil. Tampoco modifica SQL, consultas, fórmulas, permisos, exportaciones ni callbacks.
+
+Validación automatizada local: 105 pruebas focalizadas correctas (94 de Órdenes/Listas y 11 de Flota). No se abrió la aplicación ni navegador. Las referencias de Library sólo permitieron OCR/caption, no inspección de píxeles; siguen pendientes medición de `scrollWidth/clientWidth`, capturas en 320/390/639/640/768/1280, carga/vacío/error/permisos y drawers abiertos. No hubo commit, push ni publicación.
+
 ## Causas encontradas y tratamiento
 
 | Causa | Consumidores alcanzados | Tratamiento local | Límite |

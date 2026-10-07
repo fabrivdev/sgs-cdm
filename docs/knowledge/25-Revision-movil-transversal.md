@@ -72,6 +72,18 @@ Corrección posterior de QA: las acciones de alta ubicadas en `PageHeader` manti
 
 En Equipo y accesos de Administración, la fila de teléfono reserva el ancho principal al nombre y lo limita a dos líneas, con el valor completo en `title`. La presencia conserva el punto visible, el estado completo accesible y su `title`, pero no compite con la identidad como texto lateral; la ficha mantiene su botón de 44 × 44 px y el mismo callback. Desde 640 px continúa la tabla sin cambios.
 
+## Jerarquía móvil de servicios y selectores rápidos - 07/10/2026
+
+Esta regla posterior reemplaza, bajo 640 px, las menciones anteriores que dejaban la semana de Planificador o el estado de Trabajos visibles fuera de `Más filtros`. Los selectores rápidos que modifican el conjunto mostrado pertenecen al panel móvil: semana de Planificador, estado de Trabajos, estado de técnicos de Productividad y período/medida de Cumplimiento. En tablet/escritorio se conservan los controles existentes. Las pestañas Órdenes/Productividad/Cumplimiento son navegación real y permanecen visibles; no deben tratarse como filtros.
+
+Órdenes usa exactamente tres columnas de indicadores en teléfono. Sus cinco indicadores quedan en dos filas 3 + 2, con el mismo ancho de columna y sin ocultar valores. Esta excepción no cambia la distribución compartida de otros `KpiStrip`. El panel gerencial continúa mostrando cuatro indicadores por sección; esa regla define cuántos son visibles y no impone una grilla móvil desde este cambio.
+
+La lista móvil de Órdenes separa identidad, actividad y estado en tres columnas. Productividad elimina el ancho mínimo de 440 px y muestra Técnico/Productividad; horas y meta siguen en el texto accesible del medidor, y la fila abre el registro completo del técnico. No se repiten OS/Horas/Meta como microcolumnas ni la alerta de incidencias fuera de Filtros. Cumplimiento mantiene un período por vez y expresa resultados como `n de total cumplidos`, `programado(s)` y `No disponible`; período y Trabajos/Horas están en Filtros y no se duplican sobre la matriz.
+
+La acción de detalle `Registrar lectura` de Flota usa el mismo tratamiento móvil que las altas del encabezado: objetivo de 44 × 44 px, icono visible, nombre accesible y texto sólo desde 640 px. La causa era una rama condicional del `PageHeader` que no consumía la clase compartida aunque `Nuevo vehículo` sí lo hacía.
+
+Validación automatizada local: 94 pruebas de Órdenes, Productividad, Cumplimiento, Planificador y Trabajos, más 11 de la acción compartida y drawers de Flota. No se abrió navegador; la comprobación real de overflow y composición sigue pendiente en 320/390/639/640/768/1280 px con filtros y drawers abiertos. No hubo SQL, cambios de consultas, datos productivos, commit ni publicación.
+
 ## Historial de etapas anteriores
 
 ## Calendario

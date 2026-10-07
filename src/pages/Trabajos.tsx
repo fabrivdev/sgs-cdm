@@ -11,7 +11,7 @@ import { toast } from "sonner";
 import { cn } from "@/lib/utils";
 import { NuevoTrabajoDialog } from "@/components/trabajos/NuevoTrabajoDialog";
 import { TrabajoDetalleDrawer } from "@/components/trabajos/TrabajoDetalleDrawer";
-import { FiltersBar, FilterDate } from "@/components/filters/FiltersBar";
+import { FiltersBar, FilterCustom, FilterDate } from "@/components/filters/FiltersBar";
 import { FilterMultiSelect, matchesMulti } from "@/components/filters/FilterMultiSelect";
 import { EmptyState } from "@/components/EmptyState";
 import { KanbanSkeleton } from "@/components/LoadingSkeletons";
@@ -81,11 +81,11 @@ export default function Trabajos() {
       busqueda: q || undefined,
       sucursales: fSucursales.length ? fSucursales : undefined,
       prioridades: fPrioridades.length ? fPrioridades : undefined,
-      estados: fEstados.length ? fEstados : undefined,
+      estados: isPhone && phoneState !== "todos" ? [phoneState] : fEstados.length ? fEstados : undefined,
       fecha: fFecha || undefined,
     });
     return clearPageFilters;
-  }, [clearPageFilters, fEstados, fFecha, fPrioridades, fSucursales, q, setPageFilters]);
+  }, [clearPageFilters, fEstados, fFecha, fPrioridades, fSucursales, isPhone, phoneState, q, setPageFilters]);
 
   useEffect(() => {
     if (isTecnico && !isAdmin && profile?.sucursal && fSucursales.length === 0) {
@@ -168,7 +168,7 @@ export default function Trabajos() {
 
   const limpiar = () => {
     setQ(""); setFSucursales([]); setFPrioridades([]); setFEstados([]);
-    setFFecha("");
+    setFFecha(""); setPhoneState("todos");
   };
 
   const activosCount =
@@ -176,7 +176,8 @@ export default function Trabajos() {
     (fSucursales.length ? 1 : 0) +
     (fPrioridades.length ? 1 : 0) +
     (fEstados.length ? 1 : 0) +
-    (fFecha ? 1 : 0);
+    (fFecha ? 1 : 0) +
+    (isPhone && phoneState !== "todos" ? 1 : 0);
 
   return (
     <div className={pageShellWide}>
@@ -191,23 +192,22 @@ export default function Trabajos() {
         activeCount={activosCount}
         onClear={limpiar}
         meta={`${filtered.length} trabajo${filtered.length !== 1 ? "s" : ""}`}
-        expanded={<><FilterMultiSelect label="Prioridad" values={fPrioridades} onChange={setFPrioridades} placeholder="Todas" width="w-full" options={PRIORIDADES.map(p => ({ value: p.key, label: p.label }))} /><FilterDate label="Fecha" value={fFecha} onChange={setFFecha} title="Filtrar por actividad del trabajo en esa fecha" width="w-full" /></>}
+        expanded={<>
+          {isPhone && <FilterCustom label="Estado visible" width="w-full"><select aria-label="Estado visible de trabajos" value={phoneState} onChange={event => setPhoneState(event.target.value)} className="h-11 w-full rounded-md border border-input bg-background px-3 text-base">
+            {[{ key: "todos", label: "Todos" }, ...ESTADOS_TRABAJO].map(state => <option key={state.key} value={state.key}>{state.label} ({state.key === "todos" ? filtered.length : filtered.filter(t => estadoTrabajoDesdeJornadas(agendasByTrabajo.get(t.id) ?? [], t.estado_general) === state.key).length})</option>)}
+          </select></FilterCustom>}
+          <FilterMultiSelect label="Prioridad" values={fPrioridades} onChange={setFPrioridades} placeholder="Todas" width="w-full" options={PRIORIDADES.map(p => ({ value: p.key, label: p.label }))} /><FilterDate label="Fecha" value={fFecha} onChange={setFFecha} title="Filtrar por actividad del trabajo en esa fecha" width="w-full" />
+        </>}
       >
         <FilterMultiSelect
           label="Sucursal" values={fSucursales} onChange={setFSucursales} placeholder="Todas" width="w-[150px]"
           options={SUCURSALES.map(s => ({ value: s, label: s }))}
         />
-        <FilterMultiSelect
+        {!isPhone && <FilterMultiSelect
           label="Estado" values={fEstados} onChange={setFEstados} placeholder="Todos" width="w-[130px]"
           options={ESTADOS_TRABAJO.map(e => ({ value: e.key, label: e.label }))}
-        />
+        />}
       </FiltersBar>
-
-
-
-      <nav aria-label="Estado de los trabajos" className="grid grid-cols-3 gap-x-2 sm:hidden">
-        {[{ key: "todos", label: "Todos" }, ...ESTADOS_TRABAJO].map(state => <button key={state.key} type="button" aria-pressed={phoneState === state.key} onClick={() => setPhoneState(state.key)} className={cn("min-h-11 border-b-2 text-[12px]", phoneState === state.key ? "border-primary font-semibold" : "border-transparent text-muted-foreground")}>{state.label} <span className="tabular-nums">{state.key === "todos" ? filtered.length : filtered.filter(t => estadoTrabajoDesdeJornadas(agendasByTrabajo.get(t.id) ?? [], t.estado_general) === state.key).length}</span></button>)}
-      </nav>
 
       {loading ? (
         <KanbanSkeleton columns={ESTADOS_TRABAJO.length} />

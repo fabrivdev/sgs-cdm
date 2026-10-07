@@ -8,7 +8,17 @@ vi.mock("@/integrations/supabase/client",()=>({supabase:{rpc}}));
 vi.mock("@/hooks/useAuth",()=>({useAuth:()=>({can:()=>true})}));
 vi.mock("@/hooks/useServicioTecnicos",()=>({useServicioTecnicos:()=>({data:[]})}));
 vi.mock("@/components/filters/FiltersBar",()=>({
-  FiltersBar:({children,onClear,search}:{children:ReactNode;onClear:()=>void;search:{value:string;onChange:(s:string)=>void}})=><div><input aria-label="Buscar" value={search.value} onChange={e=>search.onChange(e.target.value)}/>{children}<button onClick={onClear}>Limpiar filtros</button></div>,
+  FiltersBar:({children,expanded,onClear,search}:{children:ReactNode;expanded?:ReactNode;onClear:()=>void;search:{value:string;onChange:(s:string)=>void}})=>{
+    return <div>
+      <input aria-label="Buscar" value={search.value} onChange={e=>search.onChange(e.target.value)}/>
+      {children}
+      {expanded&&<><button type="button" aria-label="Más filtros" aria-expanded="false" onClick={event=>{
+        event.currentTarget.setAttribute('aria-expanded','true');
+        (event.currentTarget.nextElementSibling as HTMLElement).hidden=false;
+      }}>Más filtros</button><div role="dialog" aria-label="Filtros adicionales" hidden>{expanded}</div></>}
+      <button onClick={onClear}>Limpiar filtros</button>
+    </div>;
+  },
   FilterCustom:({children}:{children:ReactNode})=><div>{children}</div>,
   FilterDate:({label,value,onChange}:{label:string;value:string;onChange:(s:string)=>void})=><input aria-label={label} value={value} onChange={e=>onChange(e.target.value)} />,
   FilterSelect:({label,value,onChange,options}:{label:string;value:string;onChange:(s:string)=>void;options:{value:string;label:string}[]})=><select aria-label={label} value={value} onChange={e=>onChange(e.target.value)}>{options.map(o=><option key={o.value} value={o.value}>{o.label}</option>)}</select>,
@@ -21,8 +31,17 @@ function setup() {
     if(name.startsWith('ventas_servicios_indicadores')) return {data:{totales:{...amounts,ordenes:1,documentos:1,horas:4},por_tipo:[],por_marca_tipo:[],por_maquina:[]},error:null};
     return {data:[],error:null};
   });
-  return render(<Ventas area="servicios" />);
+  const view=render(<Ventas area="servicios" />);
+  openFilters();
+  return view;
 }
+const openFilters=()=>{
+  const trigger=screen.getByRole('button',{name:'Más filtros'});
+  expect(trigger).toHaveAttribute('aria-expanded','false');
+  fireEvent.click(trigger);
+  expect(trigger).toHaveAttribute('aria-expanded','true');
+  expect(screen.getByRole('dialog',{name:'Filtros adicionales'})).toBeVisible();
+};
 afterEach(()=>{cleanup();rpc.mockReset();});
 describe('Ventas Servicios global filter routing',()=>{
   it('clears pending text without restoring it after debounce',async()=>{

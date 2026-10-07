@@ -22,7 +22,7 @@ export function PlannerMobileAgenda<T extends AgendaRow>({ rows, columns, sort, 
   columns: readonly SalesColumn<T>[];
   sort: SalesSort;
   onSort: (key: string) => void;
-  navigation: ReactNode;
+  navigation?: ReactNode;
   status?: ReactNode;
   client: (row: T) => string;
   reference: (row: T) => string;
@@ -31,8 +31,8 @@ export function PlannerMobileAgenda<T extends AgendaRow>({ rows, columns, sort, 
   rowClassName?: (row: T) => string;
 }) {
   return <section aria-label="Agenda del Planificador" className="min-w-0">
-    <div className="flex min-w-0 items-center border-b">
-      <div className="min-w-0 flex-1">{navigation}</div>
+    <div className="flex min-w-0 items-center justify-end border-b">
+      {navigation && <div className="min-w-0 flex-1">{navigation}</div>}
       <CompactListOrderMenu label="jornadas" columns={columns} sort={sort} onSort={onSort} />
     </div>
     {status ? <div className="py-8 text-center text-[13px] text-muted-foreground">{status}</div> :
