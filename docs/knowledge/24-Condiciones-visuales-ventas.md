@@ -181,3 +181,7 @@ Validaci�n local: componentes cubren contenido �til frente a fragmentos vac�
 `Ventas.tsx` asigna cada carga de Máquinas a su solicitud vigente. Una respuesta anterior, incluidos errores o rechazos, no reemplaza indicadores, períodos, error ni estado de carga después de cambiar filtros, limpiar, reintentar o salir de la vista. Los argumentos y la RPC permanecen iguales; no se modifica ninguna regla financiera ni permiso.
 
 Regresiones locales con componentes reales: `FiltersBar.search.test.tsx` y `VentasAsync.test.tsx`, incluyendo demoras controladas, orden inverso de respuestas, limpieza repetida, desmontaje y StrictMode. La prueba visual local en el navegador cloud quedó bloqueada al abrir localhost (`ERR_BLOCKED_BY_CLIENT`); no se publicó el fixture ni se consultó producción. Esta nota no acredita despliegue, ejecución de SQL ni sincronización de Obsidian; el clon no contiene el índice, mapa ni configuración local de sincronización.
+
+## Alias confirmado de vendedor en Máquinas - 08/10/2026
+
+Fabrizio confirmó que el vendedor informado exactamente como `CARLOS` en Ventas de Máquinas corresponde a `CARLOS BENITEZ`. La vista aplica este alias solo en ese módulo y antes de agrupar, por lo que venta y nota de crédito conservan sus líneas, signos e importes mientras el resumen calcula unidades netas, clientes y facturas sobre el conjunto unificado. No es una regla global de personas: otros nombres que contienen Carlos permanecen separados. No modifica datos, usuarios, clientes ni fuentes financieras y no requiere SQL.

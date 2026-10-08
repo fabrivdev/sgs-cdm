@@ -103,6 +103,30 @@ describe("Ventas de Máquinas", () => {
     expect(screen.getByText("CARLOS BENITEZ")).toBeInTheDocument();
   });
 
+  it("agrupa el alias confirmado Carlos sin sumar clientes o facturas duplicados", () => {
+    const aliasData: MaquinasDashboardResponse = {
+      ...data,
+      resumen: { ...data.resumen, total: 50, facturas: 3, clientes: 2, vendidas: 2, notas_credito: 1, netas: 1 },
+      lineas: [
+        { ...data.lineas[0], factura: "V-1", cliente_facturado: "Cliente A", comercial: "CARLOS BENITEZ", facturado: 100, unidades: 1 },
+        { ...data.lineas[1], factura: "NC-1", cliente_facturado: "Cliente A", comercial: "CARLOS", facturado: -100, unidades: -1 },
+        { ...data.lineas[0], id: "3", factura: "V-2", cliente_facturado: "Cliente B", comercial: "CARLOS ACOSTA", facturado: 50, unidades: 1 },
+      ],
+    };
+    render(<MaquinasExplorer data={aliasData} loading={false} error={null} desde="2026-08-01" hasta="2026-08-31" />);
+    fireEvent.click(screen.getByRole("button", { name: "Vendedores" }));
+
+    const benitez = screen.getByText("CARLOS BENITEZ").closest(".grid")!;
+    expect(Array.from(benitez.children).map(cell => cell.textContent)).toEqual([
+      "CARLOS BENITEZ", "1", "1", "0", "1", "2", "$ 0", "0%",
+    ]);
+    const acosta = screen.getByText("CARLOS ACOSTA").closest(".grid")!;
+    expect(Array.from(acosta.children).map(cell => cell.textContent)).toEqual([
+      "CARLOS ACOSTA", "1", "0", "1", "1", "1", "$ 50", "100%",
+    ]);
+    expect(screen.queryByText("CARLOS")).not.toBeInTheDocument();
+  });
+
   it("agrupa por marca y tipo y permite ver el modelo", () => {
     setup();
     fireEvent.click(screen.getByRole("button", { name: "Máquinas" }));

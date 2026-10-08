@@ -13,7 +13,7 @@ import { MarcaBadge } from "@/components/StatusBadges";
 
 import { cn } from "@/lib/utils";
 import { canonicalClientName } from "@/lib/clientIdentity";
-import { shortPersonName } from "@/lib/personName";
+import { machineSalesSellerName } from "@/lib/machineSalesSellerName";
 import { RowCount, TableScroll, scrollHead, salesHeader } from "./TableScroll";
 import { salesColumnClass } from "./salesTableFormat";
 import { useSectionTable } from "@/components/exports/useSectionTable";
@@ -86,7 +86,7 @@ const brandLabel = (value: string | null | undefined) => {
 };
 
 const sellerLabel = (value: string | null | undefined) => {
-  return shortPersonName(value).toLocaleUpperCase("es-PY") || "Sin vendedor";
+  return machineSalesSellerName(value).toLocaleUpperCase("es-PY") || "Sin vendedor";
 };
 
 function summarize(lines: MaquinaVentaLinea[]): MaquinasResumen {
