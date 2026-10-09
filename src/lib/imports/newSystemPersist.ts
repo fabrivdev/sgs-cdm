@@ -21,18 +21,42 @@ import {
 } from "@/lib/imports";
 import { validateBillingSourceBatch } from "@/lib/imports/billingLineStableReimport";
 import { persistedBillingTimeType } from "@/lib/imports/billingTimeType";
+import {
+  emitImportProgress,
+  type ImportProgressCallback,
+} from "@/lib/imports/importProgress";
 
 export { persistedBillingTimeType } from "@/lib/imports/billingTimeType";
+
+const RECONCILE_SERVICE_ORDERS_BY_ABSENCE = false;
 
 export interface PersistNewSystemBundleArgs {
   bundle: NewSystemImportBundle;
   userId: string;
   mode?: "validate" | "persist";
+  onProgress?: ImportProgressCallback;
+  skipServiceOrders?: boolean;
   fileNames: {
     facturacion: string | null;
     ordenesServicio: string | null;
     productos: string | null;
   };
+}
+
+export interface PersistNewSystemServiceOrdersArgs {
+  bundle: NewSystemImportBundle;
+  userId: string;
+  onProgress?: ImportProgressCallback;
+  fileNames: PersistNewSystemBundleArgs["fileNames"];
+}
+
+export class ServiceOrderImportFailure extends Error {
+  readonly confirmedServiceOrders: number;
+
+  constructor(message: string, confirmedServiceOrders: number) {
+    super(message);
+    this.confirmedServiceOrders = confirmedServiceOrders;
+  }
 }
 
 export interface PersistNewSystemBundleResult {
@@ -98,6 +122,38 @@ export function prepareBillingPersistenceRows(bundle: NewSystemImportBundle) {
   });
 }
 
+export function prepareServiceOrderPersistenceRows(bundle: NewSystemImportBundle) {
+  const invoiceDateByServiceOrder = new Map<string, string>();
+  const billingRowById = new Map(bundle.facturacion.rows.map((row) => [row.rowId, row]));
+  for (const crosswalk of bundle.billingCrosswalk) {
+    if (!crosswalk.serviceOrderNumber) continue;
+    const billingRow = billingRowById.get(crosswalk.billingRowId);
+    const billingDate = billingRow?.emissionDate ?? billingRow?.dueDate ?? null;
+    if (!billingDate) continue;
+    const current = invoiceDateByServiceOrder.get(crosswalk.serviceOrderNumber);
+    if (!current || billingDate > current) {
+      invoiceDateByServiceOrder.set(crosswalk.serviceOrderNumber, billingDate);
+    }
+  }
+
+  return aggregateNewSystemServiceOrders(bundle.ordenesServicioPayload).map((row) => ({
+    ...row,
+    fecha_emision_factura: row.fecha_emision_factura
+      ?? invoiceDateByServiceOrder.get(row.os_numero)
+      ?? null,
+  }));
+}
+
+export function missingPersistedServiceOrderNumbers(
+  expected: string[],
+  persisted: Array<{ os_numero?: unknown }> | null | undefined,
+) {
+  const found = new Set(
+    (persisted ?? []).map((row) => String(row.os_numero ?? "").trim()).filter(Boolean),
+  );
+  return expected.filter((osNumero) => !found.has(osNumero));
+}
+
 const missingPartsHistoryRefresh = (error: any) =>
   error?.code === "PGRST202"
   || error?.code === "42883"
@@ -118,6 +174,104 @@ const postBillingStageError = (stage: string, error: unknown) => {
   );
 };
 
+export async function persistNewSystemServiceOrders({
+  bundle,
+  userId,
+  onProgress,
+  fileNames,
+}: PersistNewSystemServiceOrdersArgs) {
+  const payload = prepareServiceOrderPersistenceRows(bundle);
+  const { data: osImport, error: importError } = await supabase
+    .from("importaciones")
+    .insert({
+      ...bundle.importaciones.ordenesServicio,
+      insertados: 0,
+      duplicados: 0,
+      usuario_id: userId,
+      metadata: {
+        ...(bundle.importaciones.ordenesServicio.metadata as Record<string, unknown>),
+        archivos_relacionados: fileNames,
+      } as any,
+    } as any)
+    .select("id")
+    .single();
+  if (importError) throw new ServiceOrderImportFailure(String(importError.message ?? importError), 0);
+
+  let confirmed = 0;
+  let batch = 0;
+  for (let i = 0; i < payload.length; i += 500) {
+    const chunk = payload.slice(i, i + 500).map((row) => ({
+      ...row,
+      actualizado_en: new Date().toISOString(),
+    }));
+    batch += 1;
+    emitImportProgress(onProgress, {
+      phase: "service-orders.persist",
+      sourceFile: fileNames.ordenesServicio ?? undefined,
+      status: "started",
+      completed: confirmed,
+      total: payload.length,
+      batch,
+    });
+    const { error } = await (supabase.from("ordenes_servicio_importadas" as any).upsert(chunk as any, {
+      onConflict: "os_numero",
+    }) as any);
+    if (error) {
+      emitImportProgress(onProgress, {
+        phase: "service-orders.persist",
+        sourceFile: fileNames.ordenesServicio ?? undefined,
+        status: "failed",
+        completed: confirmed,
+        total: payload.length,
+        batch,
+        error: String(error.message ?? error),
+      });
+      const detail = isMissingOsImportTableError(error)
+        ? "Falta aplicar la migracion de ordenes de servicio."
+        : String(error.message ?? error);
+      throw new ServiceOrderImportFailure(detail, confirmed);
+    }
+
+    const expectedNumbers = chunk.map((row) => row.os_numero);
+    const { data: verifiedRows, error: verificationError } = await (supabase
+      .from("ordenes_servicio_importadas" as any)
+      .select("os_numero")
+      .in("os_numero", expectedNumbers) as any);
+    if (verificationError) {
+      throw new ServiceOrderImportFailure(String(verificationError.message ?? verificationError), confirmed);
+    }
+    const missingNumbers = missingPersistedServiceOrderNumbers(expectedNumbers, verifiedRows);
+    if (missingNumbers.length) {
+      throw new ServiceOrderImportFailure(
+        `La base no devolvio ${missingNumbers.length} OS despues del upsert: ${missingNumbers.join(", ")}.`,
+        confirmed,
+      );
+    }
+    confirmed += chunk.length;
+    emitImportProgress(onProgress, {
+      phase: "service-orders.persist",
+      sourceFile: fileNames.ordenesServicio ?? undefined,
+      status: "succeeded",
+      completed: confirmed,
+      total: payload.length,
+      batch,
+    });
+  }
+
+  await persistCommissionTimeEntries({
+    rows: bundle.ordenesServicio.rows,
+    importId: osImport.id,
+    strict: false,
+  });
+  const { error: closeError } = await supabase
+    .from("importaciones")
+    .update({ insertados: confirmed, duplicados: 0 } as any)
+    .eq("id", osImport.id);
+  if (closeError) throw new ServiceOrderImportFailure(String(closeError.message ?? closeError), confirmed);
+
+  return { ordenesServicio: confirmed, ordenesServicioOmitidas: 0 };
+}
+
 export async function actualizarVentasRepuestosPeriodo(desde: string | null, hasta: string | null) {
   if (!desde || !hasta) return { actualizado: false, error: null as string | null };
 
@@ -137,10 +291,11 @@ export async function persistNewSystemBundle({
   bundle,
   userId,
   mode = "persist",
+  skipServiceOrders = false,
   fileNames,
 }: PersistNewSystemBundleArgs): Promise<PersistNewSystemBundleResult> {
   const osWindow = bundle.diagnostics.replacement.ordenesServicio;
-  if (osWindow.shouldReplace) {
+  if (RECONCILE_SERVICE_ORDERS_BY_ABSENCE && osWindow.shouldReplace) {
     // La reconciliacion debe existir antes de cualquier escritura. Sin este
     // preflight, publicar el frontend antes de aplicar la migracion podria
     // dejar una importacion parcial tras reemplazar la facturacion.
@@ -246,22 +401,7 @@ export async function persistNewSystemBundle({
   const facturacionValidada = validateBillingSourceBatch(facturacionLineasSinValidar);
   const facturacionLineas = facturacionValidada.rows;
 
-  const osInvoiceDateByNumber = new Map<string, string>();
-  for (const crosswalk of bundle.billingCrosswalk) {
-    if (!crosswalk.serviceOrderNumber) continue;
-    const billingRow = bundle.facturacion.rows.find((row) => row.rowId === crosswalk.billingRowId);
-    const billingDate = billingRow?.emissionDate ?? billingRow?.dueDate ?? null;
-    if (!billingDate) continue;
-    const current = osInvoiceDateByNumber.get(crosswalk.serviceOrderNumber);
-    if (!current || billingDate > current) {
-      osInvoiceDateByNumber.set(crosswalk.serviceOrderNumber, billingDate);
-    }
-  }
-
-  const ordenesServicioPayload = aggregateNewSystemServiceOrders(bundle.ordenesServicioPayload).map((row) => ({
-    ...row,
-    fecha_emision_factura: row.fecha_emision_factura ?? osInvoiceDateByNumber.get(row.os_numero) ?? null,
-  }));
+  const ordenesServicioPayload = prepareServiceOrderPersistenceRows(bundle);
 
   const billingWindow = bundle.diagnostics.replacement.facturacion;
   const billingDates = facturacionLineas.map((row) => row.fecha_factura).filter((value): value is string => Boolean(value));
@@ -304,6 +444,22 @@ export async function persistNewSystemBundle({
       facturacionExcluidas,
       ordenesServicioOmitidas: 0,
       ordenesServicio: ordenesServicioPayload.length,
+      ordenesServicioArchivadas: 0,
+      ordenesServicioBloqueadas: 0,
+      jornadasDesactivadas: 0,
+      facturacionDesde,
+      facturacionHasta,
+      historialRepuestosActualizado: false,
+      historialRepuestosError: null,
+    };
+  }
+
+  if (skipServiceOrders) {
+    return {
+      facturacionLineas: facturacionAceptadas,
+      facturacionExcluidas,
+      ordenesServicioOmitidas: 0,
+      ordenesServicio: 0,
       ordenesServicioArchivadas: 0,
       ordenesServicioBloqueadas: 0,
       jornadasDesactivadas: 0,
@@ -369,7 +525,7 @@ export async function persistNewSystemBundle({
   let ordenesServicioArchivadas = 0;
   let ordenesServicioBloqueadas = 0;
   let jornadasDesactivadas = 0;
-  if (osWindow.shouldReplace && osWindow.from && osWindow.to) {
+  if (RECONCILE_SERVICE_ORDERS_BY_ABSENCE && osWindow.shouldReplace && osWindow.from && osWindow.to) {
     const { data, error } = await (supabase.rpc as any)("ordenes_servicio_reconciliar_snapshot", {
       p_importacion_id: osImp.id,
       p_desde: osWindow.from,

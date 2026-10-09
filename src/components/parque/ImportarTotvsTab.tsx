@@ -6,6 +6,7 @@ import { cargarTodo } from "@/hooks/useCatalogos";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
+import { Progress } from "@/components/ui/progress";
 import {
   Select,
   SelectContent,
@@ -59,6 +60,8 @@ import {
   mergeBranchTransferRows,
   reconcileMachineStockChassis,
   persistNewSystemBundle,
+  persistNewSystemServiceOrders,
+  ServiceOrderImportFailure,
   actualizarVentasRepuestosPeriodo,
   type CanonicalClienteRow,
   type CanonicalImportDispatchRow,
@@ -89,6 +92,7 @@ import {
   type ReceivablesPreflight,
   type ReceivablesPersistResult,
   type ReceivablesRpcClient,
+  type ImportProgressEvent,
   syntheticValueDiffersFromBalance,
   TOTVS_FILE_KIND_LABELS,
   detectTotvsFileKind,
@@ -231,6 +235,7 @@ export function ImportarTotvsTab({ onChanged }: { onChanged: () => void }) {
   const [detected, setDetected] = useState<DetectedFile[]>([]);
   const [preview, setPreview] = useState<Preview | null>(null);
   const [busy, setBusy] = useState(false);
+  const [importProgress, setImportProgress] = useState<ImportProgressEvent | null>(null);
   const [dragOver, setDragOver] = useState(false);
   const folderInputRef = useRef<HTMLInputElement>(null);
   const filesInputRef = useRef<HTMLInputElement>(null);
@@ -559,14 +564,14 @@ export function ImportarTotvsTab({ onChanged }: { onChanged: () => void }) {
   const confirmar = async () => {
     if (!preview || !user) return;
 
+    let confirmedServiceOrders = 0;
     setBusy(true);
+    setImportProgress(null);
     try {
       let facturacionLineas = 0;
       let facturacionExcluidas = 0;
-      let ordenesServicioOmitidas = 0;
       let ordenesServicio = 0;
       let ordenesServicioArchivadas = 0;
-      let ordenesServicioBloqueadas = 0;
       let facturacionDesde: string | null = null;
       let facturacionHasta: string | null = null;
       let historialRepuestosError: string | null = null;
@@ -626,6 +631,21 @@ export function ImportarTotvsTab({ onChanged }: { onChanged: () => void }) {
         })
         : null;
 
+      if (newSystemBundle && preview.bundleFiles) {
+        const osResult = await persistNewSystemServiceOrders({
+          bundle: newSystemBundle,
+          userId: user.id,
+          onProgress: setImportProgress,
+          fileNames: {
+            facturacion: preview.bundleFiles.facturacion.fileName,
+            ordenesServicio: preview.bundleFiles.ordenesServicio.fileName,
+            productos: preview.bundleFiles.productos.fileName,
+          },
+        });
+        confirmedServiceOrders = osResult.ordenesServicio;
+        ordenesServicio = osResult.ordenesServicio;
+      }
+
       // El mismo RPC que persiste el lote se ejecuta en una subtransaccion
       // descartada antes de tocar clientes. Esto evita escrituras del maestro
       // ante errores deterministas del paquete, sin prometer atomicidad global
@@ -675,6 +695,7 @@ export function ImportarTotvsTab({ onChanged }: { onChanged: () => void }) {
         const resultado = await persistNewSystemBundle({
           bundle: newSystemBundle,
           userId: user.id,
+          skipServiceOrders: true,
           fileNames: {
             facturacion: preview.bundleFiles.facturacion.fileName,
             ordenesServicio: preview.bundleFiles.ordenesServicio.fileName,
@@ -683,10 +704,8 @@ export function ImportarTotvsTab({ onChanged }: { onChanged: () => void }) {
         });
         facturacionLineas = resultado.facturacionLineas;
         facturacionExcluidas = resultado.facturacionExcluidas;
-        ordenesServicioOmitidas = resultado.ordenesServicioOmitidas;
-        ordenesServicio = resultado.ordenesServicio;
+        ordenesServicio += resultado.ordenesServicio;
         ordenesServicioArchivadas = resultado.ordenesServicioArchivadas;
-        ordenesServicioBloqueadas = resultado.ordenesServicioBloqueadas;
         facturacionDesde = resultado.facturacionDesde;
         facturacionHasta = resultado.facturacionHasta;
         historialRepuestosError = resultado.historialRepuestosError;
@@ -1046,7 +1065,7 @@ export function ImportarTotvsTab({ onChanged }: { onChanged: () => void }) {
           ? `${receivablesResultados.reduce((sum, item) => sum + item.preflight.documentRows, 0)} cuotas de cuentas por cobrar (${receivablesResultados.reduce((sum, item) => sum + item.insertadas, 0)} nuevas, ${receivablesResultados.reduce((sum, item) => sum + item.sinCambios, 0)} sin cambios)`
           : null,
         preview.bundleFiles
-          ? `${facturacionLineas} líneas de facturación y ${ordenesServicio} OS vigentes${
+          ? `${facturacionLineas} líneas de facturación y ${ordenesServicio} OS importadas${
               ordenesServicioArchivadas ? `; ${ordenesServicioArchivadas} OS ausentes archivadas` : ""
             }`
           : null,
@@ -1065,14 +1084,13 @@ export function ImportarTotvsTab({ onChanged }: { onChanged: () => void }) {
         supplierRows.length ? `${supplierRows.length} proveedores (${suppliersInsertados} nuevos, ${suppliersActualizados} actualizados, ${suppliersSinCambios} sin cambios)` : null,
         branchTransferRows.length ? `${branchTransferRows.length} transferencias en tránsito (${branchTransfersInsertadas} nuevas, ${branchTransfersActualizadas} actualizadas, ${branchTransfersSinCambios} sin cambios)` : null,
       ].filter(Boolean);
-      toast.success(`Importado: ${partes.join(", ")}.`);
-      if (facturacionExcluidas || ordenesServicioOmitidas) {
-        toast.info(`${facturacionExcluidas} líneas excluidas por anulación confirmada; ${ordenesServicioOmitidas} OS omitidas por las reglas vigentes.`);
-      }
-      if (ordenesServicioBloqueadas) {
-        toast.warning(
-          `${ordenesServicioBloqueadas} OS ausentes conservaron su estado porque tienen factura, trabajo o comisión liquidada.`,
-        );
+      toast.success(
+        `Importacion completada: ${ordenesServicio} OS importadas, ${facturacionLineas} lineas de facturacion${
+          partes.length > 1 ? ` y ${partes.length - 1} grupos adicionales` : ""
+        }.`,
+      );
+      if (facturacionExcluidas) {
+        toast.info(`${facturacionExcluidas} lineas de facturacion excluidas por anulacion confirmada.`);
       }
       if (historialRepuestosError) toast.warning(historialRepuestosError);
 
@@ -1082,9 +1100,17 @@ export function ImportarTotvsTab({ onChanged }: { onChanged: () => void }) {
       await queryClient.invalidateQueries({ queryKey: ["repuestos", "sugerencia-viva"] });
       onChanged();
     } catch (e) {
-      toast.error("Error importando: " + (e as Error).message);
+      const confirmed = e instanceof ServiceOrderImportFailure
+        ? e.confirmedServiceOrders
+        : confirmedServiceOrders;
+      toast.error(
+        confirmed
+          ? `${confirmed} OS importadas; fallo otra etapa: ${(e as Error).message}`
+          : "Error importando: " + (e as Error).message,
+      );
     } finally {
       setBusy(false);
+      setImportProgress(null);
     }
   };
 
@@ -1094,13 +1120,28 @@ export function ImportarTotvsTab({ onChanged }: { onChanged: () => void }) {
         <div>
           <div className="text-[13px] font-semibold">Importar datos de TOTVS</div>
           <p className="mt-0.5 text-[12px] text-muted-foreground">
-            Elegí la carpeta completa de exports (o los archivos sueltos) — se detecta automáticamente cada tipo de
-            reporte por el nombre del archivo: órdenes de servicio, facturación, productos, stock de repuestos y de máquinas, el reporte
-            general de maquinarias como respaldo de chasis, pedidos y solicitudes de compra, pedidos de venta,
-            importaciones-despacho, clientes, proveedores, facturas de compra, transferencias entre sucursales en tránsito,
-            Kardex analítico, Kardex sintético valorizado, Libro Mayor y cuentas por cobrar a la fecha. Los archivos de respaldo con sufijo _original se ignoran.
+            Elegí una carpeta de exports o archivos XML sueltos. El tipo de reporte se detecta por el nombre.
           </p>
         </div>
+
+        {busy && importProgress && (
+          <div className="space-y-1.5 rounded-md border p-3" aria-live="polite">
+            <div className="flex justify-between gap-3 text-[11px] text-muted-foreground">
+              <span>{importProgress.sourceFile ?? "Importacion TOTVS"}</span>
+              <span>
+                {importProgress.total == null
+                  ? "Procesando..."
+                  : `${Math.min(importProgress.completed, importProgress.total).toLocaleString("es-PY")} / ${importProgress.total.toLocaleString("es-PY")}`}
+              </span>
+            </div>
+            <Progress
+              value={importProgress.total
+                ? Math.min((importProgress.completed / importProgress.total) * 100, 100)
+                : 8}
+              className="h-2"
+            />
+          </div>
+        )}
 
         <div
           className={cn(

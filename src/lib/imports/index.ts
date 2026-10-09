@@ -5,6 +5,7 @@ export * from "@/lib/imports/cutoff";
 export * from "@/lib/imports/fiscal";
 export * from "@/lib/imports/kardex";
 export * from "@/lib/imports/importDispatch";
+export * from "@/lib/imports/importProgress";
 export * from "@/lib/imports/salesOrders";
 export * from "@/lib/imports/syntheticKardex";
 export * from "@/lib/imports/purchaseInvoices";
