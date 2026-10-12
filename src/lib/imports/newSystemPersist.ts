@@ -50,6 +50,20 @@ export interface PersistNewSystemServiceOrdersArgs {
   fileNames: PersistNewSystemBundleArgs["fileNames"];
 }
 
+type ServiceOrderBatchRpcClient = {
+  rpc: (
+    name: "totvs_importar_ordenes_servicio_lote_v1",
+    params: {
+      p_importacion_id: string;
+      p_lote_numero: number;
+      p_filas: Record<string, unknown>[];
+    },
+  ) => Promise<{
+    data: { persistidas?: unknown[]; excluidas?: unknown[]; total?: number } | null;
+    error: { code?: string; message?: string } | null;
+  }>;
+};
+
 export class ServiceOrderImportFailure extends Error {
   readonly confirmedServiceOrders: number;
 
@@ -144,6 +158,15 @@ export function prepareServiceOrderPersistenceRows(bundle: NewSystemImportBundle
   }));
 }
 
+export function filterRowsForConfirmedServiceOrderExclusions<
+  T extends { serviceOrderNumber: string },
+>(rows: T[], exclusions: Iterable<string>) {
+  const excluded = new Set(
+    Array.from(exclusions, (value) => String(value).trim().toUpperCase()).filter(Boolean),
+  );
+  return rows.filter((row) => !excluded.has(row.serviceOrderNumber.trim().toUpperCase()));
+}
+
 export function missingPersistedServiceOrderNumbers(
   expected: string[],
   persisted: Array<{ os_numero?: unknown }> | null | undefined,
@@ -158,6 +181,11 @@ const missingPartsHistoryRefresh = (error: any) =>
   error?.code === "PGRST202"
   || error?.code === "42883"
   || String(error?.message ?? "").includes("repuestos_actualizar_ventas_periodo");
+
+const missingServiceOrderBatchRpc = (error: { code?: string; message?: string } | null) =>
+  error?.code === "PGRST202"
+  || error?.code === "42883"
+  || String(error?.message ?? "").includes("totvs_importar_ordenes_servicio_lote_v1");
 
 const missingServiceOrderReconciliation = (error: any) =>
   error?.code === "PGRST202"
@@ -181,6 +209,10 @@ export async function persistNewSystemServiceOrders({
   fileNames,
 }: PersistNewSystemServiceOrdersArgs) {
   const payload = prepareServiceOrderPersistenceRows(bundle);
+  const importMetadata = {
+    ...(bundle.importaciones.ordenesServicio.metadata as Record<string, unknown>),
+    archivos_relacionados: fileNames,
+  };
   const { data: osImport, error: importError } = await supabase
     .from("importaciones")
     .insert({
@@ -188,16 +220,15 @@ export async function persistNewSystemServiceOrders({
       insertados: 0,
       duplicados: 0,
       usuario_id: userId,
-      metadata: {
-        ...(bundle.importaciones.ordenesServicio.metadata as Record<string, unknown>),
-        archivos_relacionados: fileNames,
-      } as any,
+      metadata: importMetadata as any,
     } as any)
     .select("id")
     .single();
   if (importError) throw new ServiceOrderImportFailure(String(importError.message ?? importError), 0);
 
   let confirmed = 0;
+  let excluded = 0;
+  const excludedServiceOrderNumbers = new Set<string>();
   let batch = 0;
   for (let i = 0; i < payload.length; i += 500) {
     const chunk = payload.slice(i, i + 500).map((row) => ({
@@ -209,67 +240,96 @@ export async function persistNewSystemServiceOrders({
       phase: "service-orders.persist",
       sourceFile: fileNames.ordenesServicio ?? undefined,
       status: "started",
-      completed: confirmed,
+      completed: confirmed + excluded,
       total: payload.length,
       batch,
     });
-    const { error } = await (supabase.from("ordenes_servicio_importadas" as any).upsert(chunk as any, {
-      onConflict: "os_numero",
-    }) as any);
+    const expectedNumbers = chunk.map((row) => row.os_numero.trim().toUpperCase());
+    const { data, error } = await (supabase as unknown as ServiceOrderBatchRpcClient).rpc("totvs_importar_ordenes_servicio_lote_v1", {
+      p_importacion_id: osImport.id,
+      p_lote_numero: batch,
+      p_filas: chunk,
+    });
     if (error) {
       emitImportProgress(onProgress, {
         phase: "service-orders.persist",
         sourceFile: fileNames.ordenesServicio ?? undefined,
         status: "failed",
-        completed: confirmed,
+        completed: confirmed + excluded,
         total: payload.length,
         batch,
         error: String(error.message ?? error),
       });
-      const detail = isMissingOsImportTableError(error)
-        ? "Falta aplicar la migracion de ordenes de servicio."
+      const detail = isMissingOsImportTableError(error) || missingServiceOrderBatchRpc(error)
+        ? "Falta aplicar la migración del importador transaccional de órdenes de servicio."
         : String(error.message ?? error);
       throw new ServiceOrderImportFailure(detail, confirmed);
     }
-
-    const expectedNumbers = chunk.map((row) => row.os_numero);
-    const { data: verifiedRows, error: verificationError } = await (supabase
-      .from("ordenes_servicio_importadas" as any)
-      .select("os_numero")
-      .in("os_numero", expectedNumbers) as any);
-    if (verificationError) {
-      throw new ServiceOrderImportFailure(String(verificationError.message ?? verificationError), confirmed);
+    const persistedNumbers = Array.isArray(data?.persistidas)
+      ? data.persistidas.map((value) => String(value).trim().toUpperCase())
+      : [];
+    const excludedNumbers = Array.isArray(data?.excluidas)
+      ? data.excluidas.map((value) => String(value).trim().toUpperCase())
+      : [];
+    const persistedSet = new Set(persistedNumbers);
+    const excludedSet = new Set(excludedNumbers);
+    const returnedNumbers = new Set([...persistedNumbers, ...excludedNumbers]);
+    const missingNumbers = expectedNumbers.filter((osNumero) => !returnedNumbers.has(osNumero));
+    const unexpectedNumbers = [...returnedNumbers].filter((osNumero) => !expectedNumbers.includes(osNumero));
+    const overlappingNumbers = [...persistedSet].filter((osNumero) => excludedSet.has(osNumero));
+    const contractFailures = [
+      Number(data?.total) !== expectedNumbers.length ? `total ${String(data?.total)} de ${expectedNumbers.length}` : null,
+      persistedSet.size !== persistedNumbers.length ? "persistidas duplicadas" : null,
+      excludedSet.size !== excludedNumbers.length ? "excluidas duplicadas" : null,
+      overlappingNumbers.length ? `en ambos estados: ${overlappingNumbers.join(", ")}` : null,
+      missingNumbers.length ? `faltan: ${missingNumbers.join(", ")}` : null,
+      unexpectedNumbers.length ? `sobran: ${unexpectedNumbers.join(", ")}` : null,
+    ].filter(Boolean);
+    const verificationFailure = contractFailures.length
+      ? `La respuesta transaccional de OS no coincide con el lote (${contractFailures.join("; ")}).`
+      : null;
+    if (verificationFailure) {
+      emitImportProgress(onProgress, {
+        phase: "service-orders.persist",
+        sourceFile: fileNames.ordenesServicio ?? undefined,
+        status: "failed",
+        completed: confirmed + excluded,
+        total: payload.length,
+        batch,
+        error: verificationFailure,
+      });
+      throw new ServiceOrderImportFailure(verificationFailure, confirmed);
     }
-    const missingNumbers = missingPersistedServiceOrderNumbers(expectedNumbers, verifiedRows);
-    if (missingNumbers.length) {
-      throw new ServiceOrderImportFailure(
-        `La base no devolvio ${missingNumbers.length} OS despues del upsert: ${missingNumbers.join(", ")}.`,
-        confirmed,
-      );
-    }
-    confirmed += chunk.length;
+    confirmed += persistedNumbers.length;
+    excluded += excludedNumbers.length;
+    for (const osNumero of excludedNumbers) excludedServiceOrderNumbers.add(osNumero);
     emitImportProgress(onProgress, {
       phase: "service-orders.persist",
       sourceFile: fileNames.ordenesServicio ?? undefined,
       status: "succeeded",
-      completed: confirmed,
+      completed: confirmed + excluded,
       total: payload.length,
       batch,
     });
   }
 
   await persistCommissionTimeEntries({
-    rows: bundle.ordenesServicio.rows,
+    rows: filterRowsForConfirmedServiceOrderExclusions(
+      bundle.ordenesServicio.rows,
+      excludedServiceOrderNumbers,
+    ),
     importId: osImport.id,
     strict: false,
   });
   const { error: closeError } = await supabase
     .from("importaciones")
-    .update({ insertados: confirmed, duplicados: 0 } as any)
+    .update({
+      duplicados: 0,
+    } as any)
     .eq("id", osImport.id);
   if (closeError) throw new ServiceOrderImportFailure(String(closeError.message ?? closeError), confirmed);
 
-  return { ordenesServicio: confirmed, ordenesServicioOmitidas: 0 };
+  return { ordenesServicio: confirmed, ordenesServicioOmitidas: excluded };
 }
 
 export async function actualizarVentasRepuestosPeriodo(desde: string | null, hasta: string | null) {
@@ -294,6 +354,11 @@ export async function persistNewSystemBundle({
   skipServiceOrders = false,
   fileNames,
 }: PersistNewSystemBundleArgs): Promise<PersistNewSystemBundleResult> {
+  if (mode === "persist" && !skipServiceOrders) {
+    throw new Error(
+      "La persistencia directa de OS esta deshabilitada. Usa el importador TOTVS principal para respetar exclusiones y auditoria.",
+    );
+  }
   const osWindow = bundle.diagnostics.replacement.ordenesServicio;
   if (RECONCILE_SERVICE_ORDERS_BY_ABSENCE && osWindow.shouldReplace) {
     // La reconciliacion debe existir antes de cualquier escritura. Sin este

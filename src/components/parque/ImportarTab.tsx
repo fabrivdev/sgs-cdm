@@ -564,6 +564,11 @@ export function ImportarTab({ onChanged }: { onChanged: () => void }) {
   const confirmarOrdenesServicio = async () => {
     if (!osRows || !user) return;
 
+    toast.error(
+      "Este importador anterior de OS esta deshabilitado. Usa Importar datos de TOTVS para respetar exclusiones y auditoria.",
+    );
+    return;
+
     setBusy(true);
     try {
       const payload = osRows.map((r) => ({
@@ -675,6 +680,11 @@ export function ImportarTab({ onChanged }: { onChanged: () => void }) {
 
   const confirmarNuevoSistemaXml = async () => {
     if (!newSystemPreview || !user) return;
+
+    toast.error(
+      "Este importador anterior esta deshabilitado. Usa Importar datos de TOTVS para importar OS y facturacion de forma segura.",
+    );
+    return;
 
     setBusy(true);
     try {
@@ -1692,43 +1702,15 @@ export function ImportarTab({ onChanged }: { onChanged: () => void }) {
 
   return (
     <div className="space-y-4">
-      <Card className="border-primary/20">
-        <CardContent className="space-y-3 p-3 sm:p-4">
-          <div className="flex flex-wrap items-start justify-between gap-2">
-            <div className="space-y-1">
-              <div className="text-[13px] font-semibold">Importacion vigente - Nuevo sistema XML</div>
-              <div className="max-w-3xl text-[11px] text-muted-foreground">
-                El historico hasta 30/06/2026 queda congelado. Al confirmar, se reemplaza solo el tramo nuevo de facturacion y ordenes de servicio.
-              </div>
+      <Card className="border-muted bg-muted/20">
+        <CardContent className="flex flex-wrap items-center justify-between gap-2 p-3 sm:p-4">
+          <div>
+            <div className="text-[13px] font-semibold">XML de facturacion y ordenes de servicio</div>
+            <div className="text-[11px] text-muted-foreground">
+              Usa Importar datos de TOTVS. Este panel anterior queda solo como referencia.
             </div>
-            <Badge variant="secondary" className="text-[10px]">Desde 01/07/2026</Badge>
           </div>
-          <div className="overflow-hidden rounded-lg border bg-background">
-            <DropZone
-              title="Facturacion XML"
-              help="facturas - ndc - ncc - ventas.xml - base principal para la venta real del nuevo sistema."
-              onFile={(file) => procesarNuevoSistemaXml("facturacion", file)}
-              accept=".xml"
-              selectedFileLabel={newSystemFiles.facturacion?.fileName ?? null}
-              compact
-            />
-            <DropZone
-              title="Ordenes de servicio XML"
-              help="ordenes_de_servicio.xml - cruza documento/factura para distinguir Cliente, Garantia e Interno."
-              onFile={(file) => procesarNuevoSistemaXml("ordenesServicio", file)}
-              accept=".xml"
-              selectedFileLabel={newSystemFiles.ordenesServicio?.fileName ?? null}
-              compact
-            />
-            <DropZone
-              title="Maestro de productos XML"
-              help="maestro_de_productos.xml - completa marca, familia y grupo para enriquecer facturacion y OS."
-              onFile={(file) => procesarNuevoSistemaXml("productos", file)}
-              accept=".xml"
-              selectedFileLabel={newSystemFiles.productos?.fileName ?? null}
-              compact
-            />
-          </div>
+          <Badge variant="outline" className="text-[10px]">Deshabilitado</Badge>
         </CardContent>
       </Card>
 
@@ -1944,16 +1926,6 @@ export function ImportarTab({ onChanged }: { onChanged: () => void }) {
         </>
       )}
 
-      {newSystemPreview && (
-        <NewSystemXmlPreview
-          bundle={newSystemPreview}
-          files={newSystemFiles}
-          onConfirm={confirmarNuevoSistemaXml}
-          onCancel={resetNewSystemImport}
-          busy={busy}
-        />
-      )}
-
       {cliRows && (
         <Preview
           title={`Clientes — ${cliFile}`}
@@ -1971,27 +1943,6 @@ export function ImportarTab({ onChanged }: { onChanged: () => void }) {
           rows={conRows}
           onConfirm={confirmarContactos}
           onCancel={() => setConRows(null)}
-          busy={busy}
-        />
-      )}
-
-      {osRows && (
-        <Preview
-          title={`Ordenes de servicio - ${osFile}`}
-          rows={osRows}
-          columns={[
-            "os_numero",
-            "trabajo_codigo",
-            "cliente_nombre",
-            "tipo_tiempo",
-            "servicios_cantidad",
-            "terceros_valor",
-            "kilometro_valor",
-            "servicios_valor",
-            "repuesto_valor",
-          ]}
-          onConfirm={confirmarOrdenesServicio}
-          onCancel={() => setOsRows(null)}
           busy={busy}
         />
       )}

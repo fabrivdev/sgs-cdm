@@ -103,6 +103,13 @@ import { cn } from "@/lib/utils";
 type FileKind = TotvsFileKind;
 const KIND_LABELS = TOTVS_FILE_KIND_LABELS;
 
+function conciseImportErrorSummary(prefix: string, detail: string) {
+  const normalized = detail.replace(/\s+/g, " ").trim();
+  const firstCause = normalized.match(/^.*?[.!?](?:\s|$)/)?.[0]?.trim() || normalized;
+  const limited = firstCause.length > 180 ? `${firstCause.slice(0, 177).trimEnd()}...` : firstCause;
+  return limited ? `${prefix}: ${limited}` : prefix;
+}
+
 interface DetectedFile {
   file: File;
   kind: FileKind | "ignorar";
@@ -236,6 +243,7 @@ export function ImportarTotvsTab({ onChanged }: { onChanged: () => void }) {
   const [preview, setPreview] = useState<Preview | null>(null);
   const [busy, setBusy] = useState(false);
   const [importProgress, setImportProgress] = useState<ImportProgressEvent | null>(null);
+  const [importError, setImportError] = useState<{ summary: string; detail: string } | null>(null);
   const [dragOver, setDragOver] = useState(false);
   const folderInputRef = useRef<HTMLInputElement>(null);
   const filesInputRef = useRef<HTMLInputElement>(null);
@@ -266,11 +274,13 @@ export function ImportarTotvsTab({ onChanged }: { onChanged: () => void }) {
       return [...prev, ...nuevos];
     });
     setPreview(null);
+    setImportError(null);
   };
 
   const removeFile = (name: string) => {
     setDetected((prev) => prev.filter((d) => d.file.name !== name));
     setPreview(null);
+    setImportError(null);
   };
 
   const setKind = (name: string, kind: DetectedFile["kind"]) => {
@@ -278,11 +288,13 @@ export function ImportarTotvsTab({ onChanged }: { onChanged: () => void }) {
       ? { ...d, kind, cutoffDate: kind === "cuentas_cobrar" ? d.cutoffDate ?? "" : undefined }
       : d)));
     setPreview(null);
+    setImportError(null);
   };
 
   const setCutoffDate = (name: string, cutoffDate: string) => {
     setDetected((prev) => prev.map((d) => (d.file.name === name ? { ...d, cutoffDate } : d)));
     setPreview(null);
+    setImportError(null);
   };
 
   const usableFiles = useMemo(() => detected.filter((d) => d.kind !== "ignorar"), [detected]);
@@ -294,6 +306,24 @@ export function ImportarTotvsTab({ onChanged }: { onChanged: () => void }) {
     }
     return counts;
   }, [usableFiles]);
+  const previewWarningCount = useMemo(() => {
+    if (!preview) return 0;
+    const mayorWarnings = preview.mayor.reduce((total, item) => total
+      + item.warnings.length
+      + item.missing.account
+      + item.missing.accountDescription
+      + item.missing.costCenter
+      + item.missing.origin
+      + item.duplicateCandidateKeys
+      + item.signViolations.type1Negative
+      + item.signViolations.type2Positive, 0);
+    const receivablesWarnings = preview.receivables.reduce((total, item) => total + item.warnings.length, 0);
+    return mayorWarnings
+      + receivablesWarnings
+      + preview.machineStockChassis.unresolvedPlaceholders
+      + preview.machineStockChassis.validConflicts
+      + preview.machineStockChassis.ambiguousProductCodes;
+  }, [preview]);
 
   const leerArchivos = async () => {
     if (usableFiles.length === 0) {
@@ -307,6 +337,7 @@ export function ImportarTotvsTab({ onChanged }: { onChanged: () => void }) {
     }
 
     setBusy(true);
+    setImportError(null);
     try {
       const mayor: MayorPreflight[] = [];
       const receivables: ReceivablesPreflight[] = [];
@@ -552,9 +583,12 @@ export function ImportarTotvsTab({ onChanged }: { onChanged: () => void }) {
         suppliersMerged.rows.length ? `${suppliersMerged.rows.length} proveedores` : null,
         branchTransfersMerged.rows.length ? `${branchTransfersMerged.rows.length} transferencias en tránsito` : null,
       ].filter(Boolean);
-      toast.success(partes.length > 0 ? `Leído: ${partes.join(", ")}.` : "Nada para importar todavía.");
+      toast.success(`${usableFiles.length} archivos leídos; ${partes.length} grupos listos para importar.`);
     } catch (e) {
-      toast.error("Error leyendo XML: " + (e as Error).message);
+      const detail = e instanceof Error ? e.message : String(e);
+      const summary = conciseImportErrorSummary("No se pudieron leer los archivos", detail);
+      setImportError({ summary, detail });
+      toast.error(summary);
       setPreview(null);
     } finally {
       setBusy(false);
@@ -567,10 +601,12 @@ export function ImportarTotvsTab({ onChanged }: { onChanged: () => void }) {
     let confirmedServiceOrders = 0;
     setBusy(true);
     setImportProgress(null);
+    setImportError(null);
     try {
       let facturacionLineas = 0;
       let facturacionExcluidas = 0;
       let ordenesServicio = 0;
+      let ordenesServicioOmitidas = 0;
       let ordenesServicioArchivadas = 0;
       let facturacionDesde: string | null = null;
       let facturacionHasta: string | null = null;
@@ -644,6 +680,7 @@ export function ImportarTotvsTab({ onChanged }: { onChanged: () => void }) {
         });
         confirmedServiceOrders = osResult.ordenesServicio;
         ordenesServicio = osResult.ordenesServicio;
+        ordenesServicioOmitidas = osResult.ordenesServicioOmitidas;
       }
 
       // El mismo RPC que persiste el lote se ejecuta en una subtransaccion
@@ -1085,7 +1122,9 @@ export function ImportarTotvsTab({ onChanged }: { onChanged: () => void }) {
         branchTransferRows.length ? `${branchTransferRows.length} transferencias en tránsito (${branchTransfersInsertadas} nuevas, ${branchTransfersActualizadas} actualizadas, ${branchTransfersSinCambios} sin cambios)` : null,
       ].filter(Boolean);
       toast.success(
-        `Importacion completada: ${ordenesServicio} OS importadas, ${facturacionLineas} lineas de facturacion${
+        `Importación completada: ${ordenesServicio} OS importadas, ${facturacionLineas} líneas de facturación${
+          ordenesServicioOmitidas ? `, ${ordenesServicioOmitidas} OS excluida${ordenesServicioOmitidas === 1 ? "" : "s"} confirmada${ordenesServicioOmitidas === 1 ? "" : "s"}` : ""
+        }${
           partes.length > 1 ? ` y ${partes.length - 1} grupos adicionales` : ""
         }.`,
       );
@@ -1100,14 +1139,18 @@ export function ImportarTotvsTab({ onChanged }: { onChanged: () => void }) {
       await queryClient.invalidateQueries({ queryKey: ["repuestos", "sugerencia-viva"] });
       onChanged();
     } catch (e) {
+      const detail = e instanceof Error ? e.message : String(e);
       const confirmed = e instanceof ServiceOrderImportFailure
         ? e.confirmedServiceOrders
         : confirmedServiceOrders;
-      toast.error(
+      const summary = conciseImportErrorSummary(
         confirmed
-          ? `${confirmed} OS importadas; fallo otra etapa: ${(e as Error).message}`
-          : "Error importando: " + (e as Error).message,
+          ? `${confirmed} OS quedaron importadas; la etapa siguiente no se completó`
+          : "No se pudo completar la importación",
+        detail,
       );
+      setImportError({ summary, detail });
+      toast.error(summary);
     } finally {
       setBusy(false);
       setImportProgress(null);
@@ -1140,6 +1183,16 @@ export function ImportarTotvsTab({ onChanged }: { onChanged: () => void }) {
                 : 8}
               className="h-2"
             />
+          </div>
+        )}
+
+        {importError && (
+          <div className="rounded-md border border-destructive/30 bg-destructive/5 p-3 text-[12px] text-destructive" role="alert">
+            <p className="font-medium">{importError.summary}</p>
+            <details className="mt-1.5 text-foreground">
+              <summary className="cursor-pointer text-[11px] font-medium">Ver detalle técnico</summary>
+              <p className="mt-1 whitespace-pre-wrap break-words text-[11px] text-muted-foreground">{importError.detail}</p>
+            </details>
           </div>
         )}
 
@@ -1254,6 +1307,25 @@ export function ImportarTotvsTab({ onChanged }: { onChanged: () => void }) {
 
         {preview && (
           <div className="space-y-3 rounded-md border p-3">
+            <div className="flex flex-wrap items-center justify-between gap-2">
+              <div>
+                <p className="text-[12px] font-medium">
+                  {previewWarningCount ? "Requiere revisión" : "Listo para importar"}
+                </p>
+                <p className="text-[11px] text-muted-foreground">
+                  {usableFiles.length.toLocaleString("es-PY")} archivo{usableFiles.length === 1 ? "" : "s"} revisado{usableFiles.length === 1 ? "" : "s"}.
+                </p>
+              </div>
+              {preview.bundleFiles && <Badge variant="secondary">OS + Facturación vinculadas</Badge>}
+            </div>
+            {previewWarningCount > 0 && (
+              <p className="rounded-md border border-amber-300 bg-amber-50 p-2 text-[11px] text-amber-800">
+                Hay {previewWarningCount.toLocaleString("es-PY")} observaciones que requieren revisión antes de confirmar. Abrí el detalle del preflight.
+              </p>
+            )}
+            <details className="rounded-md border bg-muted/20 p-2">
+              <summary className="cursor-pointer text-[11px] font-medium">Ver detalle del preflight</summary>
+              <div className="mt-3 space-y-3">
             <div className="flex flex-wrap gap-2 text-[12px]">
               {preview.mayor.map((item) => (
                 <Badge key={item.sourceFileName} variant="secondary">{item.movementRows.toLocaleString("es-PY")} movimientos de Mayor</Badge>
@@ -1388,6 +1460,8 @@ export function ImportarTotvsTab({ onChanged }: { onChanged: () => void }) {
               completa chasis faltantes o sustituidos por el modelo mediante CODPRO exacto; no agrega al stock máquinas que no estén en la foto.
               Productos, pedidos y solicitudes se actualizan sin duplicar. Clientes agrega los nuevos y corrige los existentes por código/RUC sin cambiar su ID.
             </p>
+              </div>
+            </details>
             {hasPersistablePreview(preview) && (
               <Button type="button" size="sm" onClick={confirmar} disabled={busy}>
                 Confirmar importación

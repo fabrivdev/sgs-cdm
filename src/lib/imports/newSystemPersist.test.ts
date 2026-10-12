@@ -8,7 +8,7 @@ describe("persistencia de facturacion del sistema nuevo", () => {
   it("prevalida antes del RPC y persiste OS solo despues de facturacion", () => {
     const prevalidation = source.indexOf("validateBillingSourceBatch(facturacionLineasSinValidar)");
     const billingRpc = source.indexOf('"facturacion_validar_totvs_lote_v1"');
-    const serviceOrderImport = source.indexOf("...bundle.importaciones.ordenesServicio");
+    const serviceOrderImport = source.lastIndexOf("...bundle.importaciones.ordenesServicio");
 
     expect(prevalidation).toBeGreaterThan(0);
     expect(billingRpc).toBeGreaterThan(prevalidation);

@@ -556,7 +556,7 @@ export function aggregateNewSystemServiceOrders(rows: ServiceOrderInsert[]) {
   const sourceRowsByOs = new Map<string, ServiceOrderInsert[]>();
 
   for (const row of rows) {
-    const osNumero = String(row.os_numero ?? "").trim();
+    const osNumero = String(row.os_numero ?? "").trim().toUpperCase();
     if (!osNumero) continue;
     sourceRowsByOs.set(osNumero, [...(sourceRowsByOs.get(osNumero) ?? []), row]);
     const current = byOs.get(osNumero);
@@ -567,6 +567,7 @@ export function aggregateNewSystemServiceOrders(rows: ServiceOrderInsert[]) {
       const technician = String(row.responsable ?? "").trim();
       byOs.set(osNumero, {
         ...row,
+        os_numero: osNumero,
         raw_data: {
           ...((row.raw_data as any) ?? {}),
           lineas_agregadas: 1,
