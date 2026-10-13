@@ -12,13 +12,13 @@ const importerUi = readFileSync("src/components/parque/ImportarTotvsTab.tsx", "u
 type BillingRow = NewSystemImportBundle["facturacion"]["rows"][number];
 
 describe("persistencia de facturacion del sistema nuevo", () => {
-  it("persiste OS como fuente independiente antes de validar facturacion", () => {
+  it("valida facturacion antes de persistir OS", () => {
     const confirmFlow = importerUi.slice(importerUi.indexOf("const confirmar = async"));
     const serviceOrderImport = confirmFlow.indexOf("persistNewSystemServiceOrders");
     const billingPreflight = confirmFlow.indexOf('mode: "validate"');
 
     expect(serviceOrderImport).toBeGreaterThan(0);
-    expect(billingPreflight).toBeGreaterThan(serviceOrderImport);
+    expect(billingPreflight).toBeLessThan(serviceOrderImport);
     expect(source).toContain("skipServiceOrders = false");
   });
 

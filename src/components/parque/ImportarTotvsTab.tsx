@@ -48,7 +48,6 @@ import {
   readMayorPreflightFile,
   readXmlFileText,
   prepareNewSystemImportBundle,
-  prepareBillingPersistenceRows,
   reconcileCanonicalClientes,
   mergeKardexRows,
   mergeImportDispatchRows,
@@ -62,9 +61,7 @@ import {
   persistNewSystemServiceOrders,
   ServiceOrderImportFailure,
   accreditHistoricalBillingSource,
-  buildBillingSnapshotScope,
-  TOTVS_BILLING_BRANCHES,
-  requestBillingSnapshotDeclaration,
+  automaticBillingSnapshotDeclaration,
   actualizarVentasRepuestosPeriodo,
   type CanonicalClienteRow,
   type CanonicalImportDispatchRow,
@@ -93,7 +90,6 @@ import {
   type MayorPersistResult,
   type MayorRpcClient,
   type ImportProgressEvent,
-  type BillingSnapshotDeclaration,
   describeImportError,
   syntheticValueDiffersFromBalance,
   TOTVS_FILE_KIND_LABELS,
@@ -129,11 +125,6 @@ interface HistoricalBillingLoad {
   id: string;
   archivo_nombre: string | null;
   creado_en: string;
-}
-
-interface BillingValidationReport {
-  status: "success" | "error";
-  detail: string;
 }
 
 interface Preview {
@@ -267,16 +258,6 @@ export function ImportarTotvsTab({ onChanged }: { onChanged: () => void }) {
   const [historicalLoadId, setHistoricalLoadId] = useState("");
   const [loadingHistoricalLoads, setLoadingHistoricalLoads] = useState(false);
   const [accreditingHistoricalLoad, setAccreditingHistoricalLoad] = useState(false);
-  const [billingValidationReport, setBillingValidationReport] = useState<BillingValidationReport | null>(null);
-  const [billingValidationScope, setBillingValidationScope] = useState<BillingSnapshotDeclaration>(() => {
-    const today = new Date().toISOString().slice(0, 10);
-    return {
-      from: `${today.slice(0, 4)}-07-01`,
-      to: today,
-      includedBranches: [...TOTVS_BILLING_BRANCHES],
-      completenessConfirmed: true,
-    };
-  });
   const folderInputRef = useRef<HTMLInputElement>(null);
   const filesInputRef = useRef<HTMLInputElement>(null);
 
@@ -304,7 +285,6 @@ export function ImportarTotvsTab({ onChanged }: { onChanged: () => void }) {
     });
     setPreview(null);
     setImportError(null);
-    setBillingValidationReport(null);
     setHistoricalLoads([]);
     setHistoricalLoadId("");
   };
@@ -313,7 +293,6 @@ export function ImportarTotvsTab({ onChanged }: { onChanged: () => void }) {
     setDetected((prev) => prev.filter((d) => d.file.name !== name));
     setPreview(null);
     setImportError(null);
-    setBillingValidationReport(null);
     setHistoricalLoads([]);
     setHistoricalLoadId("");
   };
@@ -322,7 +301,6 @@ export function ImportarTotvsTab({ onChanged }: { onChanged: () => void }) {
     setDetected((prev) => prev.map((d) => (d.file.name === name ? { ...d, kind } : d)));
     setPreview(null);
     setImportError(null);
-    setBillingValidationReport(null);
     setHistoricalLoads([]);
     setHistoricalLoadId("");
   };
@@ -376,15 +354,10 @@ export function ImportarTotvsTab({ onChanged }: { onChanged: () => void }) {
       productos: bundleFiles.productos,
       usuarioId: user.id,
     });
-    const billingSnapshotDeclaration = requestBillingSnapshotDeclaration({
-      observedFrom: bundle.diagnostics.replacement.facturacion.from,
+    const billingSnapshotDeclaration = automaticBillingSnapshotDeclaration({
+      sourceXml: bundleFiles.facturacion.xmlText,
       observedTo: bundle.diagnostics.replacement.facturacion.to,
     });
-    if (billingSnapshotDeclaration === undefined) return;
-    if (billingSnapshotDeclaration === null) {
-      toast.error("La acreditación histórica requiere el reporte completo y su alcance declarado.");
-      return;
-    }
 
     setAccreditingHistoricalLoad(true);
     try {
@@ -414,71 +387,6 @@ export function ImportarTotvsTab({ onChanged }: { onChanged: () => void }) {
     }
   };
 
-  const validateBillingOnly = async () => {
-    const bundleFiles = preview?.bundleFiles;
-    if (!bundleFiles || !user) {
-      toast.error("Para validar la facturacion se necesitan los XML de OS, Facturacion y Productos.");
-      return;
-    }
-
-    const bundle = prepareNewSystemImportBundle({
-      facturacion: bundleFiles.facturacion,
-      ordenesServicio: bundleFiles.ordenesServicio,
-      productos: bundleFiles.productos,
-      usuarioId: user.id,
-    });
-    const billingRows = prepareBillingPersistenceRows(bundle);
-    const billingSnapshotScope = buildBillingSnapshotScope(billingValidationScope, {
-      sourceFileSha256: bundleFiles.facturacion.sha256,
-      sourceFileByteSize: bundleFiles.facturacion.byteSize,
-      observedLineCount: billingRows.length,
-      observedBranches: billingRows.map((row) => String(row.sucursal ?? "")),
-    });
-    if (!billingSnapshotScope) {
-      const detail = "El alcance editable no cubre todas las sucursales observadas o tiene fechas invalidas; no se llamo al servidor.";
-      setBillingValidationReport({ status: "error", detail });
-      toast.error(detail);
-      return;
-    }
-
-    let activeValidationStage = "billing.validate";
-    setBusy(true);
-    setImportProgress(null);
-    setBillingValidationReport(null);
-    setImportError(null);
-    try {
-      const result = await persistNewSystemBundle({
-        bundle,
-        userId: user.id,
-        mode: "validate",
-        onProgress: (event) => {
-          activeValidationStage = event.phase;
-          setImportProgress(event);
-        },
-        billingSnapshotDeclaration: billingValidationScope,
-        fileNames: {
-          facturacion: bundleFiles.facturacion.fileName,
-          ordenesServicio: bundleFiles.ordenesServicio.fileName,
-          productos: bundleFiles.productos.fileName,
-        },
-      });
-      const detail = [
-        "Validacion completada con rollback: no se guardaron facturacion, OS ni acreditaciones.",
-        `${result.facturacionLineas.toLocaleString("es-PY")} lineas activas`,
-        `${result.facturacionExcluidas.toLocaleString("es-PY")} exclusiones confirmadas`,
-      ].join(" ");
-      setBillingValidationReport({ status: "success", detail });
-      toast.success("Facturacion validada sin guardar cambios.");
-    } catch (error) {
-      const detail = describeImportError(error, activeValidationStage);
-      setBillingValidationReport({ status: "error", detail });
-      toast.error("La validacion de facturacion fue rechazada. El detalle quedo visible debajo.");
-    } finally {
-      setBusy(false);
-      setImportProgress(null);
-    }
-  };
-
   const leerArchivos = async () => {
     if (usableFiles.length === 0) {
       toast.error("Asigná al menos un archivo a alguno de los tipos disponibles.");
@@ -487,7 +395,6 @@ export function ImportarTotvsTab({ onChanged }: { onChanged: () => void }) {
 
     setBusy(true);
     setImportProgress(null);
-    setBillingValidationReport(null);
     setImportError(null);
     try {
       const mayor: MayorPreflight[] = [];
@@ -790,6 +697,30 @@ export function ImportarTotvsTab({ onChanged }: { onChanged: () => void }) {
       let branchTransfersSinCambios = 0;
       const mayorResultados: MayorPersistResult[] = [];
 
+      const billingSnapshotDeclaration = newSystemBundle && preview.bundleFiles
+        ? automaticBillingSnapshotDeclaration({
+          sourceXml: preview.bundleFiles.facturacion.xmlText,
+          observedTo: newSystemBundle.diagnostics.replacement.facturacion.to,
+        })
+        : null;
+
+      // Ejecuta las mismas guardas del importador dentro de una transaccion
+      // descartada antes de escribir Mayor, OS, clientes o facturacion.
+      if (newSystemBundle && preview.bundleFiles && billingSnapshotDeclaration) {
+        await persistNewSystemBundle({
+          bundle: newSystemBundle,
+          userId: user.id,
+          mode: "validate",
+          onProgress: handleImportProgress,
+          billingSnapshotDeclaration,
+          fileNames: {
+            facturacion: preview.bundleFiles.facturacion.fileName,
+            ordenesServicio: preview.bundleFiles.ordenesServicio.fileName,
+            productos: preview.bundleFiles.productos.fileName,
+          },
+        });
+      }
+
       const mayorFiles = usableFiles.filter((item) => item.kind === "mayor").map((item) => item.file);
       if (mayorFiles.length !== preview.mayor.length) {
         throw new Error("Los archivos del Mayor cambiaron después del preflight; volvé a leerlos antes de confirmar.");
@@ -817,39 +748,6 @@ export function ImportarTotvsTab({ onChanged }: { onChanged: () => void }) {
         ordenesServicio = osResult.ordenesServicio;
         importedServiceOrders = osResult.ordenesServicio;
         ordenesServicioOmitidas = osResult.ordenesServicioOmitidas;
-      }
-
-      const billingSnapshotDeclaration = newSystemBundle
-        ? requestBillingSnapshotDeclaration({
-          observedFrom: newSystemBundle.diagnostics.replacement.facturacion.from,
-          observedTo: newSystemBundle.diagnostics.replacement.facturacion.to,
-        })
-        : null;
-      if (billingSnapshotDeclaration === undefined) {
-        if (importedServiceOrders) {
-          toast.success(`${importedServiceOrders} OS importadas. Facturacion no iniciada.`);
-          onChanged();
-        }
-        return;
-      }
-
-      // El mismo RPC que persiste el lote se ejecuta en una subtransaccion
-      // descartada antes de tocar clientes. Esto evita escrituras del maestro
-      // ante errores deterministas del paquete, sin prometer atomicidad global
-      // entre las llamadas HTTP posteriores.
-      if (newSystemBundle && preview.bundleFiles) {
-        await persistNewSystemBundle({
-          bundle: newSystemBundle,
-          userId: user.id,
-          mode: "validate",
-          onProgress: handleImportProgress,
-          billingSnapshotDeclaration,
-          fileNames: {
-            facturacion: preview.bundleFiles.facturacion.fileName,
-            ordenesServicio: preview.bundleFiles.ordenesServicio.fileName,
-            productos: preview.bundleFiles.productos.fileName,
-          },
-        });
       }
 
       // El maestro se aplica antes que facturacion/OS: asi las lineas del
@@ -1565,88 +1463,6 @@ export function ImportarTotvsTab({ onChanged }: { onChanged: () => void }) {
             </p>
               </div>
             </details>
-            {preview.bundleFiles && (
-              <div className="space-y-2 rounded-md border border-dashed p-2 text-[11px]">
-                <p className="text-muted-foreground">
-                  La validacion ejecuta las mismas guardas de facturacion dentro de una subtransaccion descartada.
-                  No importa OS, no acredita cargas y no conserva cambios del RPC.
-                </p>
-                <details>
-                  <summary className="cursor-pointer font-medium text-muted-foreground">
-                    Alcance completo: {billingValidationScope.from} a {billingValidationScope.to}; todas las sucursales
-                  </summary>
-                  <div className="mt-2 space-y-2 rounded border p-2">
-                    <div className="flex flex-wrap gap-3">
-                      <label className="space-y-1">
-                        <span className="block text-muted-foreground">Desde</span>
-                        <input
-                          type="date"
-                          className="h-8 rounded border bg-background px-2"
-                          value={billingValidationScope.from}
-                          onChange={(event) => setBillingValidationScope((current) => ({
-                            ...current,
-                            from: event.target.value,
-                          }))}
-                        />
-                      </label>
-                      <label className="space-y-1">
-                        <span className="block text-muted-foreground">Hasta</span>
-                        <input
-                          type="date"
-                          className="h-8 rounded border bg-background px-2"
-                          value={billingValidationScope.to}
-                          onChange={(event) => setBillingValidationScope((current) => ({
-                            ...current,
-                            to: event.target.value,
-                          }))}
-                        />
-                      </label>
-                    </div>
-                    <div>
-                      <p className="mb-1 text-muted-foreground">Sucursales incluidas</p>
-                      <div className="flex flex-wrap gap-x-3 gap-y-1">
-                        {TOTVS_BILLING_BRANCHES.map((branch) => (
-                          <label key={branch} className="flex items-center gap-1">
-                            <input
-                              type="checkbox"
-                              checked={billingValidationScope.includedBranches.includes(branch)}
-                              onChange={(event) => setBillingValidationScope((current) => ({
-                                ...current,
-                                includedBranches: event.target.checked
-                                  ? [...new Set([...current.includedBranches, branch])]
-                                  : current.includedBranches.filter((value) => value !== branch),
-                              }))}
-                            />
-                            {branch}
-                          </label>
-                        ))}
-                      </div>
-                    </div>
-                  </div>
-                </details>
-                <Button type="button" size="sm" variant="outline" onClick={validateBillingOnly} disabled={busy}>
-                  Validar facturacion sin guardar
-                </Button>
-                {billingValidationReport && (
-                  <div
-                    role="status"
-                    className={cn(
-                      "rounded border p-2",
-                      billingValidationReport.status === "error"
-                        ? "border-destructive/40 bg-destructive/5 text-destructive"
-                        : "border-emerald-300 bg-emerald-50 text-emerald-900",
-                    )}
-                  >
-                    <p className="font-medium">
-                      {billingValidationReport.status === "error" ? "Validacion rechazada" : "Validacion correcta"}
-                    </p>
-                    <pre className="mt-1 whitespace-pre-wrap break-words font-mono text-[10px]">
-                      {billingValidationReport.detail}
-                    </pre>
-                  </div>
-                )}
-              </div>
-            )}
             {preview.bundleFiles && (
               <details className="rounded-md border border-dashed p-2 text-[11px]">
                 <summary className="cursor-pointer font-medium text-muted-foreground">Avanzado</summary>

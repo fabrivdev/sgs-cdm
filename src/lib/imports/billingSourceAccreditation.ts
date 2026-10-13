@@ -86,6 +86,26 @@ export const TOTVS_BILLING_BRANCHES = [
   "Campo 9", "Katuete", "Loma Plata", "Misiones", "Santa Rita", "Santa Rosa",
 ] as const;
 
+export function automaticBillingSnapshotDeclaration(args: {
+  sourceXml: string;
+  observedTo: string | null;
+}): BillingSnapshotDeclaration {
+  const createdDate = args.sourceXml.match(/<Created>(\d{4}-\d{2}-\d{2})T/i)?.[1] ?? null;
+  const to = createdDate ?? args.observedTo;
+  if (!to || !/^\d{4}-\d{2}-\d{2}$/.test(to) || to < "2026-07-01") {
+    throw new Error("El reporte de Ventas no informa una fecha de corte valida desde el 01/07/2026.");
+  }
+  if (args.observedTo && args.observedTo > to) {
+    throw new Error("La fecha maxima de las lineas supera la fecha de corte declarada por el reporte de Ventas.");
+  }
+  return {
+    from: "2026-07-01",
+    to,
+    includedBranches: [...TOTVS_BILLING_BRANCHES],
+    completenessConfirmed: true,
+  };
+}
+
 export function requestBillingSnapshotDeclaration(args: {
   observedFrom: string | null;
   observedTo: string | null;

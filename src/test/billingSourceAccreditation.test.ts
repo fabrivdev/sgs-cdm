@@ -2,6 +2,7 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import {
   accreditExistingBillingSource,
+  automaticBillingSnapshotDeclaration,
   toBillingSourceIdentityRpc,
   type BillingSourceAccreditationRpcClient,
 } from "@/lib/imports/billingSourceAccreditation";
@@ -124,6 +125,25 @@ describe("adaptador frontend de acreditacion historica", () => {
       delete: persistenceMocks.remove,
     });
     persistenceMocks.cargarTodo.mockResolvedValue([]);
+  });
+
+  it("deriva el alcance acordado del corte del propio reporte sin prompts", () => {
+    expect(automaticBillingSnapshotDeclaration({
+      sourceXml: "<Created>2026-10-13T11:19:03Z</Created>",
+      observedTo: "2026-10-13",
+    })).toEqual({
+      from: "2026-07-01",
+      to: "2026-10-13",
+      includedBranches: ["Campo 9", "Katuete", "Loma Plata", "Misiones", "Santa Rita", "Santa Rosa"],
+      completenessConfirmed: true,
+    });
+  });
+
+  it("bloquea un corte inconsistente con las lineas del reporte", () => {
+    expect(() => automaticBillingSnapshotDeclaration({
+      sourceXml: "<Created>2026-10-12T23:59:59Z</Created>",
+      observedTo: "2026-10-13",
+    })).toThrow(/fecha maxima de las lineas supera la fecha de corte/);
   });
 
   it("convierte SourceFileIdentity al contrato RPC y envia el conjunto completo", async () => {

@@ -77,6 +77,15 @@ mismo archivo no crea otro cambio de estado.
 
 La regla no se activa para cargas incrementales o archivos que el operador
 declare parciales, aunque el archivo contenga filas de todas las sucursales.
+
+Desde el 13/10/2026 el importador principal no pide al operador declarar este
+alcance ni expone un boton de validacion manual. Ventas TOTVS usa el contrato
+confirmado de snapshot acumulativo desde `2026-07-01`, las seis sucursales y la
+fecha de corte `Created` del XML (con la maxima fecha observada solo como
+respaldo y control de consistencia). El RPC de validacion con rollback se ejecuta
+automaticamente antes de cualquier escritura de Mayor, OS, clientes o
+facturacion. Un rechazo detiene el flujo y conserva el detalle tecnico visible;
+no relaja las guardas de identidad, cambios comerciales, omisiones o exclusiones.
 Los consumidores SQL operativos y los lectores directos filtran
 `excluido_de_reportes=false`; parque, repuestos y consolidacion se refrescan
 dentro de la misma transaccion del snapshot completo. Un fallo de cualquiera
