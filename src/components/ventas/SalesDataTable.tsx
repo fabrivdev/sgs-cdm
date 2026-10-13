@@ -14,11 +14,13 @@ export type SalesDisplayColumn<T> = SalesColumn<T> & {
 export function SalesDataTable<T>({ title, rows, columns, initialSort, rowKey, fileName, sheetName = "Ventas Servicios",
   empty = "Sin facturación en el período.", footer, onRowClick, onDetailClick, selected, countLabel = "filas",
   mobileIdentity, mobileEmbedded = false, mobileCountKey, mobileCountLabel, mobilePrimaryLabel, mobileMetricLabel, desktopBreakpoint = 1024,
+  hideDesktopTitle = false,
 }: {
   title: string; rows: readonly T[]; columns: readonly SalesDisplayColumn<T>[];
   initialSort: SalesSort; rowKey: (row: T) => string; fileName: string; sheetName?: string;
   empty?: string; footer?: T; onRowClick?: (row: T) => void; selected?: (row: T) => boolean; countLabel?: string;
   mobileEmbedded?: boolean; onDetailClick?: (row: T) => void; desktopBreakpoint?: number;
+  hideDesktopTitle?: boolean;
   mobileCountKey?: string; mobileCountLabel?: string; mobilePrimaryLabel?: string; mobileMetricLabel?: string;
   mobileIdentity?: (row: T) => string;
 }) {
@@ -41,9 +43,9 @@ export function SalesDataTable<T>({ title, rows, columns, initialSort, rowKey, f
     </div>;
   });
   return <section aria-label={title} className="min-w-0 max-w-full overflow-hidden rounded-md border">
-    <div className="flex min-w-0 items-center justify-between gap-2 border-b px-3 py-2">
+    {!hideDesktopTitle && <div className="flex min-w-0 items-center justify-between gap-2 border-b px-3 py-2">
       <h3 className="truncate text-[12px] font-semibold">{title}</h3>
-    </div>
+    </div>}
     <div role="table" aria-label={title} aria-colcount={columns.length}>
       <TableScroll rows={ordered.length} className="min-w-0 max-w-full">
         <div role="row" style={grid} className={`grid gap-x-2 bg-muted/60 px-3 py-2 text-[11px] font-medium text-muted-foreground ${scrollHead} ${salesHeader}`}>

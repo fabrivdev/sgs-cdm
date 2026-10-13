@@ -30,6 +30,10 @@ describe("Panorama de Ventas de Servicios", () => {
       "Total del período", "$ 300", "$ 210", "$ 30", "$ 45", "$ 15", "1", "2", "+100%", "+100%", "100%",
     ]);
     expect(total.tagName).not.toBe("BUTTON");
+    const title = screen.getByRole("heading", { name: "Facturación por período" });
+    expect(title.closest("button")).toBeNull();
+    expect(screen.queryByRole("button", { name: "Facturación por período" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("heading", { name: "Períodos" })).not.toBeInTheDocument();
     expect(rpc).toHaveBeenCalledTimes(3); // Ninguna consulta adicional para el total.
   });
   it("calcula LM y LY al cruzar sistemas y usa el mismo tramo para un mes parcial", async () => {

@@ -3,12 +3,10 @@ import { useEffect, useMemo, useState } from "react";
 import { SalesDataTable, type SalesDisplayColumn } from "./SalesDataTable";
 import { serviceMoneyColumn, serviceNumberColumn, serviceShareColumn } from "./serviceSalesColumns";
 import { serviceFiltersKey, serviceFilteredRequest, type ServiceSalesFilters } from "./serviceSalesFilters";
-import { ChevronDown, ChevronUp } from "lucide-react";
 import { endOfDay, endOfISOWeek, endOfMonth, endOfYear, format, subDays, subMonths, subWeeks, subYears } from "date-fns";
 import { serviceFilteredError as serviceSalesError } from "./serviceSalesFilters";
 import { supabase } from "@/integrations/supabase/client";
 import { Panel } from "@/components/layout/AppPrimitives";
-import { useMobileDisclosure } from "@/hooks/useMobileDisclosure";
 import { pct } from "@/components/dashboard/utils";
 import type { PeriodMode } from "@/components/dashboard/types";
 import { cn } from "@/lib/utils";
@@ -54,7 +52,6 @@ export function ServiciosPanorama({ desde, hasta, sucursal, buscar, tipoTiempo, 
   const [previousYear, setPreviousYear] = useState<PanoramaResponse | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [collapsed, setCollapsed] = useMobileDisclosure(!!error);
 
   useEffect(() => {
     let alive = true;
@@ -133,15 +130,14 @@ export function ServiciosPanorama({ desde, hasta, sucursal, buscar, tipoTiempo, 
   } : undefined;
   return <Panel className={cn("sales-periods min-w-0 p-0 lg:p-3", mobile.active && mobile.view !== "periodos" && !error && "hidden")}>
     {!mobile.active && <div className="flex min-h-11 min-w-0 items-center justify-between gap-2 px-3 lg:min-h-0 lg:px-0">
-      <button type="button" aria-expanded={!collapsed} onClick={()=>setCollapsed(value=>!value)} className="flex min-h-11 min-w-0 items-center gap-2 text-left">
+      <div className="flex min-w-0 items-center">
         <h2 className="truncate text-[13px] font-semibold">Facturación por período</h2>
-        {collapsed ? <ChevronDown className="h-4 w-4 shrink-0 text-muted-foreground" /> : <ChevronUp className="h-4 w-4 shrink-0 text-muted-foreground" />}
-      </button>
+      </div>
       {selectedPeriod && <button type="button" onClick={()=>onSelectPeriod(null)} className="shrink-0 rounded-full border bg-accent px-2.5 py-1 text-[10px] font-medium hover:bg-accent/70">Ver período completo ×</button>}
     </div>}
-    <div hidden={!mobile.active && collapsed}>{loading ? <div className="py-8 text-center text-[12px] text-muted-foreground">Cargando panorama…</div>
+    <div>{loading ? <div className="py-8 text-center text-[12px] text-muted-foreground">Cargando panorama…</div>
       : error ? <div role="alert" className="py-8 text-center text-[12px] text-destructive">{error}</div>
-      : <div className="min-w-0 lg:mt-3"><SalesDataTable mobileEmbedded mobileCountKey={mobile.active ? "facturas" : undefined} mobileCountLabel="Fact." mobilePrimaryLabel={mobile.active && periodMode === "mes" ? "Mes" : undefined} mobileMetricLabel={mobile.active ? "Facturado" : undefined} title="Períodos" rows={rows} columns={columns}
+      : <div className="min-w-0 lg:mt-3"><SalesDataTable mobileEmbedded hideDesktopTitle mobileCountKey={mobile.active ? "facturas" : undefined} mobileCountLabel="Fact." mobilePrimaryLabel={mobile.active && periodMode === "mes" ? "Mes" : undefined} mobileMetricLabel={mobile.active ? "Facturado" : undefined} title="Períodos" rows={rows} columns={columns}
         initialSort={{key:"periodo",direction:"asc"}} rowKey={row=>row.periodo} footer={footer}
         fileName={`ventas-servicios-periodos-${desde}-${hasta}.xlsx`}
         onRowClick={row=>{ onSelectPeriod(row.periodo === selectedPeriod ? null : row.periodo); if (mobile.active) mobile.setView("detalle"); }}

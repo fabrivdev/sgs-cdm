@@ -83,6 +83,8 @@ describe("Ventas de Repuestos", () => {
   });
   it("comparte panorama y resumen sin repetir la consulta", async () => {
     setup(); await screen.findByText("CLAAS");
+    expect(screen.getByText("Facturación por período")).toBeInTheDocument();
+    expect(screen.queryByText("Evolución de la facturación")).not.toBeInTheDocument();
     expect(rpc.mock.calls.filter(([name]) => name === "ventas_repuestos_panorama_v2")).toHaveLength(1);
     expect(rpc).not.toHaveBeenCalledWith("ventas_area_resumen", expect.anything());
     const tables = screen.getAllByRole("table");

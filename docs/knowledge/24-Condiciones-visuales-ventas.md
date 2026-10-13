@@ -166,6 +166,8 @@ Ajuste posterior sobre captura móvil: Períodos usa un solo encabezado del pane
 
 Decisión transversal del 07/10/2026: Ventas de Servicios, Máquinas y Repuestos no repiten el rango general debajo del título. Desde/Hasta permanecen disponibles en filtros y conservan exactamente el mismo estado, consulta y cálculo; Períodos/Resumen/Detalle, indicadores y escritorio tampoco cambian. El único menú de sección se monta junto a filtros en todos los anchos. Esta decisión reemplaza la excepción limitada a Servicios del 06/10/2026.
 
+Ajuste local del 13/10/2026: el bloque `Facturación por período` de Servicios permanece siempre visible y usa un solo encabezado estático, sin flecha ni control de despliegue. Repuestos usa el mismo título que Servicios y Máquinas. Es una alineación visual: no cambia selección de períodos, datos, filtros, cálculos, totales ni exportaciones; no requiere SQL y no acredita publicación.
+
 ## Contenido real de M�s filtros - 06/10/2026
 
 En escritorio, M�s filtros contiene dimensiones secundarias reales y no repite Per�odo r�pido, Desde, Hasta, Agrupar ni Sucursal cuando esos controles caben en la barra. `FiltersBar.children` conserva la fila primaria y `expanded` contiene los secundarios. Si no hay secundarios respaldados y nada desborda, el acceso se oculta en escritorio; en m�vil o ante desborde, los primarios siguen accesibles. No se inventan dimensiones para mantener visible el bot�n.
