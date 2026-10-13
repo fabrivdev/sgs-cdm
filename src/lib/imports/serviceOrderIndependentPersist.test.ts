@@ -16,8 +16,9 @@ const serviceOrderFlow = persistSource.slice(
 
 describe("persistencia independiente de OS", () => {
   it("ejecuta OS antes del preflight de facturacion y no repite el lote", () => {
-    expect(uiSource.lastIndexOf("persistNewSystemServiceOrders")).toBeLessThan(
-      uiSource.indexOf('mode: "validate"'),
+    const confirmFlow = uiSource.slice(uiSource.indexOf("const confirmar = async"));
+    expect(confirmFlow.indexOf("persistNewSystemServiceOrders")).toBeLessThan(
+      confirmFlow.indexOf('mode: "validate"'),
     );
     expect(uiSource).toContain("skipServiceOrders: true");
   });

@@ -24,6 +24,8 @@ import {
 interface ImportFileInput {
   fileName: string;
   xmlText: string;
+  byteSize: number;
+  sha256: string;
 }
 
 export interface NewSystemImportBundleInput {
@@ -131,6 +133,9 @@ export function prepareNewSystemImportBundle(input: NewSystemImportBundleInput):
         metadata: buildImportMetadataEnvelope(facturacion, {
           linkedToServiceOrders: billingMatchedToOs,
           directSales: billingDirectSales,
+          sourceIdentityVersion: "sha256-v1",
+          sourceFileSha256: input.facturacion.sha256,
+          sourceFileByteSize: input.facturacion.byteSize,
         }),
       }),
       ordenesServicio: buildImportInsert({

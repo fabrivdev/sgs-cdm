@@ -12,11 +12,43 @@ export const normalizeText = (value: unknown) =>
 
 export const normalizeUpper = (value: unknown) => normalizeText(value).toUpperCase();
 
+const MAX_SAFE_NUMERIC_MAGNITUDE = Number.MAX_SAFE_INTEGER;
+const MAX_SCIENTIFIC_EXPONENT = 308;
+const MAX_NUMERIC_TEXT_LENGTH = 128;
+
+function safeFiniteNumber(value: number): number {
+  if (!Number.isFinite(value) || Math.abs(value) > MAX_SAFE_NUMERIC_MAGNITUDE) return 0;
+  return value;
+}
+
 export function parseFlexibleNumber(value: unknown): number {
   if (value == null || value === "") return 0;
-  if (typeof value === "number") return Number.isFinite(value) ? value : 0;
+  if (typeof value === "number") return safeFiniteNumber(value);
   const raw = String(value).trim();
-  if (!raw) return 0;
+  if (!raw || raw.length > MAX_NUMERIC_TEXT_LENGTH) return 0;
+
+  // La notacion cientifica debe validarse antes de la limpieza flexible.
+  // Quitar la E primero convertiria, por ejemplo, "7E-2" en otro numero.
+  const scientific = raw.match(
+    /^([+-]?(?:\d+(?:[.,]\d+)?|[.,]\d+))[eE]([+-]?\d{1,4})$/,
+  );
+  if (scientific) {
+    const exponent = Number(scientific[2]);
+    if (!Number.isInteger(exponent) || Math.abs(exponent) > MAX_SCIENTIFIC_EXPONENT) return 0;
+
+    const parsed = Number(`${scientific[1].replace(",", ".")}e${scientific[2]}`);
+    if (parsed === 0 && /[1-9]/.test(scientific[1])) return 0;
+    return safeFiniteNumber(parsed);
+  }
+
+  // Una E dentro de una etiqueta ("Dolares14,09", "EUR1.234,56") no es
+  // notacion cientifica. Si, en cambio, la porcion numerica empieza como un
+  // exponente pero no cumplio el patron completo, se rechaza sin rescatar un
+  // numero distinto al quitar la E ("7E", "1e2e3", "E-2").
+  const numericPortion = raw.replace(/^[^\d+.,-]+/, "").trimStart();
+  const malformedScientificAttempt = /^[+-]?[\d.,]+\s*[eE]/.test(numericPortion)
+    || /^[eE](?:[+-]?\d|$)/.test(raw);
+  if (malformedScientificAttempt) return 0;
 
   const cleaned = raw
     .replace(/[^\d,.-]/g, "")
@@ -31,16 +63,16 @@ export function parseFlexibleNumber(value: unknown): number {
 
   if (hasComma && hasDot) {
     if (lastComma > lastDot) {
-      return Number(cleaned.replace(/\./g, "").replace(",", ".")) || 0;
+      return safeFiniteNumber(Number(cleaned.replace(/\./g, "").replace(",", ".")));
     }
-    return Number(cleaned.replace(/,/g, "")) || 0;
+    return safeFiniteNumber(Number(cleaned.replace(/,/g, "")));
   }
 
   if (hasComma) {
-    return Number(cleaned.replace(/\./g, "").replace(",", ".")) || 0;
+    return safeFiniteNumber(Number(cleaned.replace(/\./g, "").replace(",", ".")));
   }
 
-  return Number(cleaned) || 0;
+  return safeFiniteNumber(Number(cleaned));
 }
 
 // Para columnas de CANTIDAD que representan horas trabajadas, la planilla de

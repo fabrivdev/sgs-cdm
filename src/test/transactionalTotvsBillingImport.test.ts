@@ -33,7 +33,7 @@ describe("importacion transaccional de facturacion TOTVS", () => {
   it("bloquea lineas ausentes y cambios comerciales en vez de reemplazarlos", () => {
     expect(migration).toContain("Cambio comercial para la identidad TOTVS");
     expect(migration).toContain("El XML omite lineas TOTVS existentes en la ventana");
-    expect(importer).toContain('"facturacion_importar_totvs_lote_v1"');
+    expect(importer).toContain('"facturacion_importar_totvs_lote_con_fuente_v1"');
   });
 
   it("protege corte historico y valida cobertura antes de borrar resumen", () => {

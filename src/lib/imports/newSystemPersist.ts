@@ -22,19 +22,35 @@ import {
 import { validateBillingSourceBatch } from "@/lib/imports/billingLineStableReimport";
 import { persistedBillingTimeType } from "@/lib/imports/billingTimeType";
 import {
+  accreditExistingBillingSource,
+  buildBillingSnapshotScope,
+  type BillingSourceAccreditationRpcClient,
+  type BillingSnapshotDeclaration,
+} from "@/lib/imports/billingSourceAccreditation";
+import type { SourceFileIdentity } from "@/lib/imports/sourceIdentity";
+import {
+  describeImportError,
   emitImportProgress,
+  runImportProgressStep,
   type ImportProgressCallback,
 } from "@/lib/imports/importProgress";
 
 export { persistedBillingTimeType } from "@/lib/imports/billingTimeType";
 
+// La ausencia en una exportacion de OS no representa una anulacion. El estado
+// operativo se toma exclusivamente de situacion_os, informada por la fuente.
 const RECONCILE_SERVICE_ORDERS_BY_ABSENCE = false;
 
 export interface PersistNewSystemBundleArgs {
   bundle: NewSystemImportBundle;
   userId: string;
-  mode?: "validate" | "persist";
   onProgress?: ImportProgressCallback;
+  billingSnapshotDeclaration?: BillingSnapshotDeclaration | null;
+  mode?: "validate" | "persist" | "accredit";
+  accreditation?: {
+    supportingLoadId: string;
+    sourceIdentity: SourceFileIdentity;
+  };
   skipServiceOrders?: boolean;
   fileNames: {
     facturacion: string | null;
@@ -43,12 +59,10 @@ export interface PersistNewSystemBundleArgs {
   };
 }
 
-export interface PersistNewSystemServiceOrdersArgs {
-  bundle: NewSystemImportBundle;
-  userId: string;
-  onProgress?: ImportProgressCallback;
-  fileNames: PersistNewSystemBundleArgs["fileNames"];
-}
+export type PersistNewSystemServiceOrdersArgs = Pick<
+  PersistNewSystemBundleArgs,
+  "bundle" | "userId" | "onProgress" | "fileNames"
+>;
 
 type ServiceOrderBatchRpcClient = {
   rpc: (
@@ -85,6 +99,27 @@ export interface PersistNewSystemBundleResult {
   facturacionHasta: string | null;
   historialRepuestosActualizado: boolean;
   historialRepuestosError: string | null;
+  consolidacionTecnicaError?: string | null;
+}
+
+export type AccreditHistoricalBillingSourceArgs = Omit<
+  PersistNewSystemBundleArgs,
+  "mode" | "accreditation"
+> & {
+  supportingLoadId: string;
+  sourceIdentity: SourceFileIdentity;
+};
+
+export function accreditHistoricalBillingSource({
+  supportingLoadId,
+  sourceIdentity,
+  ...args
+}: AccreditHistoricalBillingSourceArgs) {
+  return persistNewSystemBundle({
+    ...args,
+    mode: "accredit",
+    accreditation: { supportingLoadId, sourceIdentity },
+  });
 }
 
 export function prepareBillingPersistenceRows(bundle: NewSystemImportBundle) {
@@ -136,9 +171,21 @@ export function prepareBillingPersistenceRows(bundle: NewSystemImportBundle) {
   });
 }
 
+export function indexFirstBillingRowsById(
+  rows: NewSystemImportBundle["facturacion"]["rows"],
+) {
+  const byId = new Map<string, NewSystemImportBundle["facturacion"]["rows"][number]>();
+  for (const row of rows) {
+    if (!byId.has(row.rowId)) byId.set(row.rowId, row);
+  }
+  return byId;
+}
+
 export function prepareServiceOrderPersistenceRows(bundle: NewSystemImportBundle) {
+  // Este enriquecimiento usa solo el contenido ya leido de los XML; no exige
+  // que facturacion valide ni persista, por lo que mantiene independiente la OS.
   const invoiceDateByServiceOrder = new Map<string, string>();
-  const billingRowById = new Map(bundle.facturacion.rows.map((row) => [row.rowId, row]));
+  const billingRowById = indexFirstBillingRowsById(bundle.facturacion.rows);
   for (const crosswalk of bundle.billingCrosswalk) {
     if (!crosswalk.serviceOrderNumber) continue;
     const billingRow = billingRowById.get(crosswalk.billingRowId);
@@ -193,9 +240,7 @@ const missingServiceOrderReconciliation = (error: any) =>
   || /ordenes_servicio_(reconciliar_snapshot|importadas_archivo)/.test(String(error?.message ?? ""));
 
 const postBillingStageError = (stage: string, error: unknown) => {
-  const detail = error instanceof Error
-    ? error.message
-    : String((error as { message?: unknown } | null)?.message ?? error ?? "Error desconocido");
+  const detail = describeImportError(error, stage);
   return new Error(
     `La facturacion quedo confirmada, pero fallo la etapa posterior ${stage}. `
     + `Es seguro reintentar el mismo paquete: la facturacion reutilizara sus UUID. Detalle: ${detail}`,
@@ -245,11 +290,10 @@ export async function persistNewSystemServiceOrders({
       batch,
     });
     const expectedNumbers = chunk.map((row) => row.os_numero.trim().toUpperCase());
-    const { data, error } = await (supabase as unknown as ServiceOrderBatchRpcClient).rpc("totvs_importar_ordenes_servicio_lote_v1", {
-      p_importacion_id: osImport.id,
-      p_lote_numero: batch,
-      p_filas: chunk,
-    });
+    const { data, error } = await (supabase as unknown as ServiceOrderBatchRpcClient).rpc(
+      "totvs_importar_ordenes_servicio_lote_v1",
+      { p_importacion_id: osImport.id, p_lote_numero: batch, p_filas: chunk },
+    );
     if (error) {
       emitImportProgress(onProgress, {
         phase: "service-orders.persist",
@@ -323,9 +367,7 @@ export async function persistNewSystemServiceOrders({
   });
   const { error: closeError } = await supabase
     .from("importaciones")
-    .update({
-      duplicados: 0,
-    } as any)
+    .update({ duplicados: 0 } as any)
     .eq("id", osImport.id);
   if (closeError) throw new ServiceOrderImportFailure(String(closeError.message ?? closeError), confirmed);
 
@@ -351,13 +393,19 @@ export async function persistNewSystemBundle({
   bundle,
   userId,
   mode = "persist",
+  accreditation,
   skipServiceOrders = false,
+  onProgress,
+  billingSnapshotDeclaration = null,
   fileNames,
 }: PersistNewSystemBundleArgs): Promise<PersistNewSystemBundleResult> {
   if (mode === "persist" && !skipServiceOrders) {
     throw new Error(
       "La persistencia directa de OS esta deshabilitada. Usa el importador TOTVS principal para respetar exclusiones y auditoria.",
     );
+  }
+  if (mode === "accredit" && !accreditation) {
+    throw new Error("La acreditacion retrospectiva requiere la carga historica y la identidad del archivo original.");
   }
   const osWindow = bundle.diagnostics.replacement.ordenesServicio;
   if (RECONCILE_SERVICE_ORDERS_BY_ABSENCE && osWindow.shouldReplace) {
@@ -378,7 +426,14 @@ export async function persistNewSystemBundle({
     }
   }
 
-  const cliExistentes = await cargarTodo<any>(supabase.from("clientes").select("*"));
+  const cliExistentes = await runImportProgressStep({
+    callback: onProgress,
+    phase: "billing.clients",
+    operation: "clientes.select.all",
+    completed: 0,
+    total: null,
+    action: () => cargarTodo<any>(supabase.from("clientes").select("*")),
+  });
 
   const cliByCod = new Map<string, string>();
   const cliByNombre = new Map<string, string>();
@@ -470,40 +525,139 @@ export async function persistNewSystemBundle({
 
   const billingWindow = bundle.diagnostics.replacement.facturacion;
   const billingDates = facturacionLineas.map((row) => row.fecha_factura).filter((value): value is string => Boolean(value));
-  const facturacionDesde = billingWindow.from ?? (billingDates.length ? [...billingDates].sort()[0] : null);
-  const facturacionHasta = billingWindow.to ?? (billingDates.length ? [...billingDates].sort().at(-1)! : null);
+  const observedBillingFrom = billingWindow.from ?? (billingDates.length ? [...billingDates].sort()[0] : null);
+  const observedBillingTo = billingWindow.to ?? (billingDates.length ? [...billingDates].sort().at(-1)! : null);
+  const billingSnapshotScope = buildBillingSnapshotScope(
+    billingSnapshotDeclaration,
+    {
+      sourceFileSha256: String(
+        (bundle.importaciones.facturacion.metadata as Record<string, unknown>).sourceFileSha256 ?? "",
+      ),
+      sourceFileByteSize: Number(
+        (bundle.importaciones.facturacion.metadata as Record<string, unknown>).sourceFileByteSize ?? 0,
+      ),
+      observedLineCount: facturacionLineas.length,
+      observedBranches: facturacionLineas.map((row) => String(row.sucursal ?? "")),
+    },
+  );
+  const facturacionDesde = billingSnapshotScope?.from ?? observedBillingFrom;
+  const facturacionHasta = billingSnapshotScope?.to ?? observedBillingTo;
+  const replaceBillingSummary = billingSnapshotScope !== null;
   const osNumeros = Array.from(new Set(ordenesServicioPayload.map((row) => row.os_numero).filter(Boolean)));
 
-  const billingRpc = mode === "validate"
-    ? "facturacion_validar_totvs_lote_v1"
-    : "facturacion_importar_totvs_lote_v1";
-  const { data: facturacionData, error: facturacionError } = await (supabase.rpc as any)(billingRpc, {
-    p_importacion: {
-      ...bundle.importaciones.facturacion,
-      metadata: {
-        ...(bundle.importaciones.facturacion.metadata as Record<string, unknown>),
-        archivos_relacionados: fileNames,
-        duplicados_exactos_colapsados: facturacionValidada.collapsedExactDuplicates,
-      },
+  const importEnvelope = {
+    ...bundle.importaciones.facturacion,
+    metadata: {
+      ...(bundle.importaciones.facturacion.metadata as Record<string, unknown>),
+      archivos_relacionados: fileNames,
+      duplicados_exactos_colapsados: facturacionValidada.collapsedExactDuplicates,
+      sourcePeriodFrom: facturacionDesde,
+      sourcePeriodTo: facturacionHasta,
+      snapshot_scope: billingSnapshotScope,
+      technicalLoadState: "COMPLETE_ON_RPC_SUCCESS",
     },
-    p_resumen: facturacionResumen,
-    p_lineas: facturacionLineas,
-    p_desde: facturacionDesde,
-    p_hasta: facturacionHasta,
-    p_reemplazar_resumen: billingWindow.shouldReplace,
+  };
+  const billingResponse = await runImportProgressStep({
+    callback: onProgress,
+    phase: mode === "validate" ? "billing.validate" : mode === "accredit" ? "billing.accredit" : "billing.persist",
+    sourceFile: fileNames.facturacion ?? undefined,
+    operation: mode === "validate"
+      ? "facturacion_validar_totvs_lote_v1"
+      : mode === "accredit"
+        ? "facturacion_acreditar_fuente_existente_v1"
+        : "facturacion_importar_totvs_lote_con_fuente_v1",
+    completed: 0,
+    total: facturacionLineas.length,
+    batch: 1,
+    batchRows: facturacionLineas.length,
+    resultError: (response) => response.error,
+    action: () => mode === "accredit"
+      ? accreditExistingBillingSource(
+        supabase as unknown as BillingSourceAccreditationRpcClient,
+        {
+          supportingLoadId: accreditation!.supportingLoadId,
+          sourceIdentity: accreditation!.sourceIdentity,
+          importEnvelope,
+          summary: facturacionResumen,
+          lines: facturacionLineas,
+          from: facturacionDesde,
+          to: facturacionHasta,
+          replaceSummary: replaceBillingSummary,
+        },
+      )
+      : (supabase.rpc as any)(
+        mode === "validate" ? "facturacion_validar_totvs_lote_v1" : "facturacion_importar_totvs_lote_con_fuente_v1",
+        {
+          p_importacion: importEnvelope,
+          p_resumen: facturacionResumen,
+          p_lineas: facturacionLineas,
+          p_desde: facturacionDesde,
+          p_hasta: facturacionHasta,
+          p_reemplazar_resumen: replaceBillingSummary,
+        },
+      ),
   });
+  const { data: facturacionData, error: facturacionError } = billingResponse;
   if (facturacionError) {
     if (isMissingBillingLinesTableError(facturacionError) || facturacionError.code === "PGRST202") {
       throw new Error("Falta aplicar la migracion transaccional de facturacion TOTVS antes de importar el XML.");
     }
-    throw facturacionError;
+    throw new Error(describeImportError(
+      facturacionError,
+      mode === "validate" ? "billing.validate" : mode === "accredit" ? "billing.accredit" : "billing.persist",
+    ));
   }
 
   const facturacionResultado = (facturacionData ?? {}) as Record<string, unknown>;
   const facturacionExcluidas = Number(facturacionResultado.excluidas_confirmadas ?? 0);
   const facturacionAceptadas = Number(facturacionResultado.lineas_activas ?? facturacionLineas.length - facturacionExcluidas);
+  let consolidacionTecnicaError: string | null = null;
+  if (mode !== "validate") {
+    const supportingLoadId = String(
+      facturacionResultado.supporting_load_id
+        ?? facturacionResultado.importacion_id
+        ?? accreditation?.supportingLoadId
+        ?? "",
+    ) || null;
+    if (supportingLoadId) {
+      try {
+        const refreshRpc = supabase.rpc as unknown as (
+          name: string,
+          params: Record<string, unknown>,
+        ) => PromiseLike<{
+          data: { status?: string; error?: string } | null;
+          error: { code?: string; message?: string } | null;
+        }>;
+        const { data, error } = await refreshRpc("totvs_refrescar_consolidacion_post_import_v1", {
+          p_mayor_carga_id: null,
+          p_facturacion_carga_id: supportingLoadId,
+        });
+        if (error && !["PGRST202", "42883"].includes(error.code ?? "")) {
+          consolidacionTecnicaError = error.message ?? "No se pudo refrescar la consolidacion tecnica.";
+        } else if (data?.status === "FAILED") {
+          consolidacionTecnicaError = data.error ?? "No se pudo refrescar la consolidacion tecnica.";
+        }
+      } catch (refreshError) {
+        consolidacionTecnicaError = refreshError instanceof Error
+          ? refreshError.message
+          : String(refreshError);
+      }
+    }
+  }
 
-  if (mode === "validate") {
+  let historialRepuestos = { actualizado: false, error: null as string | null };
+  if (mode !== "validate") {
+    // Estas proyecciones dependen de la facturacion activa, por lo que deben
+    // reconciliarse tambien en una acreditacion historica y aun si una etapa
+    // posterior de OS falla. Sus RPC ya son idempotentes.
+    const { error: refreshParkError } = await (supabase.rpc as any)("refrescar_parque_ultima_actividad");
+    if (refreshParkError) {
+      console.error("No se pudo reconciliar la ultima actividad del Parque", refreshParkError);
+    }
+    historialRepuestos = await actualizarVentasRepuestosPeriodo(facturacionDesde, facturacionHasta);
+  }
+
+  if (mode === "validate" || mode === "accredit") {
     return {
       facturacionLineas: facturacionAceptadas,
       facturacionExcluidas,
@@ -514,8 +668,9 @@ export async function persistNewSystemBundle({
       jornadasDesactivadas: 0,
       facturacionDesde,
       facturacionHasta,
-      historialRepuestosActualizado: false,
-      historialRepuestosError: null,
+      historialRepuestosActualizado: historialRepuestos.actualizado,
+      historialRepuestosError: historialRepuestos.error,
+      consolidacionTecnicaError,
     };
   }
 
@@ -530,8 +685,9 @@ export async function persistNewSystemBundle({
       jornadasDesactivadas: 0,
       facturacionDesde,
       facturacionHasta,
-      historialRepuestosActualizado: false,
-      historialRepuestosError: null,
+      historialRepuestosActualizado: historialRepuestos.actualizado,
+      historialRepuestosError: historialRepuestos.error,
+      consolidacionTecnicaError,
     };
   }
 
@@ -552,14 +708,28 @@ export async function persistNewSystemBundle({
   if (osImpError) throw postBillingStageError("registro de ordenes de servicio", osImpError);
 
   let ordenesServicioPersistidas = 0;
+  let ordenesServicioCompletadas = 0;
+  let loteOrdenesServicio = 0;
   for (let i = 0; i < ordenesServicioPayload.length; i += 500) {
     const chunk = ordenesServicioPayload.slice(i, i + 500).map((row) => ({
       ...row,
       actualizado_en: new Date().toISOString(),
     }));
-    const { data: osPersistidas, error } = await (supabase.from("ordenes_servicio_importadas" as any).upsert(chunk as any, {
-      onConflict: "os_numero",
-    }).select("os_numero") as any);
+    loteOrdenesServicio += 1;
+    const { error } = await runImportProgressStep({
+      callback: onProgress,
+      phase: "service-orders.batch",
+      sourceFile: fileNames.ordenesServicio ?? undefined,
+      operation: "ordenes_servicio_importadas.upsert",
+      completed: ordenesServicioCompletadas,
+      total: ordenesServicioPayload.length,
+      batch: loteOrdenesServicio,
+      batchRows: chunk.length,
+      resultError: (response: { error?: unknown }) => response.error,
+      action: () => (supabase.from("ordenes_servicio_importadas" as any).upsert(chunk as any, {
+        onConflict: "os_numero",
+      }) as any),
+    });
     if (error) {
       if (isMissingOsImportTableError(error)) {
         throw postBillingStageError(
@@ -569,7 +739,8 @@ export async function persistNewSystemBundle({
       }
       throw postBillingStageError("persistencia de ordenes de servicio", error);
     }
-    ordenesServicioPersistidas += Array.isArray(osPersistidas) ? osPersistidas.length : 0;
+    ordenesServicioCompletadas += chunk.length;
+    ordenesServicioPersistidas += chunk.length;
   }
   const ordenesServicioOmitidas = ordenesServicioPayload.length - ordenesServicioPersistidas;
 
@@ -622,13 +793,6 @@ export async function persistNewSystemBundle({
     .eq("id", osImp.id);
   if (updateOsImpError) throw postBillingStageError("cierre del registro de ordenes de servicio", updateOsImpError);
 
-  const { error: refreshParkError } = await (supabase.rpc as any)("refrescar_parque_ultima_actividad");
-  if (refreshParkError) {
-    console.error("No se pudo reconciliar la ultima actividad del Parque", refreshParkError);
-  }
-
-  const historialRepuestos = await actualizarVentasRepuestosPeriodo(facturacionDesde, facturacionHasta);
-
   return {
     facturacionLineas: facturacionAceptadas,
     facturacionExcluidas,
@@ -641,5 +805,6 @@ export async function persistNewSystemBundle({
     facturacionHasta,
     historialRepuestosActualizado: historialRepuestos.actualizado,
     historialRepuestosError: historialRepuestos.error,
+    consolidacionTecnicaError,
   };
 }

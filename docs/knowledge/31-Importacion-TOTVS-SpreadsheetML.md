@@ -53,4 +53,98 @@ no acredita triggers ni vistas productivas que no se hayan reproducido.
 La migracion guarda la definicion previa del RPC antes de reemplazarla. La
 auditoria de importacion conserva valores anteriores de todas las columnas
 modificadas, raw_data anterior y huellas antes/despues. Revertir el codigo no
-revierte datos importados; una reversión de datos requiere controles propios.
+revierte datos importados; una reversion de datos requiere controles propios.
+
+## Anulacion por ausencia en snapshot completo (2026-10-09)
+
+El usuario confirmo que un documento anulado deja de aparecer del reporte
+acumulativo de Ventas TOTVS. Esta semantica solo se aplica cuando el operador
+declara `totvs-billing-full-v1`, todos los documentos, el intervalo DESDE/HASTA
+del reporte y la lista de sucursales incluidas. El XML real inspeccionado no
+trae esos filtros como metadata; por eso las fechas no se deducen del minimo y
+maximo observado. Una sucursal declarada puede tener cero filas. Las sucursales
+observadas deben ser subconjunto de las declaradas. Fechas y sucursales se
+solicitan sin valores precargados, de modo que incluir una sucursal vacia sea
+una decision explicita y no un efecto del formulario.
+
+La migracion `20261009180000` conserva UUID, importacion anterior, importes y
+`raw_data` de la linea ausente. Marca la linea fuera de reportes y registra un
+evento `ANULADA_POR_AUSENCIA`; no ejecuta DELETE sobre el detalle. El resumen
+de la ventana se reconstruye solo desde el snapshot actual dentro de la misma
+transaccion. Si una identidad reaparece en un snapshot completo posterior, se
+reactiva la misma fila y se registra `REACTIVADA_POR_REAPARICION`. Repetir el
+mismo archivo no crea otro cambio de estado.
+
+La regla no se activa para cargas incrementales o archivos que el operador
+declare parciales, aunque el archivo contenga filas de todas las sucursales.
+Los consumidores SQL operativos y los lectores directos filtran
+`excluido_de_reportes=false`; parque, repuestos y consolidacion se refrescan
+dentro de la misma transaccion del snapshot completo. Un fallo de cualquiera
+revierte detalle, resumen y auditoria. La migracion `20261009182000` no revierte
+estados manuales de maquinaria por una mera coincidencia de chasis. Si existe
+un vinculo manual independiente o una conciliacion automatica historica sin
+estado previo trazable, la carga completa aborta transaccionalmente para no
+adivinar ni pisar ese estado.
+No cambia formulas, cron ni diseno del panel. La verificacion es local y no
+acredita que las migraciones hayan sido aplicadas en produccion.
+
+## Enriquecimiento descriptivo seguro de facturacion (2026-10-13)
+
+La propuesta `20261013173000` cubre el hueco de grupo/subgrupo sin convertir
+una reimportacion en reemplazo de asientos. Solo admite completar un grupo
+ausente (`NULL`, vacio o `-`) cuando factura y maestro de productos aportan el
+mismo subgrupo no vacio para el mismo SKU, el tipo canonico coincide y el resto
+de la firma comercial, fecha, fabricante compatible y moneda no cambia. Un
+grupo conocido distinto, una sola fuente descriptiva, una preservacion
+auditada o un documento excluido no se adapta.
+
+La matriz sigue separando identidad de descripcion. SKU, cantidad, importes y
+moneda son guardas duras; cero es un importe, no ausencia. El core previo sigue
+siendo responsable de completar fabricante y vendedor ausentes y de las reglas
+de OS/tiempo/marca que exigen evidencia. Esta propuesta no relaja esas reglas
+ni convierte codigo de fabricante en identidad de producto. Ademas conserva
+un vendedor conocido solo si coincide con su raw historico, y una marca
+conocida ante ausencia explicita aunque no haya OS solo cuando la evidencia
+historica es univoca. Tambien conserva `CODFAB` conocido ante vacio solo si el
+SKU permanece igual y el raw historico coincide; fabricante nunca forma la
+identidad. Esas preservaciones se auditan por separado. Para grupo,
+una fuente posterior vacia solo conserva un valor conocido si `GRUPO` y
+`product_group` historicos lo acreditan conjuntamente.
+
+Una fila canonica con OS y par de deduplicacion permanece bajo la proteccion
+especial del core aunque no tenga una preservacion explicita: este wrapper no
+la adapta. Completar una marca antes desconocida continua sujeto a las reglas
+de evidencia del core; esta allowlist no pretende aceptar toda diferencia
+descriptiva futura.
+
+El wrapper toma el mismo advisory lock que el core y bloquea los UUID destino
+antes de planificar. Los duplicados fisicos solo se resuelven mediante pares
+canonico/descartado auditados; nunca por `min(id)`. Antes de adaptar el lote,
+reconcilia el resumen recibido contra el detalle original. Despues reconstruye
+detalle efectivo y resumen desde la misma clasificacion, conserva UUID, hash,
+carga e importes, y registra la decision. Cualquier fallo posterior revierte
+detalle, resumen, auditoria, procedencia e importacion.
+
+La validacion disponible es local con PGlite y contratos de funciones tomados
+de las migraciones del repositorio. No acredita el cuerpo desplegado de
+`core_consolidacion`, no aplica SQL remoto y requiere un preflight completo del
+lote antes de confirmar una importacion productiva.
+
+El hotfix `20261013183500` corrige dos incompatibilidades de tipos del wrapper
+ya instalado: convierte `tipo_facturacion` a `text` antes de usar una cadena
+vacia en `coalesce`, y asigna `grupo_normalizado` como `text` sin referenciar un
+tipo enum inexistente. La regresion reproduce primero el `22P02` con los enums
+reales de sucursal, marca y tipo de facturacion, verifica que grupo permanece
+`text` y ejecuta el hotfix dos veces para comprobar idempotencia. No modifica
+filas ni relaja las guardas comerciales.
+
+El hotfix `20261013190000` separa la evidencia historica de las reparaciones
+cientificas del resumen materializado. Conserva `resumen_id` UUID NOT NULL y
+los snapshots before/after, pero elimina exclusivamente la FK RESTRICT de
+`resumen_id` a `facturacion(id)` en las tablas V1/V2, despues de verificar
+tabla, columna, tipo, destino y accion de borrado en catalogo. Las FKs a la
+linea de detalle y a la importacion permanecen. Esto permite que un snapshot
+completo reconstruya `facturacion` sin borrar auditoria ni usar CASCADE.
+El rollback V2 anterior no debe ejecutarse luego de esa reconstruccion: sus
+UUID de resumen ya son historicos; sus guardas abortan y revierten sin tocar
+detalle ni evidencia cuando no encuentra exactamente los tres resumenes.

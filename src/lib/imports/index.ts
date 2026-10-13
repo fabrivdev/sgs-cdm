@@ -11,6 +11,7 @@ export * from "@/lib/imports/syntheticKardex";
 export * from "@/lib/imports/purchaseInvoices";
 export * from "@/lib/imports/suppliers";
 export * from "@/lib/imports/branchTransfers";
+export * from "@/lib/imports/billingSourceAccreditation";
 export * from "@/lib/imports/mappings";
 export * from "@/lib/imports/machineStock";
 export * from "@/lib/imports/mayorPreflight";

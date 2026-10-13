@@ -45,11 +45,10 @@ import {
   mapStockSheet,
   parseSpreadsheetXml,
   persistMayorFile,
-  persistReceivablesFile,
   readMayorPreflightFile,
-  readReceivablesPreflightFile,
   readXmlFileText,
   prepareNewSystemImportBundle,
+  prepareBillingPersistenceRows,
   reconcileCanonicalClientes,
   mergeKardexRows,
   mergeImportDispatchRows,
@@ -62,6 +61,10 @@ import {
   persistNewSystemBundle,
   persistNewSystemServiceOrders,
   ServiceOrderImportFailure,
+  accreditHistoricalBillingSource,
+  buildBillingSnapshotScope,
+  TOTVS_BILLING_BRANCHES,
+  requestBillingSnapshotDeclaration,
   actualizarVentasRepuestosPeriodo,
   type CanonicalClienteRow,
   type CanonicalImportDispatchRow,
@@ -89,16 +92,16 @@ import {
   type MayorPreflight,
   type MayorPersistResult,
   type MayorRpcClient,
-  type ReceivablesPreflight,
-  type ReceivablesPersistResult,
-  type ReceivablesRpcClient,
   type ImportProgressEvent,
+  type BillingSnapshotDeclaration,
+  describeImportError,
   syntheticValueDiffersFromBalance,
   TOTVS_FILE_KIND_LABELS,
   detectTotvsFileKind,
   type TotvsFileKind,
 } from "@/lib/imports";
 import { cn } from "@/lib/utils";
+import { identifySourceFile } from "@/lib/imports/sourceIdentity";
 
 type FileKind = TotvsFileKind;
 const KIND_LABELS = TOTVS_FILE_KIND_LABELS;
@@ -113,12 +116,28 @@ function conciseImportErrorSummary(prefix: string, detail: string) {
 interface DetectedFile {
   file: File;
   kind: FileKind | "ignorar";
-  cutoffDate?: string;
+}
+
+interface BundleSourceFile {
+  fileName: string;
+  xmlText: string;
+  byteSize: number;
+  sha256: string;
+}
+
+interface HistoricalBillingLoad {
+  id: string;
+  archivo_nombre: string | null;
+  creado_en: string;
+}
+
+interface BillingValidationReport {
+  status: "success" | "error";
+  detail: string;
 }
 
 interface Preview {
   mayor: MayorPreflight[];
-  receivables: ReceivablesPreflight[];
   productos: CanonicalProductRow[];
   stock: CanonicalStockRow[];
   stockMaquinas: CanonicalMachineStockRow[];
@@ -148,14 +167,13 @@ interface Preview {
   supplierDuplicatesSkipped: number;
   branchTransfers: CanonicalBranchTransferRow[];
   branchTransferDuplicatesSkipped: number;
-  bundleFiles: { facturacion: { fileName: string; xmlText: string }; ordenesServicio: { fileName: string; xmlText: string }; productos: { fileName: string; xmlText: string } } | null;
+  bundleFiles: { facturacion: BundleSourceFile; ordenesServicio: BundleSourceFile; productos: BundleSourceFile } | null;
   faltaParaTrio: string[];
 }
 
 function hasPersistablePreview(preview: Preview) {
   return Boolean(
     preview.mayor.length
-    || preview.receivables.length
     || preview.bundleFiles
     || preview.productos.length
     || preview.stock.length
@@ -245,6 +263,20 @@ export function ImportarTotvsTab({ onChanged }: { onChanged: () => void }) {
   const [importProgress, setImportProgress] = useState<ImportProgressEvent | null>(null);
   const [importError, setImportError] = useState<{ summary: string; detail: string } | null>(null);
   const [dragOver, setDragOver] = useState(false);
+  const [historicalLoads, setHistoricalLoads] = useState<HistoricalBillingLoad[]>([]);
+  const [historicalLoadId, setHistoricalLoadId] = useState("");
+  const [loadingHistoricalLoads, setLoadingHistoricalLoads] = useState(false);
+  const [accreditingHistoricalLoad, setAccreditingHistoricalLoad] = useState(false);
+  const [billingValidationReport, setBillingValidationReport] = useState<BillingValidationReport | null>(null);
+  const [billingValidationScope, setBillingValidationScope] = useState<BillingSnapshotDeclaration>(() => {
+    const today = new Date().toISOString().slice(0, 10);
+    return {
+      from: `${today.slice(0, 4)}-07-01`,
+      to: today,
+      includedBranches: [...TOTVS_BILLING_BRANCHES],
+      completenessConfirmed: true,
+    };
+  });
   const folderInputRef = useRef<HTMLInputElement>(null);
   const filesInputRef = useRef<HTMLInputElement>(null);
 
@@ -267,34 +299,32 @@ export function ImportarTotvsTab({ onChanged }: { onChanged: () => void }) {
       const existingNames = new Set(prev.map((d) => d.file.name));
       const nuevos = xmlFiles
         .filter((file) => !existingNames.has(file.name))
-        .map((file) => {
-          const kind = detectTotvsFileKind(file.name);
-          return { file, kind, cutoffDate: kind === "cuentas_cobrar" ? "" : undefined };
-        });
+        .map((file) => ({ file, kind: detectTotvsFileKind(file.name) }));
       return [...prev, ...nuevos];
     });
     setPreview(null);
     setImportError(null);
+    setBillingValidationReport(null);
+    setHistoricalLoads([]);
+    setHistoricalLoadId("");
   };
 
   const removeFile = (name: string) => {
     setDetected((prev) => prev.filter((d) => d.file.name !== name));
     setPreview(null);
     setImportError(null);
+    setBillingValidationReport(null);
+    setHistoricalLoads([]);
+    setHistoricalLoadId("");
   };
 
   const setKind = (name: string, kind: DetectedFile["kind"]) => {
-    setDetected((prev) => prev.map((d) => (d.file.name === name
-      ? { ...d, kind, cutoffDate: kind === "cuentas_cobrar" ? d.cutoffDate ?? "" : undefined }
-      : d)));
+    setDetected((prev) => prev.map((d) => (d.file.name === name ? { ...d, kind } : d)));
     setPreview(null);
     setImportError(null);
-  };
-
-  const setCutoffDate = (name: string, cutoffDate: string) => {
-    setDetected((prev) => prev.map((d) => (d.file.name === name ? { ...d, cutoffDate } : d)));
-    setPreview(null);
-    setImportError(null);
+    setBillingValidationReport(null);
+    setHistoricalLoads([]);
+    setHistoricalLoadId("");
   };
 
   const usableFiles = useMemo(() => detected.filter((d) => d.kind !== "ignorar"), [detected]);
@@ -306,41 +336,161 @@ export function ImportarTotvsTab({ onChanged }: { onChanged: () => void }) {
     }
     return counts;
   }, [usableFiles]);
-  const previewWarningCount = useMemo(() => {
-    if (!preview) return 0;
-    const mayorWarnings = preview.mayor.reduce((total, item) => total
-      + item.warnings.length
-      + item.missing.account
-      + item.missing.accountDescription
-      + item.missing.costCenter
-      + item.missing.origin
-      + item.duplicateCandidateKeys
-      + item.signViolations.type1Negative
-      + item.signViolations.type2Positive, 0);
-    const receivablesWarnings = preview.receivables.reduce((total, item) => total + item.warnings.length, 0);
-    return mayorWarnings
-      + receivablesWarnings
-      + preview.machineStockChassis.unresolvedPlaceholders
-      + preview.machineStockChassis.validConflicts
-      + preview.machineStockChassis.ambiguousProductCodes;
-  }, [preview]);
+
+  const loadHistoricalBillingLoads = async () => {
+    const billingFile = preview?.bundleFiles?.facturacion;
+    if (!billingFile) return;
+
+    setLoadingHistoricalLoads(true);
+    try {
+      const { data, error } = await supabase
+        .from("importaciones")
+        .select("id, archivo_nombre, creado_en")
+        .eq("origen_sistema", "new_xml_facturacion")
+        .eq("archivo_nombre", billingFile.fileName)
+        .order("creado_en", { ascending: false })
+        .limit(25);
+      if (error) throw error;
+
+      const loads = (data ?? []) as HistoricalBillingLoad[];
+      setHistoricalLoads(loads);
+      setHistoricalLoadId((current) => loads.some((load) => load.id === current) ? current : "");
+      if (loads.length === 0) toast.info("No se encontraron cargas anteriores con el mismo nombre de archivo.");
+    } catch (error) {
+      toast.error("No se pudieron consultar las cargas anteriores: " + (error as Error).message);
+    } finally {
+      setLoadingHistoricalLoads(false);
+    }
+  };
+
+  const accreditSelectedHistoricalLoad = async () => {
+    const bundleFiles = preview?.bundleFiles;
+    if (!bundleFiles || !user || !historicalLoadId) {
+      toast.error("Seleccioná una carga histórica antes de acreditar.");
+      return;
+    }
+
+    const bundle = prepareNewSystemImportBundle({
+      facturacion: bundleFiles.facturacion,
+      ordenesServicio: bundleFiles.ordenesServicio,
+      productos: bundleFiles.productos,
+      usuarioId: user.id,
+    });
+    const billingSnapshotDeclaration = requestBillingSnapshotDeclaration({
+      observedFrom: bundle.diagnostics.replacement.facturacion.from,
+      observedTo: bundle.diagnostics.replacement.facturacion.to,
+    });
+    if (billingSnapshotDeclaration === undefined) return;
+    if (billingSnapshotDeclaration === null) {
+      toast.error("La acreditación histórica requiere el reporte completo y su alcance declarado.");
+      return;
+    }
+
+    setAccreditingHistoricalLoad(true);
+    try {
+      const result = await accreditHistoricalBillingSource({
+        bundle,
+        userId: user.id,
+        billingSnapshotDeclaration,
+        supportingLoadId: historicalLoadId,
+        sourceIdentity: {
+          fileName: bundleFiles.facturacion.fileName,
+          byteSize: bundleFiles.facturacion.byteSize,
+          sha256: bundleFiles.facturacion.sha256,
+        },
+        fileNames: {
+          facturacion: bundleFiles.facturacion.fileName,
+          ordenesServicio: bundleFiles.ordenesServicio.fileName,
+          productos: bundleFiles.productos.fileName,
+        },
+      });
+      toast.success(
+        `Carga acreditada sin reimportar: ${result.facturacionLineas.toLocaleString("es-PY")} líneas verificadas.`,
+      );
+    } catch (error) {
+      toast.error("No se pudo acreditar la carga: " + (error as Error).message);
+    } finally {
+      setAccreditingHistoricalLoad(false);
+    }
+  };
+
+  const validateBillingOnly = async () => {
+    const bundleFiles = preview?.bundleFiles;
+    if (!bundleFiles || !user) {
+      toast.error("Para validar la facturacion se necesitan los XML de OS, Facturacion y Productos.");
+      return;
+    }
+
+    const bundle = prepareNewSystemImportBundle({
+      facturacion: bundleFiles.facturacion,
+      ordenesServicio: bundleFiles.ordenesServicio,
+      productos: bundleFiles.productos,
+      usuarioId: user.id,
+    });
+    const billingRows = prepareBillingPersistenceRows(bundle);
+    const billingSnapshotScope = buildBillingSnapshotScope(billingValidationScope, {
+      sourceFileSha256: bundleFiles.facturacion.sha256,
+      sourceFileByteSize: bundleFiles.facturacion.byteSize,
+      observedLineCount: billingRows.length,
+      observedBranches: billingRows.map((row) => String(row.sucursal ?? "")),
+    });
+    if (!billingSnapshotScope) {
+      const detail = "El alcance editable no cubre todas las sucursales observadas o tiene fechas invalidas; no se llamo al servidor.";
+      setBillingValidationReport({ status: "error", detail });
+      toast.error(detail);
+      return;
+    }
+
+    let activeValidationStage = "billing.validate";
+    setBusy(true);
+    setImportProgress(null);
+    setBillingValidationReport(null);
+    setImportError(null);
+    try {
+      const result = await persistNewSystemBundle({
+        bundle,
+        userId: user.id,
+        mode: "validate",
+        onProgress: (event) => {
+          activeValidationStage = event.phase;
+          setImportProgress(event);
+        },
+        billingSnapshotDeclaration: billingValidationScope,
+        fileNames: {
+          facturacion: bundleFiles.facturacion.fileName,
+          ordenesServicio: bundleFiles.ordenesServicio.fileName,
+          productos: bundleFiles.productos.fileName,
+        },
+      });
+      const detail = [
+        "Validacion completada con rollback: no se guardaron facturacion, OS ni acreditaciones.",
+        `${result.facturacionLineas.toLocaleString("es-PY")} lineas activas`,
+        `${result.facturacionExcluidas.toLocaleString("es-PY")} exclusiones confirmadas`,
+      ].join(" ");
+      setBillingValidationReport({ status: "success", detail });
+      toast.success("Facturacion validada sin guardar cambios.");
+    } catch (error) {
+      const detail = describeImportError(error, activeValidationStage);
+      setBillingValidationReport({ status: "error", detail });
+      toast.error("La validacion de facturacion fue rechazada. El detalle quedo visible debajo.");
+    } finally {
+      setBusy(false);
+      setImportProgress(null);
+    }
+  };
 
   const leerArchivos = async () => {
     if (usableFiles.length === 0) {
       toast.error("Asigná al menos un archivo a alguno de los tipos disponibles.");
       return;
     }
-    const missingCutoff = usableFiles.find((item) => item.kind === "cuentas_cobrar" && !item.cutoffDate);
-    if (missingCutoff) {
-      toast.error(`Confirmá la fecha de corte de ${missingCutoff.file.name}. No se infiere desde la fecha del archivo.`);
-      return;
-    }
 
     setBusy(true);
+    setImportProgress(null);
+    setBillingValidationReport(null);
     setImportError(null);
     try {
       const mayor: MayorPreflight[] = [];
-      const receivables: ReceivablesPreflight[] = [];
       const productos: CanonicalProductRow[] = [];
       const stock: CanonicalStockRow[] = [];
       let stockMaquinas: CanonicalMachineStockRow[] = [];
@@ -355,31 +505,25 @@ export function ImportarTotvsTab({ onChanged }: { onChanged: () => void }) {
       const suppliersUnmerged: CanonicalSupplierRow[] = [];
       const branchTransfersUnmerged: CanonicalBranchTransferRow[] = [];
       let clientesTodos: CanonicalClienteRow[] = [];
-      let osTexto: { fileName: string; xmlText: string } | null = null;
-      let facturacionTexto: { fileName: string; xmlText: string } | null = null;
-      let productosTexto: { fileName: string; xmlText: string } | null = null;
+      let osTexto: BundleSourceFile | null = null;
+      let facturacionTexto: BundleSourceFile | null = null;
+      let productosTexto: BundleSourceFile | null = null;
 
-      for (const { file, kind, cutoffDate } of usableFiles) {
+      for (const { file, kind } of usableFiles) {
         try {
           if (kind === "mayor") {
             mayor.push(await readMayorPreflightFile(file, file.name));
             continue;
           }
-          if (kind === "cuentas_cobrar") {
-            receivables.push(await readReceivablesPreflightFile(file, file.name, {
-              cutoffDate: cutoffDate ?? "",
-              sourceLastModified: file.lastModified,
-            }));
-            continue;
-          }
           const xmlText = await readXmlFileText(file);
+          const identity = await identifySourceFile(file);
 
           if (kind === "os") {
-            osTexto = { fileName: file.name, xmlText };
+            osTexto = { ...identity, xmlText };
             continue;
           }
           if (kind === "facturacion") {
-            facturacionTexto = { fileName: file.name, xmlText };
+            facturacionTexto = { ...identity, xmlText };
             continue;
           }
 
@@ -388,7 +532,7 @@ export function ImportarTotvsTab({ onChanged }: { onChanged: () => void }) {
           if (!sheet) throw new Error("no contiene una hoja legible");
 
           if (kind === "productos") {
-            productosTexto = { fileName: file.name, xmlText };
+            productosTexto = { ...identity, xmlText };
             productos.push(...mapProductosSheet(file.name, sheet).rows);
           } else if (kind === "stock") {
             stock.push(...mapStockSheet(file.name, sheet).rows);
@@ -529,7 +673,6 @@ export function ImportarTotvsTab({ onChanged }: { onChanged: () => void }) {
 
       setPreview({
         mayor,
-        receivables,
         productos,
         stock,
         stockMaquinas,
@@ -565,7 +708,6 @@ export function ImportarTotvsTab({ onChanged }: { onChanged: () => void }) {
 
       const partes = [
         mayor.length ? `${mayor.reduce((sum, item) => sum + item.movementRows, 0)} movimientos de Mayor (preflight)` : null,
-        receivables.length ? `${receivables.reduce((sum, item) => sum + item.documentRows, 0)} cuotas de cuentas por cobrar (preflight)` : null,
         bundleFiles ? "OS + Facturación" : null,
         productos.length ? `${productos.length} productos` : null,
         stock.length ? `${stock.length} filas de stock` : null,
@@ -583,7 +725,7 @@ export function ImportarTotvsTab({ onChanged }: { onChanged: () => void }) {
         suppliersMerged.rows.length ? `${suppliersMerged.rows.length} proveedores` : null,
         branchTransfersMerged.rows.length ? `${branchTransfersMerged.rows.length} transferencias en tránsito` : null,
       ].filter(Boolean);
-      toast.success(`${usableFiles.length} archivos leídos; ${partes.length} grupos listos para importar.`);
+      toast.success(partes.length > 0 ? `Leído: ${partes.join(", ")}.` : "Nada para importar todavía.");
     } catch (e) {
       const detail = e instanceof Error ? e.message : String(e);
       const summary = conciseImportErrorSummary("No se pudieron leer los archivos", detail);
@@ -598,16 +740,30 @@ export function ImportarTotvsTab({ onChanged }: { onChanged: () => void }) {
   const confirmar = async () => {
     if (!preview || !user) return;
 
-    let confirmedServiceOrders = 0;
+    const newSystemBundle = preview.bundleFiles
+      ? prepareNewSystemImportBundle({
+        facturacion: preview.bundleFiles.facturacion,
+        ordenesServicio: preview.bundleFiles.ordenesServicio,
+        productos: preview.bundleFiles.productos,
+        usuarioId: user.id,
+      })
+      : null;
+    let importedServiceOrders = 0;
+    let activeImportStage: string | undefined;
+    const handleImportProgress = (event: ImportProgressEvent) => {
+      activeImportStage = event.phase;
+      setImportProgress(event);
+    };
     setBusy(true);
     setImportProgress(null);
     setImportError(null);
     try {
       let facturacionLineas = 0;
       let facturacionExcluidas = 0;
-      let ordenesServicio = 0;
       let ordenesServicioOmitidas = 0;
+      let ordenesServicio = 0;
       let ordenesServicioArchivadas = 0;
+      let ordenesServicioBloqueadas = 0;
       let facturacionDesde: string | null = null;
       let facturacionHasta: string | null = null;
       let historialRepuestosError: string | null = null;
@@ -633,7 +789,6 @@ export function ImportarTotvsTab({ onChanged }: { onChanged: () => void }) {
       let branchTransfersActualizadas = 0;
       let branchTransfersSinCambios = 0;
       const mayorResultados: MayorPersistResult[] = [];
-      const receivablesResultados: ReceivablesPersistResult[] = [];
 
       const mayorFiles = usableFiles.filter((item) => item.kind === "mayor").map((item) => item.file);
       if (mayorFiles.length !== preview.mayor.length) {
@@ -643,44 +798,39 @@ export function ImportarTotvsTab({ onChanged }: { onChanged: () => void }) {
         mayorResultados.push(await persistMayorFile({
           file,
           client: supabase as unknown as MayorRpcClient,
+          expectedMovementRows: preview.mayor[mayorResultados.length]?.movementRows,
+          onProgress: handleImportProgress,
         }));
       }
-
-      const receivablesFiles = usableFiles.filter((item) => item.kind === "cuentas_cobrar");
-      if (receivablesFiles.length !== preview.receivables.length) {
-        throw new Error("Los archivos de cuentas por cobrar cambiaron después del preflight; volvé a leerlos antes de confirmar.");
-      }
-      for (const item of receivablesFiles) {
-        receivablesResultados.push(await persistReceivablesFile({
-          file: item.file,
-          client: supabase as unknown as ReceivablesRpcClient,
-          cutoffDate: item.cutoffDate ?? "",
-        }));
-      }
-
-      const newSystemBundle = preview.bundleFiles
-        ? prepareNewSystemImportBundle({
-          facturacion: preview.bundleFiles.facturacion,
-          ordenesServicio: preview.bundleFiles.ordenesServicio,
-          productos: preview.bundleFiles.productos,
-          usuarioId: user.id,
-        })
-        : null;
 
       if (newSystemBundle && preview.bundleFiles) {
         const osResult = await persistNewSystemServiceOrders({
           bundle: newSystemBundle,
           userId: user.id,
-          onProgress: setImportProgress,
+          onProgress: handleImportProgress,
           fileNames: {
             facturacion: preview.bundleFiles.facturacion.fileName,
             ordenesServicio: preview.bundleFiles.ordenesServicio.fileName,
             productos: preview.bundleFiles.productos.fileName,
           },
         });
-        confirmedServiceOrders = osResult.ordenesServicio;
         ordenesServicio = osResult.ordenesServicio;
+        importedServiceOrders = osResult.ordenesServicio;
         ordenesServicioOmitidas = osResult.ordenesServicioOmitidas;
+      }
+
+      const billingSnapshotDeclaration = newSystemBundle
+        ? requestBillingSnapshotDeclaration({
+          observedFrom: newSystemBundle.diagnostics.replacement.facturacion.from,
+          observedTo: newSystemBundle.diagnostics.replacement.facturacion.to,
+        })
+        : null;
+      if (billingSnapshotDeclaration === undefined) {
+        if (importedServiceOrders) {
+          toast.success(`${importedServiceOrders} OS importadas. Facturacion no iniciada.`);
+          onChanged();
+        }
+        return;
       }
 
       // El mismo RPC que persiste el lote se ejecuta en una subtransaccion
@@ -692,6 +842,8 @@ export function ImportarTotvsTab({ onChanged }: { onChanged: () => void }) {
           bundle: newSystemBundle,
           userId: user.id,
           mode: "validate",
+          onProgress: handleImportProgress,
+          billingSnapshotDeclaration,
           fileNames: {
             facturacion: preview.bundleFiles.facturacion.fileName,
             ordenesServicio: preview.bundleFiles.ordenesServicio.fileName,
@@ -733,6 +885,8 @@ export function ImportarTotvsTab({ onChanged }: { onChanged: () => void }) {
           bundle: newSystemBundle,
           userId: user.id,
           skipServiceOrders: true,
+          onProgress: handleImportProgress,
+          billingSnapshotDeclaration,
           fileNames: {
             facturacion: preview.bundleFiles.facturacion.fileName,
             ordenesServicio: preview.bundleFiles.ordenesServicio.fileName,
@@ -741,8 +895,10 @@ export function ImportarTotvsTab({ onChanged }: { onChanged: () => void }) {
         });
         facturacionLineas = resultado.facturacionLineas;
         facturacionExcluidas = resultado.facturacionExcluidas;
+        ordenesServicioOmitidas += resultado.ordenesServicioOmitidas;
         ordenesServicio += resultado.ordenesServicio;
         ordenesServicioArchivadas = resultado.ordenesServicioArchivadas;
+        ordenesServicioBloqueadas = resultado.ordenesServicioBloqueadas;
         facturacionDesde = resultado.facturacionDesde;
         facturacionHasta = resultado.facturacionHasta;
         historialRepuestosError = resultado.historialRepuestosError;
@@ -1098,9 +1254,6 @@ export function ImportarTotvsTab({ onChanged }: { onChanged: () => void }) {
         mayorResultados.length
           ? `${mayorResultados.reduce((sum, item) => sum + item.preflight.movementRows, 0)} movimientos de Mayor (${mayorResultados.reduce((sum, item) => sum + item.insertadas, 0)} nuevos, ${mayorResultados.reduce((sum, item) => sum + item.sinCambios, 0)} sin cambios, ${mayorResultados.reduce((sum, item) => sum + item.cuarentena, 0)} en cuarentena)`
           : null,
-        receivablesResultados.length
-          ? `${receivablesResultados.reduce((sum, item) => sum + item.preflight.documentRows, 0)} cuotas de cuentas por cobrar (${receivablesResultados.reduce((sum, item) => sum + item.insertadas, 0)} nuevas, ${receivablesResultados.reduce((sum, item) => sum + item.sinCambios, 0)} sin cambios)`
-          : null,
         preview.bundleFiles
           ? `${facturacionLineas} líneas de facturación y ${ordenesServicio} OS importadas${
               ordenesServicioArchivadas ? `; ${ordenesServicioArchivadas} OS ausentes archivadas` : ""
@@ -1121,13 +1274,7 @@ export function ImportarTotvsTab({ onChanged }: { onChanged: () => void }) {
         supplierRows.length ? `${supplierRows.length} proveedores (${suppliersInsertados} nuevos, ${suppliersActualizados} actualizados, ${suppliersSinCambios} sin cambios)` : null,
         branchTransferRows.length ? `${branchTransferRows.length} transferencias en tránsito (${branchTransfersInsertadas} nuevas, ${branchTransfersActualizadas} actualizadas, ${branchTransfersSinCambios} sin cambios)` : null,
       ].filter(Boolean);
-      toast.success(
-        `Importación completada: ${ordenesServicio} OS importadas, ${facturacionLineas} líneas de facturación${
-          ordenesServicioOmitidas ? `, ${ordenesServicioOmitidas} OS excluida${ordenesServicioOmitidas === 1 ? "" : "s"} confirmada${ordenesServicioOmitidas === 1 ? "" : "s"}` : ""
-        }${
-          partes.length > 1 ? ` y ${partes.length - 1} grupos adicionales` : ""
-        }.`,
-      );
+      toast.success(`Importacion completada (${partes.length} grupos procesados).`);
       if (facturacionExcluidas) {
         toast.info(`${facturacionExcluidas} lineas de facturacion excluidas por anulacion confirmada.`);
       }
@@ -1139,10 +1286,10 @@ export function ImportarTotvsTab({ onChanged }: { onChanged: () => void }) {
       await queryClient.invalidateQueries({ queryKey: ["repuestos", "sugerencia-viva"] });
       onChanged();
     } catch (e) {
-      const detail = e instanceof Error ? e.message : String(e);
+      const detail = describeImportError(e, activeImportStage);
       const confirmed = e instanceof ServiceOrderImportFailure
         ? e.confirmedServiceOrders
-        : confirmedServiceOrders;
+        : importedServiceOrders;
       const summary = conciseImportErrorSummary(
         confirmed
           ? `${confirmed} OS quedaron importadas; la etapa siguiente no se completó`
@@ -1163,24 +1310,24 @@ export function ImportarTotvsTab({ onChanged }: { onChanged: () => void }) {
         <div>
           <div className="text-[13px] font-semibold">Importar datos de TOTVS</div>
           <p className="mt-0.5 text-[12px] text-muted-foreground">
-            Elegí una carpeta de exports o archivos XML sueltos. El tipo de reporte se detecta por el nombre.
+            Elegir una carpeta de exports o archivos XML sueltos. El tipo de reporte se detecta por el nombre.
           </p>
         </div>
 
         {busy && importProgress && (
           <div className="space-y-1.5 rounded-md border p-3" aria-live="polite">
             <div className="flex justify-between gap-3 text-[11px] text-muted-foreground">
-              <span>{importProgress.sourceFile ?? "Importacion TOTVS"}</span>
+              <span>{importProgress.sourceFile ?? "Importacion TOTVS"} - {importProgress.phase}</span>
               <span>
                 {importProgress.total == null
-                  ? "Procesando..."
+                  ? importProgress.status === "started" ? "Procesando..." : "Completado"
                   : `${Math.min(importProgress.completed, importProgress.total).toLocaleString("es-PY")} / ${importProgress.total.toLocaleString("es-PY")}`}
               </span>
             </div>
             <Progress
               value={importProgress.total
                 ? Math.min((importProgress.completed / importProgress.total) * 100, 100)
-                : 8}
+                : importProgress.status === "succeeded" ? 100 : 8}
               className="h-2"
             />
           </div>
@@ -1265,17 +1412,6 @@ export function ImportarTotvsTab({ onChanged }: { onChanged: () => void }) {
                     <SelectItem value="ignorar">Ignorar</SelectItem>
                   </SelectContent>
                 </Select>
-                {d.kind === "cuentas_cobrar" && (
-                  <label className="flex items-center gap-1.5 text-[11px] text-muted-foreground">
-                    Corte confirmado
-                    <input
-                      type="date"
-                      value={d.cutoffDate ?? ""}
-                      onChange={(event) => setCutoffDate(d.file.name, event.target.value)}
-                      className="h-7 rounded-md border bg-background px-2 text-[12px] text-foreground"
-                    />
-                  </label>
-                )}
                 <Button type="button" variant="ghost" size="icon" className="h-7 w-7" onClick={() => removeFile(d.file.name)}>
                   <X className="h-3.5 w-3.5" />
                 </Button>
@@ -1307,20 +1443,9 @@ export function ImportarTotvsTab({ onChanged }: { onChanged: () => void }) {
 
         {preview && (
           <div className="space-y-3 rounded-md border p-3">
-            <div className="flex flex-wrap items-center justify-between gap-2">
-              <div>
-                <p className="text-[12px] font-medium">
-                  {previewWarningCount ? "Requiere revisión" : "Listo para importar"}
-                </p>
-                <p className="text-[11px] text-muted-foreground">
-                  {usableFiles.length.toLocaleString("es-PY")} archivo{usableFiles.length === 1 ? "" : "s"} revisado{usableFiles.length === 1 ? "" : "s"}.
-                </p>
-              </div>
-              {preview.bundleFiles && <Badge variant="secondary">OS + Facturación vinculadas</Badge>}
-            </div>
-            {previewWarningCount > 0 && (
+            {preview.mayor.some((item) => item.warnings.length > 0) && (
               <p className="rounded-md border border-amber-300 bg-amber-50 p-2 text-[11px] text-amber-800">
-                Hay {previewWarningCount.toLocaleString("es-PY")} observaciones que requieren revisión antes de confirmar. Abrí el detalle del preflight.
+                Requiere revisión: abrí el detalle del preflight antes de confirmar.
               </p>
             )}
             <details className="rounded-md border bg-muted/20 p-2">
@@ -1329,9 +1454,6 @@ export function ImportarTotvsTab({ onChanged }: { onChanged: () => void }) {
             <div className="flex flex-wrap gap-2 text-[12px]">
               {preview.mayor.map((item) => (
                 <Badge key={item.sourceFileName} variant="secondary">{item.movementRows.toLocaleString("es-PY")} movimientos de Mayor</Badge>
-              ))}
-              {preview.receivables.map((item) => (
-                <Badge key={item.sourceFileName} variant="secondary">{item.documentRows.toLocaleString("es-PY")} cuotas por cobrar</Badge>
               ))}
               {preview.bundleFiles && <Badge variant="secondary">OS + Facturación listas para cruzar</Badge>}
               {preview.productos.length > 0 && <Badge variant="secondary">{preview.productos.length} productos</Badge>}
@@ -1380,25 +1502,6 @@ export function ImportarTotvsTab({ onChanged }: { onChanged: () => void }) {
                 </p>
                 {item.warnings.map((warning) => <p key={warning} className="text-amber-700">{warning}</p>)}
                 <p className="font-medium text-amber-800">Preflight completado. Al confirmar se cargará por lotes al staging del Mayor; las cuentas sin código quedarán en cuarentena y TPSLDO=9 seguirá separado.</p>
-              </div>
-            ))}
-            {preview.receivables.map((item) => (
-              <div key={item.sourceFileName} className="space-y-1 rounded border border-amber-200 bg-amber-50/50 p-2 text-[11px]">
-                <p className="font-medium text-foreground">{item.sourceFileName}</p>
-                <p className="text-muted-foreground">
-                  Corte confirmado {item.cutoffDate}: {item.documentRows.toLocaleString("es-PY")} cuotas, {item.documents.toLocaleString("es-PY")} documentos, {item.clients.toLocaleString("es-PY")} clientes y moneda {item.currencies.join(", ")}.
-                </p>
-                <p className="text-muted-foreground">
-                  Facturas NF USD con saldo positivo: {item.eligiblePendingUsd.toLocaleString("es-PY", { minimumFractionDigits: 2, maximumFractionDigits: 2 })} USD. Vencido antes del corte: {item.overdueUsd.toLocaleString("es-PY", { minimumFractionDigits: 2, maximumFractionDigits: 2 })} USD; vence hoy: {item.dueTodayUsd.toLocaleString("es-PY", { minimumFractionDigits: 2, maximumFractionDigits: 2 })} USD; futuro: {item.futureUsd.toLocaleString("es-PY", { minimumFractionDigits: 2, maximumFractionDigits: 2 })} USD.
-                </p>
-                <p className="text-muted-foreground">
-                  El KPI usa el SALDO actual de cada NF, que ya refleja lo aplicado en el reporte fuente; no vuelve a descontar RA ni NCC. {item.zeroBalanceRows} filas con saldo cero y {item.negativeBalanceRows} negativas se conservan fuera de mora.
-                </p>
-                <p className="text-muted-foreground">
-                  RA significa cobro anticipado de cliente: {item.customerAdvanceRows} filas suman {item.customerAdvanceBalance.toLocaleString("es-PY", { minimumFractionDigits: 2, maximumFractionDigits: 2 })} USD y se informan por separado. Cobertura de aplicacion RA: {item.customerAdvanceApplicationCoverage}.
-                </p>
-                {item.warnings.map((warning) => <p key={warning} className="text-amber-700">{warning}</p>)}
-                <p className="font-medium text-amber-800">Preflight solamente. Confirmar requiere la migración preparada; no aplica SQL desde esta pantalla.</p>
               </div>
             ))}
             {preview.machineStockChassis.unresolvedPlaceholders > 0 && (
@@ -1462,6 +1565,132 @@ export function ImportarTotvsTab({ onChanged }: { onChanged: () => void }) {
             </p>
               </div>
             </details>
+            {preview.bundleFiles && (
+              <div className="space-y-2 rounded-md border border-dashed p-2 text-[11px]">
+                <p className="text-muted-foreground">
+                  La validacion ejecuta las mismas guardas de facturacion dentro de una subtransaccion descartada.
+                  No importa OS, no acredita cargas y no conserva cambios del RPC.
+                </p>
+                <details>
+                  <summary className="cursor-pointer font-medium text-muted-foreground">
+                    Alcance completo: {billingValidationScope.from} a {billingValidationScope.to}; todas las sucursales
+                  </summary>
+                  <div className="mt-2 space-y-2 rounded border p-2">
+                    <div className="flex flex-wrap gap-3">
+                      <label className="space-y-1">
+                        <span className="block text-muted-foreground">Desde</span>
+                        <input
+                          type="date"
+                          className="h-8 rounded border bg-background px-2"
+                          value={billingValidationScope.from}
+                          onChange={(event) => setBillingValidationScope((current) => ({
+                            ...current,
+                            from: event.target.value,
+                          }))}
+                        />
+                      </label>
+                      <label className="space-y-1">
+                        <span className="block text-muted-foreground">Hasta</span>
+                        <input
+                          type="date"
+                          className="h-8 rounded border bg-background px-2"
+                          value={billingValidationScope.to}
+                          onChange={(event) => setBillingValidationScope((current) => ({
+                            ...current,
+                            to: event.target.value,
+                          }))}
+                        />
+                      </label>
+                    </div>
+                    <div>
+                      <p className="mb-1 text-muted-foreground">Sucursales incluidas</p>
+                      <div className="flex flex-wrap gap-x-3 gap-y-1">
+                        {TOTVS_BILLING_BRANCHES.map((branch) => (
+                          <label key={branch} className="flex items-center gap-1">
+                            <input
+                              type="checkbox"
+                              checked={billingValidationScope.includedBranches.includes(branch)}
+                              onChange={(event) => setBillingValidationScope((current) => ({
+                                ...current,
+                                includedBranches: event.target.checked
+                                  ? [...new Set([...current.includedBranches, branch])]
+                                  : current.includedBranches.filter((value) => value !== branch),
+                              }))}
+                            />
+                            {branch}
+                          </label>
+                        ))}
+                      </div>
+                    </div>
+                  </div>
+                </details>
+                <Button type="button" size="sm" variant="outline" onClick={validateBillingOnly} disabled={busy}>
+                  Validar facturacion sin guardar
+                </Button>
+                {billingValidationReport && (
+                  <div
+                    role="status"
+                    className={cn(
+                      "rounded border p-2",
+                      billingValidationReport.status === "error"
+                        ? "border-destructive/40 bg-destructive/5 text-destructive"
+                        : "border-emerald-300 bg-emerald-50 text-emerald-900",
+                    )}
+                  >
+                    <p className="font-medium">
+                      {billingValidationReport.status === "error" ? "Validacion rechazada" : "Validacion correcta"}
+                    </p>
+                    <pre className="mt-1 whitespace-pre-wrap break-words font-mono text-[10px]">
+                      {billingValidationReport.detail}
+                    </pre>
+                  </div>
+                )}
+              </div>
+            )}
+            {preview.bundleFiles && (
+              <details className="rounded-md border border-dashed p-2 text-[11px]">
+                <summary className="cursor-pointer font-medium text-muted-foreground">Avanzado</summary>
+                <div className="mt-2 space-y-2">
+                  <p className="text-muted-foreground">
+                    Acreditá una carga histórica usando los tres XML originales ya seleccionados. El servidor valida el contenido completo y no vuelve a importar facturación ni órdenes de servicio.
+                  </p>
+                  <div className="flex flex-wrap items-center gap-2">
+                    <Button
+                      type="button"
+                      size="sm"
+                      variant="outline"
+                      onClick={loadHistoricalBillingLoads}
+                      disabled={loadingHistoricalLoads || accreditingHistoricalLoad}
+                    >
+                      {loadingHistoricalLoads ? "Buscando…" : "Buscar carga existente"}
+                    </Button>
+                    {historicalLoads.length > 0 && (
+                      <Select value={historicalLoadId} onValueChange={setHistoricalLoadId}>
+                        <SelectTrigger className="h-8 min-w-72 text-[11px]">
+                          <SelectValue placeholder="Seleccionar carga histórica" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {historicalLoads.map((load) => (
+                            <SelectItem key={load.id} value={load.id}>
+                              {new Date(load.creado_en).toLocaleString("es-PY")} · {load.archivo_nombre ?? load.id}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    )}
+                    <Button
+                      type="button"
+                      size="sm"
+                      variant="secondary"
+                      onClick={accreditSelectedHistoricalLoad}
+                      disabled={!historicalLoadId || loadingHistoricalLoads || accreditingHistoricalLoad}
+                    >
+                      {accreditingHistoricalLoad ? "Acreditando…" : "Acreditar carga existente"}
+                    </Button>
+                  </div>
+                </div>
+              </details>
+            )}
             {hasPersistablePreview(preview) && (
               <Button type="button" size="sm" onClick={confirmar} disabled={busy}>
                 Confirmar importación

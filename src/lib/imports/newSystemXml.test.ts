@@ -85,6 +85,18 @@ describe("importacion XML de ordenes de servicio", () => {
     expect(result.rows[2].serviceHours).toBe(5);
   });
 
+  it("importa una OS anulada y conserva el estado explicito de la fuente", () => {
+    const result = mapOrdenesServicioSheet("ordenes.xml", {
+      name: "Ordenes de Servicio",
+      headers: [],
+      rows: [{ Sucursal: "01", "NRO OS": "00000034", ESTADO: "Anulada" }],
+    });
+    const aggregated = aggregateNewSystemServiceOrders(result.rows.map(mapCanonicalOsToImportRow));
+
+    expect(aggregated).toHaveLength(1);
+    expect(aggregated[0]).toMatchObject({ os_numero: "01-00000034", situacion_os: "Anulada" });
+  });
+
   it("prioriza el chasis real del vehiculo sobre el identificador interno", () => {
     const result = mapOrdenesServicioSheet("ordenes.xml", {
       name: "Ordenes de Servicio",
@@ -878,6 +890,62 @@ describe("importacion XML de facturacion", () => {
     expect(result.rows[0].currency).toBe("USD");
     expect(result.rows[0].totalValueBase).toBe(138.04);
     expect(result.rows[0].totalValueWithIva).toBe(151.84);
+  });
+
+  it("interpreta los tres importes cientificos observados y aplica la politica IVA vigente", () => {
+    const result = mapFacturaVentasSheet("facturas.xml", {
+      name: "Facturas",
+      headers: [],
+      rows: [
+        {
+          FILIAL: "01 - Santa Rita", EMISION: "20260727", ESPECIE: "NF", SERIE: "FE1",
+          DOCUMENTO: "0010010004833", ITEM: "03", NOMBRE: "GANADERA EL FOGON S.A.",
+          MONORI: "DOLARES", GRUPO: "009 - REPUESTOS", CODIGO: "REPIN001450",
+          CODFAB: "00170049", PRODUCTO: "ARANDELA ELASTICA 00170049", CANTIDAD: "4",
+          VUNITUSD: "1.7500000000000002E-2", TOTALUSD: "7.0000000000000007E-2",
+          UNIUSDIVA: "0.02", TOTUSDIVA: "0.08", TIPOES: "509 - IVA 10% C/STOCK S/T",
+        },
+        {
+          FILIAL: "02 - Katuete", EMISION: "20260916", ESPECIE: "NF", SERIE: "FE1",
+          DOCUMENTO: "0020010003229", ITEM: "11", NOMBRE: "CAMPOS DEL MANANA S.A. - SANTA RITA",
+          MONORI: "Dolares", GRUPO: "009 - REPUESTOS", CODIGO: "REPIN008338",
+          CODFAB: "2350890", PRODUCTO: "PASADOR 235089.0", CANTIDAD: "1",
+          VUNITUSD: "7.0000000000000007E-2", TOTALUSD: "7.0000000000000007E-2",
+          UNIUSDIVA: "0.08", TOTUSDIVA: "0.08", TIPOES: "509 - IVA 10% C/STOCK S/T",
+        },
+        {
+          FILIAL: "02 - Katuete", EMISION: "20260924", ESPECIE: "NF", SERIE: "FE1",
+          DOCUMENTO: "0020010003252", ITEM: "11", NOMBRE: "CAMPOS DEL MANANA S.A. - SANTA RITA",
+          MONORI: "Dolares", GRUPO: "009 - REPUESTOS", CODIGO: "REPIN008338",
+          CODFAB: "2350890", PRODUCTO: "PASADOR 235089.0", CANTIDAD: "1",
+          VUNITUSD: "7.0000000000000007E-2", TOTALUSD: "7.0000000000000007E-2",
+          UNIUSDIVA: "0.08", TOTUSDIVA: "0.08", TIPOES: "509 - IVA 10% C/STOCK S/T",
+        },
+      ],
+    });
+
+    expect(result.rows.map((row) => ({
+      rowId: row.rowId,
+      unitValueBase: row.unitValueBase,
+      totalValueBase: row.totalValueBase,
+      unitValueWithIva: row.unitValueWithIva,
+      totalValueWithIva: row.totalValueWithIva,
+      currency: row.currency,
+    }))).toEqual([
+      {
+        rowId: "0010010004833|REPIN001450|03|1", unitValueBase: 0.0175,
+        totalValueBase: 0.07, unitValueWithIva: 0.02, totalValueWithIva: 0.08, currency: "USD",
+      },
+      {
+        rowId: "0020010003229|REPIN008338|11|2", unitValueBase: 0.07,
+        totalValueBase: 0.07, unitValueWithIva: 0.08, totalValueWithIva: 0.08, currency: "USD",
+      },
+      {
+        rowId: "0020010003252|REPIN008338|11|3", unitValueBase: 0.07,
+        totalValueBase: 0.07, unitValueWithIva: 0.08, totalValueWithIva: 0.08, currency: "USD",
+      },
+    ]);
+    expect(result.rows.every((row) => row.raw.TOTALUSD === "7.0000000000000007E-2")).toBe(true);
   });
 
   it("preserva fechas compactas, notas de credito negativas y clasifica maquinarias", () => {
