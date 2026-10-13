@@ -19,20 +19,20 @@ async function selectExport(name="Exportar Facturación por técnico") {
 }
 afterEach(()=>{cleanup();vi.clearAllMocks();device.mobile=false;});
 describe("service technician table",()=>{
-  it("uses nine concise columns and filters only this table without recalculating participation",async()=>{
+  it("uses nine concise columns without a local technician filter or review alert",async()=>{
     rpc.mockResolvedValue({data:[row,{...row,tecnico_clave:"b",tecnico:"Técnico B",mo_total:200,total_horas:9}],error:null});
     render(<ServiciosTecnicos {...props} filtros={{documento:"nc"}} />);
     await screen.findByText(displayImportedTechnicianName(row.tecnico));
     const labels=["Técnico","Horas Cliente","Horas Garantía","Horas Interno","Total horas","MO Cliente","MO Garantía","MO Interno","MO total"];
     expect(screen.getAllByRole("columnheader").map(header=>header.textContent)).toEqual(labels);
     expect(screen.queryByRole("columnheader",{name:/sin clasificar|asociad/i})).not.toBeInTheDocument();
-    expect(screen.getByRole("alert")).toHaveTextContent("tipo de tiempo pendiente de revisión");
-    fireEvent.change(screen.getByRole("searchbox",{name:"Filtrar técnico en esta tabla"}),{target:{value:"tecnico a"}});
-    expect(screen.queryByText(displayImportedTechnicianName("Técnico B"))).not.toBeInTheDocument();
+    expect(screen.queryByRole("searchbox",{name:"Filtrar técnico en esta tabla"})).not.toBeInTheDocument();
+    expect(screen.queryByText("tipo de tiempo pendiente de revisión")).not.toBeInTheDocument();
+    expect(screen.getByText(displayImportedTechnicianName("Técnico B"))).toBeInTheDocument();
     expect(screen.getByText("$ 100")).toBeInTheDocument();
     await selectExport();
     await waitFor(()=>expect(exportTable).toHaveBeenCalled());
-    expect(exportTable.mock.calls[0][0].rows).toEqual([{...row,tecnico:displayImportedTechnicianName(row.tecnico)}]);
+    expect(exportTable.mock.calls[0][0].rows).toHaveLength(2);
     expect(exportTable.mock.calls[0][0].columns.map((column:{label:string})=>column.label)).toEqual(labels);
     expect(rpc).toHaveBeenCalledTimes(1);
     expect(rpc).toHaveBeenCalledWith("ventas_servicios_tecnicos_v2",expect.objectContaining({p_filtros:{documento:"nc"}}));
@@ -82,6 +82,25 @@ describe("service technician table",()=>{
     await waitFor(()=>expect(exportTable).toHaveBeenCalled());
     expect(exportTable.mock.calls[0][0].rows).toHaveLength(1);
     expect(exportTable.mock.calls[0][0].rows[0]).toMatchObject({horas_os:37,horas_mo:null,mo_periodo:null});
+  });
+  it("consolidates the confirmed Agustin alias only in this report and preserves workbook totals",async()=>{
+    const full={...row,tecnico_clave:"profile-id",tecnico:"AGUSTIN MARTINEZ FERNANDEZ",
+      horas_cliente:22.5,horas_garantia:null,horas_interno:null,horas_otros:null,total_horas:22.5,
+      mo_cliente:431.6666666666667,mo_garantia:0,mo_interno:0,mo_otros:0,mo_total:431.6666666666667};
+    const short={...row,tecnico_clave:"legacy-name",tecnico:"ME0002 - AGUSTIN MARTINEZ",
+      horas_cliente:10.5,horas_garantia:null,horas_interno:null,horas_otros:null,total_horas:10.5,
+      mo_cliente:122.5,mo_garantia:0,mo_interno:0,mo_otros:0,mo_total:122.5};
+    rpc.mockResolvedValue({data:[full,short],error:null});
+    render(<ServiciosTecnicos {...props} />);
+    expect(await screen.findAllByText("AGUSTIN MARTINEZ FERNANDEZ")).not.toHaveLength(0);
+    expect(screen.queryByText(/^AGUSTIN MARTINEZ$/)).not.toBeInTheDocument();
+    await selectExport();
+    await waitFor(()=>expect(exportTable).toHaveBeenCalled());
+    expect(exportTable.mock.calls[0][0].rows).toHaveLength(1);
+    expect(exportTable.mock.calls[0][0].rows[0]).toMatchObject({
+      tecnico:"AGUSTIN MARTINEZ FERNANDEZ",horas_cliente:33,total_horas:33,
+      mo_cliente:554.1666666666667,mo_total:554.1666666666667,
+    });
   });
   it("closes old detail and removes exports on new filters and reports missing SQL without fallback",async()=>{
     rpc.mockResolvedValueOnce({data:[contextRow],error:null}).mockResolvedValueOnce({data:null,error:{code:'PGRST202'}});

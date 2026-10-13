@@ -2,7 +2,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { useServicioTecnicos } from "@/hooks/useServicioTecnicos";
-import { displayImportedTechnicianName, matchTechnicianProfile, type TechnicianProfileReference } from "@/lib/technicianMatching";
+import { displayImportedTechnicianName, matchTechnicianProfile, normalizeTechnicianName, type TechnicianProfileReference } from "@/lib/technicianMatching";
 import type { IndicadoresFiltros } from "@/components/ventas/useServiciosIndicadores";
 import { SalesDataTable, type SalesDisplayColumn } from "./SalesDataTable";
 import { serviceNumberColumn, serviceMoneyColumn } from "./serviceSalesColumns";
@@ -16,10 +16,15 @@ const requestError = (error: { code?: string; message?: string }) =>
     : error.message || "No se pudo completar la consulta.";
 
 const unknown = (value: string) => /sin (tecnico|técnico|identificar|informar|atribuir)/i.test(value);
+const REPORT_TECHNICIAN_ALIASES: Record<string, string> = {
+  "AGUSTIN MARTINEZ": "AGUSTIN MARTINEZ FERNANDEZ",
+};
+
+const reportTechnicianName = (value: string) =>
+  REPORT_TECHNICIAN_ALIASES[normalizeTechnicianName(value)] ?? value;
 
 export function ServiciosTecnicos({ desde, hasta, sucursal, buscar, tipoTiempo, marca = "", tipoMaquina = "", filtros }: IndicadoresFiltros) {
   const filterKey = serviceFiltersKey(filtros);
-  const [technicianSearch, setTechnicianSearch] = useState("");
   const [rows, setRows] = useState<Fila[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -60,7 +65,9 @@ export function ServiciosTecnicos({ desde, hasta, sucursal, buscar, tipoTiempo, 
     rows.forEach((row) => {
       const nombre = row.tecnico_clave === "SIN_TECNICO_ATRIBUIDO"
         ? "Sin técnico atribuido"
-        : matchTechnicianProfile(row.tecnico, profiles)?.nombre ?? displayImportedTechnicianName(row.tecnico);
+        : reportTechnicianName(
+          matchTechnicianProfile(row.tecnico, profiles)?.nombre ?? displayImportedTechnicianName(row.tecnico),
+        );
       const current = map.get(nombre);
       if (!current) { map.set(nombre, { ...row, tecnico: nombre }); return; }
       map.set(nombre, {
@@ -84,7 +91,6 @@ export function ServiciosTecnicos({ desde, hasta, sucursal, buscar, tipoTiempo, 
   if (loading) return <div className="py-12 text-center text-[12px] text-muted-foreground">Cargando técnicos…</div>;
   if (error) return <div role="alert" className="py-12 text-center text-[12px] text-destructive">{error}</div>;
 
-  const filtered = unified.filter(row => row.tecnico.normalize("NFD").replace(/[\u0300-\u036f]/g,"").toUpperCase().includes(technicianSearch.normalize("NFD").replace(/[\u0300-\u036f]/g,"").toUpperCase().trim()));
   const columns: SalesDisplayColumn<Fila>[] = [
     { key: "tecnico", label: "Técnico", kind: "text", value: row => row.tecnico, weight: 2.4, className: "font-medium" },
     ...([ ["horas_cliente", "Horas Cliente"], ["horas_garantia", "Horas Garantía"], ["horas_interno", "Horas Interno"],
@@ -98,14 +104,11 @@ export function ServiciosTecnicos({ desde, hasta, sucursal, buscar, tipoTiempo, 
       .map(([key, label]) => serviceMoneyColumn<Fila>(key, label, row => row[key])),
   ];
   return <div className="mt-3 min-w-0 space-y-2">
-    <input type="search" aria-label="Filtrar técnico en esta tabla" placeholder="Técnico…" value={technicianSearch} onChange={event=>setTechnicianSearch(event.target.value)} className="h-8 w-full max-w-xs rounded-md border bg-background px-2 text-[12px]" />
-    {filtered.some(row => Number(row.horas_otros || 0) !== 0 || Number(row.mo_otros || 0) !== 0 || row.detalle_os.some(detail => !["Cliente", "Garantia", "Interno"].includes(detail.tipo_tiempo))) &&
-      <div role="alert" className="text-[12px] text-destructive">Hay datos con tipo de tiempo pendiente de revisión.</div>}
-    <SalesDataTable title="Facturación por técnico" rows={filtered} columns={columns} desktopBreakpoint={1280}
+    <SalesDataTable title="Facturación por técnico" rows={unified} columns={columns} desktopBreakpoint={1280}
       initialSort={{key:"total_horas",direction:"desc"}} rowKey={row => row.tecnico} countLabel="técnicos"
       onRowClick={row => setSelected(row.tecnico)} onDetailClick={row => setSelected(row.tecnico)}
       fileName={`ventas-servicios-tecnicos-${desde}-${hasta}.xlsx`} empty="Sin técnicos ni mano de obra para los filtros seleccionados." />
-    <ServiceTechnicianDetailExport rows={filtered} desde={desde} hasta={hasta} />
-    <ServiceTechnicianDetail row={filtered.find(row => row.tecnico === selected)} onClose={() => setSelected(null)} desde={desde} hasta={hasta} />
+    <ServiceTechnicianDetailExport rows={unified} desde={desde} hasta={hasta} />
+    <ServiceTechnicianDetail row={unified.find(row => row.tecnico === selected)} onClose={() => setSelected(null)} desde={desde} hasta={hasta} />
   </div>;
 }
