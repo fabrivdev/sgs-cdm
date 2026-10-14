@@ -191,7 +191,9 @@ describe("Importaciones: detalle compacto", () => {
     });
     setup({ id: unitIds[0], importacion_linea_id: "line-1", numero_unidad: 1, cantidad_lote: 8 });
     fireEvent.mouseDown(screen.getByRole("tab", { name: "Documentos" }), { button: 0 });
-    expect(await screen.findByText("Documento histórico: unidades pendientes de asignar")).toBeInTheDocument();
+    expect(await screen.findByText("Esta unidad no tiene un archivo de factura asignado.")).toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: "Gestionar otros archivos del lote (1)" }));
+    expect(screen.getByText("Documento histórico: unidades pendientes de asignar")).toBeInTheDocument();
     fireEvent.click(screen.getByRole("button", { name: "Asignar unidades de proveedor.pdf" }));
     for (let number = 1; number <= 5; number++) {
       fireEvent.click(screen.getByLabelText(`Unidad ${number}`));
@@ -201,6 +203,31 @@ describe("Importaciones: detalle compacto", () => {
       p_documento_id: "invoice-1", p_unidad_ids: unitIds.slice(0, 5),
     }));
     expect(mocks.rpc).not.toHaveBeenCalledWith("maquinaria_actualizar_unidad_importacion", expect.anything());
+  });
+  it("no presenta la factura de la unidad 3 como archivo de la unidad 1", async () => {
+    const records: Record<string, unknown[]> = {
+      maquinaria_documentos: [{ id: "invoice-3", tipo: "FACTURA_IMPORTACION", archivo_nombre: "N.0041-00003320.jpg", storage_path: "test.jpg", creado_en: "2026-10-14", datos_extraidos: { factura_numero: "0041-00003320" } }],
+      maquinaria_importacion_unidades: [1, 2, 3].map(number => ({ id: `unit-${number}`, numero_unidad: number, chasis: null })),
+      maquinaria_documentos_factura_importacion_unidades: [{ documento_id: "invoice-3", importacion_unidad_id: "unit-3" }],
+    };
+    mocks.from.mockImplementation((table: string) => {
+      const filters: [string, unknown][] = [];
+      const query = {
+        select: () => query, eq: (field: string, value: unknown) => { filters.push([field, value]); return query; }, order: () => query, in: () => query,
+        then: (resolve: (value: unknown) => unknown) => Promise.resolve({ data: (records[table] ?? []).filter(record => filters.every(([field, value]) => field in (record as object) ? (record as Record<string, unknown>)[field] === value : true)), error: null }).then(resolve),
+      };
+      return query;
+    });
+    setup({ id: "unit-1", importacion_linea_id: "line-1", numero_unidad: 1, cantidad_lote: 8, invoice_supplier: "0041-00003318" });
+    fireEvent.mouseDown(screen.getByRole("tab", { name: "Documentos" }), { button: 0 });
+    expect(await screen.findByText("Esta unidad no tiene un archivo de factura asignado.")).toBeInTheDocument();
+    expect(screen.getByText("Estos datos están cargados en la unidad, pero no tienen un archivo de factura asignado.")).toBeInTheDocument();
+    expect(screen.queryByText(/N\.0041-00003320\.jpg/)).not.toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: "Gestionar otros archivos del lote (1)" }));
+    expect(screen.getByText(/N\.0041-00003320\.jpg/)).toBeInTheDocument();
+    expect(screen.getByText("Cubre unidad 3")).toBeInTheDocument();
+    expect(screen.queryByText("Archivo de esta unidad")).not.toBeInTheDocument();
+    expect(mocks.rpc).not.toHaveBeenCalled();
   });
   it("no añade ayuda ni modifica acciones en otras secciones sin help", () => {
     render(<DetailSection card title="Otro panel" action={<button>Acción existente</button>}><span>Dato existente</span></DetailSection>);

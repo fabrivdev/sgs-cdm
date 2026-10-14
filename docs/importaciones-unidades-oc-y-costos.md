@@ -15,6 +15,7 @@
 - El costo definitivo con IVA solo se edita tras identificar inequívocamente la máquina en stock. Esta pantalla lo registra: el stock actual no tiene una columna de costo desde la cual leerlo automáticamente.
 - Los costos antiguos se conservan. No se convierten automáticamente en importes de factura del proveedor ni se borran por no tener stock vigente; se muestran como referencia histórica fuera de stock.
 - La OC pertenece a la cabecera y se comparte. Cada archivo de factura del proveedor se vincula a las unidades concretas que cubre: una, todas o un subconjunto. Los datos e importes unitarios editados pertenecen a cada unidad.
+- El detalle de cada unidad muestra solo el archivo que la cubre. Los demás archivos se consultan en la gestión separada del lote; no presentarlos como factura de la unidad abierta. Los datos unitarios sin archivo asociado permanecen visibles con advertencia, sin inferir vínculos por número ni por fecha.
 - Cuando hay una NP, la edición individual mantiene el detalle estructurado de facturas del proveedor. No permite dar distinta moneda o fecha a otra unidad de la misma factura compartida; una factura distinta se registra con otro número.
 - Guardar una sección envía solo sus campos modificados. El servidor limita los campos admitidos y exige los permisos actuales de gestión.
 

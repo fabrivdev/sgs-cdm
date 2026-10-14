@@ -587,7 +587,7 @@ async function extractSupplierInvoice(file: File): Promise<MachineSupplierInvoic
 }
 
 type MachineDocumentType = "NP" | "OC" | "FACTURA_IMPORTACION" | "FACTURA_VENTA" | "OTRO";
-type StoredMachineDocument = { id: string; archivo_nombre: string; storage_path: string; creado_en: string };
+type StoredMachineDocument = { id: string; archivo_nombre: string; storage_path: string; creado_en: string; datos_extraidos?: { factura_numero?: string } | null };
 
 const MACHINE_DOCUMENT_LABELS: Record<MachineDocumentType, string> = {
   NP: "Nota de pedido",
@@ -1475,7 +1475,7 @@ function SaleInvoiceButton({ operationId, units, lines, links, documentId, onSav
   </Dialog>;
 }
 
-function DeleteDocumentButton({ documentLabel, onDelete, compact = false }: { documentLabel: string; onDelete: () => Promise<void>; compact?: boolean }) {
+function DeleteDocumentButton({ documentLabel, onDelete, compact = false, description }: { documentLabel: string; onDelete: () => Promise<void>; compact?: boolean; description?: string }) {
   const [deleting, setDeleting] = useState(false);
   const remove = async () => {
     setDeleting(true);
@@ -1491,7 +1491,7 @@ function DeleteDocumentButton({ documentLabel, onDelete, compact = false }: { do
   return <AlertDialog>
     <AlertDialogTrigger asChild><Button type="button" variant="ghost" size={compact ? "icon" : "sm"} className={cn("h-8 text-destructive hover:bg-destructive/10 hover:text-destructive", compact && "w-8")} aria-label={compact ? `Eliminar ${documentLabel.toLowerCase()}` : undefined} title={compact ? `Eliminar ${documentLabel.toLowerCase()}` : undefined} disabled={deleting}><Trash2 className={cn("h-3.5 w-3.5", !compact && "mr-1.5")} />{!compact && "Eliminar"}</Button></AlertDialogTrigger>
     <AlertDialogContent>
-      <AlertDialogHeader><AlertDialogTitle>Eliminar {documentLabel.toLowerCase()}</AlertDialogTitle><AlertDialogDescription>El archivo dejará de estar disponible en este registro. Esta acción no se puede deshacer.</AlertDialogDescription></AlertDialogHeader>
+      <AlertDialogHeader><AlertDialogTitle>Eliminar {documentLabel.toLowerCase()}</AlertDialogTitle><AlertDialogDescription>{description ?? "El archivo dejará de estar disponible en este registro. Esta acción no se puede deshacer."}</AlertDialogDescription></AlertDialogHeader>
       <AlertDialogFooter><AlertDialogCancel>Cancelar</AlertDialogCancel><AlertDialogAction className="bg-destructive text-destructive-foreground hover:bg-destructive/90" onClick={remove}>Eliminar</AlertDialogAction></AlertDialogFooter>
     </AlertDialogContent>
   </AlertDialog>;
@@ -1655,6 +1655,7 @@ export function ImportDetailDrawer({ row, onOpenChange, onEditHeader, onSaved }:
   const [uploadingOc, setUploadingOc] = useState(false);
   const [uploadingSupplierInvoice, setUploadingSupplierInvoice] = useState(false);
   const [supplierEditorOpen, setSupplierEditorOpen] = useState(false);
+  const [showOtherSupplierDocuments, setShowOtherSupplierDocuments] = useState(false);
   const [supplierEditingDocumentId, setSupplierEditingDocumentId] = useState<string | null>(null);
   const [supplierFile, setSupplierFile] = useState<File | null>(null);
   const [supplierSelectedUnits, setSupplierSelectedUnits] = useState<string[]>([]);
@@ -1673,7 +1674,7 @@ export function ImportDetailDrawer({ row, onOpenChange, onEditHeader, onSaved }:
   const detailSupplierInvoiceQuery = useQuery({
     queryKey: ["machine-import-supplier-invoice-documents", row?.importacion_linea_id], enabled: Boolean(row?.importacion_linea_id),
     queryFn: async () => {
-      const { data, error } = await db.from("maquinaria_documentos").select("id,archivo_nombre,storage_path,creado_en").eq("importacion_linea_id", row?.importacion_linea_id).eq("tipo", "FACTURA_IMPORTACION").order("creado_en", { ascending: false });
+      const { data, error } = await db.from("maquinaria_documentos").select("id,archivo_nombre,storage_path,creado_en,datos_extraidos").eq("importacion_linea_id", row?.importacion_linea_id).eq("tipo", "FACTURA_IMPORTACION").order("creado_en", { ascending: false });
       if (error) throw error;
       return data ?? [];
     },
@@ -1704,7 +1705,7 @@ export function ImportDetailDrawer({ row, onOpenChange, onEditHeader, onSaved }:
   useEffect(() => {
     setActiveTab("resumen");
     setEditingChassis(false); setEditingImportData(false); setEditingInvoice(false); setEditingStockCost(false); setEditingReceipt(false);
-    setSupplierEditorOpen(false); setSupplierEditingDocumentId(null); setSupplierFile(null); setSupplierSelectedUnits([]);
+    setSupplierEditorOpen(false); setShowOtherSupplierDocuments(false); setSupplierEditingDocumentId(null); setSupplierFile(null); setSupplierSelectedUnits([]);
     setForm(importUnitForm(row ?? {}));
     setReceipt({ fecha: row?.ata ?? TODAY });
   }, [row]);
@@ -1814,6 +1815,24 @@ export function ImportDetailDrawer({ row, onOpenChange, onEditHeader, onSaved }:
   const supplierLineUnits = supplierLineUnitsQuery.data ?? [];
   const supplierDocumentForUnit = supplierDocuments.find((document: StoredMachineDocument) =>
     supplierLinks.some(link => link.documento_id === document.id && link.importacion_unidad_id === row.id)) as StoredMachineDocument | undefined;
+  const otherSupplierDocuments = supplierDocuments.filter((document: StoredMachineDocument) => document.id !== supplierDocumentForUnit?.id) as StoredMachineDocument[];
+  const currentInvoiceNumber = String(row.invoice_supplier ?? "").toUpperCase().replace(/[^A-Z0-9]/g, "");
+  const linkedInvoiceNumber = String(supplierDocumentForUnit?.datos_extraidos?.factura_numero ?? "").toUpperCase().replace(/[^A-Z0-9]/g, "");
+  const supplierInvoiceMismatch = Boolean(currentInvoiceNumber && linkedInvoiceNumber && currentInvoiceNumber !== linkedInvoiceNumber);
+  const renderSupplierDocument = (document: StoredMachineDocument, isCurrentUnit: boolean) => {
+    const covered = supplierLinks.filter(link => link.documento_id === document.id)
+      .map(link => supplierLineUnits.find(unit => unit.id === link.importacion_unidad_id)).filter(Boolean);
+    const coverage = covered.length
+      ? `Cubre ${covered.map(unit => `unidad ${unit!.numero_unidad}${unit!.chasis ? ` · ${unit!.chasis}` : ""}`).join(", ")}`
+      : "Documento histórico: unidades pendientes de asignar";
+    return <div key={document.id} className="rounded-lg border px-3 py-2">
+      <DocumentRow compactActions label={isCurrentUnit ? "Archivo de esta unidad" : "Otro archivo del lote"} fileName={document.archivo_nombre} date={formatDate(document.creado_en)} onOpen={() => openMachineDocument(document.storage_path, document.archivo_nombre)} action={canEdit ? <>
+        <Button variant="ghost" size="icon" className="h-8 w-8" aria-label={`Asignar unidades de ${document.archivo_nombre}`} title="Asignar unidades" onClick={() => { setSupplierEditingDocumentId(document.id); setSupplierFile(null); setSupplierSelectedUnits(supplierLinks.filter(link => link.documento_id === document.id).map(link => link.importacion_unidad_id)); setSupplierEditorOpen(true); }}><Pencil className="h-3.5 w-3.5" /></Button>
+        <DeleteDocumentButton compact documentLabel="Factura del proveedor" description={`Se eliminará ${document.archivo_nombre} y dejará de estar disponible para ${covered.length ? covered.map(unit => `la unidad ${unit!.numero_unidad}`).join(", ") : "este lote"}. Los datos cargados en cada unidad se conservarán. Esta acción no se puede deshacer.`} onDelete={async () => { await deleteSupplierInvoiceDocument(document); await detailSupplierInvoiceQuery.refetch(); await supplierLinksQuery.refetch(); }} />
+      </> : undefined} />
+      <p className="mt-1 text-[10px] text-muted-foreground">{coverage}</p>
+    </div>;
+  };
   const hasSupplierInvoiceData = Boolean(row.invoice_supplier || row.factura_proveedor_fecha || row.valor_factura_proveedor != null);
   const displayedOrderValue = importNetOrderValue({
     unitGrossValue: row.precio_oc,
@@ -1906,16 +1925,15 @@ export function ImportDetailDrawer({ row, onOpenChange, onEditHeader, onSaved }:
             <DocumentRow compactActions label="Orden de compra" fileName={ocDocument?.archivo_nombre} date={ocDocument ? formatDate(ocDocument.creado_en) : null} onOpen={ocDocument ? () => openMachineDocument(ocDocument.storage_path, ocDocument.archivo_nombre) : undefined} action={canEdit ? <><Button variant="ghost" size="icon" className="h-8 w-8" aria-label={ocDocument ? "Reemplazar orden de compra" : "Adjuntar orden de compra"} title={ocDocument ? "Reemplazar orden de compra" : "Adjuntar orden de compra"} disabled={uploadingOc} onClick={() => detailOcRef.current?.click()}><Upload className="h-3.5 w-3.5" /></Button>{ocDocument && <DeleteDocumentButton compact documentLabel="Orden de compra" onDelete={async () => { await deleteMachineDocuments({ importLineId: row.importacion_linea_id, type: "OC" }); await detailOcQuery.refetch(); }} />}</> : undefined} />
           </div>
           <div className="space-y-2 border-t pt-3">
-            <div className="flex items-center justify-between gap-2"><div><h3 className="text-[12px] font-semibold">Facturas del proveedor</h3><p className="text-[11px] text-muted-foreground">Cada archivo cubre solo las unidades elegidas del lote.</p></div>{canEdit && <Button variant="ghost" size="icon" className="h-8 w-8" aria-label="Adjuntar factura del proveedor" title="Adjuntar factura del proveedor" onClick={() => { setSupplierEditingDocumentId(null); setSupplierFile(null); setSupplierSelectedUnits(supplierDocumentForUnit ? [] : [row.id]); setSupplierEditorOpen(true); }}><Upload className="h-3.5 w-3.5" /></Button>}</div>
+            <div className="flex items-center justify-between gap-2"><div><h3 className="text-[12px] font-semibold">Factura de la unidad {row.numero_unidad}/{Math.max(1, Number(row.cantidad_lote) || 1)}</h3><p className="text-[11px] text-muted-foreground">Solo se muestra aquí el archivo asignado a esta máquina.</p></div>{canEdit && <Button variant="ghost" size="icon" className="h-8 w-8" aria-label="Adjuntar factura del proveedor" title={supplierDocumentForUnit ? "Esta unidad ya tiene una factura asignada" : "Adjuntar factura del proveedor"} disabled={Boolean(supplierDocumentForUnit)} onClick={() => { setSupplierEditingDocumentId(null); setSupplierFile(null); setSupplierSelectedUnits([row.id]); setSupplierEditorOpen(true); }}><Upload className="h-3.5 w-3.5" /></Button>}</div>
             {supplierLinksQuery.isError && <p className="text-[11px] text-destructive">No se pudieron consultar los vínculos por unidad. Aplicá la migración de facturas de importación.</p>}
-            {supplierDocuments.map((document: StoredMachineDocument) => {
-              const covered = supplierLinks.filter(link => link.documento_id === document.id).map(link => supplierLineUnits.find(unit => unit.id === link.importacion_unidad_id)).filter(Boolean);
-              return <div key={document.id} className="rounded-lg border px-3 py-2">
-                <DocumentRow compactActions label={document.id === supplierDocumentForUnit?.id ? "Factura de esta unidad" : "Factura del lote"} fileName={document.archivo_nombre} date={formatDate(document.creado_en)} onOpen={() => openMachineDocument(document.storage_path, document.archivo_nombre)} action={canEdit ? <><Button variant="ghost" size="icon" className="h-8 w-8" aria-label={`Asignar unidades de ${document.archivo_nombre}`} title="Asignar unidades" onClick={() => { setSupplierEditingDocumentId(document.id); setSupplierFile(null); setSupplierSelectedUnits(supplierLinks.filter(link => link.documento_id === document.id).map(link => link.importacion_unidad_id)); setSupplierEditorOpen(true); }}><Pencil className="h-3.5 w-3.5" /></Button><DeleteDocumentButton compact documentLabel="Factura del proveedor" onDelete={async () => { await deleteSupplierInvoiceDocument(document); await detailSupplierInvoiceQuery.refetch(); await supplierLinksQuery.refetch(); }} /></> : undefined} />
-                <p className="mt-1 text-[10px] text-muted-foreground">{covered.length ? `Cubre ${covered.map(unit => `${unit!.numero_unidad}${unit!.chasis ? ` · ${unit!.chasis}` : ""}`).join(", ")}` : "Documento histórico: unidades pendientes de asignar"}</p>
-              </div>;
-            })}
-            {supplierDocuments.length === 0 && <p className="text-[11px] text-muted-foreground">No hay facturas adjuntas al lote.</p>}
+            {!detailSupplierInvoiceQuery.isLoading && !supplierLinksQuery.isLoading && !supplierLinksQuery.isError && (supplierDocumentForUnit
+              ? renderSupplierDocument(supplierDocumentForUnit, true)
+              : <p className="text-[11px] text-muted-foreground">Esta unidad no tiene un archivo de factura asignado.</p>)}
+            {otherSupplierDocuments.length > 0 && <div className="border-t pt-2">
+              <Button variant="ghost" size="sm" className="h-7 px-1 text-[11px]" onClick={() => setShowOtherSupplierDocuments(value => !value)} aria-expanded={showOtherSupplierDocuments}>{showOtherSupplierDocuments ? "Ocultar" : "Gestionar"} otros archivos del lote ({otherSupplierDocuments.length})</Button>
+              {showOtherSupplierDocuments && <div className="mt-2 space-y-2"><p className="text-[10px] text-muted-foreground">Estos archivos no están asignados a la unidad {row.numero_unidad}. Podés revisar o cambiar las unidades que cubren.</p>{otherSupplierDocuments.map((document: StoredMachineDocument) => renderSupplierDocument(document, false))}</div>}
+            </div>}
             {supplierEditorOpen && canEdit && <div className="space-y-3 rounded-lg border bg-muted/30 p-3">
               <h4 className="text-[11px] font-semibold">{supplierEditingDocumentId ? "Unidades cubiertas por esta factura" : "Nueva factura del proveedor"}</h4>
               {!supplierEditingDocumentId && <input ref={detailSupplierInvoiceRef} aria-label="Archivo de factura del proveedor" type="file" accept="application/pdf,image/jpeg,image/png,image/webp" className="block w-full text-[11px]" onChange={event => setSupplierFile(event.target.files?.[0] ?? null)} />}
@@ -1929,6 +1947,8 @@ export function ImportDetailDrawer({ row, onOpenChange, onEditHeader, onSaved }:
           </div>
           <DetailSection card icon={<FileText className="h-3.5 w-3.5" />} title="Factura proveedor" help="Importe facturado por el proveedor para esta unidad, separado del costo de stock." action={canEdit && !editingInvoice ? <Button aria-label="Editar factura proveedor" title="Editar factura proveedor" variant="ghost" size="icon" className="h-7 w-7" onClick={() => { closeEditors(); setEditingInvoice(true); }}><Pencil className="h-3.5 w-3.5" /></Button> : undefined}>
             {editingInvoice ? <ImportUnitFields section="invoice" form={form} onChange={setForm} onCancel={cancelEdit} onSave={() => saveUnit("invoice")} saving={saving} /> : hasSupplierInvoiceData ? <KeyValueGrid><KeyValueItem label="Número" value={row.invoice_supplier} empty="—" mono /><KeyValueItem label="Fecha" value={formatDate(row.factura_proveedor_fecha)} empty="—" /><KeyValueItem label="Moneda" value={row.factura_proveedor_moneda} empty="—" /><KeyValueItem label="Valor factura" value={row.valor_factura_proveedor == null ? null : formatImportMoney(row.valor_factura_proveedor, row.factura_proveedor_moneda ?? "USD")} empty="Sin cargar" /></KeyValueGrid> : <p className="text-[11px] text-muted-foreground">Sin datos cargados</p>}
+            {hasSupplierInvoiceData && !supplierLinksQuery.isLoading && !supplierLinksQuery.isError && !supplierDocumentForUnit && <p className="mt-2 text-[11px] text-amber-700">Estos datos están cargados en la unidad, pero no tienen un archivo de factura asignado.</p>}
+            {supplierInvoiceMismatch && <p className="mt-2 text-[11px] text-destructive">El número guardado en la unidad no coincide con el extraído del archivo asignado. Revisá la factura.</p>}
           </DetailSection>
         </TabsContent>
 
