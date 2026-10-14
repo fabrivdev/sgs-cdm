@@ -1,3 +1,16 @@
+# Design QA — valorización por sucursal y tabla analítica, 14/10/2026
+
+Resultado: revisión visual independiente aprobada, sin P0/P1/P2 pendientes. Esta revisión sustituye las decisiones de distribución por códigos y color solo en detalle del registro anterior, preservado debajo como historia.
+
+- Referencia: ejemplo del usuario, conservando header/filtros/KPI/paneles, recuperando segundo semáforo y con Tabs exclusivamente en tabla inferior.
+- Capturas `outputs/analisis-valorizado-{320,390,639,640,768,1280,1448}.jpg` del chat; detalle 320/1280, estados loading/error/empty. Datos sintéticos, no sesión pública. DOM sin overflow; contenedores interiores monetarios completos en móvil. Texto largo usa elipsis, cada registro ocupa una línea.
+- Interacciones: desglose CLAAS→Familia, cambio a Detalle conservando contexto, ficha completa móvil, filtro USD mínimo, estados independientes y exportación con 9.040 filas únicas, 2 grupos, 8 colores, 6 sucursales y 3 franjas. Los paneles superiores permanecen fuera de las pestañas.
+- Monetario: porcentajes sobre USD, null conserva ausencia; signos/residuos no se borran. Campos de calidad y fórmula de rotación en ficha/Excel, sin subtítulos ni explicaciones permanentes.
+- Verificación: 12 pruebas focalizadas (PGlite con migraciones reales y contrato Supabase), ESLint del cambio y build Vite correctos. `tsc -p tsconfig.app.json --noEmit` encuentra errores anteriores fuera del área modificada (importadores, MaquinariaOperaciones, tests OS y target replaceAll); no declarar chequeo global aprobado.
+- SELECT de solo lectura del cálculo candidato en FASANTA: USD 4.773.445,70, 10.044 códigos; grupos/colores/sucursales concilian. Analítico vacío y sintético 21.102 filas. No se aplicó migración ni se publicó Lovable durante esta revisión.
+
+---
+
 # Design QA — Análisis de repuestos, 14/10/2026
 
 Final result: passed. Revisión independiente aprobada sin P0/P1/P2 pendientes.

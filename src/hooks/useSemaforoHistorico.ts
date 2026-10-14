@@ -21,6 +21,14 @@ export interface SemaforoFiltros {
   marca: string;
   color: string;
   sucursal: string;
+  familia?: string;
+  deposito?: string;
+  franja?: string;
+  usd_min?: string;
+  usd_max?: string;
+  dias_min?: string;
+  dias_max?: string;
+  valorizacion?: string;
 }
 
 export interface SemaforoFila {
@@ -62,40 +70,58 @@ export interface SemaforoResumenColor {
   saldos_coincidentes: number;
 }
 
+export type SemaforoAgrupacion = "marca" | "familia" | "sucursal" | "deposito";
+export interface SemaforoGrupo { nombre: string; lineas: number; unidades: number; valor_kardex_usd: number | null; ubicaciones_sin_valor: number; rotacion: number | null }
+
 export interface SemaforoResultado {
+  version: string;
+  ubicaciones_sin_valor: number;
+  grupos: SemaforoGrupo[];
+  franjas: Array<{ franja: string; lineas: number; valor_kardex_usd: number | null }>;
+  facetas: { familias: string[]; depositos: string[]; sucursales: string[] };
+  rotacion: { valor: number | null; estado: string };
   fecha_analisis: string;
   lineas: number;
   unidades_stock: number;
-  valor_kardex_usd: number;
+  valor_kardex_usd: number | null;
   lineas_valorizadas: number;
   saldos_coincidentes: number;
   kardex_cargado_en: string | null;
   por_color: SemaforoResumenColor[];
-  sucursales: Array<{ nombre: string; lineas: number; unidades: number }>;
+  sucursales: Array<{ nombre: string; lineas: number; unidades: number; valor_kardex_usd: number | null }>;
   rows: SemaforoFila[];
 }
 
-export async function fetchSemaforoHistorico(filtros: SemaforoFiltros, page: number, limit = SEMAFORO_PAGE_SIZE): Promise<SemaforoResultado> {
-  const { data, error } = await supabase.rpc("repuestos_semaforo_historico_paginado" as never, {
-    p_busqueda: filtros.busqueda.trim() || null,
-    p_marca: filtros.marca || null,
-    p_color: filtros.color || null,
-    p_sucursal: filtros.sucursal || null,
+export async function fetchSemaforoHistorico(filtros: SemaforoFiltros, page: number, limit = SEMAFORO_PAGE_SIZE, agrupacion: SemaforoAgrupacion = "marca"): Promise<SemaforoResultado> {
+  const { data: response, error } = await supabase.rpc("repuestos_analisis_valorizado" as never, {
+    p_filtros: { ...filtros, busqueda: filtros.busqueda.trim() },
+    p_agrupacion: agrupacion,
     p_limite: limit,
     p_offset: page * limit,
   } as never);
-  if (error) throw error;
+  if (error) {
+    if (error.code === "PGRST202") throw new Error("Falta aplicar la actualizaciÃ³n del anÃ¡lisis valorizado en la base de datos.");
+    throw error;
+  }
+  const data: unknown = response;
   if (!data || typeof data !== "object" || !("rows" in data) || !("por_color" in data) || !("sucursales" in data)
-    || !Array.isArray(data.rows) || !Array.isArray(data.por_color) || !Array.isArray(data.sucursales)) {
+    || !Array.isArray(data.rows) || !Array.isArray(data.por_color) || !Array.isArray(data.sucursales) || !("grupos" in data) || !Array.isArray(data.grupos) || !("franjas" in data) || !Array.isArray(data.franjas)) {
     throw new Error("El informe del semÃ¡foro devolviÃ³ un formato invÃ¡lido");
   }
-  return data as SemaforoResultado;
+  if (!("facetas" in data) || !data.facetas || typeof data.facetas !== "object"
+    || !("familias" in data.facetas) || !Array.isArray(data.facetas.familias)
+    || !("depositos" in data.facetas) || !Array.isArray(data.facetas.depositos)
+    || !("sucursales" in data.facetas) || !Array.isArray(data.facetas.sucursales)
+    || !("version" in data) || typeof data.version !== "string") {
+    throw new Error("El informe del semáforo devolvió un formato inválido");
+  }
+  return data as unknown as SemaforoResultado;
 }
 
-export function useSemaforoHistorico(filtros: SemaforoFiltros, page: number) {
+export function useSemaforoHistorico(filtros: SemaforoFiltros, page: number, agrupacion: SemaforoAgrupacion = "marca") {
   return useQuery({
-    queryKey: ["repuestos", "semaforo_historico", filtros, page],
-    queryFn: () => fetchSemaforoHistorico(filtros, page),
+    queryKey: ["repuestos", "semaforo_historico", filtros, page, agrupacion],
+    queryFn: () => fetchSemaforoHistorico(filtros, page, SEMAFORO_PAGE_SIZE, agrupacion),
     staleTime: 5 * 60_000,
     retry: false,
     refetchOnWindowFocus: false,
