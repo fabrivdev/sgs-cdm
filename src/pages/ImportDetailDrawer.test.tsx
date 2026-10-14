@@ -189,6 +189,12 @@ describe("Importaciones: detalle compacto", () => {
       };
       return query;
     });
+    mocks.rpc.mockImplementation(async (name: string, args: { p_documento_id?: string; p_unidad_ids?: string[] }) => {
+      if (name === "maquinaria_vincular_documento_factura_importacion") {
+        records.maquinaria_documentos_factura_importacion_unidades = (args.p_unidad_ids ?? []).map(id => ({ documento_id: args.p_documento_id, importacion_unidad_id: id }));
+      }
+      return { data: {}, error: null };
+    });
     setup({ id: unitIds[0], importacion_linea_id: "line-1", numero_unidad: 1, cantidad_lote: 8 });
     fireEvent.mouseDown(screen.getByRole("tab", { name: "Documentos" }), { button: 0 });
     expect(await screen.findByText("Esta unidad no tiene un archivo de factura asignado.")).toBeInTheDocument();
@@ -202,7 +208,30 @@ describe("Importaciones: detalle compacto", () => {
     await waitFor(() => expect(mocks.rpc).toHaveBeenCalledWith("maquinaria_vincular_documento_factura_importacion", {
       p_documento_id: "invoice-1", p_unidad_ids: unitIds.slice(0, 5),
     }));
+    expect(await screen.findByRole("status")).toHaveTextContent("proveedor.pdf guardada para las unidades 1, 2, 3, 4, 5.");
     expect(mocks.rpc).not.toHaveBeenCalledWith("maquinaria_actualizar_unidad_importacion", expect.anything());
+  });
+  it("no confirma éxito cuando el vínculo informado por la RPC no aparece al releer", async () => {
+    const records: Record<string, unknown[]> = {
+      maquinaria_documentos: [{ id: "invoice-1", archivo_nombre: "proveedor.pdf", storage_path: "test.pdf", creado_en: "2026-10-14" }],
+      maquinaria_importacion_unidades: [{ id: "unit-1", numero_unidad: 1, chasis: null }],
+      maquinaria_documentos_factura_importacion_unidades: [],
+    };
+    mocks.from.mockImplementation((table: string) => {
+      const query = {
+        select: () => query, eq: () => query, order: () => query, in: () => query,
+        then: (resolve: (value: unknown) => unknown) => Promise.resolve({ data: records[table], error: null }).then(resolve),
+      };
+      return query;
+    });
+    setup({ id: "unit-1", importacion_linea_id: "line-1" });
+    fireEvent.mouseDown(screen.getByRole("tab", { name: "Documentos" }), { button: 0 });
+    fireEvent.click(await screen.findByRole("button", { name: "Gestionar otros archivos del lote (1)" }));
+    fireEvent.click(screen.getByRole("button", { name: "Asignar unidades de proveedor.pdf" }));
+    fireEvent.click(screen.getByLabelText("Unidad 1"));
+    fireEvent.click(screen.getByRole("button", { name: "Guardar factura" }));
+    expect(await screen.findByRole("status")).toHaveTextContent("no quedó vinculada a las unidades elegidas");
+    expect(screen.getByRole("button", { name: "Guardar factura" })).toBeEnabled();
   });
   it("no presenta la factura de la unidad 3 como archivo de la unidad 1", async () => {
     const records: Record<string, unknown[]> = {
@@ -226,6 +255,10 @@ describe("Importaciones: detalle compacto", () => {
     fireEvent.click(screen.getByRole("button", { name: "Gestionar otros archivos del lote (1)" }));
     expect(screen.getByText(/N\.0041-00003320\.jpg/)).toBeInTheDocument();
     expect(screen.getByText("Cubre unidad 3")).toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: "Eliminar factura del proveedor" }));
+    expect(screen.getByRole("alertdialog")).toHaveTextContent("Eliminar definitivamente N.0041-00003320.jpg del lote");
+    expect(screen.getByRole("alertdialog")).toHaveTextContent("No se trata de ocultarlo solo en esta pantalla.");
+    fireEvent.click(screen.getByRole("button", { name: "Cancelar" }));
     expect(screen.queryByText("Archivo de esta unidad")).not.toBeInTheDocument();
     expect(mocks.rpc).not.toHaveBeenCalled();
   });
