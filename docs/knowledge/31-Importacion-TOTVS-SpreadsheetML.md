@@ -9,7 +9,7 @@ El selector reconoce OS, facturación de ventas, productos, stock de repuestos, 
 ## Reglas conservadoras
 
 - Kardex analítico usa `TABLA + RECNO`. Dos archivos reales comparten 10.457 claves y contradicen 4.063: 3.998 solo en costos y 65 en campos no monetarios. El lote completo se bloquea; nunca se prefiere el archivo más nuevo por fecha.
-- Kardex sintético conserva SALDO, PPP1/2/3 y VALOR_1/2/3. La fuente no declara fecha de corte ni moneda de cada eje y no se recalcula `VALOR = SALDO × PPP`.
+- Kardex sintético conserva SALDO, PPP1/2/3 y VALOR_1/2/3. El XML no declara fecha de corte ni moneda de cada eje y no se recalcula `VALOR = SALDO × PPP`. Posteriormente el negocio confirmó que los ejes 1/2/3 corresponden a PYG/USD/EUR; es una confirmación funcional externa al XML, usada por el semáforo de repuestos para etiquetar `VALOR_2` como USD, no para inferir un corte actual.
 - Facturas de compra conservan `MONORI`, importes Gs, importes USD y `TIPCAM` por separado. No convierten ni eligen una moneda contable. La serie puede venir vacía y forma parte de la clave como texto vacío.
 - El maestro de proveedores contiene dos encabezados idénticos `Ag. Ret.IVA?`; se guardan como banderas 1 y 2 hasta confirmar su semántica.
 - Transferencias en tránsito son una foto: las claves ausentes en una carga completa dejan de estar vigentes, pero permanecen en historial.

@@ -1,12 +1,14 @@
 # Repuestos
 
-## Semáforo de stock: estado al 14/10/2026
+## Semáforo histórico de stock (código del 14/10/2026)
 
-Implementación local en codex/stock-semaphore-v1, base 65bc039; no integrada ni publicada. Diseño acordado: resumen, cards, torta del semáforo, distribución por sucursal y detalle filtrable. Compras queda fuera sin evidencia de ingreso al stock.
+`Repuestos.tsx` integra la sección `StockSemaphoreSection`. La migración `20261014190000_parts_historical_semaphore.sql` crea `v_repuestos_semaforo_historico` y su RPC paginada. Código y migración preparados localmente: un commit no acredita que Lovable haya publicado la pantalla ni que el SQL se haya aplicado. El prototipo aislado en `codex/stock-semaphore-v1` quedó reemplazado para esta función; no trasladar sus cuatro estados de reposición.
 
-Según el contexto confirmado por Fabrizio, V3 fue aplicada pero la distribución posterior no se validó; V4 quedó preparada para reimportar el maestro de junio y recuperar última venta/compra. Se comprobó el archivo local 20261013120000_allow_legacy_master_snapshot_reimport.sql y sus pruebas; no se comprobó su aplicación ni la equivalencia exacta del paquete llamado V4.
+El universo son productos activos `REP%` con stock positivo en `v_repuestos_stock_matriz`. Se agrupan por código interno y leen exclusivamente ventas positivas `repuestos_ventas_vinculacion.estado_vinculo='CONFIRMADA'` hasta la fecha de análisis. Se usan todos los años disponibles para la última venta; las ventas de 365 días solo distinguen verde oscuro (10 o más unidades) de verde claro (1 a 9). Sin ventas recientes: amarillo 366–730 días, naranja 731–1000, lila 1001–1825 y gris más de 1825. Sin venta confirmada con código del maestro anterior vinculado y activo: rojo. Sin venta ni equivalencia acreditada: `SIN_DATOS`, separado de rojo. No se asignan líneas ambiguas por código de fabricante. El Excel `stock30-05.xls` inspiró colores e informes; sus fórmulas y totales no se replican.
 
-Usar todo el histórico disponible, sin limitarlo a un año. Códigos antiguos/nuevos solo se vinculan con equivalencias acreditadas. Historial insuficiente no significa sin movimiento. Los promedios de 12 meses de Sugerencias son otro cálculo; no trasladar ese límite al historial del semáforo. Ver [[08-Pendientes-y-validacion]] y [[12-Estado-local]].
+`VALOR_2` del Kardex sintético se presenta como USD según confirmación funcional, junto al saldo de la misma foto, archivo y fecha de carga. La fuente no declara fecha de corte; el saldo puede diferir del stock actual. El informe suma el valor observado y cuenta las líneas valorizadas y con saldo coincidente, sin recalcular `VALOR=SALDO×PPP` ni llamarlo valor actual. Filtros por marca, color, sucursal con stock y búsqueda; resumen por color, participación en líneas/valor, distribución por sucursal, detalle y exportación. Las sumas por sucursal cuentan unidades en cada ubicación; una línea puede figurar en varias sucursales.
+
+Sugerencias de compra ya lee `repuestos_demanda_mensual` y `repuestos_ventas_vinculacion` confirmada; el reconciliador del maestro activo prioriza equivalencias `CONFIRMADA`/`CONFIRMADA_CANONICA`. Su decisión de reposición usa ventanas 12/24 meses y recurrencia. El color histórico no altera ese motor ni crea una orden de compra. El maestro activo `Lista Mercadoria.xls` tiene cero fechas `ultima_venta`/`ultima_compra` informadas: el semáforo usa fechas reales del historial vinculado, no esos campos vacíos. Ver [[08-Pendientes-y-validacion]] y [[12-Estado-local]].
 
 ## Ventas e histórico
 
