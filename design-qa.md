@@ -1,3 +1,37 @@
+# Design QA — Análisis de repuestos, 14/10/2026
+
+Final result: passed. Revisión independiente aprobada sin P0/P1/P2 pendientes.
+
+Referencia: imagen aportada por el usuario (1448 × 1086), comparada junto al render real de los componentes en `outputs/analisis-comparacion.jpg` del chat del 14/10. Vista previa local aislada: `/work/semaforo-qa.html`, backend sustituido por datos sintéticos; no se usó una sesión productiva. No acredita importes reales ni despliegue público.
+
+## Diferencias deliberadas aprobadas
+
+Se conserva el orden título/filtros/KPI/paneles/detalle. Cuatro KPI, sin saldo coincidente ni sin venta; porcentaje con venta365d en lugar de rotación. Sin subtítulos, textos explicativos permanentes, total repetido en donut, segundo bloque de rotación o segundo filtro de color. El filtro de color afecta detalle y Excel; resumen siempre corresponde a búsqueda/marca/sucursal. Colores/criterios de negocio preservados. Componentes nativos y tokens de SGS-CDM prevalecen sobre la apariencia de la maqueta. No se copiaron sus cifras inconsistentes.
+
+## Superficies y evidencia
+
+- Tipografía: PageHeader 18 px, jerarquía compartida, tabla 13 px y resumen 12 px; elipsis solo identidad/textos, cantidades comprobadas sin recorte. Una línea por registro en todos los tamaños.
+- Espaciado: gutters compartidos, gap12, cuatro KPI; paneles se apilan cuando el ancho útil no permite 520 px cada uno. Sin mínimos ni desbordamiento horizontal.
+- Tokens: Card/KpiStrip/FiltersBar/CompactListTable/ResponsiveDrawer y MarcaBadge compartidos. Ocho colores históricos, barras de sucursal con primary. Sin gradientes nuevos.
+- Assets: no fotografías ni ilustraciones necesarias; iconos Lucide y gráfico Recharts. El dibujo de la maqueta no se usa como fondo ni como UI.
+- Contenido: fecha de análisis, no promesa de actualización. Un solo selector de color y menú de exportación. Datos secundarios accesibles en ficha/Excel.
+- Capturas reales: `analisis-repuestos-{320,390,639,640,768,1280,1448}.jpg`; comparación responsive y capturas de carga/vacío/error, ficha móvil y cantidades en `outputs/` del chat. Todas fuera de Git. Anchos verificados mediante viewport, documento sin overflow y texto de celda nowrap. Filas44,8 px en teléfono/640 y38,5 px desde768.
+- Inspección focalizada de tabla: `analisis-numeros-320.jpg` y `analisis-numeros-1280.jpg`, valores1.284.556 y132,456789. En escritorio el contenedor interior numérico mide116 px de clientWidth y scrollWidth para ambos. Sucursal1.955.276,456789 completa en móvil.
+
+## Iteraciones
+
+1. Primera captura320: unidades/porcentaje del resumen demasiado juntos. Se retiró Unidades de ese resumen en teléfono (permanece en Excel), manteniendo tres columnas legibles.
+2. Revisor independiente detectó Marca sin badge y riesgo de truncamiento numérico. Se restauró MarcaBadge, se conservaron seis decimales y se amplió Stock según longitud; en teléfono Descripción pasa a ficha si el número requiere espacio. Se amplió Unidades de sucursal.
+3. Nueva revisión encontró132,456789 recortado en escritorio. Se corrigió el umbral de ancho de Stock, se recapturó a1280 y el revisor independiente aprobó la evidencia final.
+
+## Comportamiento comprobado
+
+Color rojo mantiene10.044 y36,2% en KPI del fixture; detalle/paginación cambian. MarcaCLAAS reduce universo a5.022; Limpiar restaura filtros/página. Ficha móvil conserva nulos, cantidades y procedencia. Excel Sin datos contiene174 filas únicas, ocho colores y seis sucursales; permiso de exportación desactivado elimina el menú. Carga/vacío/error tienen estado propio sin ceros ficticios ante error. Consulta original RPC conserva binding. Se protege exportación contra respuesta incompleta/duplicados.
+
+TypeScript, ESLint focalizado, tres pruebas de RPC/SQL y build oficial correctos; advertencias conocidas de Browserslist/chunks. Sin SQL nuevo ni escrituras de datos. La comprobación con sesión autorizada y cifras reales corresponde al despliegue público posterior.
+
+---
+
 # Design QA - scroll vertical de tablas largas en móvil
 
 01/10/2026, base `e6846b719c916230538628979ae65f152cd126a7`. `TableScroll` deja de imponer `max-height` y scroll vertical propio bajo 768 px cuando una lista supera 20 filas. Conserva `overflow-x-auto`; desde `md` mantiene el límite de 480 px, `overflow-y-auto`, gutter estable y encabezados sticky existentes. No cambia filas, consultas, paginación, filtros, orden, selección, acciones ni exportaciones.

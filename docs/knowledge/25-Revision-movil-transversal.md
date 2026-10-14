@@ -1,5 +1,7 @@
 # Revisión móvil transversal
 
+Excepción específica vigente del 14/10/2026: Repuestos > Análisis exige una sola línea visual por registro también en teléfono. No aplicar allí MobileRecord ni identidad apilada; ocultar secundarios en ficha/Excel cuando no entren. Sin subtítulos ni textos explicativos permanentes. Ver [[06-Repuestos]]. Las demás secciones conservan sus acuerdos.
+
 ## Lectura de vigencia al 14/10/2026
 
 Las reglas visuales siguen siendo referencia. La auditoría, prioridades y fases fechadas más abajo son antecedentes; no constituyen una lista actual de cambios a ejecutar. Main recibió correcciones posteriores: contrastar cada punto antes de reabrirlo. No se hizo una nueva auditoría visual de pantallas en esta revisión documental. Ver [[24-Condiciones-visuales-ventas]] y [[08-Pendientes-y-validacion]].

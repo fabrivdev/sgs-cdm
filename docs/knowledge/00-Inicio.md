@@ -1,5 +1,7 @@
 # SGS-CDM: inicio
 
+Excepción específica vigente del 14/10/2026: Repuestos > Análisis exige una sola línea visual por registro también en teléfono. No aplicar allí MobileRecord ni identidad apilada; ocultar secundarios en ficha/Excel cuando no entren. Sin subtítulos ni textos explicativos permanentes. Ver [[06-Repuestos]]. Las demás secciones conservan sus acuerdos.
+
 Revisión documental: 14/10/2026. La referencia exacta de código para las fichas generadas consta en `atlas-review.json` y en el manifiesto de sincronización; las notas funcionales indican sus propias comprobaciones y límites. El despliegue Lovable y la aplicación de SQL no se infieren de un commit.
 
 ## Para retomar el trabajo

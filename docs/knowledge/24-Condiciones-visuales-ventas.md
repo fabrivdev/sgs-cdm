@@ -1,5 +1,7 @@
 # Condiciones visuales obligatorias de Ventas
 
+Excepción específica vigente del 14/10/2026: Repuestos > Análisis exige una sola línea visual por registro también en teléfono. No aplicar allí MobileRecord ni identidad apilada; ocultar secundarios en ficha/Excel cuando no entren. Sin subtítulos ni textos explicativos permanentes. Ver [[06-Repuestos]]. Las demás secciones conservan sus acuerdos.
+
 ## Vigencia al 14/10/2026
 
 En main cac486c: “Facturación por período” uniforme en las tres áreas; Servicios siempre visible, sin desplegable ni título interno duplicado. Desde el acuerdo del 07/10, Desde/Hasta viven en filtros sin repetir el rango general bajo el título. 8295892 retira filtro local y aviso rojo de Técnicos y consolida los dos nombres de Agustín. Estos hechos de código prevalecen sobre las etapas históricas siguientes; publicación no verificada. La excepción móvil bajo 640 px permanece vigente.

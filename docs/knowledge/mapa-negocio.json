@@ -2598,13 +2598,17 @@
       "id": "repuestos.stock",
       "title": "Stock de repuestos",
       "module": "repuestos",
-      "description": "Teléfono: descripción/código/marca agrupados y total separado; reemplaza tres columnas rígidas de identidad. Tablet/escritorio conserva ejes separados y filtros, orden, avisos y Excel originales. Catálogo paginado de una línea y once campos, marcas con color y existencias centradas. Familia solo en Excel; seis sucursales visibles desde 768 px y Fabricante desde 1024 px. Tres campos principales en teléfonos (Código, Descripción, Total), Marca desde 768 px y desglose en ficha/Excel. Conserva filtros, contadores, nueve claves de orden global y export completo; Marca/Fabricante aún no ordenables en servidor.",
+      "description": "Teléfono: descripción/código/marca agrupados y total separado; reemplaza tres columnas rígidas de identidad. Tablet/escritorio conserva ejes separados y filtros, orden, avisos y Excel originales. Catálogo paginado de una línea y once campos, marcas con color y existencias centradas. Familia solo en Excel; seis sucursales visibles desde 768 px y Fabricante desde 1024 px. Tres campos principales en teléfonos (Código, Descripción, Total), Marca desde 768 px y desglose en ficha/Excel. Conserva filtros, contadores, nueve claves de orden global y export completo; Marca/Fabricante aún no ordenables en servidor. Análisis es una sección independiente del mismo permiso: cuatro KPI, distribución histórica por color y sucursal, detalle de una línea incluso en teléfono. Color afecta solo detalle/Excel; búsqueda, marca y sucursal afectan también resumen. Porcentaje con venta365d no equivale a rotación. Sin subtítulos ni explicaciones permanentes; datos secundarios en ficha/Excel.",
       "sources": [
         "src/pages/Repuestos.tsx",
         "src/components/repuestos/PartsStockTable.tsx",
         "src/hooks/useRepuestos.ts",
         "docs/knowledge/24-Condiciones-visuales-ventas.md",
-        "docs/knowledge/25-Revision-movil-transversal.md"
+        "docs/knowledge/25-Revision-movil-transversal.md",
+        "src/pages/RepuestosAnalisis.tsx",
+        "src/components/repuestos/StockSemaphoreSection.tsx",
+        "src/hooks/useSemaforoHistorico.ts",
+        "docs/knowledge/06-Repuestos.md"
       ],
       "flows": [
         "stock-repuestos"

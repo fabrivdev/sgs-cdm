@@ -1,15 +1,18 @@
 import { useEffect, useState } from "react";
-import { AlertTriangle, ChevronLeft, ChevronRight } from "lucide-react";
+import { AlertTriangle, ChevronLeft, ChevronRight, Package, Boxes, Coins, Activity } from "lucide-react";
 import { toast } from "sonner";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { MarcaBadge } from "@/components/StatusBadges";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { KpiItem, KpiStrip } from "@/components/layout/AppPrimitives";
-import { FiltersBar, FilterCustom } from "@/components/filters/FiltersBar";
+import { KpiItem, KpiStrip, PageHeader } from "@/components/layout/AppPrimitives";
+import { FiltersBar, FilterSelect } from "@/components/filters/FiltersBar";
 import { SectionActionsMenu } from "@/components/exports/SectionActionsMenu";
-import { MobileRecord } from "@/components/lists/MobileRecord";
+import { CompactListTable, type CompactListColumn } from "@/components/lists/CompactListTable";
+import { PieChart, Pie, Cell, ResponsiveContainer } from "recharts";
 import { ResponsiveDrawer, ResponsiveDrawerBody, ResponsiveDrawerHeader } from "@/components/ui/responsive-drawer";
-import { useIsMobile } from "@/hooks/use-mobile";
-import { metaText, sectionTitle, tableHeadText, tableText } from "@/lib/ui-classes";
+
+import { sectionTitle, tableText } from "@/lib/ui-classes";
 import { useDebouncedValue } from "@/hooks/useDebouncedValue";
 import { MARCAS } from "@/lib/constants";
 import {
@@ -19,8 +22,8 @@ import {
 
 const SUCURSALES = ["Santa Rita", "Santa Rosa", "Campo 9", "Misiones", "Loma Plata", "Katuete"];
 const INITIAL_FILTERS: SemaforoFiltros = { busqueda: "", marca: "", color: "", sucursal: "" };
-const quantity = (value: number | null | undefined) => value == null ? "—" : Number(value).toLocaleString("es-PY", { maximumFractionDigits: 2 });
-const usd = (value: number | null | undefined) => value == null ? "—" : `USD ${Number(value).toLocaleString("es-PY", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+const quantity = (value: number | null | undefined) => value == null ? "—" : Number(value).toLocaleString("es-PY", { maximumFractionDigits: 6 });
+const usd = (value: number | null | undefined) => value == null ? "—" : `$ ${Number(value).toLocaleString("es-PY", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
 const fecha = (value: string | null | undefined) => value ? new Date(`${value.slice(0, 10)}T12:00:00`).toLocaleDateString("es-PY") : "—";
 
 function exportRow(row: SemaforoFila) {
@@ -55,17 +58,41 @@ function exportRow(row: SemaforoFila) {
   };
 }
 
-function DetailFields({ row }: { row: SemaforoFila }) {
-  return <div className={`grid gap-3 sm:grid-cols-2 ${tableText}`}>
-    <div>Fabricante: {row.codigo_fabricante || "—"}<br />Código anterior confirmado: {row.codigo_anterior_ejemplo || "—"}{row.codigos_anteriores > 1 && ` (+${row.codigos_anteriores - 1})`}</div>
-    <div>Última venta: {fecha(row.ultima_venta)}<br />Antigüedad: {row.dias_ultima_venta == null ? "—" : `${quantity(row.dias_ultima_venta)} días`}</div>
-    <div>Ventas {new Date().getFullYear()}: {quantity(row.unidades_anio_actual)}<br />{new Date().getFullYear() - 1}: {quantity(row.unidades_anio_anterior)} · {new Date().getFullYear() - 2}: {quantity(row.unidades_hace_dos_anios)}</div>
-    <div>Kardex: {usd(row.valor_kardex_usd)}<br />Saldo foto: {quantity(row.saldo_kardex)} · actual: {quantity(row.stock_total)}<br />Archivo: {row.kardex_archivo || "—"}</div>
-  </div>;
+const COLOR_FILLS = ["#047857", "#34d399", "#fbbf24", "#f97316", "#a78bfa", "#94a3b8", "#ef4444", "#e2e8f0"];
+const percent = (part: number, total: number) => total > 0 ? `${(part / total * 100).toLocaleString("es-PY", { maximumFractionDigits: 1 })}%` : "—";
+
+function ColorLabel({ color, compact = false }: { color: string; compact?: boolean }) {
+  const definition = SEMAFORO_COLORES.find(item => item.id === color);
+  return <span className="flex min-w-0 items-center gap-2" title={definition?.descripcion}>
+    <span aria-hidden className={`h-2.5 w-2.5 shrink-0 rounded-full ${definition?.className ?? "bg-slate-200"}`} />
+    <span className={compact ? "sr-only sm:not-sr-only sm:truncate" : "truncate"}>{definition?.label ?? color}</span>
+  </span>;
 }
 
+function DetailFields({ row }: { row: SemaforoFila }) {
+  const year = Number(row.fecha_analisis.slice(0, 4));
+  const fields = [
+    ["Fecha de análisis", fecha(row.fecha_analisis)], ["Código", row.codigo_interno], ["Descripción", row.descripcion], ["Marca", row.marca],
+    ["Fabricante", row.codigo_fabricante], ["Familia", row.familia],
+    ["Código anterior", row.codigo_anterior_ejemplo], ["Equivalencias", quantity(row.codigos_anteriores)],
+    ["Stock", quantity(row.stock_total)], ["Última venta", fecha(row.ultima_venta)],
+    ["Días sin venta", quantity(row.dias_ultima_venta)], ["Ventas 365d", quantity(row.unidades_365d)],
+    [String(year), quantity(row.unidades_anio_actual)], [String(year - 1), quantity(row.unidades_anio_anterior)],
+    [String(year - 2), quantity(row.unidades_hace_dos_anios)],
+    ["Santa Rita", quantity(row.santa_rita)], ["Santa Rosa", quantity(row.santa_rosa)], ["Campo 9", quantity(row.campo_9)],
+    ["Misiones", quantity(row.misiones)], ["Loma Plata", quantity(row.loma_plata)], ["Katuete", quantity(row.katuete)],
+    ["Valor Kardex (USD)", usd(row.valor_kardex_usd)], ["Saldo Kardex", quantity(row.saldo_kardex)],
+    ["Saldo coincide", row.saldo_kardex == null ? "—" : row.saldo_coincide ? "Sí" : "No"],
+    ["Archivo Kardex", row.kardex_archivo], ["Carga Kardex", fecha(row.kardex_cargado_en)],
+  ];
+  return <dl className={`space-y-2 ${tableText}`}>{fields.map(([label, value]) =>
+    <div key={label} className="grid grid-cols-[120px_minmax(0,1fr)] gap-3 border-b pb-2"><dt className="text-muted-foreground">{label}</dt><dd className="min-w-0 break-words">{value || "—"}</dd></div>
+  )}</dl>;
+}
+
+
 export function StockSemaphoreSection({ canExport }: { canExport: boolean }) {
-  const isPhone = useIsMobile(640);
+
   const [search, setSearch] = useState("");
   const debounced = useDebouncedValue(search, 300);
   const [filtros, setFiltros] = useState<SemaforoFiltros>(INITIAL_FILTERS);
@@ -75,10 +102,11 @@ export function StockSemaphoreSection({ canExport }: { canExport: boolean }) {
   useEffect(() => { setFiltros(current => ({ ...current, busqueda: debounced })); }, [debounced]);
   useEffect(() => { setPage(0); setSelected(null); }, [filtros]);
   const report = useSemaforoHistorico(filtros, page);
-  const data = report.data;
-  const rows = data?.rows ?? [];
+  const overview = useSemaforoHistorico({ ...filtros, color: "" }, 0);
+  const data = overview.data;
+  const rows = report.data?.rows ?? [];
   const byColor = new Map(data?.por_color.map(item => [item.color, item]) ?? []);
-  const pages = Math.max(1, Math.ceil((data?.lineas ?? 0) / SEMAFORO_PAGE_SIZE));
+  const pages = Math.max(1, Math.ceil((report.data?.lineas ?? 0) / SEMAFORO_PAGE_SIZE));
 
   const exportar = async () => {
     setExporting(true);
@@ -97,6 +125,7 @@ export function StockSemaphoreSection({ canExport }: { canExport: boolean }) {
         if (chunk.rows.length < 200) break;
         exportPage += 1;
       } while (all.length < expected);
+      if (all.length !== expected || new Set(all.map(row => row.codigo_interno)).size !== expected) throw new Error("La exportación está incompleta. Reintentá.");
       if (!all.length) throw new Error("No hay repuestos para exportar con estos filtros.");
       const XLSX = await import("xlsx");
       const workbook = XLSX.utils.book_new();
@@ -129,60 +158,74 @@ export function StockSemaphoreSection({ canExport }: { canExport: boolean }) {
     }
   };
 
+  const stockDigits = Math.max(1, ...rows.map(row => quantity(row.stock_total).length));
+  const columns: CompactListColumn<SemaforoFila>[] = [
+    { key: "codigo", label: "Código", kind: "text", width: "w-[110px]", value: row => row.codigo_interno,
+      render: row => <button type="button" className="block min-h-11 w-full truncate text-left font-mono focus-visible:ring-2 focus-visible:ring-ring md:min-h-0" onClick={() => setSelected(row)} aria-label={`Ver ${row.codigo_interno}`}>{row.codigo_interno}</button> },
+    { key: "descripcion", label: "Descripción", kind: "text", width: "w-auto", value: row => row.descripcion },
+    { key: "marca", label: "Marca", kind: "text", width: "w-[100px]", hiddenBelow: "lg", value: row => row.marca, render: row => <MarcaBadge marca={row.marca} /> },
+    { key: "stock", label: "Stock", kind: "number", align: "center", width: stockDigits > 8 ? "w-[130px]" : "w-[85px]", value: row => row.stock_total, render: row => quantity(row.stock_total) },
+    { key: "dias", label: "Días sin venta", kind: "number", align: "center", width: "w-[100px]", hiddenBelow: "md", value: row => row.dias_ultima_venta, render: row => quantity(row.dias_ultima_venta) },
+    { key: "ventas", label: "Unid. 365d", kind: "number", align: "center", width: "w-[90px]", hiddenBelow: "lg", value: row => row.unidades_365d, render: row => quantity(row.unidades_365d) },
+    { key: "color", label: "Color", kind: "text", width: "w-[125px]", value: row => row.color, render: row => <ColorLabel color={row.color} compact /> },
+  ];
+  const mobileColumns = [{ ...columns[0], width: stockDigits > 8 ? "w-auto" : "w-[88px]" }, ...(stockDigits > 8 ? [] : [columns[1]]), { ...columns[3], width: stockDigits > 8 ? "w-[130px]" : "w-[62px]" }, { ...columns[6], width: "w-[30px]", label: "" }];
+  const recent = (byColor.get("VERDE_OSCURO")?.lineas ?? 0) + (byColor.get("VERDE_CLARO")?.lineas ?? 0);
+  const maxBranch = Math.max(1, ...(data?.sucursales.map(branch => branch.lineas) ?? []));
+  const chart = SEMAFORO_COLORES.map((color, index) => ({ name: color.label, value: byColor.get(color.id)?.lineas ?? 0, fill: COLOR_FILLS[index] }));
+
   return <section className="min-w-0 space-y-3" aria-label="Semáforo histórico de repuestos">
+    <PageHeader title="Análisis de repuestos" actions={data && <time className="hidden text-[12px] text-muted-foreground sm:block" dateTime={data.fecha_analisis}>Análisis {fecha(data.fecha_analisis)}</time>} />
     <FiltersBar
       search={{ value: search, onChange: setSearch, placeholder: "Código, descripción o fabricante…", label: "Buscar", width: "w-[min(390px,32vw)]" }}
-      activeCount={Number(Boolean(filtros.busqueda)) + Number(Boolean(filtros.marca)) + Number(Boolean(filtros.color)) + Number(Boolean(filtros.sucursal))}
+      activeCount={Number(Boolean(filtros.busqueda)) + Number(Boolean(filtros.marca)) + Number(Boolean(filtros.sucursal))}
       onClear={() => { setSearch(""); setFiltros(INITIAL_FILTERS); }}
-      mobileContext={data ? `Análisis ${fecha(data.fecha_analisis)} · ${quantity(data.lineas)} repuestos` : "Rotación por última venta confirmada"}
       secondaryActions={canExport ? <SectionActionsMenu busy={exporting} options={[{
-        id: "exportar-semaforo", label: "Exportar semáforo histórico", disabled: exporting || report.isLoading || report.isError || !data?.lineas,
+        id: "exportar-semaforo", label: "Exportar semáforo histórico", disabled: exporting || report.isLoading || report.isError || !report.data?.lineas,
         onSelect: () => void exportar(),
       }]} /> : undefined}
-      expanded={<>
-        <FilterCustom label="Color" width="w-full"><select aria-label="Filtrar por color" value={filtros.color} onChange={event => setFiltros(current => ({ ...current, color: event.target.value }))} className="h-11 w-full rounded-md border bg-background px-2 text-base sm:h-8 sm:text-[12px]"><option value="">Todos los colores</option>{SEMAFORO_COLORES.map(color => <option key={color.id} value={color.id}>{color.label}</option>)}</select></FilterCustom>
-        <FilterCustom label="Sucursal con stock" width="w-full"><select aria-label="Filtrar por sucursal con stock" value={filtros.sucursal} onChange={event => setFiltros(current => ({ ...current, sucursal: event.target.value }))} className="h-11 w-full rounded-md border bg-background px-2 text-base sm:h-8 sm:text-[12px]"><option value="">Todas las sucursales</option>{SUCURSALES.map(sucursal => <option key={sucursal}>{sucursal}</option>)}</select></FilterCustom>
-      </>}
     >
-      <FilterCustom label="Marca" width="w-[140px]"><select aria-label="Filtrar por marca" value={filtros.marca} onChange={event => setFiltros(current => ({ ...current, marca: event.target.value }))} className="h-11 w-full rounded-md border bg-background px-2 text-base sm:h-8 sm:text-[12px]"><option value="">Todas las marcas</option>{MARCAS.map(marca => <option key={marca}>{marca}</option>)}</select></FilterCustom>
+      <FilterSelect label="Marca" value={filtros.marca || "all"} onChange={marca => setFiltros(current => ({ ...current, marca: marca === "all" ? "" : marca }))} placeholder="Todas" options={[{ value: "all", label: "Todas" }, ...MARCAS.map(marca => ({ value: marca, label: marca }))]} />
+      <FilterSelect label="Sucursal con stock" value={filtros.sucursal || "all"} onChange={sucursal => setFiltros(current => ({ ...current, sucursal: sucursal === "all" ? "" : sucursal }))} placeholder="Todas" width="w-[180px]" options={[{ value: "all", label: "Todas" }, ...SUCURSALES.map(nombre => ({ value: nombre, label: nombre }))]} />
     </FiltersBar>
-
-    {report.isLoading && <p className="text-sm text-muted-foreground">Calculando historial y valorización…</p>}
-    {report.isError && <div className="flex items-center justify-between gap-3 rounded-md border border-destructive/40 p-3 text-sm text-destructive"><span><AlertTriangle className="mr-2 inline h-4 w-4" />No se pudo cargar el semáforo. {(report.error as Error).message}</span><Button type="button" variant="outline" size="sm" onClick={() => void report.refetch()}>Reintentar</Button></div>}
-    {data && <>
+    {overview.isLoading && <div role="status" className="rounded-xl border p-4 text-sm text-muted-foreground">Cargando análisis…</div>}
+    {overview.isError && <div role="alert" className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-destructive/40 p-3 text-sm text-destructive"><span><AlertTriangle className="mr-2 inline h-4 w-4" />No se pudo cargar el análisis.</span><Button variant="outline" onClick={() => void overview.refetch()}>Reintentar</Button></div>}
+    {data && !overview.isError && <>
       <KpiStrip>
-        <KpiItem label="Con stock" value={quantity(data.lineas)} detail={`${quantity(data.unidades_stock)} unidades`} />
-        <KpiItem label="Kardex USD" value={usd(data.valor_kardex_usd)} detail={`${quantity(data.lineas_valorizadas)} líneas valorizadas`} />
-        <KpiItem label="Saldo coincidente" value={quantity(data.saldos_coincidentes)} detail="Con la foto del Kardex" />
+        <KpiItem label="Códigos con stock" value={quantity(data.lineas)} icon={<Package />} />
+        <KpiItem label="Unidades en stock" value={quantity(data.unidades_stock)} icon={<Boxes />} className={quantity(data.unidades_stock).length > 12 ? "[&>div:nth-child(2)]:text-[14px]" : undefined} />
+        <KpiItem label="Valor Kardex ref." value={<span title="USD">{data.lineas_valorizadas ? usd(data.valor_kardex_usd) : "—"}</span>} icon={<Coins />} className="[&>div:nth-child(2)]:text-[clamp(14px,1.6vw,20px)]" />
+        <KpiItem label="Con venta en 365d" value={percent(recent, data.lineas)} icon={<Activity />} />
       </KpiStrip>
-      <p className={metaText}>El valor USD es VALOR_2 del último Kardex, cargado {fecha(data.kardex_cargado_en)}. Es una foto de costo sin fecha de corte en el XML; puede diferir del stock actual.</p>
-      <div className="grid grid-cols-2 gap-2 lg:grid-cols-4">{SEMAFORO_COLORES.map(color => {
-        const item = byColor.get(color.id);
-        const lines = item?.lineas ?? 0;
-        return <button type="button" key={color.id} aria-pressed={filtros.color === color.id} onClick={() => setFiltros(current => ({ ...current, color: current.color === color.id ? "" : color.id }))} className="min-h-11 rounded-md border bg-card px-3 py-2 text-left transition-colors hover:bg-accent focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring aria-pressed:border-primary">
-          <span className="flex items-center gap-1.5 text-[12px] font-semibold"><span className={`h-2.5 w-2.5 shrink-0 rounded-full ${color.className}`} />{color.label}<span className="ml-auto tabular-nums">{quantity(lines)}</span></span>
-          <span className={metaText}>{color.descripcion}</span>
-          <span className={`${metaText} mt-1 block`}>{usd(item?.valor_kardex_usd)} · {data.lineas ? (lines / data.lineas * 100).toLocaleString("es-PY", { maximumFractionDigits: 1 }) : 0}% de líneas · {data.valor_kardex_usd ? (Number(item?.valor_kardex_usd ?? 0) / data.valor_kardex_usd * 100).toLocaleString("es-PY", { maximumFractionDigits: 1 }) : 0}% del valor</span>
-        </button>;
-      })}</div>
-      <Card><CardHeader className="px-3 py-2"><CardTitle className={sectionTitle}>Stock por sucursal</CardTitle></CardHeader><CardContent className="grid gap-x-4 px-3 pb-2 sm:grid-cols-2 lg:grid-cols-3">{data.sucursales.map(branch => <div key={branch.nombre} className={`flex items-center justify-between gap-2 border-t py-2 ${tableText}`}><span>{branch.nombre}<span className={`ml-2 ${metaText}`}>{quantity(branch.lineas)} líneas</span></span><span className="font-medium tabular-nums">{quantity(branch.unidades)}</span></div>)}</CardContent></Card>
-      <Card><CardContent className="p-0">
-        {isPhone && rows.length > 0 && <div role="table" aria-label="Detalle del semáforo" className={tableText}>
-          <div role="row" className={`grid grid-cols-[minmax(0,1fr)_76px] gap-2 border-b bg-muted/50 px-3 py-2 ${tableHeadText}`}><span role="columnheader">Repuesto / color</span><span role="columnheader" className="text-right">Stock</span></div>
-          {rows.map(row => <div role="row" key={row.codigo_interno} className="grid grid-cols-[minmax(0,1fr)_76px] items-center gap-2 border-b px-3 py-1.5">
-            <button type="button" role="cell" className="min-h-11 min-w-0 text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring" onClick={() => setSelected(selected?.codigo_interno === row.codigo_interno ? null : row)} aria-expanded={selected?.codigo_interno === row.codigo_interno}>
-              <MobileRecord primary={row.descripcion} secondary={<span className="flex flex-wrap items-center gap-1.5"><span className="font-mono">{row.codigo_interno}</span><span className={`h-2 w-2 rounded-full ${SEMAFORO_COLORES.find(c => c.id === row.color)?.className ?? "bg-slate-200"}`} />{SEMAFORO_COLORES.find(c => c.id === row.color)?.label ?? row.color}</span>} />
-            </button>
-            <span role="cell" className="text-right font-medium tabular-nums">{quantity(row.stock_total)}</span>
-          </div>)}
-        </div>}
-        {rows.length === 0 ? <p className="p-4 text-sm text-muted-foreground">Sin repuestos para estos filtros.</p> : !isPhone && <div className="overflow-x-auto"><table className="w-full min-w-[760px] text-sm"><thead className="bg-muted/50 text-left"><tr><th className="px-3 py-2">Código / descripción</th><th className="px-3 py-2">Marca</th><th className="px-3 py-2">Color</th><th className="px-3 py-2 text-right">Stock</th><th className="px-3 py-2">Última venta</th><th className="px-3 py-2 text-right">Ventas 365d</th><th className="px-3 py-2 text-right">Kardex USD</th></tr></thead><tbody>{rows.map(row => <tr key={row.codigo_interno} className="border-t hover:bg-muted/40"><td className="px-3 py-2"><button type="button" className="max-w-[320px] text-left hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring" onClick={() => setSelected(selected?.codigo_interno === row.codigo_interno ? null : row)} aria-expanded={selected?.codigo_interno === row.codigo_interno}><span className="block font-mono text-xs">{row.codigo_interno}</span><span className="block truncate">{row.descripcion}</span></button></td><td className="px-3 py-2">{row.marca}</td><td className="px-3 py-2"><span className="flex items-center gap-2"><span className={`h-2.5 w-2.5 rounded-full ${SEMAFORO_COLORES.find(c => c.id === row.color)?.className ?? "bg-slate-200"}`} />{SEMAFORO_COLORES.find(c => c.id === row.color)?.label ?? row.color}</span></td><td className="px-3 py-2 text-right tabular-nums">{quantity(row.stock_total)}</td><td className="px-3 py-2">{fecha(row.ultima_venta)}</td><td className="px-3 py-2 text-right tabular-nums">{quantity(row.unidades_365d)}</td><td className="px-3 py-2 text-right tabular-nums">{usd(row.valor_kardex_usd)}{row.saldo_kardex != null && !row.saldo_coincide && <span className="block text-xs text-amber-700">Saldo diferente</span>}</td></tr>)}</tbody></table></div>}
-        <div className="flex items-center justify-between border-t px-3 py-2 text-xs text-muted-foreground"><span>Página {page + 1} de {pages} · {quantity(data.lineas)} repuestos</span><span className="flex gap-1"><Button type="button" variant="outline" size="sm" disabled={page === 0} onClick={() => setPage(p => p - 1)} aria-label="Página anterior"><ChevronLeft className="h-4 w-4" /></Button><Button type="button" variant="outline" size="sm" disabled={page + 1 >= pages} onClick={() => setPage(p => p + 1)} aria-label="Página siguiente"><ChevronRight className="h-4 w-4" /></Button></span></div>
+      <div className="grid min-w-0 gap-3 [grid-template-columns:repeat(auto-fit,minmax(min(100%,520px),1fr))]">
+        <Card className="min-w-0"><CardHeader className="px-3 py-3"><CardTitle className={sectionTitle}>Semáforo histórico</CardTitle></CardHeader>
+          <CardContent className="grid min-w-0 items-center gap-3 px-3 pb-3 sm:grid-cols-[180px_minmax(0,1fr)] 2xl:grid-cols-[220px_minmax(0,1fr)]">
+            <div className="mx-auto h-[180px] w-[180px] 2xl:h-[220px] 2xl:w-[220px]" aria-hidden>
+              <ResponsiveContainer width="100%" height="100%"><PieChart><Pie data={data.lineas ? chart : [{ value: 1, fill: "#e2e8f0" }]} dataKey="value" innerRadius="58%" outerRadius="96%" stroke="hsl(var(--card))" strokeWidth={2} isAnimationActive={false}>{(data.lineas ? chart : [{ fill: "#e2e8f0" }]).map((item, index) => <Cell key={index} fill={item.fill} />)}</Pie></PieChart></ResponsiveContainer>
+            </div>
+            <table aria-label="Distribución por color" className="w-full table-fixed text-[12px] tabular-nums">
+              <thead className="text-muted-foreground"><tr className="border-b"><th className="w-[45%] py-2 sm:w-[35%] text-left font-medium">Color</th><th className="py-2 text-center font-medium">Códigos</th><th className="w-[25%] py-2 sm:w-[18%] text-right font-medium">%</th><th className="hidden w-[30%] py-2 text-center font-medium sm:table-cell">Unidades</th></tr></thead>
+              <tbody>{SEMAFORO_COLORES.map(color => { const item = byColor.get(color.id); return <tr key={color.id} className="border-b last:border-0"><td className="overflow-hidden py-2"><ColorLabel color={color.id} /></td><td className="text-center">{quantity(item?.lineas ?? 0)}</td><td className="text-right">{percent(item?.lineas ?? 0, data.lineas)}</td><td className="hidden text-center sm:table-cell">{quantity(item?.unidades_stock ?? 0)}</td></tr>; })}</tbody>
+            </table>
+          </CardContent>
+        </Card>
+        <Card className="min-w-0"><CardHeader className="px-3 py-3"><CardTitle className={sectionTitle}>Stock por sucursal</CardTitle></CardHeader><CardContent className="px-3 pb-3">
+          <table aria-label="Stock por sucursal" className="w-full table-fixed text-[12px] tabular-nums"><thead className="text-muted-foreground"><tr className="border-b"><th className="py-2 text-left font-medium">Sucursal</th><th className="hidden w-[25%] sm:table-cell" aria-label="Presencia" /><th className="w-[20%] py-2 text-center font-medium">Códigos</th><th className="w-[47%] py-2 text-center font-medium sm:w-[30%]">Unidades</th></tr></thead>
+            <tbody>{data.sucursales.map(branch => <tr key={branch.nombre} className="h-11 border-b last:border-0"><td className="truncate pr-2">{branch.nombre}</td><td className="hidden pr-3 sm:table-cell"><div aria-hidden className="h-2 rounded-full bg-muted"><div className="h-full rounded-full bg-primary" style={{ width: `${branch.lineas / maxBranch * 100}%` }} /></div></td><td className="text-center">{quantity(branch.lineas)}</td><td className="text-center">{quantity(branch.unidades)}</td></tr>)}</tbody>
+          </table>
+        </CardContent></Card>
+      </div>
+      <Card className="min-w-0"><CardHeader className="flex-row flex-wrap items-center justify-between gap-2 px-3 py-2"><CardTitle className={sectionTitle}>Detalle de repuestos</CardTitle>
+        <Select value={filtros.color || "all"} onValueChange={color => setFiltros(current => ({ ...current, color: color === "all" ? "" : color }))}><SelectTrigger aria-label="Color del detalle" className="h-11 w-[170px] text-[12px] sm:h-8"><SelectValue /></SelectTrigger><SelectContent><SelectItem value="all">Todos los colores</SelectItem>{SEMAFORO_COLORES.map(color => <SelectItem key={color.id} value={color.id}>{color.label}</SelectItem>)}</SelectContent></Select>
+      </CardHeader><CardContent className="p-0">
+        <CompactListTable rows={rows} columns={columns} mobileColumns={mobileColumns} id={row => row.codigo_interno} label="Detalle de repuestos" className="[&_td>div]:!whitespace-nowrap max-md:[&_td]:py-0" onSelect={setSelected}
+          status={report.isLoading ? <span role="status">Cargando detalle…</span> : report.isError ? <span role="alert">No se pudo cargar el detalle. <Button variant="ghost" onClick={() => void report.refetch()}>Reintentar</Button></span> : !rows.length ? "Sin repuestos para estos filtros." : undefined} />
+        <div className="flex items-center justify-between gap-2 border-t px-3 py-2 text-[12px] text-muted-foreground"><span>{page + 1} / {pages}</span><div className="flex gap-1"><Button variant="outline" size="sm" className="min-h-11 min-w-11 sm:min-h-8 sm:min-w-8" disabled={page === 0 || report.isLoading} onClick={() => setPage(p => p - 1)} aria-label="Página anterior"><ChevronLeft className="h-4 w-4" /></Button><Button variant="outline" size="sm" className="min-h-11 min-w-11 sm:min-h-8 sm:min-w-8" disabled={page + 1 >= pages || report.isLoading || report.isError} onClick={() => setPage(p => p + 1)} aria-label="Página siguiente"><ChevronRight className="h-4 w-4" /></Button></div></div>
       </CardContent></Card>
-      {isPhone ? <ResponsiveDrawer open={!!selected} onOpenChange={open => { if (!open) setSelected(null); }}>
-        <ResponsiveDrawerHeader><h2 className={sectionTitle}>{selected?.descripcion}</h2><p className={metaText}>{selected?.codigo_interno} · {selected?.marca}</p></ResponsiveDrawerHeader>
+      <ResponsiveDrawer open={!!selected} onOpenChange={open => { if (!open) setSelected(null); }}>
+        <ResponsiveDrawerHeader><h2 className={sectionTitle}>Detalle del repuesto</h2></ResponsiveDrawerHeader>
         <ResponsiveDrawerBody>{selected && <DetailFields row={selected} />}</ResponsiveDrawerBody>
-      </ResponsiveDrawer> : selected && <Card><CardHeader className="px-3 py-2"><CardTitle className={sectionTitle}>{selected.codigo_interno} · {selected.descripcion}</CardTitle></CardHeader><CardContent className="px-3 pb-3"><DetailFields row={selected} /></CardContent></Card>}
+      </ResponsiveDrawer>
     </>}
   </section>;
 }
