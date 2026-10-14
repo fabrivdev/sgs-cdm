@@ -1,5 +1,11 @@
 # Contrato del Mayor para indicadores gerenciales
 
+## Ajuste del contrato preparado el 14/10/2026
+
+El rechazo de una clave con otra huella entre archivos distintos impedía importar el corte actualizado. `20261014120000_version_totvs_mayor_snapshots.sql` permite guardar versiones inmutables de la misma clave y deja un solo corte `COMPLETA`; los anteriores pasan a `SUPERADA`, por lo que las consultas gerenciales antiguas que filtraban `COMPLETA` tampoco duplican versiones. Una clave repetida con huellas distintas dentro de la misma carga continúa bloqueada. Antes de finalizar, el adaptador distingue cambios descriptivos de cambios en importe, cuenta, centro de costo y tipo contable, y pide aceptación explícita de estos últimos. La clasificación de cuentas aprobada sigue separada del asiento; las nueve diferencias contables observadas en el XML actualizado no se aprueban por esta migración. Pendiente de SQL y publicación real.
+
+## Análisis y propuesta histórica del primer corte
+
 Auditoría local realizada el 2026-10-06 sobre el Mayor de 47.257.141 bytes y
 la clasificación preliminar de 251 cuentas. No se aplicó SQL, no se cargaron
 datos y no se modificó el panel.
@@ -103,8 +109,9 @@ La fuente y su clasificación deben permanecer separadas:
 
 La clave idempotente es
 `SUCURS+FECHA+LOTE+SUBLOTE+DOCUMENTO+LINEA`. Una reimportación con la misma
-clave y huella cuenta como sin cambio. La misma clave con distinta huella
-bloquea el lote para revisión; no se actualiza silenciosamente. Los
+clave y huella cuenta como sin cambio. En esta propuesta inicial, la misma
+clave con distinta huella bloqueaba el lote; el ajuste del 14/10 permite una
+versión posterior sin actualizar silenciosamente la anterior. Los
 totalizadores nunca llegan a la tabla de asientos.
 
 El RPC propuesto debe aceptar lotes de hasta 500 filas, modo `validate/import`,

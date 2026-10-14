@@ -1,5 +1,13 @@
 # Libro Mayor TOTVS
 
+## Archivo actualizado y contrato preparado el 14/10/2026
+
+El XML actualizado de 52.820.854 bytes (SHA-256 `604b4438a696a2c776d59a5d18fa71a9d46b2f062a362cc1a4413b2469a7862e`) contiene 32.461 movimientos hasta el 13/10. Frente a los 29.040 del corte completo anterior: 27.999 claves y huellas iguales, 1.041 claves con nueva huella y 3.421 claves nuevas. De las 1.041 versiones, 1.032 solo cambian datos ajenos a los seis campos contables controlados; nueve cambian cuenta, centro de costo o `TPSLDO` (ocho pasan de 9 a 1). Ningún importe PYG/USD cambió en esas claves. Son datos de comparación local y consulta anterior de la base, no una importación nueva acreditada.
+
+La migración `20261014120000_version_totvs_mayor_snapshots.sql` conserva las versiones fuente y deja un único corte `COMPLETA`; los anteriores pasan a `SUPERADA` con su procedencia intacta. Esto protege también las consultas gerenciales anteriores que filtraban solo `COMPLETA`. El adaptador muestra los cambios contables antes de finalizar y cancela la carga si no se aceptan. Reimportar el mismo archivo no suma asientos dos veces. Aplicación SQL, publicación Lovable e importación real permanecen pendientes; no interpretar las pruebas PGlite como validación de producción.
+
+## Evidencia histórica del primer corte
+
 Contexto verificado localmente el 2026-10-06 contra
 `mayor_contable_2_monedas_140624.xml` (47.257.141 bytes), un SpreadsheetML de
 Excel 2003. Esta etapa solo agrega reconocimiento y preflight local: no crea

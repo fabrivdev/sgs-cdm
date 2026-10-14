@@ -1,5 +1,9 @@
 # Entrega local del importador de Libro Mayor
 
+Actualización 14/10/2026: esta nota registra la entrega inicial del 06/10. Para el XML actualizado se preparó la migración incremental `20261014120000_version_totvs_mayor_snapshots.sql` y la confirmación de cambios contables en `mayorPersist.ts`/`ImportarTotvsTab.tsx`. Aplicar la migración después de la inicial y antes de intentar de nuevo la importación; el estado productivo del nuevo contrato sigue pendiente. Ver [[35-Libro-Mayor-TOTVS]] y [[36-Contrato-Mayor-Gerencial]].
+
+## Entrega inicial del 06/10 (histórica)
+
 Estado: preparado localmente; no aplicado a Supabase/Lovable, no publicado y no
 subido al repositorio remoto.
 

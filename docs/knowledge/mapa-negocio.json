@@ -272,6 +272,22 @@
       ]
     },
     {
+      "id": "carga-mayor",
+      "title": "Corte completo del Libro Mayor TOTVS",
+      "module": "datos",
+      "description": "Archivo y controles conciliados de PYG, USD, TPSLDO, aperturas y cuarentena. Un solo corte permanece COMPLETA y alimenta el agregado vigente; los anteriores pasan a SUPERADA y conservan auditoría.",
+      "tables": ["totvs_mayor_cargas", "totvs_mayor_carga_movimientos"],
+      "related": ["asiento-mayor"]
+    },
+    {
+      "id": "asiento-mayor",
+      "title": "Versión fuente de un asiento del Mayor",
+      "module": "datos",
+      "description": "Clave candidata y huella literal conservadas por versión. Los importes PYG/USD, tipo de saldo y cuenta no se sobrescriben silenciosamente al actualizar el archivo.",
+      "tables": ["totvs_mayor_movimientos", "totvs_mayor_cuarentena"],
+      "related": ["carga-mayor"]
+    },
+    {
       "id": "linea-factura",
       "title": "Línea canónica de facturación",
       "module": "ventas",
@@ -678,8 +694,8 @@
       "id": "reimportacion-facturacion-totvs",
       "title": "Reimportación estable de líneas TOTVS",
       "module": "datos",
-      "description": "Identificar cada línea comercial por origen, sucursal, documento e ITEM de origen; conservar ITEM distintos. El lote financiero se valida antes de escribir y el RPC compara identidades/evidencia en una transacción sin borrar el detalle. Solo enriquecimientos unívocos y pares auditados admiten reparación; ambigüedad o cambio comercial bloquean. Respetar exclusiones confirmadas y contar sus líneas aparte. En la interfaz vigente, OS se procesan primero mediante RPC transaccional por lote y luego facturación; omitir una OS del XML no la archiva. El paquete completo no es atómico y debe informar OS confirmadas ante fallo posterior.",
-      "check": "Probar ITEM distintos, cambios comerciales, cobertura financiera, exclusiones, OS ausente en foto parcial, respuesta del RPC de OS con persistidas/excluidas disjuntas y cobertura exacta, jornadas filtradas y fallo financiero tras OS confirmadas. Separar prevención, reparación auditada, fixtures y producción verificada.",
+      "description": "Identificar cada línea comercial por origen, sucursal, documento e ITEM de origen; conservar ITEM distintos. El lote financiero se valida antes de escribir y el RPC compara identidades/evidencia en una transacción sin borrar el detalle. Solo enriquecimientos unívocos y pares auditados admiten reparación; ambigüedad o cambio comercial bloquean. Respetar exclusiones confirmadas y contar sus líneas aparte. La procedencia de una carga completa solo acredita líneas con fecha de factura; la reparación puntual de 775 vínculos espurios del 14/10 se entrega como SQL manual auditado y no acredita que ya esté aplicada. En la interfaz vigente, OS se procesan primero mediante RPC transaccional por lote y luego facturación; omitir una OS del XML no la archiva. El paquete completo no es atómico y debe informar OS confirmadas ante fallo posterior.",
+      "check": "Probar ITEM distintos, cambios comerciales, cobertura financiera, exclusiones, OS ausente en foto parcial, respuesta del RPC de OS con persistidas/excluidas disjuntas y cobertura exacta, jornadas filtradas y fallo financiero tras OS confirmadas. Antes de reparar procedencia comprobar carga/hash y 4892=4117+775, conservar auditoría y confirmar 4117 tras el cambio. Separar prevención, reparación auditada, fixtures y producción verificada.",
       "entities": [
         "factura",
         "linea-factura",
@@ -694,11 +710,29 @@
         "supabase/migrations/20261002120000_transactional_totvs_billing_import.sql",
         "supabase/migrations/20261003001500_reconcile_totvs_reimport_evidence.sql",
         "supabase/migrations/20261003010500_honor_confirmed_totvs_exclusions.sql",
+        "supabase/admin/repair_latest_billing_provenance_20261014_review_only.sql",
         "supabase/migrations/20261012120000_import_service_orders_with_confirmed_exclusions.sql",
         "docs/knowledge/03-Ventas-y-conciliacion.md",
         "docs/knowledge/31-Calidad-XML-sistema-nuevo-reunion-TI.md"
       ],
       "evidence": "commits 64fddf5, 98bb75c, 0759249, 2340fba, b579338 y 65bc039 de origin/main; pruebas locales con fixtures/PGlite, sin SQL ni producción verificada en esta revisión"
+    },
+    {
+      "id": "mayor-foto-versionada",
+      "title": "Mayor: foto completa y asientos versionados",
+      "module": "datos",
+      "description": "Una clave SUCURS+FECHA+LOTE+SUBLOTE+DOCUMENTO+LINEA puede tener una nueva huella en un archivo posterior. Guardar ambas versiones y activar únicamente un corte completo conciliado; los anteriores pasan a SUPERADA para que consultas previas que filtran COMPLETA tampoco sumen ambas versiones. Una carga en progreso o cancelada no altera el agregado. Diferenciar cambios descriptivos de cambios en importe, cuenta, centro de costo o tipo, y pedir aceptación explícita antes de activar estos últimos. Conservar PYG/USD y TPSLDO separados, cuarentenas y estados de cierre sin inferir datos faltantes.",
+      "check": "Reimportar el mismo archivo, uno con descripciones corregidas y otro con TPSLDO o cuenta corregida; comprobar conflicto de dos versiones en una sola carga, cancelación, suma sin duplicados, historia auditable y permisos. La migración y las pruebas locales no acreditan SQL aplicado ni publicación.",
+      "entities": ["carga-mayor", "asiento-mayor"],
+      "sources": [
+        "src/lib/imports/mayorPreflight.ts",
+        "src/lib/imports/mayorPersist.ts",
+        "src/components/parque/ImportarTotvsTab.tsx",
+        "supabase/migrations/20261006130000_import_totvs_mayor_staging.sql",
+        "supabase/migrations/20261014120000_version_totvs_mayor_snapshots.sql",
+        "docs/knowledge/35-Libro-Mayor-TOTVS.md"
+      ],
+      "evidence": "Archivo actualizado y cargas consultadas el 14/10/2026; implementación y simulación PGlite locales, pendiente aplicar SQL y publicar código"
     },
     {
       "check": "Verificar las condiciones anteriores con render real; esta regla conserva la edición manual reconciliada del 14/10/2026.",

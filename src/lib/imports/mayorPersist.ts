@@ -1,4 +1,5 @@
 import { readMayorPreflightFile, type MayorPreflight } from "@/lib/imports/mayorPreflight";
+import type { ImportProgressCallback } from "@/lib/imports/importProgress";
 
 export interface MayorRpcError {
   code?: string;
@@ -16,6 +17,13 @@ interface MayorBatchResult {
   total?: number;
   insertadas?: number;
   sin_cambios?: number;
+  versionadas?: number;
+  cambios_contables?: number;
+  cambios_descriptivos?: number;
+  cambios_importe?: number;
+  cambios_cuenta?: number;
+  cambios_centro?: number;
+  cambios_tipo?: number;
   conflictos?: number;
   cuarentena?: number;
   vinculadas?: number;
@@ -27,6 +35,13 @@ export interface MayorPersistResult {
   lotes: number;
   insertadas: number;
   sinCambios: number;
+  versionadas: number;
+  cambiosContables: number;
+  cambiosDescriptivos: number;
+  cambiosImporte: number;
+  cambiosCuenta: number;
+  cambiosCentro: number;
+  cambiosTipo: number;
   vinculadas: number;
   cuarentena: number;
 }
@@ -60,7 +75,7 @@ function explainFailure(error: unknown, cargaId: string | null, cancelError: unk
   } else if (failure?.code === "42501") {
     message = "El usuario actual no tiene permiso admin.importaciones para importar el Libro Mayor.";
   } else if (failure?.code === "23505") {
-    message = `El Libro Mayor contiene una clave ya cargada con otra huella. ${message}`;
+    message = `El Libro Mayor contiene una clave duplicada o dos versiones en la misma carga. ${message}`;
   } else if (failure?.code === "23514") {
     message = `El Libro Mayor no concilia con sus controles. ${message}`;
   }
@@ -74,13 +89,31 @@ function explainFailure(error: unknown, cargaId: string | null, cancelError: unk
 export async function persistMayorFile(options: {
   file: File;
   client: MayorRpcClient;
+  expectedMovementRows?: number;
+  onProgress?: ImportProgressCallback;
+  confirmAccountingChanges?: (changes: {
+    versionadas: number;
+    cambiosContables: number;
+    cambiosDescriptivos: number;
+    cambiosImporte: number;
+    cambiosCuenta: number;
+    cambiosCentro: number;
+    cambiosTipo: number;
+  }) => boolean | Promise<boolean>;
 }): Promise<MayorPersistResult> {
-  const { file, client } = options;
+  const { file, client, confirmAccountingChanges } = options;
   const fileSha256 = await sha256Hex(file);
   let cargaId: string | null = null;
   let lotes = 0;
   let insertadas = 0;
   let sinCambios = 0;
+  let versionadas = 0;
+  let cambiosContables = 0;
+  let cambiosDescriptivos = 0;
+  let cambiosImporte = 0;
+  let cambiosCuenta = 0;
+  let cambiosCentro = 0;
+  let cambiosTipo = 0;
   let vinculadas = 0;
   let cuarentena = 0;
 
@@ -105,7 +138,7 @@ export async function persistMayorFile(options: {
         if (Number(validation.conflictos ?? 0) > 0) {
           throw new MayorRpcFailure({
             code: "23505",
-            message: `${validation.conflictos} claves ya existen con otra huella.`,
+            message: `${validation.conflictos} claves tienen dos versiones dentro de la misma carga.`,
           });
         }
 
@@ -117,10 +150,24 @@ export async function persistMayorFile(options: {
         lotes += 1;
         insertadas += Number(imported.insertadas ?? 0);
         sinCambios += Number(imported.sin_cambios ?? 0);
+        versionadas += Number(imported.versionadas ?? 0);
+        cambiosContables += Number(imported.cambios_contables ?? 0);
+        cambiosDescriptivos += Number(imported.cambios_descriptivos ?? 0);
+        cambiosImporte += Number(imported.cambios_importe ?? 0);
+        cambiosCuenta += Number(imported.cambios_cuenta ?? 0);
+        cambiosCentro += Number(imported.cambios_centro ?? 0);
+        cambiosTipo += Number(imported.cambios_tipo ?? 0);
         vinculadas += Number(imported.vinculadas ?? 0);
         cuarentena += Number(imported.cuarentena ?? 0);
       },
     });
+
+    if (cambiosContables > 0 && !(await confirmAccountingChanges?.({
+      versionadas, cambiosContables, cambiosDescriptivos,
+      cambiosImporte, cambiosCuenta, cambiosCentro, cambiosTipo,
+    }))) {
+      throw new Error(`Se canceló la activación del nuevo corte del Mayor: ${cambiosContables} cambios contables requieren confirmación.`);
+    }
 
     await callRpc(client, "totvs_finalizar_mayor_carga_v1", {
       p_carga_id: cargaId,
@@ -137,7 +184,9 @@ export async function persistMayorFile(options: {
       },
     });
 
-    return { cargaId, preflight, lotes, insertadas, sinCambios, vinculadas, cuarentena };
+    return { cargaId, preflight, lotes, insertadas, sinCambios, versionadas,
+      cambiosContables, cambiosDescriptivos, cambiosImporte, cambiosCuenta,
+      cambiosCentro, cambiosTipo, vinculadas, cuarentena };
   } catch (error) {
     let cancelError: unknown = null;
     if (cargaId) {

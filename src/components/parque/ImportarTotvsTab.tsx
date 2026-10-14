@@ -731,6 +731,16 @@ export function ImportarTotvsTab({ onChanged }: { onChanged: () => void }) {
           client: supabase as unknown as MayorRpcClient,
           expectedMovementRows: preview.mayor[mayorResultados.length]?.movementRows,
           onProgress: handleImportProgress,
+          confirmAccountingChanges: ({ versionadas, cambiosContables, cambiosDescriptivos,
+            cambiosImporte, cambiosCuenta, cambiosCentro, cambiosTipo }) =>
+            window.confirm(
+              `El Mayor actualizado contiene ${versionadas.toLocaleString("es-PY")} asientos con nueva versión. ` +
+              `${cambiosDescriptivos.toLocaleString("es-PY")} solo cambiaron en datos descriptivos y ` +
+              `${cambiosContables.toLocaleString("es-PY")} tienen cambios contables: ` +
+              `${cambiosImporte} en importe, ${cambiosCuenta} en cuenta, ` +
+              `${cambiosCentro} en centro de costo y ${cambiosTipo} en tipo. ` +
+              `La versión anterior quedará auditable. ¿Activar este nuevo corte completo?`,
+            ),
         }));
       }
 
@@ -1150,7 +1160,7 @@ export function ImportarTotvsTab({ onChanged }: { onChanged: () => void }) {
 
       const partes = [
         mayorResultados.length
-          ? `${mayorResultados.reduce((sum, item) => sum + item.preflight.movementRows, 0)} movimientos de Mayor (${mayorResultados.reduce((sum, item) => sum + item.insertadas, 0)} nuevos, ${mayorResultados.reduce((sum, item) => sum + item.sinCambios, 0)} sin cambios, ${mayorResultados.reduce((sum, item) => sum + item.cuarentena, 0)} en cuarentena)`
+          ? `${mayorResultados.reduce((sum, item) => sum + item.preflight.movementRows, 0)} movimientos de Mayor (${mayorResultados.reduce((sum, item) => sum + item.insertadas, 0)} versiones nuevas, ${mayorResultados.reduce((sum, item) => sum + item.versionadas, 0)} claves corregidas, ${mayorResultados.reduce((sum, item) => sum + item.sinCambios, 0)} sin cambios, ${mayorResultados.reduce((sum, item) => sum + item.cuarentena, 0)} en cuarentena)`
           : null,
         preview.bundleFiles
           ? `${facturacionLineas} líneas de facturación y ${ordenesServicio} OS importadas${

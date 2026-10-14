@@ -1,6 +1,6 @@
 # SGS-CDM: inicio
 
-Revisión documental: 14/10/2026. Referencia de código: main en cac486c5e8c23e0c7b1b297a755ab88e515eafa0, confirmado por GitHub. El despliegue Lovable y la base no fueron verificados en esta revisión.
+Revisión documental: 14/10/2026. La referencia exacta de código para las fichas generadas consta en `atlas-review.json` y en el manifiesto de sincronización; las notas funcionales indican sus propias comprobaciones y límites. El despliegue Lovable y la aplicación de SQL no se infieren de un commit.
 
 ## Para retomar el trabajo
 

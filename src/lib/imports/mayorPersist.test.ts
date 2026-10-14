@@ -1,5 +1,5 @@
 import { File as NodeFile } from "node:buffer";
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 import { persistMayorFile, type MayorRpcClient } from "./mayorPersist";
 
 const headers = [
@@ -56,7 +56,31 @@ describe("persistMayorFile", () => {
       },
     };
 
-    await expect(persistMayorFile({ file: xmlFile(), client })).rejects.toThrow(/otra huella/i);
+    await expect(persistMayorFile({ file: xmlFile(), client })).rejects.toThrow(/dos versiones/i);
+    expect(calls.at(-1)).toBe("totvs_cancelar_mayor_carga_v1");
+    expect(calls).not.toContain("totvs_finalizar_mayor_carga_v1");
+  });
+
+  it("pide aceptación explícita antes de activar cambios contables y cancela si se rechazan", async () => {
+    const calls: string[] = [];
+    const client: MayorRpcClient = {
+      rpc: async (name) => {
+        calls.push(name);
+        if (name === "totvs_iniciar_mayor_carga_v1") return { data: "load-changed", error: null };
+        if (name === "totvs_importar_mayor_lote_v1") return { data: {
+          conflictos: 0, insertadas: 1, versionadas: 1,
+          cambios_contables: 1, cambios_descriptivos: 0, vinculadas: 1,
+        }, error: null };
+        return { data: null, error: null };
+      },
+    };
+    const confirmAccountingChanges = vi.fn(() => false);
+    await expect(persistMayorFile({ file: xmlFile(), client, confirmAccountingChanges }))
+      .rejects.toThrow(/requieren confirmación/i);
+    expect(confirmAccountingChanges).toHaveBeenCalledWith({
+      versionadas: 1, cambiosContables: 1, cambiosDescriptivos: 0,
+      cambiosImporte: 0, cambiosCuenta: 0, cambiosCentro: 0, cambiosTipo: 0,
+    });
     expect(calls.at(-1)).toBe("totvs_cancelar_mayor_carga_v1");
     expect(calls).not.toContain("totvs_finalizar_mayor_carga_v1");
   });

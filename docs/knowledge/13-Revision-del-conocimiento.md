@@ -1,5 +1,11 @@
 # Revisión del conocimiento
 
+## Reconciliación funcional del 14/10/2026: Mayor y procedencia TOTVS
+
+Se contrastó el XML actualizado del Mayor con 29.040 claves de la última carga completa: 3.421 nuevas, 1.041 con huella distinta y nueve con cambio contable. Se preparó un contrato de versiones por foto completa, con aceptación explícita de cambios contables y pruebas PGlite. La carga de facturación acreditó 4.117 líneas fechadas y dos exclusiones; 775 vínculos históricos sin fecha figuran adicionalmente en la relación de procedencia. Se preparó una reparación puntual auditada y un guard de reincidencia, probados localmente. Ver [[08-Pendientes-y-validacion]], [[35-Libro-Mayor-TOTVS]] y la regla `mayor-foto-versionada` del mapa funcional. El SQL y la publicación pública permanecen separados del commit y requieren verificación productiva posterior.
+
+## Revisión documental anterior del 14/10/2026
+
 ## Revisión documental del 14/10/2026
 
 Referencia actual: main cac486c confirmado por GitHub; cinco copias locales inspeccionadas. Se revisaron las entradas, objetivos, notas de los pendientes y reglas relacionadas. Auditoría estructural de 701 notas: sin destinos wiki ausentes ni enlaces ambiguos ni duplicados exactos; se detectaron caracteres dañados en cinco notas visuales/de mantenimiento.
