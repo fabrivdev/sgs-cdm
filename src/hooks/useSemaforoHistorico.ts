@@ -29,6 +29,10 @@ export interface SemaforoFiltros {
   dias_min?: string;
   dias_max?: string;
   valorizacion?: string;
+  compra_dias_min?: string;
+  compra_dias_max?: string;
+  orden?: string;
+  direccion?: string;
 }
 
 export interface SemaforoFila {
@@ -44,6 +48,9 @@ export interface SemaforoFila {
   misiones: number;
   loma_plata: number;
   katuete: number;
+  ultima_compra: string | null;
+  dias_ultima_compra: number | null;
+  fuente_compra: string | null;
   ultima_venta: string | null;
   dias_ultima_venta: number | null;
   unidades_365d: number;
@@ -74,6 +81,7 @@ export type SemaforoAgrupacion = "marca" | "familia" | "sucursal" | "deposito";
 export interface SemaforoGrupo { nombre: string; lineas: number; unidades: number; valor_kardex_usd: number | null; ubicaciones_sin_valor: number; rotacion: number | null }
 
 export interface SemaforoResultado {
+  base_antiguedad: "ULTIMA_COMPRA_V1";
   version: string;
   ubicaciones_sin_valor: number;
   grupos: SemaforoGrupo[];
@@ -113,8 +121,9 @@ export async function fetchSemaforoHistorico(filtros: SemaforoFiltros, page: num
     || !("depositos" in data.facetas) || !Array.isArray(data.facetas.depositos)
     || !("sucursales" in data.facetas) || !Array.isArray(data.facetas.sucursales)
     || !("version" in data) || typeof data.version !== "string") {
-    throw new Error("El informe del sem�foro devolvi� un formato inv�lido");
+    throw new Error("El informe del semáforo devolvió un formato inválido");
   }
+  if (!("base_antiguedad" in data) || data.base_antiguedad !== "ULTIMA_COMPRA_V1") throw new Error("Falta aplicar la actualización de antigüedad por última compra.");
   return data as unknown as SemaforoResultado;
 }
 

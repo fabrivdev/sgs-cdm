@@ -13,7 +13,8 @@ beforeAll(async () => {
     CREATE TABLE repuestos_stock (producto_codigo text,sucursal text,deposito text,saldo_actual numeric);
     CREATE TABLE repuestos_ventas_vinculacion (producto_codigo text,fecha_efectiva date,cantidad numeric,estado_vinculo text);
     CREATE TABLE repuestos_maestro_legacy_cargas (id integer PRIMARY KEY,activo boolean,estado text);
-    CREATE TABLE repuestos_maestro_legacy (carga_id integer,producto_codigo text,codigo_legacy text,estado_vinculo text);
+    CREATE TABLE repuestos_maestro_legacy (carga_id integer,producto_codigo text,codigo_legacy text,estado_vinculo text,codigo_legacy_norm text);
+    CREATE TABLE totvs_facturas_compra_lineas (producto_codigo text,fecha_emision date,especie text,cantidad numeric,total_usd numeric);
     CREATE TABLE totvs_kardex_sintetico (producto_codigo text,sucursal text,deposito text,saldo numeric,valor_2 numeric,actualizado_en timestamptz,archivo_origen text);
     INSERT INTO v_repuestos_stock_matriz VALUES ('REP1','FAB1','Filtro','CLAAS','Filtros',2,0,0,0,0,3,5),('REP2',null,'Correa','GATES',null,4,0,0,0,0,0,4),('REP3',null,'Pieza','CLAAS','Filtros',1,0,0,0,0,0,1);
     INSERT INTO repuestos_stock VALUES ('REP1','Santa Rita','01 - DEPOSITO GENERAL',2),('REP1','Katuete','01 - DEPOSITO GENERAL',3),('REP2','Santa Rita','01 - DEPOSITO GENERAL',4),('REP3','Santa Rita','52 - GARANTIA',1);
@@ -22,6 +23,13 @@ beforeAll(async () => {
   `);
   await db.exec(readFileSync('supabase/migrations/20261014190000_parts_historical_semaphore.sql','utf8'));
   await db.exec(readFileSync('supabase/migrations/20261014210000_parts_analysis_valuation.sql','utf8'));
+  await db.exec(readFileSync('supabase/migrations/20261014220000_parts_purchase_age.sql','utf8'));
+  await db.exec(`
+    INSERT INTO repuestos_maestro_legacy_cargas VALUES (1,true,'COMPLETADO'),(2,false,'COMPLETADO');
+    INSERT INTO repuestos_maestro_legacy VALUES (1,'REP1','8','CONFIRMADA','8'),(1,'REP2','9','PENDIENTE','9'),(2,'REP3','10','CONFIRMADA','10');
+    INSERT INTO repuestos_compras_historicas VALUES (repeat('a',64),'test.xls','8',current_date-800,2,now()),(repeat('a',64),'test.xls','9',current_date-2,3,now()),(repeat('a',64),'test.xls','10',current_date-2,4,now());
+    INSERT INTO totvs_facturas_compra_lineas VALUES ('REP1',current_date-365,'NF',1,100),('REP1',current_date-1,'NCC',1,100),('REP1',current_date+1,'NF',1,100),('REP1',current_date-2,'NF',-1,100);
+  `);
 });
 afterAll(() => db.close());
 async function report(filters = {}, group = 'marca', limit = 50, offset = 0) {
@@ -68,6 +76,31 @@ describe('valorización por ubicación', () => {
     const r = await report({deposito:'52',usd_max:'0'});
     expect(r.valor_kardex_usd).toBe(-10);
     expect(r.rows[0].saldo_kardex).toBe(0);
+  });
+  it('usa la compra más reciente y excluye NC, cantidades negativas, futuras y vínculos no confirmados', async () => {
+    const r=await report();
+    expect(r.base_antiguedad).toBe('ULTIMA_COMPRA_V1');
+    const a=r.rows.find(x=>x.codigo_interno==='REP1')!;
+    expect(a.dias_ultima_compra).toBe(365);
+    expect(a.fuente_compra).toBe('Factura de compra TOTVS');
+    expect(r.rows.find(x=>x.codigo_interno==='REP2')?.ultima_compra).toBeNull();
+    expect(r.rows.find(x=>x.codigo_interno==='REP3')?.ultima_compra).toBeNull();
+    expect((await report({franja:'HASTA_365'})).lineas).toBe(1);
+    expect((await report({franja:'SIN_FECHA'})).lineas).toBe(2);
+    expect((await report({compra_dias_min:'366'})).lineas).toBe(0);
+  });
+  it('separa 365/366/730/731 días y conserva venta reciente independiente de compra antigua', async () => {
+    for (const [days,band] of [[366,'DE_366_A_730'],[730,'DE_366_A_730'],[731,'MAS_730']] as const) {
+      await db.exec(`UPDATE totvs_facturas_compra_lineas SET fecha_emision=current_date-${days} WHERE especie='NF' AND cantidad=1 AND fecha_emision<=current_date`);
+      const r=await report({franja:band});
+      expect(r.lineas).toBe(1);
+      expect(r.rows[0].color).toBe('VERDE_OSCURO');
+    }
+  });
+  it('ordena el conjunto antes de paginar y mantiene ausencias al final', async () => {
+    expect((await report({orden:'codigo',direccion:'desc'},'marca',1)).rows[0].codigo_interno).toBe('REP3');
+    expect((await report({orden:'usd',direccion:'asc'},'marca',1)).rows[0].codigo_interno).toBe('REP3');
+    expect((await report({orden:'usd',direccion:'desc'},'marca',1,2)).rows[0].codigo_interno).toBe('REP2');
   });
   it('fingerprint cambia con valores aunque cantidad de filas no cambie', async () => {
     const before = await report();
