@@ -5,10 +5,10 @@ import type { ComponentProps } from "react";
 import { ImportDetailDrawer, ImportsTable } from "./MaquinariaOperaciones";
 import { DetailSection } from "@/components/maquinaria/MachineDetailPrimitives";
 
-const mocks = vi.hoisted(() => ({ rpc: vi.fn(), admin: true }));
+const mocks = vi.hoisted(() => ({ rpc: vi.fn(), from: vi.fn(), admin: true }));
 vi.mock("pdfjs-dist", () => ({ getDocument: vi.fn(), GlobalWorkerOptions: {} }));
 vi.mock("@/hooks/useAuth", () => ({ useAuth: () => ({ isAdmin: mocks.admin, roles: [] }) }));
-vi.mock("@/integrations/supabase/client", () => ({ supabase: { rpc: mocks.rpc } }));
+vi.mock("@/integrations/supabase/client", () => ({ supabase: { rpc: mocks.rpc, from: mocks.from } }));
 
 type Row = NonNullable<ComponentProps<typeof ImportDetailDrawer>["row"]>;
 const row: Row = {
@@ -30,7 +30,7 @@ function setup(patch: Partial<Row> = {}) {
   </QueryClientProvider>);
   return saved;
 }
-beforeEach(() => { mocks.admin = true; mocks.rpc.mockReset().mockResolvedValue({ data: {}, error: null }); });
+beforeEach(() => { mocks.admin = true; mocks.rpc.mockReset().mockResolvedValue({ data: {}, error: null }); mocks.from.mockReset(); });
 afterEach(cleanup);
 
 describe("Importaciones: detalle compacto", () => {
@@ -174,6 +174,33 @@ describe("Importaciones: detalle compacto", () => {
     expect(screen.queryByText("Adjuntar", { exact: true })).not.toBeInTheDocument();
     expect(screen.queryByText("Editar", { exact: true })).not.toBeInTheDocument();
     expect(mocks.rpc).not.toHaveBeenCalled();
+  });
+  it("permite asignar una factura histórica a cinco de ocho máquinas sin atribuirla a las otras", async () => {
+    const unitIds = Array.from({ length: 8 }, (_, index) => `unit-${index + 1}`);
+    const records: Record<string, unknown[]> = {
+      maquinaria_documentos: [{ id: "invoice-1", archivo_nombre: "proveedor.pdf", storage_path: "test.pdf", creado_en: "2026-10-14" }],
+      maquinaria_importacion_unidades: unitIds.map((id, index) => ({ id, numero_unidad: index + 1, chasis: null })),
+      maquinaria_documentos_factura_importacion_unidades: [],
+    };
+    mocks.from.mockImplementation((table: string) => {
+      const query = {
+        select: () => query, eq: () => query, order: () => query, in: () => query,
+        then: (resolve: (value: unknown) => unknown) => Promise.resolve({ data: records[table], error: null }).then(resolve),
+      };
+      return query;
+    });
+    setup({ id: unitIds[0], importacion_linea_id: "line-1", numero_unidad: 1, cantidad_lote: 8 });
+    fireEvent.mouseDown(screen.getByRole("tab", { name: "Documentos" }), { button: 0 });
+    expect(await screen.findByText("Documento histórico: unidades pendientes de asignar")).toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: "Asignar unidades de proveedor.pdf" }));
+    for (let number = 1; number <= 5; number++) {
+      fireEvent.click(screen.getByLabelText(`Unidad ${number}`));
+    }
+    fireEvent.click(screen.getByRole("button", { name: "Guardar factura" }));
+    await waitFor(() => expect(mocks.rpc).toHaveBeenCalledWith("maquinaria_vincular_documento_factura_importacion", {
+      p_documento_id: "invoice-1", p_unidad_ids: unitIds.slice(0, 5),
+    }));
+    expect(mocks.rpc).not.toHaveBeenCalledWith("maquinaria_actualizar_unidad_importacion", expect.anything());
   });
   it("no añade ayuda ni modifica acciones en otras secciones sin help", () => {
     render(<DetailSection card title="Otro panel" action={<button>Acción existente</button>}><span>Dato existente</span></DetailSection>);

@@ -1,8 +1,10 @@
 # Importaciones
 
-## Facturas por unidad: estado al 14/10/2026
+## Facturas del proveedor por subconjunto: cambio del 14/10/2026
 
-Main cac486c todavía consulta/cachea FACTURA_IMPORTACION por importacion_linea_id: una factura puede mostrarse en todas las unidades del lote. La corrección local en importaciones-facturas-patch usa importacion_unidad_id; mantiene OC compartida e históricos sin reasignar. Existen frontend, pruebas, ZIP y 20261013120000_scope_import_invoices_to_units.sql. Falta integrar contra main, comprobar SQL aplicado y verificar reemplazo/borrado independiente. No copiar types.ts completo ni considerar el ZIP como cambio aplicado. Ver [[12-Estado-local]].
+Acuerdo confirmado: una factura puede cubrir una unidad, todo el lote o un subconjunto (por ejemplo, 5 de 8). El archivo se vincula a las unidades elegidas, una unidad no admite dos archivos vigentes y la OC permanece compartida. La migración `20261014120000_link_supplier_invoice_documents_to_import_units.sql` agrega el vínculo documento↔unidades y conserva todos los archivos existentes. Solo asigna automáticamente los documentos de líneas con una unidad; los documentos históricos de lotes múltiples quedan visibles, pendientes de asignación explícita. Nunca inferir cobertura de un lote por el número de archivos o por datos de factura de la unidad.
+
+El detalle permite adjuntar varios archivos por lote, seleccionar sus unidades, editar la asignación y borrar un documento específico. Para facturas compartidas no copia el total extraído como valor unitario: cada importe individual se revisa aparte. El vínculo estructurado previo `maquinaria_factura_importacion_unidades` sigue existiendo para operaciones, pero no cubre importaciones manuales sin operación; este vínculo documental funciona en ambos casos. Código y prueba local: `MaquinariaOperaciones.tsx` e `ImportDetailDrawer.test.tsx`. **Pendiente:** aplicar SQL y comprobar la pantalla pública; commit/push no acreditan producción. La antigua copia `importaciones-facturas-patch` presupone un archivo exclusivo por unidad y no debe integrarse como tal. Ver [[12-Estado-local]].
 
 La corrección de doble descuento OC 9f00139 ya es antecesora de main; su disponibilidad pública no se comprobó. No reabrirla como código pendiente por la nota histórica de duplicados.
 

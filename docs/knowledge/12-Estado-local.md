@@ -1,6 +1,6 @@
 # Copias de trabajo y referencia de código
 
-Inspección del 14/10/2026. Main remoto confirmado en cac486c5e8c23e0c7b1b297a755ab88e515eafa0. Las cinco copias existen; conservar sus cambios, sin reset, mezcla automática ni copia completa de types.ts.
+Inventario original del 14/10/2026 (referencia cac486c). La referencia remota más reciente consultada para la corrección de facturas fue ff0f7e1; las filas siguientes describen el estado de aquella inspección y no sustituyen `git status` actual. Las cinco copias existen; conservar sus cambios, sin reset, mezcla automática ni copia completa de types.ts.
 
 | Copia bajo C:/Users/Usuario/Documents/Codex | Rama / base observada | Trabajo pendiente |
 | --- | --- | --- |
@@ -11,6 +11,8 @@ Inspección del 14/10/2026. Main remoto confirmado en cac486c5e8c23e0c7b1b297a75
 | 2026-10-13/task-4/importaciones-facturas-patch | codex/mayor-preflight / 3a9c96b | Frontend y tipos modificados; SQL, pruebas y nota de facturas por unidad sin seguimiento. |
 
 El paquete SGS-CDM-facturas-por-unidad-entrega.zip existe en 2026-10-13/task-4. Los puertos 8080, 8081 y 59635 son referencias históricas: no se comprobó que estén activos ni su versión.
+
+Actualización 14/10: la copia `importaciones-facturas-patch` supone un archivo exclusivo por unidad; el usuario confirmó facturas por subconjunto (por ejemplo, 5 de 8). No integrar ese parche ni su SQL. La solución revisada se desarrolla en `2026-10-13/task-2/totvs-importer-public`; comprobar commit remoto y SQL aplicado antes de afirmar disponibilidad pública. Esta actualización tiene precedencia sobre las filas de inventario anteriores.
 
 ## Origen del inventario antiguo
 
