@@ -14,6 +14,7 @@ import {
   Package,
   Boxes,
   ShoppingCart,
+  ChartNoAxesCombined,
   Sparkles,
   HandCoins,
   ClipboardList,
@@ -103,6 +104,7 @@ const navGroups: NavGroup[] = [
     items: [
       { to: "/repuestos/ventas", label: "Ventas", icon: BadgeDollarSign, section: "repuestos.ventas", end: true },
       { to: "/repuestos", label: "Catálogo y Stock", icon: Package, section: "repuestos.stock", end: true },
+      { to: "/repuestos/analisis", label: "Análisis", icon: ChartNoAxesCombined, section: "repuestos.stock", end: true },
       { to: "/repuestos/compras", label: "Compras", icon: ShoppingCart, section: "repuestos.compras", end: true },
       { to: "/repuestos/sugerencias", label: "Sugerencia de compra", icon: Sparkles, section: "repuestos.sugerencias", end: true },
     ],

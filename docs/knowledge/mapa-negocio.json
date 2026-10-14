@@ -533,7 +533,7 @@
       "id": "stock-repuesto",
       "title": "Stock de repuestos por sucursal",
       "module": "repuestos",
-      "description": "Disponibilidad física de artículos. Las consultas de lista, KPI y export tienen costos distintos y no deben disparar agregados completos por cada render.",
+      "description": "Disponibilidad física de artículos. El análisis histórico por última venta confirmada se presenta en Repuestos > Análisis, conserva separado el valor de la foto del Kardex y comparte acceso de lectura con Stock. Las consultas de lista, KPI y export tienen costos distintos y no deben disparar agregados completos por cada render.",
       "tables": [
         "repuestos_stock"
       ],

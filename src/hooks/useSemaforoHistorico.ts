@@ -76,17 +76,14 @@ export interface SemaforoResultado {
 }
 
 export async function fetchSemaforoHistorico(filtros: SemaforoFiltros, page: number, limit = SEMAFORO_PAGE_SIZE): Promise<SemaforoResultado> {
-  const rpc = supabase.rpc as unknown as (name: string, args: Record<string, unknown>) => Promise<{
-    data: unknown; error: Error | null;
-  }>;
-  const { data, error } = await rpc("repuestos_semaforo_historico_paginado", {
+  const { data, error } = await supabase.rpc("repuestos_semaforo_historico_paginado" as never, {
     p_busqueda: filtros.busqueda.trim() || null,
     p_marca: filtros.marca || null,
     p_color: filtros.color || null,
     p_sucursal: filtros.sucursal || null,
     p_limite: limit,
     p_offset: page * limit,
-  });
+  } as never);
   if (error) throw error;
   if (!data || typeof data !== "object" || !("rows" in data) || !("por_color" in data) || !("sucursales" in data)
     || !Array.isArray(data.rows) || !Array.isArray(data.por_color) || !Array.isArray(data.sucursales)) {

@@ -11,9 +11,7 @@ import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { PartsStockTable } from "@/components/repuestos/PartsStockTable";
-import { StockSemaphoreSection } from "@/components/repuestos/StockSemaphoreSection";
 import { DetalleRepuestoSheet } from "@/components/repuestos/DetalleRepuestoSheet";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useAuth } from "@/hooks/useAuth";
 import { useIsMobile } from "@/hooks/use-mobile";
 import { useDebouncedValue } from "@/hooks/useDebouncedValue";
@@ -140,12 +138,6 @@ export default function Repuestos() {
   return (
     <div className={pageShellWide}>
       <PageHeader title="Catálogo y Stock" />
-      <Tabs defaultValue="catalogo">
-        <TabsList aria-label="Secciones de stock de repuestos">
-          <TabsTrigger value="catalogo">Catálogo y stock</TabsTrigger>
-          <TabsTrigger value="semaforo">Semáforo histórico</TabsTrigger>
-        </TabsList>
-        <TabsContent value="catalogo" className="space-y-4">
 
       <KpiStrip className="sm:grid-cols-3">
         <KpiItem label="Con stock" value={matrizQuery.isLoading ? "…" : (kpis?.conStock ?? 0).toLocaleString("es-PY")} detail={`${(kpis?.totalCatalogo ?? 0).toLocaleString("es-PY")} productos`} icon={<Package className="h-4 w-4 text-primary" />} tone="positive" />
@@ -230,12 +222,6 @@ export default function Repuestos() {
         canManage={canManage}
         onSugerenciaGuardada={() => sugerenciaQuery.refetch()}
       />
-
-        </TabsContent>
-        <TabsContent value="semaforo">
-          <StockSemaphoreSection canExport={can("datos:exportar")} />
-        </TabsContent>
-      </Tabs>
 
     </div>
   );

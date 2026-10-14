@@ -25,6 +25,7 @@ const StockProyectado = lazy(() => import("./pages/StockProyectado"));
 const MaquinariaOperaciones = lazy(() => import("./pages/MaquinariaOperaciones"));
 const Trabajos = lazy(() => import("./pages/Trabajos"));
 const Repuestos = lazy(() => import("./pages/Repuestos"));
+const RepuestosAnalisis = lazy(() => import("./pages/RepuestosAnalisis"));
 const RepuestosCompras = lazy(() => import("./pages/RepuestosCompras"));
 const RepuestosSugerencias = lazy(() => import("./pages/RepuestosSugerencias"));
 const Admin = lazy(() => import("./pages/Admin"));
@@ -158,6 +159,14 @@ const App = () => (
                   element={
                     <ProtectedRoute requireModulo="repuestos" requireSection="repuestos.stock">
                       <Repuestos />
+                    </ProtectedRoute>
+                  }
+                />
+                <Route
+                  path="/repuestos/analisis"
+                  element={
+                    <ProtectedRoute requireModulo="repuestos" requireSection="repuestos.stock">
+                      <RepuestosAnalisis />
                     </ProtectedRoute>
                   }
                 />
