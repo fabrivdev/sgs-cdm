@@ -1,5 +1,34 @@
 # Condiciones visuales obligatorias de Ventas
 
+## Vigencia al 14/10/2026
+
+En main cac486c: “Facturación por período” uniforme en las tres áreas; Servicios siempre visible, sin desplegable ni título interno duplicado. Desde el acuerdo del 07/10, Desde/Hasta viven en filtros sin repetir el rango general bajo el título. 8295892 retira filtro local y aviso rojo de Técnicos y consolida los dos nombres de Agustín. Estos hechos de código prevalecen sobre las etapas históricas siguientes; publicación no verificada. La excepción móvil bajo 640 px permanece vigente.
+
+
+## Puerta de validación para cualquier cambio de Ventas
+
+Antes de crear o modificar una vista de Ventas, leer completas esta nota, [[25-Revision-movil-transversal]], [[SIG CDM/Generado/Reglas/visual-movil-transversal|la regla madre móvil]] y la nota funcional del área. Inventariar el componente nativo y la vista equivalente en los otros dos módulos; no diseñar Servicios, Máquinas o Repuestos como productos distintos. Después del cambio, volver a recorrer las condiciones y registrar evidencia por ancho/estado.
+
+Desde 640 px rige una fila por registro, un dato por columna y una sola línea visual: encabezado y dato comparten ancho/eje, sin metadatos apilados. Bajo 640 px se permite agrupar identidad/contexto en dos o más líneas solo mediante los patrones ya documentados (`MobileRecord`, `mobileColumns`, ficha/drawer), sin fusionar registros ni convertir la fila en card alta. Cantidades e importes esenciales permanecen separados. Las reglas históricas de esta nota que digan «siempre una sola línea» no anulan esta excepción de teléfono.
+
+Título, gutter, filtros, tabs, acciones y formularios deben reutilizar los componentes compartidos. Objetivos táctiles: 44 por 44 px también en tabs secundarios, limpiar/aplicar y acciones de detalle; el icono puede seguir siendo pequeño. Altas/ediciones largas usan `ResponsiveDrawer`; las confirmaciones breves pueden conservar `Dialog`/`AlertDialog`. No agregar subtítulos explicativos, cards de contexto ni avisos redundantes para rellenar la vista, pero mantener errores, reintentos, alertas financieras y rango/corte necesarios.
+
+La aprobación requiere render real en 320/390/639/640/768/1280 px, estados de carga/vacío/error/permisos, importes grandes, centavos, NC negativas, ceros, textos largos, teclado/foco, filtros/limpiar, orden, detalle y Excel. Una revisión independiente debe comparar capturas con esta nota. Tests, lint, tipos o build correctos no sustituyen esa revisión; sin evidencia visual, informar «validación visual pendiente».
+
+
+## Regla vigente de teléfono — consolidada el 25/09/2026
+
+Consultar primero [[25-Revision-movil-transversal]]. Las restricciones de una sola línea y datos no apilados corresponden a escritorio/tablet. En teléfono (menos de 640 px) se permite agrupar identidad/contexto en varias líneas cuando mejore lectura, sin fusionar registros ni convertir cada fila en una tarjeta grande. Desde 640 px se conservan las columnas previas; el encabezado global tiene su propio corte de 768 px.
+
+Ventas usa la composición continua elegida: tres indicadores principales, rango visible y Períodos/Resumen/Detalle siempre accesibles. Título de 18 px, buscador visual de 36 px con entrada de 16 px, pestañas subrayadas de 12 px y área táctil de 44 px. Un solo menú de acciones junto a filtros. No volver a plegar períodos/indicadores por defecto ni sustituir pocas pestañas por un selector. Preservar importes, signos, formatos, orden de origen, permisos y Excel completo. Las reglas financieras y de cantidades de esta nota siguen vigentes.
+
+Esta regla reemplaza las indicaciones móviles de las etapas históricas que siguen, incluso cuando éstas usan expresiones como «siempre una sola línea», «sin apilar», «selector de vista» o cuatro columnas obligatorias. No cambia la presentación acordada para escritorio/tablet. Fuente contrastada: commits `09eaa68`, `79555bb` y `7a377f9` del worktree de implementación; `SalesMobileWorkspace.tsx`, `sales-mobile-workspace.css`, `MobileSalesTable.tsx` y componentes compartidos citados en la nota 25. No acredita producción.
+
+
+## Implementación documentada en main cac486c
+
+Los acuerdos vigentes de arriba y los cambios fechados posteriores prevalecen sobre etapas anteriores. Las pruebas citadas son históricas, no reejecutadas por esta reconciliación.
+
 Acuerdos del usuario. Leer esta nota antes de modificar o publicar vistas de Ventas de Servicios, Máquinas o Repuestos. Estas condiciones son requisitos de presentación, no preferencias opcionales ni cambios de cálculo.
 
 ## Regla vigente de teléfono — revisión transversal del 24/09/2026
@@ -168,13 +197,13 @@ Decisión transversal del 07/10/2026: Ventas de Servicios, Máquinas y Repuestos
 
 Ajuste local del 13/10/2026: el bloque `Facturación por período` de Servicios permanece siempre visible y usa un solo encabezado estático, sin flecha ni control de despliegue. Repuestos usa el mismo título que Servicios y Máquinas. Es una alineación visual: no cambia selección de períodos, datos, filtros, cálculos, totales ni exportaciones; no requiere SQL y no acredita publicación.
 
-## Contenido real de M�s filtros - 06/10/2026
+## Contenido real de Más filtros - 06/10/2026
 
-En escritorio, M�s filtros contiene dimensiones secundarias reales y no repite Per�odo r�pido, Desde, Hasta, Agrupar ni Sucursal cuando esos controles caben en la barra. `FiltersBar.children` conserva la fila primaria y `expanded` contiene los secundarios. Si no hay secundarios respaldados y nada desborda, el acceso se oculta en escritorio; en m�vil o ante desborde, los primarios siguen accesibles. No se inventan dimensiones para mantener visible el bot�n.
+En escritorio, Más filtros contiene dimensiones secundarias reales y no repite Período rápido, Desde, Hasta, Agrupar ni Sucursal cuando esos controles caben en la barra. `FiltersBar.children` conserva la fila primaria y `expanded` contiene los secundarios. Si no hay secundarios respaldados y nada desborda, el acceso se oculta en escritorio; en móvil o ante desborde, los primarios siguen accesibles. No se inventan dimensiones para mantener visible el botón.
 
-Ventas de Repuestos agrega Marca y Vendedor. Ambos se aplican en servidor antes de indicadores, per�odos/comparaciones, res�menes, paginaci�n y Excel mediante `ventas_repuestos_panorama_filtros_v1` y `ventas_repuestos_listado_filtros_v1`. Sin esos filtros se conservan las RPC anteriores. Requiere aplicar manualmente `20261006120000_add_parts_sales_advanced_filters.sql`; commit o build no aplican SQL ni validan producci�n.
+Ventas de Repuestos agrega Marca y Vendedor. Ambos se aplican en servidor antes de indicadores, períodos/comparaciones, resúmenes, paginación y Excel mediante `ventas_repuestos_panorama_filtros_v1` y `ventas_repuestos_listado_filtros_v1`. Sin esos filtros se conservan las RPC anteriores. Requiere aplicar manualmente `20261006120000_add_parts_sales_advanced_filters.sql`; commit o build no aplican SQL ni validan producción.
 
-Validaci�n local: componentes cubren contenido �til frente a fragmentos vac�os/falsy y preservan accesibilidad; PGlite 0.5.8 ejecut� la migraci�n completa con datos ficticios y verific� Marca/Vendedor, comparaciones, paginaci�n y exportaci�n. Stock proyectado verifica que sus secundarios afectan las filas completas, los cuatro KPI y el archivo exportado. La revisi�n no us� la app ni navegador y no consult� datos productivos.
+Validación local: componentes cubren contenido útil frente a fragmentos vacíos/falsy y preservan accesibilidad; PGlite 0.5.8 ejecutó la migración completa con datos ficticios y verificó Marca/Vendedor, comparaciones, paginación y exportación. Stock proyectado verifica que sus secundarios afectan las filas completas, los cuatro KPI y el archivo exportado. La revisión no usó la app ni navegador y no consultó datos productivos.
 
 ## Restablecimiento y respuestas de filtros - 03/10/2026
 

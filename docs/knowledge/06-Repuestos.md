@@ -1,0 +1,49 @@
+# Repuestos
+
+## Semáforo de stock: estado al 14/10/2026
+
+Implementación local en codex/stock-semaphore-v1, base 65bc039; no integrada ni publicada. Diseño acordado: resumen, cards, torta del semáforo, distribución por sucursal y detalle filtrable. Compras queda fuera sin evidencia de ingreso al stock.
+
+Según el contexto confirmado por Fabrizio, V3 fue aplicada pero la distribución posterior no se validó; V4 quedó preparada para reimportar el maestro de junio y recuperar última venta/compra. Se comprobó el archivo local 20261013120000_allow_legacy_master_snapshot_reimport.sql y sus pruebas; no se comprobó su aplicación ni la equivalencia exacta del paquete llamado V4.
+
+Usar todo el histórico disponible, sin limitarlo a un año. Códigos antiguos/nuevos solo se vinculan con equivalencias acreditadas. Historial insuficiente no significa sin movimiento. Los promedios de 12 meses de Sugerencias son otro cálculo; no trasladar ese límite al historial del semáforo. Ver [[08-Pendientes-y-validacion]] y [[12-Estado-local]].
+
+## Ventas e histórico
+
+Hasta 30/06/2026, la fuente financiera completa es `v_ventas_repuestos_historico_completo`, respaldada por histórico detallado, no el importador agregado ni la suma adicional de GRID. Desde 01/07/2026 se usa la fuente del sistema actual clasificada como repuestos.
+
+Conservar líneas financieras sin vinculación inequívoca a producto; no convertir automáticamente esas líneas en demanda confirmada para sugerencias. La cobertura histórica y actual puede diferir en repuestos vinculados a OS: explicitarla al comparar.
+
+Notas de crédito reducen facturación y unidades netas; conservar ventas brutas y devoluciones separadas. No asumir que la facturación neta es la demanda bruta ni que una devolución confirma consumo.
+
+Detalle: una línea por repuesto, código y código fabricante cuando estén disponibles. Repetir número de factura es correcto. No usar desplegables por factura que oculten las líneas.
+
+Vendedores históricos y actuales deben agruparse con alias canónicos, no solo nombres abreviados visualmente. Mantener firma/origen de documento para conteos únicos.
+
+## Sugerencias, compras y stock
+
+Orden/exportación del 18/09: Ventas usa nueva variante `ventas_repuestos_listado_v3`, Sugerencias `repuestos_sugerencia_viva_ordenada`; ambas ordenan todo el resultado en servidor antes de paginar. Tras combinar particiones, Sugerencias vuelve a ordenar globalmente antes del corte. Exportar filtros actuales sin forzar solo sugeridos y abortar si falta parte de la respuesta. Las variantes conservan fórmulas y requieren las dos migraciones manuales del 18/09 en orden; regenerarlas tras cambios de originales. Compras permite ordenar documentos e ítems, con búsqueda de ítems también en Excel. Ficha de repuesto exporta su tabla activa desde menú propio. Catálogo mantiene informe maestro por marcas con nombre explícito, separado del export completo de filtros actuales. No modifica NC, demanda, ABC ni stock objetivo. Fuentes/límites: `docs/tablas-orden-exportacion.md`, `useSectionTable`, `suggestionTableOrder`, `useSugerenciasCompra` y fixtures SQL.
+
+Sugerencias se apoyan en demanda confirmada y disponibilidad, con reglas distintas del reporte financiero. Revisar vinculaciones y NC al medir demanda; no borrar los datos originales para forzar un total.
+
+Presentación compacta del 18/09: `PurchaseSuggestionTable` aplica una sola línea, Marca con color compartido, Código/fabricante/descripción separados y Clase independiente de Segmento. Cantidades centradas; sin sufijos en valores, sin antigüedad junto a fecha ni anchos mínimos. Familia, ABC/FSN/XYZ, antigüedad y avisos de confianza se conservan al pasar el cursor y en la ficha/exportación. No inferir cuántas sugeridas tienen confianza baja desde el contador del universo completo ni desde una página de 50 filas.
+
+En teléfonos: cinco columnas principales (Marca, Código, Descripción, Stock y Sugerencia), advertencia de calidad junto a Descripción y acceso por fila a ficha. Las siete columnas secundarias permanecen en ficha/Excel; no truncar cantidades hasta mostrar solo su primer dígito para simular que caben doce columnas.
+
+`Dem. pond.` es la demanda mensual ponderada del modelo; `Cobertura 12m` usa stock dividido por promedio mensual real de doce meses. `suggestionCoverage` comparte esa fórmula entre celdas, orden local y Excel; no cambia necesidad ni compra sugerida. Excel conserva demanda ponderada y promedio real como números separados. Los doce encabezados requieren, después de las migraciones de orden anteriores, `20260918210000_purchase_suggestion_identity_sort.sql`; agrega orden global de identidad/segmento antes de paginar y separa el orden de Clase, sin escribir datos. Verificación local con datos ficticios y PostgreSQL aislado; no acredita el esquema ni la calidad de producción.
+
+Stock debe consultar catálogo de forma paginada y evitar agregaciones/cuentas exactas de todo el universo en cada render. El export completo es otra operación. Un error o timeout no es “sin datos”; evitar reintentos que saturen la base.
+
+Registro inicial de Catálogo/Stock del 18/09 (revisado después: ver regla vigente de Stock abajo): `PartsStockTable` separaba Código, Fabricante, Marca, Descripción, Familia y existencias por sucursal/Total, con una línea por producto y cantidades centradas. En anchos menores a 1024 px mostraba cuatro campos (Código/Marca/Descripción/Total); ficha/Excel conservaban el resto. No cambió queries, contadores, permisos, filtros ni exportadores. Las nueve claves existentes siguen ordenando en servidor; las nuevas claves de identidad requieren ampliar el contrato SQL más adelante. 18 pruebas, tipos/lint/compilación y navegador local en cinco anchos con datos ficticios; no verifica producción ni requiere SQL nuevo. El Dashboard queda fuera de esta unificación por pasos.
+
+Fuentes: `docs/ventas-repuestos.md`, `docs/PLAN_SUGERENCIA_COMPRA_REPUESTOS.md`, `src/pages/Repuestos.tsx`, `src/pages/RepuestosCompras.tsx`, `src/pages/RepuestosSugerencias.tsx`, `src/components/ventas/RepuestosVentas.tsx`.
+
+Revisión de Stock solicitada después: Familia se muestra solo en el Excel del catálogo, sin columna ni título en Descripción; no se elimina de la fuente. Tabla de once campos, seis sucursales visibles desde 768 px y Fabricante desde 1024 px. En teléfono siguen cuatro campos principales y desglose en ficha/Excel. Se preservan filtros, RPC, existencias, permisos y descarga completa.
+
+Tercer paso: ComprasPedidosTab/SolicitudesCompraTab usan registros de una línea, cantidades/pendientes centrados, importes con símbolo de moneda y encabezados en el mismo eje, breves y ordenables por teclado. USD con `$` es presentación, nunca conversión de otras monedas; moneda desconocida no se inventa. Conservan documentos desplegables, seguimiento/edición, candidatos y evidencias manuales/probables. En teléfono los campos secundarios y Vincular están disponibles al pulsar Código; proveedor/fecha/conteos al pulsar Pedido. Excel completo conserva filtros, orden, unidades y valores numéricos. Esperar dependencias y mostrar error/reintento evita datos parciales. 44 regresiones y revisión local en cinco anchos; sin SQL nuevo ni validación de producción. Próximo paso Parque/Importaciones; Dashboard sigue excluido.
+
+Segundo paso visual del 18/09: `DetalleRepuestoSheet` unifica Facturas, Clientes/Meses y Sucursales: una línea, ejes compartidos, cantidades centradas sin unidades y fracciones hasta seis decimales; dinero con `$`, centavos y NC negativas. Las conversiones siguen visibles mediante aviso junto a Factura y ayuda con ecuación/regla accesible por clic/teclado. En teléfonos Cliente y P. unit. se conservan en el título de Factura y Excel completo. Búsqueda, orden, conteos distintos, permisos, fórmulas y base de cobertura permanecen intactos. [[24-Condiciones-visuales-ventas]] y `docs/tablas-orden-exportacion.md` documentan reglas y límites. Ocho nuevas pruebas y navegador con datos ficticios en cinco anchos; sin SQL nuevo ni validación de producción. Compras se completó en el tercer paso descrito arriba; Dashboard excluido.
+
+## Ajuste local móvil del 07/10/2026
+
+El formulario de seguimiento de Pedidos de compra usa `ResponsiveDrawer`: lateral en escritorio y bottom sheet con cuerpo desplazable y pie táctil en teléfono. Conserva estado, fecha estimada, seguimiento, notas, permisos y guardado originales. La selección breve entre pedidos candidatos permanece como diálogo; no se alteran vínculos, importes, monedas ni fuentes. Pruebas locales correctas; revisión visual real pendiente.

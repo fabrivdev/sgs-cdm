@@ -1,0 +1,59 @@
+# Ventas y conciliación
+
+Estado al 14/10/2026: 8295892 unifica los dos nombres de Agustín y retira filtro local/aviso rojo; cac486c unifica “Facturación por período” y elimina el desplegable/título interno duplicado de Servicios. Integrado en main, publicación no verificada. Orden y exportación de Máquinas/Repuestos ya fueron ampliados: los pasos históricos de abajo no son pendientes. En teléfono prevalece [[25-Revision-movil-transversal]].
+
+## Período y totales
+
+Usar fecha de factura para facturación. Agosto calendario termina el 31/08, no el 01/09. Todos los paneles deben respetar rango, sucursal, búsqueda y dimensiones aplicables. Los resúmenes por período de Servicios, Máquinas y Repuestos incluyen `Total del período`.
+
+Ventas netas = ventas más notas de crédito con signo negativo. No sumar conteos distintos de clientes/documentos de grupos o meses para obtener el total: recalcular unicidad sobre todo el rango.
+
+Ticket Medio = facturación neta / documentos del período. No confundir con promedio por OS.
+
+## Clasificación sin doble conteo
+
+Separar MO/Servicios, Kilometraje, Repuestos, Terceros, Máquinas y Otros. Los repuestos facturados dentro de una OS pueden estar dentro del total de Ventas de Servicios y dentro del componente Repuestos del dashboard; no sumarlos dos veces.
+
+Costo de envío, intereses y merchandising no son MO. Los grupos originales del histórico, incluido Grupo FX cuando está disponible, son evidencia de clasificación. No forzar lo desconocido dentro de Servicios para cerrar una suma.
+
+Grupo Servicios o prefijo SRV por sí solos no acreditan vínculo con OS. Conservar la facturación general y limitar la vista operativa usando evidencia: no excluir todas las líneas sin OS ni asignar Cliente cuando el tipo de tiempo es desconocido. La propuesta local 20261013201000_narrow_unlinked_service_sales_scope.sql admite SRV000001/SRV000006/SRV000100 con grupo 008, componente compatible y exclusiones comerciales; corrige también NC sin OS. Es una propuesta pendiente de comprobar contra la función efectiva, no prueba de aplicación. El SQL y unlinkedServiceSalesScope.test.ts están fuera de main en totvs-importer-public. Los conteos 739/13/5 son evidencia previa comunicada, no una consulta productiva de esta revisión.
+
+GRID histórico puede aportar evidencia del tipo de tiempo; no debe volver a sumarse como facturación cuando existe una línea canónica. Conservar evidencia útil y registro de duplicados antes de retirar una fuente monetaria.
+
+## Propietario y facturado
+
+Son dimensiones diferentes. No convertir automáticamente al receptor de la factura en dueño de la máquina. Priorizar propietario explícito activo en Parque; stock físico positivo por chasis puede acreditar máquina propia de `CAMPOS DEL MAÑANA S.A.`. Stock cero/negativo y registros inactivos no lo acreditan. Si existen dueños reales contradictorios, mostrar incertidumbre.
+
+Conservar propietario registrado en la OS como dato histórico separado del propietario actual. Clientes puede analizar propietarios o clientes facturados sin cambiar silenciosamente la población de facturación.
+
+## Presentación compartida
+
+Leer [[24-Condiciones-visuales-ventas]] antes de tocar la presentación. Importes con `$`, no `USD`; cantidades solo numéricas, sin sufijos h/hs/km/unid.; Detalle sin subtotal monetario al pie. Mantener `Total del período` en los resúmenes por período. Estas condiciones no autorizan cambios de importes, moneda o reglas de horas.
+
+Regla visual desde 640 px: cada registro ocupa una sola línea; no apilar datos, metadatos ni etiquetas dentro de una celda y no agregar párrafos explicativos. Separar datos en columnas con encabezados alineados. Usar anchos flexibles sin scroll horizontal; textos extensos con elipsis y valor íntegro al pasar el cursor, no con salto de línea.
+
+Detalle de Servicios: una fila por línea de factura, no por OS. Factura como referencia principal y OS/chasis como complemento, conservando repeticiones legítimas, NC y líneas sin OS. Usar `ventas_servicios_lineas_v2` y búsqueda normalizada igual que Clientes. Fecha, factura, sucursal, cliente facturado, propietario actual, OS, chasis, Tiempo, Código, descripción, cantidad e importe en columnas separadas. El propietario histórico permanece etiquetado en el título de la celda, sin reemplazar al propietario actual. Importes de líneas con centavos. El historial de máquina se carga bajo demanda como una sola lista: filas operativas por tipo de tiempo real y filas financieras por cada repuesto, sin agregar por OS/factura ni repartir importes de MO mixtos.
+
+Cantidad del detalle: MO muestra el campo de la OS `servicios_cantidad` (semántica de horas trabajadas pendiente de acreditar), no la unidad de factura ni horas-persona; Km usa `km_cantidad`; Repuestos/Terceros mantienen cantidad facturada. Agregar metadatos `cantidad_os`/`unidad_cantidad` sin reescribir la cantidad financiera ni importes. Ausencias/colisiones quedan desconocidas; cero explícito se conserva. Horas/km de la OS completa pueden repetirse por línea/NC y no se suman como estadística ni representan reparto por tipo en OS mixtas. Requiere ejecutar manualmente `20260917160000_service_invoice_line_operational_quantity.sql`; no modifica Comisiones. Prueba aislada: `scripts/verify-service-invoice-quantity-sql.mjs`.
+
+Etiquetas a la izquierda, cantidades y horas centradas, importes y porcentajes a la derecha. Encabezado y dato usan el mismo eje y ancho de columna. `TableScroll`, `salesTableFormat` y formatos por área son referencias compartidas.
+
+Fuentes: `docs/ventas-servicios-busqueda.md`, `docs/ventas-repuestos.md`, `src/components/ventas`, `src/pages/Ventas.tsx`. Las reglas de clasificación se deben contrastar con el SQL vigente y la base aplicada.
+
+Base de interacción compartida: Detalle de Servicios ordena sus 12 columnas por valores originales, sin deduplicar ni consultar nuevamente, y exporta todas las filas filtradas en el orden actual con permiso `datos:exportar`. Excel conserva textos completos, ceros iniciales, fechas reales, cantidades numéricas, centavos y NC; sin subtotal monetario. Base reutilizable: `salesTableInteraction`, `SalesTableControls`, `salesTableExport`. El paso inicial ya fue ampliado a las demás tablas de Servicios; no confundir aquel pendiente histórico con el alcance vigente. Máquinas/Repuestos ya incorporan orden/exportación; ver la ampliación documentada abajo. Reportes paginados deberán ordenar en SQL antes de paginar y exportar el resultado completo. Las validaciones documentadas usan fixtures locales, no producción. Aplicar [[24-Condiciones-visuales-ventas]].
+
+Detalle de Servicios reemplaza Concepto visible por Código: REP/código de origen de la línea para repuestos; códigos operativos explícitos MA/KM/SE compatibles en factura u OS para otros componentes. No usar el REP de otra línea ni inventar MA01. Componente permanece en título y lógica de cantidad, sin tocar clasificación financiera o Comisiones. Ausencias/colisiones no se adivinan. SQL manual: `20260917170000_service_invoice_line_product_code.sql`; fixture extendida `scripts/verify-service-invoice-quantity-sql.mjs` conserva íntegro el contrato anterior salvo metadato nuevo `codigo`.
+
+Paso 2: Servicios comparte filtros de cliente facturado, propietario, factura, OS, chasis, descripción, código, componente, origen, documento y vínculo con OS antes de agregar, sin alterar reglas de participación o correcciones de Comisiones. Las tablas de Períodos, ambos resúmenes, Clientes, Máquinas y Técnicos incorporan orden/exportación completos con `SalesDataTable`; el total de Períodos queda fijo al pie. El filtro local de técnicos fue retirado en 8295892; no restaurarlo desde este registro histórico. Agosto termina el 31/08. Aplicar/Enter guarda el texto pendiente y limpiar lo cancela. SQL manual `20260917180000_service_sales_shared_filters.sql`: agrega variantes filtradas de las RPC vigentes sin reemplazar originales ni reescribir datos; falta de SQL genera error explícito, no un resultado general. Si una RPC original cambia después, volver a generar su variante con esa migración. PostgreSQL aislado y Playwright con datos ficticios comprobaron conciliación/formato, no producción. La ampliación posterior de Máquinas/Repuestos está documentada abajo.
+
+## Acciones, dependencias y excepciones comprobadas el 18/09
+
+Dashboard, revisión del 21/09: `dashboard_facturacion_lote_v1` se consulta por trimestres disjuntos, con dos solicitudes simultáneas como máximo. La evaluación anual aplicada agotaba el timeout de PostgreSQL; particionar por fecha reduce cada cruce sin paginar, omitir ni repetir días. Un trimestre fallido invalida toda la carga y nunca publica parciales. No cambia fuentes, clasificación, GRID, importes ni fórmulas, y no requiere SQL nuevo si `20260916160000`/`20260916170000` ya están aplicadas. Validación local no acredita tiempo productivo.
+
+Ampliación funcional autorizada: Máquinas y Repuestos ya incorporan orden/exportación compartidos en todas sus tablas principales; quedan obsoletos los pendientes de pasos iniciales descritos arriba. Mantener una entrada por sección y snapshot de la pestaña actual. Repuestos usa `ventas_repuestos_listado_v3` con claves/direcciones validadas y orden antes de paginar; exportar completo con los mismos parámetros y comprobar cantidad. SQL manual en `20260918200000_parts_sales_global_sort_and_export.sql`; la variante copia la definición original y debe regenerarse si cambia esta. Los fixtures comparan importes, NC y ABC sin alterar población financiera. Navegador real con datos ficticios y Excel completo de 122 líneas; no comprobación productiva. Cobertura general/excepciones en `docs/tablas-orden-exportacion.md`.
+
+`Más filtros → ⋮` es el único acceso a exportación de la sección. `FiltersBar.secondaryActions` se monta una vez fuera de las variantes escritorio/móvil y fuera del panel lateral. No mover acciones de crear, editar o pagar bajo el pretexto de simplificar exportaciones. En Servicios, `SalesSectionExports` registra únicamente tablas montadas y utiliza su última respuesta filtrada y ordenada; cambiar de pestaña retira opciones anteriores sin consultar pestañas ocultas. Fallos de descarga habilitan reintento, y carga/error/sin filas no habilitan exportación. Fuentes: `docs/acciones-de-seccion.md`, `SectionActionsMenu.tsx`, `SalesSectionExports.tsx`, `SalesDataTable.tsx`.
+
+La migración de filtros copia la definición vigente de cuatro RPC al aplicarse: Períodos, Indicadores, Técnicos y Líneas. No son envoltorios que hereden automáticamente cambios posteriores. Requiere Código/cantidad operacional y desglose por marca en las definiciones de origen; falla si no encuentra exactamente la base enriquecida o las guardas esperadas. Regenerar variantes tras modificaciones posteriores de las originales. Sin filtros avanzados se invocan originales; con filtros avanzados no se permite fallback a importes generales. Fuente: `serviceSalesFilters.ts` y `20260917180000_service_sales_shared_filters.sql`.
+
+Cambio local pendiente de publicación detectado en `docs/conciliacion-postventa-dashboard.md` y `scripts/test-historical-commercial-classification.mjs`: respaldo Cliente para histórico sin tipo con receptor distinto de Campos del Mañana, conservando tipos explícitos/conflictos. La migración correspondiente existe localmente sin versionar. Esto no acredita ejecución ni distribución productiva; conservar esa diferencia al revisar cifras. La contradicción ya registrada de `facturacionReglas.ts` con SERVICIOS - OTROS permanece visible en el código y no se corrige desde esta revisión.

@@ -1,5 +1,131 @@
 # Revisión móvil transversal
 
+## Lectura de vigencia al 14/10/2026
+
+Las reglas visuales siguen siendo referencia. La auditoría, prioridades y fases fechadas más abajo son antecedentes; no constituyen una lista actual de cambios a ejecutar. Main recibió correcciones posteriores: contrastar cada punto antes de reabrirlo. No se hizo una nueva auditoría visual de pantallas en esta revisión documental. Ver [[24-Condiciones-visuales-ventas]] y [[08-Pendientes-y-validacion]].
+
+Consolidada el 25/09/2026 para orientar el próximo cambio. Leer esta nota antes de tocar vistas móviles y [[24-Condiciones-visuales-ventas]] cuando corresponda. Describe decisiones del usuario contrastadas con el worktree `C:/Users/Usuario/Documents/Codex/2026-09-08/ad/sgs-cdm-machine-refacturation`, commit `7a377f952497e8d03eab4a30ce5f6ea3a2c39c48`. Código publicado no equivale a despliegue o producción verificados.
+
+
+## Dirección acordada y prioridad
+
+- Una app móvil continua, armónica y legible; no una tabla de escritorio comprimida. Reducir contenedores, bordes anidados, títulos repetidos, espacios vacíos y desplegables innecesarios.
+- El usuario aprobó la dirección compacta del resto de las secciones. El último ajuste fue exclusivamente Planificador. No reabrir un rediseño general por una excepción de una pantalla.
+- Bajo 640 px, agrupar identidad/contexto en dos o más líneas cuando sea útil: cliente/tarea, modelo/chasis, NP/cliente o descripción/código. No confundir agrupar campos de un registro con fusionar registros. No obligar a que todo quepa en una sola línea ni convertir todo en tarjetas altas.
+- Desde 640 px conservar la presentación previa de tablet/escritorio por columnas, sus ejes y elipsis. El encabezado global usa un corte independiente de 768 px. No cambiar ambos cortes indistintamente.
+- No reducir todo por igual: texto compacto y controles visualmente discretos, pero áreas táctiles accesibles y formularios utilizables. Datos esenciales y alertas deben seguir a la vista; campos secundarios pueden estar en detalle y Excel.
+
+
+## Escala y componentes que reutilizar
+
+- `AppLayout.tsx`: encabezado compartido menor a 768 px de 56 px; menú sólo con icono, logo original de 28 px unido a «SIG CDM», campana y perfil. Objetivos táctiles de 44 × 44 px. No dejar el logo aislado entre controles ni duplicar marca.
+- `AppPrimitives.tsx`: título móvil de 18 px e indicadores planos y visibles. No usar tarjetas de KPI enormes ni plegar indicadores principales detrás de «Más».
+- `FiltersBar.tsx`: búsqueda visual de 36 px y entrada de 16 px; filtros secundarios en panel, un menú de sección a continuación. No añadir otra tarjeta exterior a la barra móvil ni duplicar acciones. El contexto necesario (corte, semana, frescura) no debe depender de abrir filtros.
+- `ui/tabs.tsx` y `sales-mobile-workspace.css`: pocas pestañas visibles, subrayado discreto, texto de 12 px, objetivo táctil de 44 px y envoltura cuando haga falta. No volver a botones verdes anchos tipo bloque ni a un selector escondido para tres vistas.
+- `MobileRecord.tsx` y `CompactListTable.mobileColumns`: identidad agrupada sólo en teléfono, columnas numéricas separadas y menú de orden de todos los campos originales. No alterar paginación o exportación porque un campo se oculta.
+- `dialog.tsx` y `responsive-drawer.tsx`: título que pueda envolver, contenido desplazable y acciones accesibles. No achicar indiscriminadamente los controles de edición.
+
+
+## Criterio por sección
+
+| Área | Prioridad de lectura en teléfono | Qué conservar |
+| --- | --- | --- |
+| Ventas de Máquinas, Servicios y Repuestos | Composición continua de la opción elegida: rango, tres indicadores, Períodos/Resumen/Detalle | Datos financieros, signos de NC, `$`, cantidades sin sufijos, total de período (no subtotal monetario en Detalle), consultas y Excel originales |
+| Máquinas y Stock | Modelo, chasis y propietario/contexto; saldo separado | Identidad física, alertas de chasis repetido, cantidades fraccionarias y autorizaciones de transferencia |
+| Operaciones e Importaciones | NP/cliente o llave/chasis; estados comprensibles por unidad | Facturación distinta de entrega; llegada distinta de situación; documentos no prueban facturación |
+| Stock proyectado | Fecha de corte visible, modelo/stock/proyectado | Fórmula completa en detalle/Excel, negativos y límites de reconstrucción histórica |
+| Repuestos, Sugerencias y Compras | Descripción/código/marca o documento/sucursal/estado; cantidades/importes separados | Orden del servidor, paginación, advertencias de calidad, ítems, vínculos y exportación completa |
+| Trabajos | Navegación visible por estado con conteos y filas planas | No cinco paneles altos plegables; tablero de escritorio, identidad y callbacks existentes |
+| Calendario | Mes/Semana/Técnicos visibles y agenda móvil en Semana/Técnicos | Disponibilidades, días no laborales, identidad propia de jornadas; consultar no reprograma |
+| Comisiones | OS/cliente/pago/validación agrupados, horas separadas donde corresponden | Selección, tipo de tiempo, detalle y pago explícito; la excepción sin horas de Planificador no se propaga aquí |
+| Administración y Dashboard | Pestañas visibles; nombre/estado/ficha o métricas/rango | Permisos, errores de fuentes y formularios; nada de cifras parciales presentadas como completas |
+
+
+## Excepción deliberada: Planificador sin horas
+
+`PlannerMobileAgenda.tsx` es una agenda plana, no una tabla de dos columnas. Fecha/día a la izquierda; cliente con mayor jerarquía; tarea secundaria de hasta dos líneas; referencia, estado y continuidad debajo. Semana, navegación y orden comparten una franja. Programar es una acción discreta que conserva permisos y área táctil.
+
+No mostrar horas por jornada ni total de horas al pie en teléfono, aunque existan valores. Sí conservarlas en la ficha, en el Excel y en tablet/escritorio. No borrar datos ni cambiar cálculos. La ocultación no se aplica a Comisiones u otras pantallas donde las horas son esenciales.
+
+Se conserva una entrada por jornada: dos jornadas del mismo servicio y día siguen siendo dos registros con sus IDs, cuadrilla y continuidad. Abrir usa el callback original, incluido su marcado de visto; no deduplicar, reprogramar ni modificar estado al cambiar la presentación. Menú de orden, filtros, carga/error/reintento y exportador especializado mantienen su alcance.
+
+Fuentes: `src/pages/Planificador.tsx`, `src/components/calendar/PlannerMobileAgenda.tsx`, `src/components/lists/ServiceLists.test.tsx`. Este ajuste reemplaza la etapa anterior «Jornada / Horas» y el total móvil.
+
+
+## Lista de comprobación para la próxima tarea
+
+1. Identificar primero la jerarquía útil de esa pantalla y reutilizar el patrón existente; no aplicar una plantilla rígida a calendarios, listas y formularios por igual.
+2. Comparar teléfono 320/390 px y frontera 639/640 px; revisar tablet 768 y escritorio 1280. Comprobar textos largos, datos vacíos, ceros, negativos y estados reales. No usar sólo una fila corta de ejemplo.
+3. Verificar ausencia de desbordamiento horizontal, tamaño de texto, áreas táctiles, foco/teclado y acceso al detalle completo cuando se limita una descripción.
+4. Conservar filtros, orden, identidad por registro/jornada, permisos, callbacks y exportación completa. Ocultar un campo no debe modificar su fuente ni su cálculo.
+5. No ocultar errores, avisos o contexto esencial para conseguir una captura limpia. Registrar el alcance real de pruebas visuales y funcionales.
+6. Mantener intactas las secciones aprobadas cuando el cambio es puntual. Documentar aquí cualquier nueva excepción explícita.
+
+
+## Evidencia de la revisión manual previa
+
+La implementación transversal `79555bb` registró 212 pruebas en 33 archivos; encabezado `1070117` y composición Ventas `09eaa68` forman la base. El ajuste de Planificador `7a377f9` pasó 26 pruebas en cuatro archivos, tipos y compilación, con comprobación visual local a 320/390/768 px. Las cifras corresponden a esas ejecuciones anteriores; no se volvieron a ejecutar durante esta actualización documental. Referencias: `design-qa.md`, `docs/mobile-review-2026-09-24.md` y pruebas citadas en el worktree.
+
+La fuente configurada del atlas (`C:/Users/Usuario/Documents/sgs-cdm`) conserva un checkout anterior y cambios locales ajenos. Estas reglas funcionales reflejan los commits nuevos comprobados en el worktree, pero el inventario técnico automático sigue describiendo el checkout configurado. No se ha alineado Git ni modificado código para sincronizar Obsidian. No confundir esa limitación con una aprobación para restaurar el diseño antiguo. Sin SQL, datos comerciales copiados ni producción consultada.
+
+
+## Auditoría histórica del 06/10/2026 (no es backlog vigente)
+
+Auditoría de código realizada sobre rutas activas y `origin/main` `669f06373c39addf14c58f2163ea3768da4b97e8`, complementada por capturas de Planificador, Flota, Calendario y órdenes. No se navegó la app desde el worktree de auditoría y no se consultó producción; las capturas no demuestran por sí solas que el frontend fotografiado corresponda al mismo commit. La implementación de armonización queda **PAUSADA por decisión del usuario** hasta disponer de créditos; esta sección es plan y criterio de aceptación, no autorización para modificar UI, SQL o datos.
+
+### Estado que no debe duplicarse
+
+| Capa | Estado comprobado | Límite |
+| --- | --- | --- |
+| `origin/main` | `2da8b64` evita abrir «Más filtros» sin contenido útil; `a7182eb` ajusta vistas móviles de Servicios; `4198044` normaliza la acción crear de Flota; `669f063` usa drawers responsivos nativos en formularios de Flota | Código publicado en Git no equivale a despliegue ni producción comprobados |
+| Local, no publicado | Trabajos tiene un commit rebasado `97028325666e6370bd2029ca20ae64addfdeac9c` con divisores neutrales, `py-2`, foco/hover/active y prueba a 320/390/639 px | El usuario pausó el push; no describirlo como presente en `origin/main` |
+| Pendiente | Armonización transversal enumerada abajo | No comenzar ni mezclar con otra tarea hasta nueva autorización |
+
+La ubicación y el tamaño de las acciones principales en las cuatro capturas son comparables; no existe evidencia para afirmar que todas las cabeceras tengan tamaños diferentes. Planificador conserva deliberadamente una acción más discreta y una agenda multilínea. Calendario no debe convertirse en tabla ni sus celdas vacías tratarse como error.
+
+### Inventario priorizado
+
+| Prioridad | Sección/causa | Corrección futura | Criterio de aceptación |
+| --- | --- | --- | --- |
+| P1 | Objetivos táctiles reducidos por clases locales: pie de `FiltersBar` en 32 px, tabs/acciones secundarias de Ventas en 40 px, controles de Cumplimiento en 36 px y permisos de Administración en 40 px o menos | Corregir primero los componentes compartidos o las excepciones mínimas; no agrandar iconos ni fondos visuales | Todo control interactivo de teléfono mide al menos 44 por 44 px, conserva foco/ARIA y no aumenta innecesariamente la altura visual |
+| P1 | `MaquinasTab` coloca «Nueva máquina» en `FiltersBar.actions`, ocultándola dentro del panel móvil | Mover la creación a `PageHeader`; icon-only con `aria-label` bajo 640 px | Acción visible sin abrir filtros, permiso y formulario sin cambios, texto desde 640 px |
+| P1 | Flota y OS apilan demasiado contexto: filas cercanas a 96/98 px, repetición de «Sin lectura» en Flota y numéricos incrustados en contexto de OS | Reordenar identidad y métricas usando fila plana y columnas/celda numérica compacta; mover secundarios al detalle existente | Un registro sigue siendo una fila; no se pierde marca/modelo/OS/chapa/estado/horas/km ni acceso al detalle, orden o Excel |
+| P1 | Administración/Accesos conserva tabla ancha con scroll en teléfono; algunos toggles son menores a 44 px | Usar resumen nombre/estado/ficha bajo 640 px y tabla desde 640; elevar controles sin alterar permisos | Sin scroll horizontal de la página; las mismas personas, estados y permisos siguen accesibles y editables según rol |
+| P2 | Calendario usa gutter móvil de 12 px y tabs propios con peso distinto | Normalizar cabecera/filtros a gutter 16 px y estilo compartido, preservando la grilla y la agenda | Mes/Semana/Técnicos siguen visibles; disponibilidades, días no laborales y consulta sin reprogramación intactos |
+| P2 | Cinco KPI de OS ocupan demasiada altura antes de la primera fila | Definir empaquetado compacto sin ocultar indicadores ni ponerlos detrás de «Más» | Los cinco KPI permanecen visibles y legibles; primer registro aparece antes sin cards altas |
+| P2 | Cabecera de Sugerencias combina «Parámetros» con texto y otra acción de información a 320 px | Convertir solo el texto de Parámetros a icon-only en teléfono, con nombre accesible | Título no colisiona; ambos controles y estados disabled siguen identificables |
+
+### Plan de armonización por dependencias
+
+| Fase | Estado | Alcance | Dependencia | Salida/aceptación |
+| --- | --- | --- | --- | --- |
+| 0. Inventario y línea base | Hecho para planificar | Rutas activas, componentes nativos, cuatro capturas y separación main/local/pendiente | Ninguna | Esta auditoría; antes de implementar se deben completar capturas faltantes con estados reales/ficticios controlados |
+| 1. Controles compartidos | PAUSADA | 44 px en `FiltersBar`, tabs de Ventas, Cumplimiento y permisos; gutters/tipografía/tabs coherentes; conservar ARIA y paneles no vacíos | Fase 0 | Pruebas de componente en 320/390/639/640; medición de píxeles y revisión independiente |
+| 2. Acciones y formularios | PAUSADA | Crear siempre en cabecera; `ResponsiveDrawer` para altas/ediciones largas; revisar Administración, Calendario, Compras y otros formularios. Excluir confirmaciones breves. No repetir Flota, ya resuelta en `669f063` | Fase 1 | Desktop lateral, teléfono nativo, cuerpo desplazable, pie 44 px, cancelar/guardar/cerrar y permisos comprobados |
+| 3. Listas y jerarquía | PAUSADA | Flota, OS, Administración/Accesos, KPI de OS y cabecera de Sugerencias; publicar Trabajos solo si sigue pendiente y sin rehacerlo | Fases 1-2 | Filas planas, identidad clara, un dato por columna desde 640, numéricos separados, callbacks/filtros/orden/Excel intactos |
+| 4. Excepciones de sección | PAUSADA | Calendario y breakpoint de Administración; revisar cada excepción contra su nota funcional | Fase 3 | Calendario sigue calendario; Planificador sigue agenda sin horas; matrices conservan semántica y navegación |
+| 5. QA y regresión visual | PAUSADA | Todas las rutas actuales en 320/390/639/640/768/1280, contenido/carga/vacío/error/permisos, textos largos, foco, teclado, drawers e imágenes | Fases 1-4 | Capturas/render real y revisor independiente; pruebas focales, typecheck/build según alcance; lista de diferencias y límites. No aprobar solo por código |
+
+Cada fase debe partir del `origin/main` vigente, inventariar cambios ajenos y cerrar una sola causa compartida antes de pasar a pantallas. No abrir pestañas nuevas si ya existe una sesión de validación; reutilizarla y cerrar las propias. Imágenes de catálogo básicas deben usar originales autorizados, fondo blanco y `object-contain`, sin gastar créditos de generación. Ninguna fase autoriza inventar datos, filtros o RPC, aplicar SQL, publicar en Lovable o afirmar despliegue productivo.
+
+### Ejecución local del 07/10/2026: lote 1
+
+La autorización para implementar la armonización se reanudó, comenzando por la fase 1. Bajo 640 px se elevaron a 44 px el pie de `FiltersBar`, los subcontroles de Ventas y los permisos de Administración; la matriz móvil de Cumplimiento usa el mismo mínimo. Los permisos exponen su estado con `aria-pressed`. No cambiaron consultas, cálculos, permisos, filtros, limpieza, callbacks ni escritorio.
+
+Pruebas focalizadas: 100 casos en cuatro archivos, typecheck, lint de los archivos afectados y compilación correctos. La prueba de Ventas comprueba los tokens CSS y no equivale a medir el render. No hubo herramienta de navegador disponible para reutilizar una pestaña existente, por lo que las capturas y revisión independiente en 320/390/639/640/768/1280 px quedan pendientes. La fase 1 está implementada en código local pero no tiene aprobación visual; las fases 2 a 5 no comenzaron. Sin push, publicación, SQL ni validación de producción.
+
+### Jerarquía móvil de servicios y selectores rápidos - 07/10/2026
+
+Bajo 640 px, semana de Planificador, estado de Trabajos, estado de técnicos de Productividad y período/medida de Cumplimiento pertenecen a `Más filtros`; no se duplican fuera. Órdenes/Productividad/Cumplimiento permanecen visibles porque son navegación real.
+
+Órdenes muestra cinco indicadores en tres columnas uniformes (3 + 2) y separa Identidad/Actividad/Estado. Productividad elimina el ancho mínimo de 440 px y deja Técnico/Productividad; el detalle completo sigue al abrir el técnico. Cumplimiento usa un período y copia explícita, sin `prog.`/`ND`. `Registrar lectura` de Flota consume la misma acción móvil compartida que `Nuevo vehículo`. El panel gerencial conserva cuatro indicadores visibles por sección y no queda sujeto a esta grilla.
+
+Validación local: 105 pruebas focalizadas correctas. Sin navegador, medición real de overflow, SQL, commit, push ni producción; siguen pendientes 320/390/639/640/768/1280 px con filtros y drawers abiertos.
+
+## Implementación documentada en main cac486c
+
+Los acuerdos vigentes de arriba y los cambios fechados posteriores prevalecen sobre etapas anteriores. Las pruebas citadas son históricas, no reejecutadas por esta reconciliación.
+
 ## Productividad móvil: nombre, porcentaje y barra de fila completa - 07/10/2026
 
 La instrucción visual más reciente reemplaza bajo 640 px la separación de Productividad en dos columnas. Cada fila usa una primera línea con el nombre del técnico a la izquierda y su porcentaje real a la derecha; el medidor ocupa una segunda línea con todo el ancho útil de la fila. El relleno sigue limitado a la proporción calculada y no se estira a 100% para completar el riel.

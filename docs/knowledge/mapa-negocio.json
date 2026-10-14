@@ -1,0 +1,2658 @@
+{
+  "modules": [
+    {
+      "id": "servicios",
+      "title": "Servicios técnicos",
+      "description": "Planificación, trabajos, jornadas, comisiones y OS con Productividad/Cumplimiento. Eficiencia = cobradas/trabajadas; la equivalencia de servicios_cantidad con trabajo real sigue pendiente de acreditar.",
+      "notes": [
+        "02-Servicios-y-comisiones",
+        "17-Gerencia-postventa",
+        "25-Revision-movil-transversal",
+        "26-Ordenes-servicio-y-productividad",
+        "31-Calidad-XML-sistema-nuevo-reunion-TI"
+      ],
+      "related": [
+        "ventas",
+        "parque",
+        "administracion",
+        "datos"
+      ]
+    },
+    {
+      "id": "parque",
+      "title": "Parque y operaciones",
+      "description": "Clientes, propiedad de máquinas, stock físico, catálogo y pedidos comerciales. Mantener separadas disponibilidad comercial y llegada logística.",
+      "notes": [
+        "04-Parque-y-operaciones",
+        "18-Gerencia-parque",
+        "25-Revision-movil-transversal"
+      ],
+      "related": [
+        "importaciones",
+        "servicios",
+        "ventas",
+        "datos"
+      ]
+    },
+    {
+      "id": "importaciones",
+      "title": "Importaciones de máquinas",
+      "description": "Seguimiento por unidad, OC, embarque, documentos de proveedor, arribo y conciliación física con stock. No confundir con importación de archivos.",
+      "notes": [
+        "05-Importaciones",
+        "19-Gerencia-importaciones",
+        "25-Revision-movil-transversal"
+      ],
+      "related": [
+        "parque",
+        "ventas",
+        "datos"
+      ]
+    },
+    {
+      "id": "repuestos",
+      "title": "Repuestos y planificación de compras",
+      "description": "Catálogo, disponibilidad por sucursal, solicitudes/pedidos y motor de sugerencia auditable. Demanda confirmada y ventas financieras tienen alcances distintos.",
+      "notes": [
+        "06-Repuestos",
+        "20-Gerencia-repuestos",
+        "25-Revision-movil-transversal"
+      ],
+      "related": [
+        "ventas",
+        "servicios",
+        "datos"
+      ]
+    },
+    {
+      "id": "ventas",
+      "title": "Ventas y dashboard",
+      "description": "Facturación de Servicios, Máquinas y Repuestos; comparaciones por período, dimensiones y conciliación con dashboard. Importes netos y conteos distintos no se calculan igual.",
+      "notes": [
+        "03-Ventas-y-conciliacion",
+        "15-Panel-gerencial",
+        "16-Gerencia-ventas",
+        "23-Modulos-futuros",
+        "24-Condiciones-visuales-ventas",
+        "25-Revision-movil-transversal"
+      ],
+      "related": [
+        "servicios",
+        "parque",
+        "repuestos",
+        "datos"
+      ]
+    },
+    {
+      "id": "administracion",
+      "title": "Administración y accesos",
+      "description": "Usuarios, roles, módulos, secciones, parámetros y cargas de datos. Los controles del menú deben corresponder con autorización en servidor.",
+      "notes": [
+        "07-Accesos-y-asistente",
+        "22-Gerencia-implementacion",
+        "25-Revision-movil-transversal"
+      ],
+      "related": [
+        "servicios",
+        "parque",
+        "repuestos",
+        "datos",
+        "asistente"
+      ]
+    },
+    {
+      "id": "datos",
+      "title": "Importación y calidad de datos",
+      "description": "Canonización de archivos legacy y actuales, corte temporal, identidades, vinculación, duplicados, snapshots y preservación de auditoría. La memoria no almacena filas comerciales.",
+      "notes": [
+        "01-Arquitectura",
+        "08-Pendientes-y-validacion",
+        "21-Gerencia-alertas",
+        "31-Calidad-XML-sistema-nuevo-reunion-TI"
+      ],
+      "related": [
+        "ventas",
+        "servicios",
+        "repuestos",
+        "parque"
+      ]
+    },
+    {
+      "id": "asistente",
+      "title": "Asistente analítico de la app",
+      "description": "Catálogo semántico y planes validados en servidor para responder sobre datos autorizados. Es independiente de la base documental de Obsidian.",
+      "notes": [
+        "07-Accesos-y-asistente"
+      ],
+      "related": [
+        "administracion",
+        "datos",
+        "ventas",
+        "servicios"
+      ]
+    }
+  ],
+  "entities": [
+    {
+      "id": "OS",
+      "title": "Orden de servicio",
+      "module": "servicios",
+      "description": "Orden importada identificada por os_numero textual, con sucursal, chasis, marca/modelo, propietario histórico, apertura, cierre operativo y factura informada. Puede contener varios tipos de tiempo; estado operativo, jornadas trabajadas y vínculo financiero son hechos distintos. Las tarifas de MO por bloque/tipo permiten horas facturadas equivalentes solo con evidencia suficiente.",
+      "tables": [
+        "ordenes_servicio_importadas",
+        "ordenes_servicio_importadas_archivo"
+      ],
+      "related": [
+        "trabajo",
+        "chasis",
+        "factura",
+        "jornada-comision",
+        "ajuste-tiempo"
+      ]
+    },
+    {
+      "id": "trabajo",
+      "title": "Trabajo macro",
+      "module": "servicios",
+      "description": "Agrupa problema, cliente, prioridad, estado e intervenciones. No es una factura ni necesariamente una única OS.",
+      "tables": [
+        "trabajos"
+      ],
+      "related": [
+        "jornada",
+        "cliente",
+        "OS"
+      ]
+    },
+    {
+      "id": "jornada",
+      "title": "Jornada operativa",
+      "module": "servicios",
+      "description": "Intervención programada/realizada con fecha, estado, responsable y auxiliares. Su cuadrilla propia tiene prioridad sobre la del servicio padre.",
+      "tables": [
+        "servicio_jornadas",
+        "servicios"
+      ],
+      "related": [
+        "trabajo",
+        "tecnico",
+        "jornada-comision"
+      ]
+    },
+    {
+      "id": "jornada-comision",
+      "title": "Jornada de comisiones",
+      "module": "servicios",
+      "description": "Registro de participación técnica importada con horas, validación, vigencia, tipo de tiempo y relación de liquidación. Varias personas pueden compartir un bloque de reloj.",
+      "tables": [
+        "comisiones_jornadas"
+      ],
+      "related": [
+        "OS",
+        "tecnico",
+        "liquidacion",
+        "ajuste-tiempo"
+      ]
+    },
+    {
+      "id": "tecnico",
+      "title": "Técnico y disponibilidad",
+      "module": "servicios",
+      "description": "Identidad técnica y perfil activo/inactivo; disponibilidad y ausencias afectan planificación/capacidad, no borran participación histórica real.",
+      "tables": [
+        "profiles",
+        "tecnico_disponibilidad",
+        "dias_no_laborales"
+      ],
+      "related": [
+        "jornada",
+        "jornada-comision",
+        "usuario"
+      ]
+    },
+    {
+      "id": "liquidacion",
+      "title": "Liquidación de comisiones",
+      "module": "servicios",
+      "description": "Cabecera y detalle de importes/horas liquidados, con estado y pago. No equiparar jornada válida, liquidada y pagada.",
+      "tables": [
+        "comisiones_liquidaciones",
+        "comisiones_liquidacion_detalle"
+      ],
+      "related": [
+        "jornada-comision",
+        "tecnico",
+        "OS"
+      ]
+    },
+    {
+      "id": "ajuste-tiempo",
+      "title": "Corrección manual de tipo de tiempo",
+      "module": "servicios",
+      "description": "Decisión administrativa persistente por identidad estable. Debe sobrevivir a reemplazo de filas importadas y conservar su evidencia.",
+      "tables": [
+        "comisiones_tipo_tiempo_ajustes",
+        "comisiones_tipo_tiempo_validaciones_os"
+      ],
+      "related": [
+        "OS",
+        "jornada-comision",
+        "linea-factura"
+      ]
+    },
+    {
+      "id": "factura",
+      "title": "Documento de facturación y NC",
+      "module": "ventas",
+      "description": "Documento comercial identificado con origen, sucursal, fecha, número y clase. Factura y nota de crédito requieren signo y conteo correctos.",
+      "tables": [
+        "facturacion",
+        "facturacion_lineas_importadas"
+      ],
+      "related": [
+        "linea-factura",
+        "cliente",
+        "OS",
+        "venta-historica"
+      ]
+    },
+    {
+      "id": "cxc-snapshot",
+      "title": "Snapshot de cuentas por cobrar TOTVS",
+      "module": "ventas",
+      "description": "Cuotas documentales por archivo y fecha de corte confirmada. VALOR y SALDO son hechos distintos; versiones del mismo corte no se suman. NF, NCC y RA conservan naturaleza y vínculo de aplicación desconocido cuando la fuente no lo trae.",
+      "tables": [
+        "totvs_cxc_cargas",
+        "totvs_cxc_documentos",
+        "totvs_cxc_carga_documentos"
+      ],
+      "related": [
+        "factura",
+        "cliente"
+      ]
+    },
+    {
+      "id": "linea-factura",
+      "title": "Línea canónica de facturación",
+      "module": "ventas",
+      "description": "Granularidad financiera con producto/concepto, importe, moneda, vendedor y posible OS. La suma debe proceder de una fuente canónica sin sumar duplicados GRID.",
+      "tables": [
+        "facturacion_lineas_importadas",
+        "repuestos_ventas_vinculacion",
+        "repuestos_ventas_duplicadas"
+      ],
+      "related": [
+        "factura",
+        "producto",
+        "OS",
+        "venta-historica"
+      ]
+    },
+    {
+      "id": "venta-historica",
+      "title": "Venta histórica y evidencia GRID",
+      "module": "datos",
+      "description": "Datos legacy detallados y evidencia de clasificación/vinculación. Una copia duplicada puede ser útil como evidencia sin aportar otra vez importe a la facturación.",
+      "tables": [
+        "facturacion",
+        "repuestos_ventas_vinculacion",
+        "repuestos_ventas_duplicadas",
+        "repuestos_facturacion_historica_cargas"
+      ],
+      "related": [
+        "linea-factura",
+        "factura",
+        "demanda"
+      ]
+    },
+    {
+      "id": "cliente",
+      "title": "Cliente, facturado y propietario",
+      "module": "parque",
+      "description": "Identidad comercial canónica. Dueño actual, dueño registrado en la OS y receptor de factura son perspectivas diferentes; no sustituir una por otra.",
+      "tables": [
+        "clientes",
+        "parque_historial_propiedad",
+        "parque_factura_os_cliente"
+      ],
+      "related": [
+        "maquina",
+        "factura",
+        "OS",
+        "NP"
+      ]
+    },
+    {
+      "id": "maquina",
+      "title": "Máquina del parque",
+      "module": "parque",
+      "description": "Máquina física con marca, tipo, modelo, serie y relación de propiedad. Las dimensiones comerciales agrupadas no deben destruir la marca/modelo original.",
+      "tables": [
+        "parque_maquinas",
+        "parque_historial_propiedad"
+      ],
+      "related": [
+        "cliente",
+        "chasis",
+        "modelo",
+        "stock-maquina"
+      ]
+    },
+    {
+      "id": "chasis",
+      "title": "Identidad por chasis",
+      "module": "parque",
+      "description": "Clave normalizada para enlazar máquina, OS, recepción e inventario. Normalizar formato no autoriza unir identidades ambiguas ni órdenes por cercanía de fecha/importe.",
+      "tables": [
+        "parque_maquinas",
+        "parque_stock_maquinas",
+        "ordenes_servicio_importadas"
+      ],
+      "related": [
+        "maquina",
+        "OS",
+        "unidad-importacion",
+        "stock-maquina"
+      ]
+    },
+    {
+      "id": "modelo",
+      "title": "Catálogo y alias de modelos",
+      "module": "parque",
+      "description": "Identidad canónica compartida por Parque, Stock, NP e Importaciones. Los alias confirmados unifican grafías/configuraciones explícitas con un modelo base sin dejar otra opción activa; el texto fuente permanece en raw para auditoría, sin fusionar por similitud difusa.",
+      "tables": [
+        "parque_modelos_catalogo",
+        "parque_modelos_alias",
+        "maquinaria_marcas_catalogo",
+        "parque_maquinas",
+        "parque_stock_maquinas",
+        "maquinaria_operacion_lineas",
+        "maquinaria_importacion_lineas"
+      ],
+      "related": [
+        "maquina",
+        "NP",
+        "unidad-importacion",
+        "stock-maquina"
+      ]
+    },
+    {
+      "id": "stock-maquina",
+      "title": "Stock físico de máquinas",
+      "module": "parque",
+      "description": "Existencia por chasis, saldo, sucursal y condición. La foto Stock de Maquinarias define las existencias; Maquinarias solo puede completar su chasis mediante Producto/CODPRO exacto y único, sin agregar filas históricas. Stock físico positivo confirma disponibilidad física aunque la unidad esté reservada comercialmente.",
+      "tables": [
+        "parque_stock_maquinas"
+      ],
+      "related": [
+        "maquina",
+        "chasis",
+        "unidad-importacion",
+        "NP",
+        "stock-proyectado-maquina"
+      ]
+    },
+    {
+      "id": "stock-proyectado-maquina",
+      "title": "Saldo proyectado de máquinas nuevas",
+      "module": "parque",
+      "description": "Proyección por modelo desde la apertura del 31/08/2026. Separa stock físico, OC pendientes y ventas pendientes; integra arribos, facturas/NC y ajustes sin usar entrega física ni máquinas usadas.",
+      "tables": [
+        "parque_stock_proyectado_apertura",
+        "parque_stock_proyectado_ajustes"
+      ],
+      "related": [
+        "stock-maquina",
+        "unidad-importacion",
+        "NP",
+        "factura",
+        "modelo"
+      ]
+    },
+    {
+      "id": "NP",
+      "title": "Nota de pedido y unidades comerciales",
+      "module": "parque",
+      "description": "Pedido comercial con cliente/vendedor, líneas y unidades. Puede conservar varios PDF, pero cada unidad solo queda facturada cuando una venta positiva canónica coincide con su chasis y no precede a la NP; su avance físico no debe reiniciarse al editar datos administrativos.",
+      "tables": [
+        "maquinaria_operaciones",
+        "maquinaria_operacion_lineas",
+        "maquinaria_unidades_operacion",
+        "maquinaria_documentos",
+        "maquinaria_facturas_venta_unidades",
+        "facturacion_lineas_importadas"
+      ],
+      "related": [
+        "cliente",
+        "modelo",
+        "stock-maquina",
+        "unidad-importacion",
+        "factura",
+        "chasis"
+      ]
+    },
+    {
+      "id": "importacion",
+      "title": "Cabecera de importación",
+      "module": "importaciones",
+      "description": "Pedido de proveedor con datos generales de OC, fechas y documentos, desagregado en unidades editables. No es un único chasis compartido.",
+      "tables": [
+        "maquinaria_importaciones_operativas",
+        "maquinaria_importacion_lineas"
+      ],
+      "related": [
+        "OC",
+        "unidad-importacion",
+        "factura-proveedor"
+      ]
+    },
+    {
+      "id": "unidad-importacion",
+      "title": "Unidad de importación",
+      "module": "importaciones",
+      "description": "Unidad con llave única, posición del pedido, chasis, herencia/ajustes de ETA y valor OC, documentos y recepción propia.",
+      "tables": [
+        "maquinaria_importacion_unidades"
+      ],
+      "related": [
+        "importacion",
+        "OC",
+        "chasis",
+        "stock-maquina",
+        "NP",
+        "factura-proveedor"
+      ]
+    },
+    {
+      "id": "OC",
+      "title": "Orden de compra y compromiso de valor",
+      "module": "importaciones",
+      "description": "Referencia de compra y valor con alcance unitario o total explícito. Se compara contra proveedor, no se convierte automáticamente en costo definitivo de stock.",
+      "tables": [
+        "maquinaria_importacion_lineas",
+        "maquinaria_importacion_unidades"
+      ],
+      "related": [
+        "importacion",
+        "unidad-importacion",
+        "factura-proveedor"
+      ]
+    },
+    {
+      "id": "factura-proveedor",
+      "title": "Factura y documentos del proveedor",
+      "module": "importaciones",
+      "description": "Documento de importación y asignación a unidades, moneda/valor para comparar con OC. Preservar diferencias y documentos sin confundirlos con venta al cliente. En main la factura adjunta aún se vincula al lote; la corrección local por unidad no está integrada. Ver 05-Importaciones y 12-Estado-local.",
+      "tables": [
+        "maquinaria_facturas_importacion",
+        "maquinaria_factura_importacion_unidades",
+        "maquinaria_documentos"
+      ],
+      "related": [
+        "OC",
+        "unidad-importacion",
+        "stock-maquina"
+      ]
+    },
+    {
+      "id": "producto",
+      "title": "Producto y códigos de repuesto",
+      "module": "repuestos",
+      "description": "Artículo con código interno, código fabricante, descripción y catálogo. Equivalencia física no significa automáticamente igual unidad de medida histórica.",
+      "tables": [
+        "productos",
+        "repuestos_productos_alias",
+        "repuestos_codigo_equivalencias",
+        "repuestos_conversiones_unidad_historica",
+        "repuestos_articulo_planificacion"
+      ],
+      "related": [
+        "stock-repuesto",
+        "demanda",
+        "linea-factura",
+        "pedido-compra"
+      ]
+    },
+    {
+      "id": "stock-repuesto",
+      "title": "Stock de repuestos por sucursal",
+      "module": "repuestos",
+      "description": "Disponibilidad física de artículos. Las consultas de lista, KPI y export tienen costos distintos y no deben disparar agregados completos por cada render.",
+      "tables": [
+        "repuestos_stock"
+      ],
+      "related": [
+        "producto",
+        "demanda",
+        "corrida"
+      ]
+    },
+    {
+      "id": "solicitud-compra",
+      "title": "Solicitud de compra de repuestos",
+      "module": "repuestos",
+      "description": "Solicitud por línea con precio, marca/código y posible pedido asociado. El vínculo automático requiere candidato inequívoco y tolerancia; lo ambiguo permite revisión manual.",
+      "tables": [
+        "compras_solicitudes",
+        "compras_solicitud_pedido_vinculo"
+      ],
+      "related": [
+        "pedido-compra",
+        "producto"
+      ]
+    },
+    {
+      "id": "pedido-compra",
+      "title": "Pedido a proveedor de repuestos",
+      "module": "repuestos",
+      "description": "Pedido por línea con cantidades, entregado/pendiente y valores. Asociar solicitud y pedido no equivale a recepción física o factura de venta.",
+      "tables": [
+        "compras_pedidos",
+        "compras_solicitud_pedido_vinculo"
+      ],
+      "related": [
+        "solicitud-compra",
+        "producto",
+        "stock-repuesto"
+      ]
+    },
+    {
+      "id": "demanda",
+      "title": "Demanda histórica confirmada",
+      "module": "repuestos",
+      "description": "Demanda mensual vinculada a productos canónicos, con origen, duplicados y correcciones. La fuente de planificación no es idéntica al universo financiero de ventas.",
+      "tables": [
+        "repuestos_demanda_mensual",
+        "repuestos_ventas_vinculacion",
+        "repuestos_maestro_legacy",
+        "repuestos_legacy_vinculos_manuales"
+      ],
+      "related": [
+        "producto",
+        "venta-historica",
+        "corrida"
+      ]
+    },
+    {
+      "id": "modelo-sugerencia",
+      "title": "Modelo versionado de sugerencia",
+      "module": "repuestos",
+      "description": "Parámetros por marca/vigencia, políticas por segmento y reglas de mix. Pesos, lead time, horizontes y umbrales son configurables; no presentar un documento inicial como parámetros actuales.",
+      "tables": [
+        "repuestos_modelo_versiones",
+        "repuestos_modelo_segmentos",
+        "repuestos_modelo_reglas_mix"
+      ],
+      "related": [
+        "corrida",
+        "demanda",
+        "producto"
+      ]
+    },
+    {
+      "id": "corrida",
+      "title": "Corrida y explicación de sugerencia",
+      "module": "repuestos",
+      "description": "Ejecución persistida con snapshots y resultados por pieza. Incluye ABC/FSN/XYZ, segmento, necesidad, stock objetivo y explicación; no solo una cantidad opaca.",
+      "tables": [
+        "repuestos_corridas",
+        "repuestos_corrida_resultados"
+      ],
+      "related": [
+        "modelo-sugerencia",
+        "demanda",
+        "stock-repuesto",
+        "producto"
+      ]
+    },
+    {
+      "id": "usuario",
+      "title": "Usuario y perfil",
+      "module": "administracion",
+      "description": "Perfil operativo y cuenta autenticada son identidades vinculadas pero distintas. Un operativo de Servicios puede tener perfil activo sin correo/contraseña y sin Auth ni roles. Una cuenta creada no garantiza rol ni acceso a módulo/sección; al asociarla después conservar profile_id y comprobar que sigue en la nómina.",
+      "tables": [
+        "profiles",
+        "user_roles",
+        "user_modulo_acceso",
+        "user_seccion_acceso"
+      ],
+      "related": [
+        "permiso",
+        "tecnico",
+        "asistente"
+      ]
+    },
+    {
+      "id": "permiso",
+      "title": "Permiso de módulo, sección y capacidad",
+      "module": "administracion",
+      "description": "Acceso al módulo/sección y capacidad para acciones, separados de rol. Validar rutas y operaciones reales, no solo visibilidad de menú.",
+      "tables": [
+        "user_modulo_acceso",
+        "user_seccion_acceso",
+        "app_secciones"
+      ],
+      "related": [
+        "usuario",
+        "asistente"
+      ]
+    },
+    {
+      "id": "asistente",
+      "title": "Plan semántico y conversación IA",
+      "module": "asistente",
+      "description": "Pregunta autorizada traducida a plan JSON validado y cálculo controlado. Conversaciones y filas privadas no se exportan a esta memoria.",
+      "tables": [
+        "ai_conversations",
+        "ai_messages"
+      ],
+      "related": [
+        "usuario",
+        "permiso",
+        "factura",
+        "OS"
+      ]
+    }
+  ],
+  "rules": [
+    {
+      "id": "mora-cxc-fuente",
+      "title": "Mora sobre saldo NF vencido, sin doble compensación",
+      "module": "ventas",
+      "description": "Para una carga completa y corte confirmado, la base candidata de mora son cuotas NF en USD con SALDO positivo; vencidas si vencimiento es anterior al corte, no igual. VALOR no equivale a deuda. NCC y anticipos RA se conservan para conciliación y no se descuentan otra vez del SALDO NF sin relación fuente auditable. No mezclar snapshots ni presentar sin datos como cero.",
+      "check": "Confirmar fecha de corte por archivo, moneda única, clave documental, controles de saldo y vencimiento; verificar que repetir SHA no reescribe y nuevo SHA del mismo corte crea versión sin sumar ambas. La consulta de resumen existe, pero el panel gerencial aún no consume este KPI; migración/versionado y fixtures no prueban producción.",
+      "entities": [
+        "cxc-snapshot",
+        "factura",
+        "cliente"
+      ],
+      "sources": [
+        "src/lib/imports/receivablesPreflight.ts",
+        "src/lib/imports/receivablesPersist.ts",
+        "supabase/migrations/20261007130000_import_totvs_accounts_receivable.sql",
+        "docs/knowledge/03-Ventas-y-conciliacion.md"
+      ],
+      "evidence": "commit daeff1e de origin/main, archivo fuente y fixtures locales documentados sin copiar microdatos; SQL y producción no verificados en esta revisión"
+    },
+    {
+      "id": "reimportacion-facturacion-totvs",
+      "title": "Reimportación estable de líneas TOTVS",
+      "module": "datos",
+      "description": "Identificar cada línea comercial por origen, sucursal, documento e ITEM de origen; conservar ITEM distintos. El lote financiero se valida antes de escribir y el RPC compara identidades/evidencia en una transacción sin borrar el detalle. Solo enriquecimientos unívocos y pares auditados admiten reparación; ambigüedad o cambio comercial bloquean. Respetar exclusiones confirmadas y contar sus líneas aparte. En la interfaz vigente, OS se procesan primero mediante RPC transaccional por lote y luego facturación; omitir una OS del XML no la archiva. El paquete completo no es atómico y debe informar OS confirmadas ante fallo posterior.",
+      "check": "Probar ITEM distintos, cambios comerciales, cobertura financiera, exclusiones, OS ausente en foto parcial, respuesta del RPC de OS con persistidas/excluidas disjuntas y cobertura exacta, jornadas filtradas y fallo financiero tras OS confirmadas. Separar prevención, reparación auditada, fixtures y producción verificada.",
+      "entities": [
+        "factura",
+        "linea-factura",
+        "OS",
+        "jornada"
+      ],
+      "sources": [
+        "src/lib/imports/billingLineStableReimport.ts",
+        "src/lib/imports/billingDuplicateRepairRules.ts",
+        "src/lib/imports/newSystemPersist.ts",
+        "src/components/parque/ImportarTotvsTab.tsx",
+        "supabase/migrations/20261002120000_transactional_totvs_billing_import.sql",
+        "supabase/migrations/20261003001500_reconcile_totvs_reimport_evidence.sql",
+        "supabase/migrations/20261003010500_honor_confirmed_totvs_exclusions.sql",
+        "supabase/migrations/20261012120000_import_service_orders_with_confirmed_exclusions.sql",
+        "docs/knowledge/03-Ventas-y-conciliacion.md",
+        "docs/knowledge/31-Calidad-XML-sistema-nuevo-reunion-TI.md"
+      ],
+      "evidence": "commits 64fddf5, 98bb75c, 0759249, 2340fba, b579338 y 65bc039 de origin/main; pruebas locales con fixtures/PGlite, sin SQL ni producción verificada en esta revisión"
+    },
+    {
+      "check": "Verificar las condiciones anteriores con render real; esta regla conserva la edición manual reconciliada del 14/10/2026.",
+      "evidence": "Memoria reconciliada el 14/10/2026; contrastar código y SQL aplicado antes de operar",
+      "id": "visual-movil-transversal",
+      "title": "Teléfono: lectura compacta y contexto visible",
+      "module": "administracion",
+      "description": "## Condición de entrada obligatoria\n\nAntes de crear una sección o modificar cualquier diseño, leer `00-Inicio.md`, [[SIG CDM/Generado/25-Revision-movil-transversal|Guía vigente de presentación móvil]], esta regla y la nota funcional del módulo. Ventas exige además [[SIG CDM/Generado/24-Condiciones-visuales-ventas|Condiciones visuales obligatorias de Ventas]]. Después del cambio se debe repetir la comparación contra esas notas. No comenzar desde una captura aislada ni usar una vista defectuosa como nuevo estándar.\n\nLas notas se contrastan siempre con rutas activas, `origin/main` y componentes vigentes. Documentación, compilación o pruebas unitarias no equivalen a aprobación visual ni a validación de producción.\n\n## Regla madre de composición\n\n- Reutilizar los componentes nativos antes de crear variantes: `PageShell`, `PageHeader`, `KpiStrip`, `FiltersBar`, `Tabs`, `CompactListTable`, `MobileRecord` y `ResponsiveDrawer`.\n- Desde 640 px, una tabla muestra un dato por columna y una sola línea por registro. Encabezado y dato comparten ancho y eje. No apilar metadatos dentro de celdas para hacer caber más columnas ni forzar scroll horizontal cuando los secundarios pueden pasar a ficha/Excel.\n- Bajo 640 px, la identidad puede agruparse en varias líneas únicamente cuando mejora lectura: cliente/tarea, modelo/chasis, NP/cliente o descripción/código. Seguir mostrando un registro por fila plana; no fusionar IDs, crear tarjetas altas ni esconder cantidades esenciales dentro de párrafos. Mantener columnas numéricas separadas cuando corresponda.\n- Agenda, Calendario y matrices no se convierten en tablas genéricas. Cada excepción debe existir previamente o documentarse con su justificación, fuentes, datos conservados y anchos probados. La agenda de Planificador sin horas es una excepción explícita, no una plantilla para Comisiones u OS.\n- No inventar filtros, campos, cifras, estados, imágenes ni datos de demostración que parezcan reales. Los fixtures visuales deben ser sintéticos y cubrir largos, vacíos, ceros y negativos.\n\n## Escala e interacción verificables\n\n- `PageShell`: gutter móvil coherente de 16 px salvo una excepción documentada. Título de 18 px. Evitar subtítulos explicativos, títulos internos repetidos, avisos redundantes y contenedores anidados; conservar errores, alertas accionables y contexto funcional como rango, corte, semana o frescura.\n- Acción principal de crear: cabecera de la sección. En teléfono usa icono con `aria-label`, objetivo táctil de 44 por 44 px e icono visual discreto; no convertir el fondo o el icono en un bloque sobredimensionado. El texto reaparece desde 640 px. Una variante más discreta solo vale cuando la nota de la sección la justifica.\n- `FiltersBar`: búsqueda visual de 36 px y texto de entrada de 16 px. Disparador, cierre, limpiar y aplicar alcanzan 44 px en teléfono. No mostrar «Más filtros» si no hay contenido útil, incluso con fragmentos o ramas por permisos/configuración; conservar `aria-expanded`, `aria-controls`, debounce, fechas, sucursal, limpiar y un solo menú de sección.\n- `Tabs`: texto de 12 px, subrayado discreto, peso coherente y objetivo táctil de 44 px. No reducir pestañas secundarias a 40/36 px, ocultar tres vistas en un selector ni crear botones verdes anchos tipo bloque.\n- Formularios de alta/edición con varios campos usan `ResponsiveDrawer`: lateral en escritorio y patrón nativo responsivo en teléfono, con cabecera, cuerpo desplazable y pie de acciones accesible. `Dialog`/`AlertDialog` queda para confirmaciones breves o excepciones documentadas.\n- Contadores y estado breve comparten la misma franja del listado cuando caben; no agregar otra card o cabecera solo para repetir «N de N». El detalle completo permanece accesible sin duplicar lo que ya comunica un badge.\n- Imágenes funcionales usan el archivo original básico sobre fondo blanco, `object-contain` y texto alternativo. No exigir generación ni créditos para una imagen de catálogo cuando existe el recurso original autorizado.\n- Reutilizar la pestaña o sesión de navegador abierta para validar y cerrar las pestañas propias al terminar; no multiplicar pestañas por cada captura.\n\n## Validación antes y después\n\nAntes de tocar código: inventariar la ruta activa, permisos, componente compartido, clases responsivas, breakpoint, jerarquía de datos, acciones, formularios, estados y evidencia visual disponible. Registrar qué ya está correcto para no duplicar arreglos.\n\nDespués: comprobar 320, 390, 639, 640, 768 y 1280 px; carga, contenido, vacío, error, permisos y textos largos; toque, teclado, foco y ARIA; filtros/limpiar/debounce; orden, callbacks, exportación y ausencia de scroll o recortes no autorizados. Medir alturas/anchos relevantes en píxeles y comparar con el componente nativo, no solo con otra captura.\n\nLa revisión visual final debe realizarla una persona o agente independiente de quien implementó. Debe revisar capturas/render real; no puede aprobar basándose únicamente en diff, clases, tests, typecheck o build. Si esa evidencia no existe, el estado es «validación visual pendiente».\n\n## Regla y alcance\n\nMenos contenedores y navegación plegada. Bajo 640 px, agrupar identidad/contexto cuando ayuda sin fusionar registros; tablet/escritorio conserva columnas. Encabezado menor a 768 px une logo y SIG CDM. Título 18 px, buscador visual 36 px/entrada 16 px, pestañas 12 px y objetivo táctil 44 px. Mantener corte/semana/frescura, estados y alertas; reutilizar componentes y no rediseñar secciones aprobadas por una excepción. Ocultar un campo no cambia cálculos, fuentes, permisos o payloads.\n\n## Qué comprobar\n\nLeer nota 25. Probar textos largos, ceros/vacíos, identidad y callbacks, errores/reintento, orden y exportación; verificar 320/390/639 frente a 640/768/1280 sin confundir compilación con validación visual.",
+      "entities": [
+        "permiso",
+        "cliente",
+        "maquina",
+        "producto",
+        "jornada"
+      ],
+      "sources": [
+        "docs/knowledge/25-Revision-movil-transversal.md",
+        "src/components/AppLayout.tsx",
+        "src/components/layout/AppPrimitives.tsx",
+        "src/components/filters/FiltersBar.tsx",
+        "src/components/lists/CompactListTable.tsx",
+        "src/components/lists/MobileRecord.tsx",
+        "src/components/ui/tabs.tsx"
+      ]
+    },
+    {
+      "check": "Leer nota 25. Probar textos largos, ceros/vacíos, identidad y callbacks, errores/reintento, orden y exportación; verificar 320/390/639 frente a 640/768/1280 sin confundir compilación con validación visual.",
+      "evidence": "Memoria reconciliada el 14/10/2026; contrastar código y SQL aplicado antes de operar",
+      "id": "visual-planificador-movil",
+      "title": "Planificador móvil: agenda sin horas",
+      "module": "servicios",
+      "description": "Bajo 640 px mostrar fecha lateral, cliente prioritario, tarea hasta dos líneas y referencia/estado/continuidad. No mostrar horas por fila ni total al pie aunque existan datos. Mantenerlas en ficha, exportación y tabla desde 640 px; no propagar la excepción a Comisiones. Semana/navegación/orden compactos. Preservar jornadas diferentes del mismo servicio/día, cuadrilla y callback original de detalle/marcado visto; no deduplicar ni reprogramar.",
+      "entities": [
+        "jornada",
+        "trabajo",
+        "tecnico",
+        "cliente"
+      ],
+      "sources": [
+        "src/pages/Planificador.tsx",
+        "src/components/calendar/PlannerMobileAgenda.tsx",
+        "src/components/lists/ServiceLists.test.tsx",
+        "docs/knowledge/25-Revision-movil-transversal.md"
+      ]
+    },
+    {
+      "id": "filtros-servicios-poblacion",
+      "title": "Filtros de Servicios antes de agregar",
+      "module": "ventas",
+      "description": "Cliente facturado y propietario, factura, OS, chasis, descripción, código, componente, origen, documento y vínculo recortan líneas financieras antes de Períodos/Indicadores/Técnicos/Líneas. Buscar técnico solo recorta su tabla. Las RPC filtradas copian la definición vigente al aplicar la migración, no heredan cambios posteriores automáticamente.",
+      "check": "Conciliar tablas sobre los mismos filtros; probar agosto hasta 31/08, limpieza del texto pendiente y ausencia de fallback si falta SQL. Regenerar variantes tras modificar RPC originales y validar códigos/cantidades/desglose de marca.",
+      "entities": [
+        "factura",
+        "linea-factura",
+        "OS",
+        "cliente",
+        "tecnico"
+      ],
+      "sources": [
+        "src/components/ventas/serviceSalesFilters.ts",
+        "src/pages/Ventas.tsx",
+        "src/pages/VentasServiceFilters.test.tsx",
+        "supabase/migrations/20260917180000_service_sales_shared_filters.sql"
+      ],
+      "evidence": "Memoria reconciliada el 14/10/2026; contrastar código y SQL aplicado antes de operar"
+    },
+    {
+      "id": "acciones-exportacion-unica",
+      "title": "Una entrada de exportación por sección",
+      "module": "ventas",
+      "description": "Más filtros seguido de un solo menú de tres puntos. Servicios, Máquinas y Repuestos exportan respuesta completa filtrada/ordenada de tablas montadas; retirar opciones al cambiar pestaña sin consultar vistas ocultas. Base compartida en listados de Parque, Operaciones, Importaciones, Stock, Compras, Sugerencias, Comisiones, Administración, Planificador y Dashboard. Comparar números/fechas originales y texto natural, ausencias al final; preservar códigos, NC y centavos. Todo archivo Excel lleva extensión .xlsx explícita desde el límite compartido, aunque la pantalla entregue solo un nombre base. Grupos de documentos/días mantienen sus subtotales y orden interno.",
+      "check": "Probar escritorio/móvil, permisos, fallos/reintentos, Excel completo, nombre descargado terminado en .xlsx y orden antes de paginar en SQL. Repuestos/Sugerencias requieren las dos migraciones manuales del 18/09. No alterar cálculos, mover crear/editar/pagar ni convertir matrices cronológicas, gráficas o previsualizaciones de carga en listados genéricos. Consultar cobertura/excepciones documentadas; commit/push no aplica SQL.",
+      "entities": [
+        "factura",
+        "linea-factura",
+        "permiso"
+      ],
+      "sources": [
+        "src/components/filters/FiltersBar.tsx",
+        "src/components/exports/SectionActionsMenu.tsx",
+        "src/components/exports/useSectionTable.tsx",
+        "src/components/exports/TableExportButton.tsx",
+        "src/components/ventas/SalesSectionExports.tsx",
+        "src/components/ventas/SalesDataTable.tsx",
+        "src/components/ventas/MaquinasVentas.tsx",
+        "src/components/ventas/RepuestosVentas.tsx",
+        "src/components/ventas/salesTableExport.ts",
+        "src/lib/xlsxFileName.ts",
+        "src/hooks/useSugerenciasCompra.ts",
+        "src/lib/suggestionTableOrder.ts",
+        "supabase/migrations/20260918200000_parts_sales_global_sort_and_export.sql",
+        "supabase/migrations/20260918201000_purchase_suggestions_global_sort.sql",
+        "docs/tablas-orden-exportacion.md",
+        "docs/acciones-de-seccion.md"
+      ],
+      "evidence": "Memoria reconciliada el 14/10/2026; contrastar código y SQL aplicado antes de operar"
+    },
+    {
+      "id": "operativo-sin-cuenta",
+      "title": "Operativo sin cuenta no necesita credenciales",
+      "module": "administracion",
+      "description": "Nombre y sucursal crean perfil activo con UUID propio y auth_user_id nulo, mediante RLS administrativa, sin Auth/roles/permisos. Cuenta opcional exige credenciales. Al asociar cuenta después, el camino linkedProfile no crea rol y la nómina exige Operativo más módulo Servicios: completar autoridad y comprobar continuidad de la identidad.",
+      "check": "Validar alta sin credenciales, rechazo RLS sin cuenta alternativa, actualización de caché y acceso solo a administradores. Antes/después de asociar acceso comprobar rol/módulo y nómina sin crear otro perfil.",
+      "entities": [
+        "usuario",
+        "permiso",
+        "tecnico",
+        "jornada"
+      ],
+      "sources": [
+        "src/lib/admin-create-person.ts",
+        "src/pages/Admin.tsx",
+        "src/pages/Admin.test.tsx",
+        "supabase/functions/admin-create-user/index.ts",
+        "supabase/migrations/20260821150000_consolidate_active_commission_technicians.sql",
+        "docs/knowledge/07-Accesos-y-asistente.md"
+      ],
+      "evidence": "Memoria reconciliada el 14/10/2026; contrastar código y SQL aplicado antes de operar"
+    },
+    {
+      "id": "visual-ventas",
+      "title": "Condiciones visuales obligatorias de Ventas",
+      "module": "ventas",
+      "description": "Escritorio/tablet conserva columnas separadas y una línea por registro. Bajo 640 px se permite agrupar identidad/contexto en varias líneas sin fusionar registros. Ventas usa composición continua: rango, tres indicadores y Períodos/Resumen/Detalle visibles; no plegar indicadores/períodos por defecto. Importes con $, cantidades numéricas sin sufijos y sin subtotal monetario al pie de Detalle; mantener Total del período, orden del origen, paginación y Excel íntegro.",
+      "check": "Leer notas 24 y 25; probar 320/390/639 frente a 640/768/1280, textos largos, NC, ceros, desconocidos, orden y exportación. No restaurar instrucciones históricas de una sola línea rígida en teléfono. Compilar no valida diseño.",
+      "entities": [
+        "factura",
+        "linea-factura",
+        "OS"
+      ],
+      "sources": [
+        "src/components/ventas/ServiciosDetalleOS.tsx",
+        "src/components/ventas/ServiciosDetalleOS.test.tsx",
+        "docs/knowledge/24-Condiciones-visuales-ventas.md",
+        "docs/knowledge/25-Revision-movil-transversal.md",
+        "src/components/ventas/MobileSalesTable.tsx",
+        "src/components/ventas/sales-mobile-workspace.css"
+      ],
+      "evidence": "Memoria reconciliada el 14/10/2026; contrastar código y SQL aplicado antes de operar"
+    },
+    {
+      "id": "fechas-facturacion",
+      "title": "Facturación usa fecha de factura",
+      "module": "ventas",
+      "description": "La venta del período no exige que el trabajo también se haya realizado en ese mes. Agosto calendario termina el 31/08; todos los paneles comparten filtros.",
+      "check": "Comparar filtros efectivos y fecha canónica en cada consumidor; no incluir 01/09 al seleccionar agosto.",
+      "entities": [
+        "factura",
+        "OS"
+      ],
+      "sources": [
+        "src/pages/Ventas.tsx",
+        "src/components/ventas/ServiciosPanorama.tsx",
+        "docs/ventas-repuestos.md"
+      ],
+      "evidence": "Memoria reconciliada el 14/10/2026; contrastar código y SQL aplicado antes de operar"
+    },
+    {
+      "id": "horas-os-persona",
+      "title": "Horas OS no son horas-persona",
+      "module": "servicios",
+      "description": "Un bloque de reloj compartido cuenta una vez como duración OS y una vez por participante como horas-persona. La clave de bloque no incluye técnico ni tipo de tiempo.",
+      "check": "Deduplicar por OS/sucursal/bloque; no sumar participantes como duración. No etiquetar horas de OS facturadas como trabajado en el mes.",
+      "entities": [
+        "OS",
+        "jornada-comision",
+        "tecnico"
+      ],
+      "sources": [
+        "src/lib/commissionMetrics.ts",
+        "src/components/ventas/ServiciosTecnicos.tsx"
+      ],
+      "evidence": "Memoria reconciliada el 14/10/2026; contrastar código y SQL aplicado antes de operar"
+    },
+    {
+      "id": "productividad-jornadas-reales",
+      "title": "Productividad desde jornadas con reloj",
+      "module": "servicios",
+      "description": "Desde 01/07/2026 usar fecha, inicio y fin registrados por técnico; enero-junio legacy sin jornadas detalladas no es productividad cero. Horas-persona válidas / meta disponible, con ausencias y baja. Activos por defecto; Sin ficha junto a Inactivos. Una OS no importada puede aportar horas válidas y queda señalada; incidencias de intervalos se excluyen sin bloquear las demás horas.",
+      "check": "Separar fecha de trabajo de apertura/cierre/factura; probar superposiciones, duplicados contradictorios, OS faltante, cambio de sistema, meta y filtros de estado. Una página RPC fallida o malformada bloquea el conjunto.",
+      "entities": [
+        "OS",
+        "jornada-comision",
+        "tecnico"
+      ],
+      "sources": [
+        "docs/knowledge/26-Ordenes-servicio-y-productividad.md",
+        "src/features/service-orders/workLog.ts",
+        "src/features/service-orders/workedProductivity.ts",
+        "src/features/service-orders/productivityPeriod.ts"
+      ],
+      "evidence": "Memoria reconciliada el 14/10/2026; contrastar código y SQL aplicado antes de operar"
+    },
+    {
+      "id": "calidad-xml-nuevo",
+      "title": "Compensaciones y correcciones del XML nuevo",
+      "module": "datos",
+      "description": "Distinguir líneas de OS, jornadas por técnico y líneas financieras. Solapes e intervalos inválidos no se imputan silenciosamente; el resumen OS puede usar CANTIDAD cuando falla el reloj, pero Productividad exige reloj real. Participantes, sucursal, tipo de tiempo, importes, moneda, vínculo factura-OS y reconciliación de snapshots han requerido reglas compensatorias o reparaciones puntuales. Un ajuste humano auditado debe sobrevivir a reimportaciones.",
+      "check": "Pedir contrato de campos/unidades/monedas y cobertura de cada XML; conciliar por grano y período, identificar bajas/versiones/duplicados, confirmar aplicación de SQL en Cloud y no asumir que una corrección local cambió el reporte fuente.",
+      "entities": [
+        "OS",
+        "jornada-comision",
+        "ajuste-tiempo",
+        "tecnico",
+        "linea-factura"
+      ],
+      "sources": [
+        "docs/knowledge/31-Calidad-XML-sistema-nuevo-reunion-TI.md",
+        "src/lib/imports/workDuration.ts",
+        "src/lib/imports/commissionTime.ts",
+        "src/lib/imports/newSystemXml.ts",
+        "src/features/service-orders/workedProductivity.ts",
+        "supabase/migrations/20260911190000_reconcile_service_order_snapshot.sql"
+      ],
+      "evidence": "Memoria reconciliada el 14/10/2026; contrastar código y SQL aplicado antes de operar"
+    },
+    {
+      "id": "eficiencia-mo-os",
+      "title": "Eficiencia de mano de obra por OS",
+      "module": "servicios",
+      "description": "Fórmulas acordadas: productividad = trabajadas/disponibles; eficiencia = cobradas/trabajadas; rendimiento = cobradas/disponibles. Comparar magnitudes compatibles. El código usa servicios_cantidad como horas de OS; aún falta acreditar que represente trabajo real para el caso observado. No dar por correcta esa equivalencia ni sustituirla por horas-persona sin contrastar XML, jornadas, población y unidad. El caso 16 y 69,57% implica aritméticamente cerca de 23, pero ese 23 no fue consultado en base. No se implementó una corrección.\n\nTarifa faltante, conciliación incompleta, ambigüedad o denominador sin acreditar impiden dar por validado el resultado. No modificar factura ni inferir tipo de cambio.",
+      "check": "Comprobar tarifa/cantidad/total de bloque por documento y tipo, NC, reimportación XML y respuesta financiera completa; no contar una RPC lenta como OS no calculable. Migración local no prueba aplicación en Cloud.",
+      "entities": [
+        "OS",
+        "factura",
+        "linea-factura",
+        "jornada-comision"
+      ],
+      "sources": [
+        "docs/knowledge/26-Ordenes-servicio-y-productividad.md",
+        "src/features/service-orders/billing.ts",
+        "supabase/migrations/20260925220000_service_order_time_type_rates.sql",
+        "supabase/migrations/20260929140000_service_order_wrong_gs_efficiency.sql"
+      ],
+      "evidence": "Memoria reconciliada el 14/10/2026; contrastar código y SQL aplicado antes de operar"
+    },
+    {
+      "id": "cumplimiento-matriz",
+      "title": "Cumplimiento de jornadas por técnico y período",
+      "module": "servicios",
+      "description": "Por celda, realizadas / (realizadas + no realizadas); futuros programados y no disponibilidad no entran en el denominador. Sin resultados decididos es desconocido, no cero. Semana usa días, mes semanas y rangos amplios meses/años según duración; agrupar no cambia los hechos.",
+      "check": "Probar meses al comienzo, rangos personalizados, períodos vacíos, ND y celda solo programada, vista móvil de un período y detalle de cada técnico.",
+      "entities": [
+        "jornada",
+        "tecnico"
+      ],
+      "sources": [
+        "docs/knowledge/26-Ordenes-servicio-y-productividad.md",
+        "src/features/service-orders/compliancePeriod.ts",
+        "src/lib/matrixCompletion.ts",
+        "src/features/service-orders/MobileTechnicianMatrix.tsx"
+      ],
+      "evidence": "Memoria reconciliada el 14/10/2026; contrastar código y SQL aplicado antes de operar"
+    },
+    {
+      "id": "reparto-mo",
+      "title": "MO según participación compatible",
+      "module": "ventas",
+      "description": "La RPC de técnicos localizada reparte por OS y tipo: MO del grupo por horas del técnico dividido por horas computables de todos. Participación positiva, vigente y no inválida; mantener sin atribuir cuando falte evidencia.",
+      "check": "Conciliar MO atribuida más sin atribuir con MO facturada. Prioridad horas válidas/calculadas/reportadas. Las jornadas de esas OS pueden ser de meses anteriores.",
+      "entities": [
+        "OS",
+        "jornada-comision",
+        "linea-factura",
+        "tecnico"
+      ],
+      "sources": [
+        "supabase/migrations/20260915100000_unify_service_sales_identity_and_search.sql",
+        "src/components/ventas/ServiciosTecnicos.tsx"
+      ],
+      "evidence": "Memoria reconciliada el 14/10/2026; contrastar código y SQL aplicado antes de operar"
+    },
+    {
+      "id": "tiempo-manual",
+      "title": "Correcciones de tiempo sobreviven importaciones",
+      "module": "servicios",
+      "description": "Priorizar tipo de tiempo corregido sobre importado y persistir ajuste por identidad estable. Cliente/Garantía/Interno pueden coexistir en una OS.",
+      "check": "Reimportar fixture y comprobar ajuste, vigencia y distribución; no unir tipos tomando el primero.",
+      "entities": [
+        "ajuste-tiempo",
+        "OS",
+        "jornada-comision"
+      ],
+      "sources": [
+        "supabase/migrations/20260825190000_persist_commission_time_type_overrides_by_identity.sql",
+        "src/pages/Comisiones.tsx"
+      ],
+      "evidence": "Memoria reconciliada el 14/10/2026; contrastar código y SQL aplicado antes de operar"
+    },
+    {
+      "id": "cuadrilla-propia",
+      "title": "Cuadrilla de jornada tiene prioridad",
+      "module": "servicios",
+      "description": "Con responsable propio, auxiliares vacíos significa sin auxiliares. Solo jornadas legacy sin responsable heredan del servicio padre.",
+      "check": "No reintroducir auxiliares históricos después de que la jornada se editó explícitamente.",
+      "entities": [
+        "jornada",
+        "tecnico"
+      ],
+      "sources": [
+        "src/lib/jornada-cuadrilla.ts",
+        "src/components/trabajos/CargarJornadaDialog.tsx"
+      ],
+      "evidence": "Memoria reconciliada el 14/10/2026; contrastar código y SQL aplicado antes de operar"
+    },
+    {
+      "id": "exclusion-os",
+      "title": "OS anulada o reemplazada no vuelve a calcularse",
+      "module": "servicios",
+      "description": "Una exclusión persistente debe bloquear participación/venta operativa inválida y doble pago tras reimportaciones, preservando auditoría y protegiendo pagos liquidados.",
+      "check": "Verificar OS/jornadas/líneas operativas y liquidaciones antes y después de nueva carga. La existencia de un archivo SQL no demuestra que la exclusión esté aplicada.",
+      "entities": [
+        "OS",
+        "liquidacion",
+        "jornada-comision",
+        "linea-factura"
+      ],
+      "sources": [
+        "docs/knowledge/08-Pendientes-y-validacion.md",
+        "docs/knowledge/31-Calidad-XML-sistema-nuevo-reunion-TI.md",
+        "src/lib/imports/newSystemPersist.ts",
+        "src/lib/imports/persist.ts",
+        "supabase/migrations/20261012120000_import_service_orders_with_confirmed_exclusions.sql"
+      ],
+      "evidence": "Memoria reconciliada el 14/10/2026; contrastar código y SQL aplicado antes de operar"
+    },
+    {
+      "id": "historial-sin-factura",
+      "title": "Historial no requiere factura asociada",
+      "module": "servicios",
+      "description": "Mostrar OS antiguas por identidad física incluso sin factura/sucursal. Sin dato de facturación no prueba no facturada. No vincular por importe o proximidad.",
+      "check": "Separar órdenes reales de vínculos inventados; contrastar snapshot original cuando aparecen OS inexistentes.",
+      "entities": [
+        "OS",
+        "chasis",
+        "factura"
+      ],
+      "sources": [
+        "src/components/ventas/MachineHistorySheet.tsx",
+        "docs/ventas-servicios-busqueda.md"
+      ],
+      "evidence": "Memoria reconciliada el 14/10/2026; contrastar código y SQL aplicado antes de operar"
+    },
+    {
+      "id": "historial-tipo-cliente",
+      "title": "Tipo histórico por cliente externo",
+      "module": "servicios",
+      "description": "Una OS legada sin tipo y con cliente externo o evidencia de facturación se presenta como Cliente. CAMPOS DEL MAÑANA y los casos sin ninguna evidencia quedan Por confirmar.",
+      "check": "No modificar OS ni jornadas; distinguir clasificación de reporte de corrección persistente y aplicar ambos SQL del 21/09 antes de esperar el resultado en la app.",
+      "entities": [
+        "OS",
+        "cliente",
+        "ajuste-tiempo"
+      ],
+      "sources": [
+        "supabase/migrations/20260921130000_complete_machine_history_ledger.sql",
+        "supabase/migrations/20260921150000_refine_machine_history_time_type.sql",
+        "src/components/ventas/MachineHistorySheet.tsx"
+      ],
+      "evidence": "Memoria reconciliada el 14/10/2026; contrastar código y SQL aplicado antes de operar"
+    },
+    {
+      "id": "historial-movimiento-facturado",
+      "title": "Historial omite movimientos con importe cero",
+      "module": "servicios",
+      "description": "El historial financiero-operativo no muestra una línea cuando su importe conocido es exactamente cero, aunque exista cantidad. Si el importe no vino informado, la actividad se conserva únicamente con cantidad real. Negativos y centavos permanecen.",
+      "check": "Distinguir cero de dato ausente al expandir MO, kilometraje, terceros y repuestos; no convertir NULL a cero ni borrar actividad sin importe que sí tenga cantidad.",
+      "entities": [
+        "OS",
+        "linea-factura"
+      ],
+      "sources": [
+        "src/components/ventas/MachineHistorySheet.tsx",
+        "src/components/ventas/MachineHistorySheet.test.tsx",
+        "docs/knowledge/24-Condiciones-visuales-ventas.md"
+      ],
+      "evidence": "Memoria reconciliada el 14/10/2026; contrastar código y SQL aplicado antes de operar"
+    },
+    {
+      "id": "dueno-no-facturado",
+      "title": "Propietario no es cliente facturado",
+      "module": "parque",
+      "description": "Mantener propietario actual, propietario histórico en la OS y receptor de factura separados. Un dueño explícito activo tiene prioridad; stock positivo puede acreditar Campos.",
+      "check": "No usar cliente de factura como fallback de dueño; conflictos de propietarios reales deben permanecer visibles.",
+      "entities": [
+        "cliente",
+        "maquina",
+        "OS",
+        "stock-maquina"
+      ],
+      "sources": [
+        "docs/ventas-servicios-busqueda.md",
+        "src/lib/clientIdentity.ts"
+      ],
+      "evidence": "Memoria reconciliada el 14/10/2026; contrastar código y SQL aplicado antes de operar"
+    },
+    {
+      "id": "stock-chasis-respaldo-codpro",
+      "title": "Maquinarias completa chasis defectuoso de Stock",
+      "module": "parque",
+      "description": "Stock de Maquinarias controla la población de la foto. Maquinarias completa un chasis vacío o reemplazado por modelo/tipo/marca/código solo con Producto/CODPRO exacto y único; no incorpora máquinas históricas ausentes de Stock ni pisa chasis válidos en conflicto.",
+      "check": "Probar coincidencia, placeholder, respaldo vacío, CODPRO ausente/duplicado y conflicto entre dos chasis válidos. Conservar CHASIS_STOCK_ORIGINAL, fuente del respaldo y advertencias; volver a cargar la foto para corregir datos ya importados.",
+      "entities": [
+        "stock-maquina",
+        "chasis",
+        "maquina"
+      ],
+      "sources": [
+        "src/lib/imports/machineStock.ts",
+        "src/lib/imports/machineStock.test.ts",
+        "src/lib/imports/totvsFileKind.ts",
+        "src/components/parque/ImportarTotvsTab.tsx",
+        "docs/knowledge/04-Parque-y-operaciones.md"
+      ],
+      "evidence": "Memoria reconciliada el 14/10/2026; contrastar código y SQL aplicado antes de operar"
+    },
+    {
+      "id": "stock-proyectado-corte",
+      "title": "Stock proyectado desde apertura verificable",
+      "module": "parque",
+      "description": "Solo máquinas nuevas y cortes desde 31/08/2026. Stock suma arribos y resta facturas netas; OC resta arribos sin bajar de cero; pendientes suma NP y resta facturas positivas por chasis. Entrega no modifica el cálculo. Diferencias de apertura se registran como corrección o ajuste explícito.",
+      "check": "Conciliar cada modelo contra apertura, ATA, venta/NC canónica, NP por chasis y ajustes. Probar NP ya facturada, OC antigua omitida, marca técnica, corte mínimo, permisos y contradicción NB sin generalizarla. No afirmar saldo productivo por fixtures o SQL versionado.",
+      "entities": [
+        "stock-proyectado-maquina",
+        "stock-maquina",
+        "unidad-importacion",
+        "NP",
+        "factura",
+        "modelo",
+        "permiso"
+      ],
+      "sources": [
+        "docs/knowledge/04-Parque-y-operaciones.md",
+        "docs/knowledge/24-Condiciones-visuales-ventas.md",
+        "docs/knowledge/07-Accesos-y-asistente.md"
+      ],
+      "evidence": "Memoria reconciliada el 14/10/2026; contrastar código y SQL aplicado antes de operar"
+    },
+    {
+      "id": "campos-canonico",
+      "title": "Nombre único de Campos del Mañana",
+      "module": "datos",
+      "description": "Variaciones de sucursal y escritura deben unificarse como CAMPOS DEL MAÑANA S.A. sin fusionar otras empresas que también contengan Campos.",
+      "check": "Probar alias y contraejemplos; mantener identidad fiscal cuando esté disponible.",
+      "entities": [
+        "cliente",
+        "factura"
+      ],
+      "sources": [
+        "src/lib/clientIdentity.ts",
+        "src/lib/clientIdentity.test.ts"
+      ],
+      "evidence": "Memoria reconciliada el 14/10/2026; contrastar código y SQL aplicado antes de operar"
+    },
+    {
+      "id": "nc-signos",
+      "title": "Notas de crédito restan sin desaparecer",
+      "module": "ventas",
+      "description": "Ventas brutas más NC negativas producen neto. Conservar devoluciones por línea, cantidades y documento; no ocultar NC históricas.",
+      "check": "Conciliar bruto, devoluciones y neto; revisar naturaleza S/E y documento, sin transformar filas ambiguas en ventas positivas.",
+      "entities": [
+        "factura",
+        "linea-factura",
+        "demanda"
+      ],
+      "sources": [
+        "src/lib/legacyPartsBilling.ts",
+        "docs/ventas-repuestos.md"
+      ],
+      "evidence": "Memoria reconciliada el 14/10/2026; contrastar código y SQL aplicado antes de operar"
+    },
+    {
+      "id": "chasis-nc-refacturacion-manual",
+      "title": "NC y nueva factura de máquina requieren decisión humana",
+      "module": "ventas",
+      "description": "Una nueva factura de un chasis existente genera revisión cuando la máquina está inactiva, cambia realmente el propietario o existe una NC anterior. Refacturación conserva propietario e identidad; Venta reutiliza el registro y registra reingreso o transferencia. UUID distintos con ID/RUC o nombre normalizado equivalente no constituyen transferencia. Las futuras notificaciones conservan el vendedor informado por la línea de factura para precargarlo y guardarlo al confirmar, sin completar avisos ni máquinas anteriores. No mover Parque/Stock ni duplicar chasis automáticamente.",
+      "check": "Probar chasis activo e inactivo, mismo cliente con UUID duplicado, RUC coincidente/conflictivo, distinto cliente, NC previa, refacturación y venta. Confirmar que el falso aviso se descarta sin escritura de propiedad, un solo parque_maquinas, historial REFACTURACION/REINGRESO, vendedor futuro heredado de la factura y compensación del aviso de parte de pago; la foto de Stock no cambia de saldo y queda bloqueada mientras Parque esté activo.",
+      "entities": [
+        "factura",
+        "maquina",
+        "chasis",
+        "stock-maquina",
+        "cliente"
+      ],
+      "sources": [
+        "src/components/NotificationsPanel.tsx",
+        "src/components/parque/MachineSaleNotificationDialog.tsx",
+        "supabase/migrations/20260923120000_reconcile_machine_credit_notes_and_resales.sql",
+        "supabase/migrations/20260923140000_suppress_same_customer_machine_transfer_alerts.sql",
+        "supabase/migrations/20260923160000_copy_machine_sale_seller_to_park.sql",
+        "scripts/verify-machine-credit-note-resale-sql.mjs"
+      ],
+      "evidence": "Memoria reconciliada el 14/10/2026; contrastar código y SQL aplicado antes de operar"
+    },
+    {
+      "id": "np-facturacion-por-chasis",
+      "title": "La factura de NP se confirma por unidad y chasis",
+      "module": "parque",
+      "description": "Adjuntar un PDF acredita un documento, no factura la NP completa. Una unidad actual se muestra y vincula como facturada solo si existe una venta positiva de maquinaria cuyo chasis normalizado coincide y cuya fecha no antecede a la NP. Cabecera, selección manual, valor acordado y estado agregado no se heredan entre máquinas.",
+      "check": "En una NP de dos máquinas, adjuntar el PDF de una sola venta: únicamente el chasis presente en facturacion_lineas_importadas queda Facturado; la hermana permanece Pendiente. Rechazar vínculos sin venta coincidente, conservar el PDF y retirar vínculos históricos inválidos sin borrar documentos. Aplicar SQL manual antes de esperar el resultado productivo.",
+      "entities": [
+        "NP",
+        "factura",
+        "linea-factura",
+        "chasis"
+      ],
+      "sources": [
+        "src/pages/MaquinariaOperaciones.tsx",
+        "src/components/parque/ParqueListTables.test.tsx",
+        "supabase/migrations/20260923170000_confirm_machine_order_billing_by_chassis.sql",
+        "docs/knowledge/24-Condiciones-visuales-ventas.md",
+        "supabase/migrations/20260930120000_optimize_machine_order_confirmed_billing.sql",
+        "scripts/verify-machine-order-billing-batch-sql.mjs",
+        "docs/knowledge/04-Parque-y-operaciones.md"
+      ],
+      "evidence": "Memoria reconciliada el 14/10/2026; contrastar código y SQL aplicado antes de operar"
+    },
+    {
+      "id": "np-importe-local",
+      "title": "Importe acordado de NP respeta formato local",
+      "module": "parque",
+      "description": "Valor por unidad acepta punto de miles y coma decimal. Nuevo pedido, edición del pedido y edición rápida usan el mismo parser; 1.500 significa mil quinientos y 1.500.000,50 conserva millones y centavos. No pasar texto local directamente a Number.",
+      "check": "Probar vacío, 1.500, 1.500.000, 1.500.000,50, decimal técnico con punto y entradas mal formadas en alta y edición. Comparar el número enviado sin aplicar SQL ni cambiar moneda.",
+      "entities": [
+        "NP"
+      ],
+      "sources": [
+        "src/lib/localizedAmount.ts",
+        "src/lib/localizedAmount.test.ts",
+        "src/pages/MaquinariaOperaciones.tsx",
+        "docs/knowledge/24-Condiciones-visuales-ventas.md"
+      ],
+      "evidence": "Memoria reconciliada el 14/10/2026; contrastar código y SQL aplicado antes de operar"
+    },
+    {
+      "id": "fuente-canonica",
+      "title": "GRID no vuelve a sumar líneas canónicas",
+      "module": "datos",
+      "description": "Conservar evidencia GRID útil de tipo de tiempo/vinculación sin sumar de nuevo su importe cuando existe la línea financiera canónica.",
+      "check": "Revisar duplicados registrados y diferencias de cobertura; no borrar evidencia antes de mapear consumidores.",
+      "entities": [
+        "venta-historica",
+        "linea-factura",
+        "demanda"
+      ],
+      "sources": [
+        "docs/knowledge/03-Ventas-y-conciliacion.md",
+        "docs/ventas-repuestos.md"
+      ],
+      "evidence": "Memoria reconciliada el 14/10/2026; contrastar código y SQL aplicado antes de operar"
+    },
+    {
+      "id": "otros-no-mo",
+      "title": "Envíos, intereses y merchandising son Otros",
+      "module": "ventas",
+      "description": "No clasificar costos accesorios como MO. Grupo FX y grupos originales deben conservar evidencia. Atención: facturacionReglas.ts aún declara SERVICIOS - OTROS como Servicio; no asumir que todas las fuentes SQL/frontend coincidan.",
+      "check": "Rastrear consumidores del helper y fuente canónica; comparar clasificación aplicada por dashboard y Ventas sin cambiar código automáticamente.",
+      "entities": [
+        "linea-factura",
+        "venta-historica"
+      ],
+      "sources": [
+        "src/lib/facturacionReglas.ts",
+        "docs/knowledge/03-Ventas-y-conciliacion.md"
+      ],
+      "evidence": "Memoria reconciliada el 14/10/2026; contrastar código y SQL aplicado antes de operar"
+    },
+    {
+      "id": "refacturacion-servicio-sin-os",
+      "title": "Refacturación explícita de Servicios no requiere OS",
+      "module": "ventas",
+      "description": "Grupo Servicios o prefijo SRV por sí solos no acreditan vínculo con OS. Conservar la facturación general y limitar la vista operativa usando evidencia: no excluir todas las líneas sin OS ni asignar Cliente cuando el tipo de tiempo es desconocido. La propuesta local 20261013201000_narrow_unlinked_service_sales_scope.sql admite SRV000001/SRV000006/SRV000100 con grupo 008, componente compatible y exclusiones comerciales; corrige también NC sin OS. Es una propuesta pendiente de comprobar contra la función efectiva, no prueba de aplicación. El SQL y unlinkedServiceSalesScope.test.ts están fuera de main en totvs-importer-public. Los conteos 739/13/5 son evidencia previa comunicada, no una consulta productiva de esta revisión.",
+      "check": "Comprobar definición aplicada, facturación general intacta, OS vinculadas, operativas sin OS, genéricas excluidas, NC y tipo desconocido conservado. No reejecutar la propuesta sin comprobar el estado actual.",
+      "entities": [
+        "factura",
+        "linea-factura",
+        "OS",
+        "cliente"
+      ],
+      "sources": [
+        "supabase/migrations/20260922130000_include_unlinked_service_refacturations.sql",
+        "scripts/verify-unlinked-service-refacturations-sql.mjs",
+        "docs/knowledge/03-Ventas-y-conciliacion.md"
+      ],
+      "evidence": "Memoria reconciliada el 14/10/2026; contrastar código y SQL aplicado antes de operar"
+    },
+    {
+      "id": "moneda-no-implicita",
+      "title": "No convertir monedas sin evidencia",
+      "module": "ventas",
+      "description": "No sumar GS/PYG como USD ni inventar FX. Los comparativos OC/proveedor requieren moneda y base fiscal compatibles.",
+      "check": "Identificar importes excluidos y moneda de origen; conservar raw fuera de Obsidian para auditoría autorizada.",
+      "entities": [
+        "factura",
+        "OC",
+        "factura-proveedor"
+      ],
+      "sources": [
+        "src/lib/imports/canonical.ts",
+        "src/lib/imports/fiscal.ts",
+        "docs/importaciones-unidades-oc-y-costos.md"
+      ],
+      "evidence": "Memoria reconciliada el 14/10/2026; contrastar código y SQL aplicado antes de operar"
+    },
+    {
+      "id": "conteos-unicos",
+      "title": "Clientes y documentos se cuentan distintos",
+      "module": "ventas",
+      "description": "Un cliente puede aparecer en varios meses/grupos. Recalcular conteos sobre todo el rango; no sumar los conteos mensuales. Ticket Medio usa neto/documentos, no OS.",
+      "check": "Comparar Total del período con población completa y claves estables de documento/origen.",
+      "entities": [
+        "cliente",
+        "factura"
+      ],
+      "sources": [
+        "src/components/ventas/RepuestosVentas.tsx",
+        "src/components/ventas/ServiciosPanorama.tsx",
+        "src/components/ventas/MaquinasVentas.tsx"
+      ],
+      "evidence": "Memoria reconciliada el 14/10/2026; contrastar código y SQL aplicado antes de operar"
+    },
+    {
+      "id": "marca-agrupada",
+      "title": "Marca real y agrupación comercial son distintas",
+      "module": "ventas",
+      "description": "Servicios y resúmenes comerciales mantienen CLAAS/HORSCH/OTROS. Operaciones conserva las otras marcas reales con sus colores. No destruir el valor original al agrupar.",
+      "check": "Aplicar agrupación solo en su contexto; comprobar nuevos/usados y alias Plantadora/Sembradora.",
+      "entities": [
+        "maquina",
+        "modelo",
+        "producto"
+      ],
+      "sources": [
+        "src/components/ventas/serviceBrandGroups.ts",
+        "src/lib/machineBrands.ts",
+        "src/components/ventas/MaquinasVentas.tsx"
+      ],
+      "evidence": "Memoria reconciliada el 14/10/2026; contrastar código y SQL aplicado antes de operar"
+    },
+    {
+      "id": "nombres-comerciales",
+      "title": "Vendedor canónico y apellido correcto",
+      "module": "ventas",
+      "description": "Unificar aliases históricos/actuales antes de agregar; quitar códigos prefijos; abreviar con primer nombre y primer apellido correcto, no última palabra. Nombres ambiguos requieren evidencia.",
+      "check": "Verificar que abreviación no cambie agrupaciones ni fusione personas homónimas.",
+      "entities": [
+        "factura",
+        "NP"
+      ],
+      "sources": [
+        "src/lib/personName.ts",
+        "src/lib/partsSellerName.ts"
+      ],
+      "evidence": "Memoria reconciliada el 14/10/2026; contrastar código y SQL aplicado antes de operar"
+    },
+    {
+      "id": "catalogo-no-fuzzy",
+      "title": "Un solo modelo canónico sin equivalencias difusas",
+      "module": "parque",
+      "description": "Usar catálogo y alias confirmados por marca/tipo. Una grafía histórica revisada se conserva como alias pero no como segunda opción activa. Las variantes exactas MAESTRO <surcos> CF E45/E50 convergen en MAESTRO CF <surcos>.45/.50; ninguna semejanza por sí sola autoriza reemplazar modelos ni cambiar números.",
+      "check": "Comprobar una sola opción en selectores de NP/importación y la misma identidad en Parque, Stock, Operaciones e Importaciones. Probar LEEB sin fusión automática, CONVIO ancho y MAESTRO E45/E50 como alias revisados; conservar raw y verificar futuras cargas.",
+      "entities": [
+        "modelo",
+        "NP",
+        "unidad-importacion",
+        "maquina",
+        "stock-maquina"
+      ],
+      "sources": [
+        "src/lib/machineModels.ts",
+        "src/lib/machineOrderValidation.ts",
+        "src/hooks/useMachineCatalog.ts",
+        "supabase/migrations/20260922170000_unify_configured_machine_models.sql",
+        "supabase/migrations/20260923180000_unify_horsch_maestro_model_notation.sql",
+        "docs/shared-machine-catalog.md"
+      ],
+      "evidence": "Memoria reconciliada el 14/10/2026; contrastar código y SQL aplicado antes de operar"
+    },
+    {
+      "id": "np-preservar-avance",
+      "title": "Editar NP no retrocede recepción",
+      "module": "parque",
+      "description": "Editar vendedor/cliente debe preservar estado físico de unidades. El estado comercial no se reinicia por cambios administrativos.",
+      "check": "Probar pedido disponible con todas las unidades recibidas y cambiar solo nombres.",
+      "entities": [
+        "NP",
+        "stock-maquina",
+        "unidad-importacion"
+      ],
+      "sources": [
+        "src/pages/MaquinariaOperaciones.tsx",
+        "src/lib/machineOrderValidation.ts"
+      ],
+      "evidence": "Memoria reconciliada el 14/10/2026; contrastar código y SQL aplicado antes de operar"
+    },
+    {
+      "id": "detalle-importacion-compacto",
+      "title": "Detalle de importación sin explicaciones invasivas",
+      "module": "importaciones",
+      "description": "Tarjetas y campos con nombres breves, estado único en cabecera y explicaciones bajo ayuda ⓘ. Conservar alertas concretas, referencias históricas y distinción OC/proveedor/costo.",
+      "check": "Probar ayuda con clic y teclado/Escape en móvil y escritorio; no cambiar payloads, permisos, tránsito/arribo ni cálculos. Ocultar Seguimiento solo cuando no hay acciones ni avisos.",
+      "entities": [
+        "unidad-importacion",
+        "OC",
+        "factura-proveedor",
+        "stock-maquina"
+      ],
+      "sources": [
+        "src/pages/MaquinariaOperaciones.tsx",
+        "src/pages/ImportDetailDrawer.test.tsx",
+        "src/components/maquinaria/MachineDetailPrimitives.tsx",
+        "src/components/maquinaria/ImportUnitFields.tsx",
+        "docs/importaciones-unidades-oc-y-costos.md"
+      ],
+      "evidence": "Memoria reconciliada el 14/10/2026; contrastar código y SQL aplicado antes de operar"
+    },
+    {
+      "id": "llave-por-unidad",
+      "title": "Llave CLAAS única por unidad",
+      "module": "importaciones",
+      "description": "Cuatro unidades de OC terminada en 111 tienen CLA111-1 a CLA111-4. No compartir llave por lote ni cambiarla al editar ETA.",
+      "check": "Validar unicidad entre cabeceras de misma OC y posición x/n. No inventar OC faltante.",
+      "entities": [
+        "unidad-importacion",
+        "OC"
+      ],
+      "sources": [
+        "docs/importaciones-unidades-oc-y-costos.md",
+        "src/lib/machineImportValues.ts"
+      ],
+      "evidence": "Memoria reconciliada el 14/10/2026; contrastar código y SQL aplicado antes de operar"
+    },
+    {
+      "id": "herencia-independiente",
+      "title": "ETA y valor OC heredan por separado",
+      "module": "importaciones",
+      "description": "Ajustes individuales no se pisan al cambiar el general; una edición de chasis no congela ETA/OC. En 1/1 evitar controles de lote irrelevantes.",
+      "check": "Probar diez unidades, tres adelantadas; cambios generales preservan excepciones individuales.",
+      "entities": [
+        "importacion",
+        "unidad-importacion",
+        "OC"
+      ],
+      "sources": [
+        "src/lib/machineImportValues.ts",
+        "src/components/maquinaria/ImportUnitFields.tsx"
+      ],
+      "evidence": "Memoria reconciliada el 14/10/2026; contrastar código y SQL aplicado antes de operar"
+    },
+    {
+      "id": "oc-proveedor-costo",
+      "title": "OC, proveedor y costo son tres valores",
+      "module": "importaciones",
+      "description": "OC es compromiso, factura proveedor compara contra él y costo final de stock se habilita con existencia física. Total de OC requiere distribución explícita y conservación de centavos.",
+      "check": "No copiar costo de stock como valor OC histórico ni confundir documentos de compra/venta.",
+      "entities": [
+        "OC",
+        "factura-proveedor",
+        "stock-maquina"
+      ],
+      "sources": [
+        "src/lib/machineImportValues.ts",
+        "docs/importaciones-unidades-oc-y-costos.md"
+      ],
+      "evidence": "Memoria reconciliada el 14/10/2026; contrastar código y SQL aplicado antes de operar"
+    },
+    {
+      "id": "llegada-fisica",
+      "title": "Completar importación por chasis en Stock o Parque",
+      "module": "importaciones",
+      "description": "Arribado exige fecha real sin coincidencia vigente. Completado exige el mismo chasis normalizado y único en Stock positivo o Parque activo, incluso sin ATA histórica. ETA, factura o etiqueta de NP no prueban llegada; no inventar fechas ni habilitar costo por Parque.",
+      "check": "Stock reservado o Parque vendido confirman sin ATA; duplicados bloquean; saldo cero o Parque inactivo no confirman; costo sigue requiriendo ATA y Stock positivo único.",
+      "entities": [
+        "unidad-importacion",
+        "stock-maquina",
+        "maquina",
+        "chasis",
+        "NP"
+      ],
+      "sources": [
+        "src/lib/machineImportStatus.ts",
+        "supabase/migrations/20260918170000_complete_imports_by_stock_or_park_chassis.sql",
+        "docs/importaciones-unidades-oc-y-costos.md"
+      ],
+      "evidence": "Memoria reconciliada el 14/10/2026; contrastar código y SQL aplicado antes de operar"
+    },
+    {
+      "id": "situacion-importacion-cinco",
+      "title": "Cinco situaciones visibles de Importaciones",
+      "module": "importaciones",
+      "description": "Stock, Reservado, En parque, Sin chasis y Sin conciliar. Vendido pendiente de entrega se presenta Reservado y conflictos/duplicados Sin conciliar, sin reescribir fuentes ni cambiar Llegada o facturación. Conservar avisos y referencias del detalle; no reducir selector comercial de Stock de Operaciones.",
+      "check": "Filtro, tabla/tarjetas, orden y exportación comparten proyección; no perder filas antiguas ni información de incidencias.",
+      "entities": [
+        "unidad-importacion",
+        "stock-maquina",
+        "chasis",
+        "NP"
+      ],
+      "sources": [
+        "src/lib/machineImportStatus.ts",
+        "src/lib/machineImportStatus.test.ts",
+        "src/pages/MaquinariaOperaciones.tsx",
+        "src/pages/ImportDetailDrawer.test.tsx",
+        "docs/importaciones-unidades-oc-y-costos.md"
+      ],
+      "evidence": "Memoria reconciliada el 14/10/2026; contrastar código y SQL aplicado antes de operar"
+    },
+    {
+      "id": "corte-sistemas",
+      "title": "Corte legacy y actual explícito",
+      "module": "datos",
+      "description": "Legacy hasta 30/06/2026; actual desde 01/07/2026. Resolver era por fecha canónica; no mezclar snapshots y fuentes agregadas indiscriminadamente.",
+      "check": "Probar fechas del límite, filas sin fecha y cobertura de ventas ligada a OS.",
+      "entities": [
+        "venta-historica",
+        "linea-factura",
+        "OS"
+      ],
+      "sources": [
+        "src/lib/imports/cutoff.ts",
+        "src/lib/imports/newSystemPersist.ts"
+      ],
+      "evidence": "Memoria reconciliada el 14/10/2026; contrastar código y SQL aplicado antes de operar"
+    },
+    {
+      "id": "finance-vs-demanda",
+      "title": "Venta financiera no es demanda confirmada",
+      "module": "repuestos",
+      "description": "Ventas conserva líneas financieras aun sin SKU inequívoco. Sugerencias usa vinculaciones confirmadas y reglas de unidades/duplicados/NC; no perder importes porque el producto sea ambiguo.",
+      "check": "Separar conciliación monetaria de demanda para cálculo de stock y revisar devoluciones sin inventar consumo.",
+      "entities": [
+        "demanda",
+        "linea-factura",
+        "producto",
+        "venta-historica"
+      ],
+      "sources": [
+        "docs/ventas-repuestos.md",
+        "src/hooks/useSugerenciasCompra.ts"
+      ],
+      "evidence": "Memoria reconciliada el 14/10/2026; contrastar código y SQL aplicado antes de operar"
+    },
+    {
+      "id": "matching-compra",
+      "title": "Solicitud-pedido exige candidato inequívoco",
+      "module": "repuestos",
+      "description": "Matching de líneas usa producto/sucursal/precio y reglas de tolerancia. Varios candidatos no justifican elegir uno arbitrariamente; preservar vínculo manual.",
+      "check": "Consultar candidatosPedido y matchAutomatico con cero, uno y varios candidatos; no equiparar vinculado a entregado.",
+      "entities": [
+        "solicitud-compra",
+        "pedido-compra",
+        "producto"
+      ],
+      "sources": [
+        "src/lib/imports/comprasMatching.ts",
+        "src/hooks/useCompras.ts"
+      ],
+      "evidence": "Memoria reconciliada el 14/10/2026; contrastar código y SQL aplicado antes de operar"
+    },
+    {
+      "id": "sugerencia-auditable",
+      "title": "Sugerencia versionada y explicable",
+      "module": "repuestos",
+      "description": "Corrida conserva parámetros/fuentes/resultados. ABC/FSN/XYZ/criticidad, segmento y horizonte condicionan demanda y stock objetivo. No reemplazar el modelo vigente por defaults de un plan antiguo.",
+      "check": "Mostrar versión y explicación, calidad de datos y estados sin historial; verificar fórmula en motor SQL vigente.",
+      "entities": [
+        "modelo-sugerencia",
+        "corrida",
+        "demanda",
+        "stock-repuesto"
+      ],
+      "sources": [
+        "src/hooks/useSugerenciasCompra.ts",
+        "docs/PLAN_SUGERENCIA_COMPRA_REPUESTOS.md"
+      ],
+      "evidence": "Memoria reconciliada el 14/10/2026; contrastar código y SQL aplicado antes de operar"
+    },
+    {
+      "id": "acceso-servidor",
+      "title": "Menú no reemplaza autorización",
+      "module": "administracion",
+      "description": "Sesión, rol, módulo/sección y capacidades se validan separadamente. RPC/Edge/RLS deben proteger acciones; una policy TO authenticated no puede usar USING (true) o WITH CHECK (true) como sustituto del permiso. Admin normal debe poder conceder acceso dentro de su autoridad. El saneamiento incluye aliases productivos incondicionales de clientes y trabajos; si falta una policy funcional, debe crear primero reglas acotadas a módulo, rol, sucursal y asignación antes de quitar el acceso abierto.",
+      "check": "Probar usuarios no superadmin y nuevas páginas de Ventas; revisar el estado final combinado de policies, incluidos aliases creados en consola, y contrastar el escáner productivo después del SQL manual. Clientes debe conservar lectura autorizada y Trabajos sus altas/cambios/bajas autorizados.",
+      "entities": [
+        "usuario",
+        "permiso",
+        "cliente",
+        "trabajo"
+      ],
+      "sources": [
+        "src/components/ProtectedRoute.tsx",
+        "src/lib/permissions.ts",
+        "src/pages/Admin.tsx",
+        "supabase/migrations/20260924130000_harden_remaining_authenticated_rls.sql",
+        "supabase/migrations/20260924143000_restore_scoped_trabajos_rls.sql",
+        "supabase/migrations/20260420185955_b0526a2a-b63f-4156-8819-fa4894362b32.sql",
+        "supabase/migrations/20260519115133_420a6c9b-0ecf-45f8-8c20-16f11f2c9b70.sql",
+        "supabase/migrations/20260812130000_enforce_role_module_matrix.sql",
+        "src/test/securityRlsHardening.test.ts"
+      ],
+      "evidence": "Memoria reconciliada el 14/10/2026; contrastar código y SQL aplicado antes de operar"
+    },
+    {
+      "id": "loader-error",
+      "title": "Error y rango inválido no son sin datos",
+      "module": "ventas",
+      "description": "Rango vacío/invertido debe detener consulta y explicar qué corregir. Timeout debe mostrar error y evitar loaders indefinidos o ceros ficticios/reintentos masivos.",
+      "check": "Probar rangos inválidos, RPC inexistente y timeout, sin ampliar simplemente todos los límites como solución de rendimiento.",
+      "entities": [
+        "factura",
+        "stock-repuesto"
+      ],
+      "sources": [
+        "src/lib/serviceSalesError.ts",
+        "src/components/ventas/ServiciosTecnicos.tsx",
+        "src/components/ventas/useServiciosIndicadores.ts"
+      ],
+      "evidence": "Memoria reconciliada el 14/10/2026; contrastar código y SQL aplicado antes de operar"
+    },
+    {
+      "id": "sql-manual",
+      "title": "Commit/push no actualiza Supabase",
+      "module": "administracion",
+      "description": "Migración presente/publicada no prueba ejecución. El usuario ejecuta manualmente las migraciones: entregar siempre el bloque SQL completo listo para copiar y pegar, con orden y comprobación, sin iniciar sesión, vincular CLI ni aplicar SQL remoto.",
+      "check": "Separar tests con fixtures, revisión de código y producción. Informar commit/push por un lado y SQL pendiente por otro; no afirmar producción corregida hasta contar con evidencia de ejecución y consulta de verificación.",
+      "entities": [
+        "permiso",
+        "linea-factura",
+        "OS"
+      ],
+      "sources": [
+        "docs/knowledge/09-Mantenimiento.md",
+        "docs/knowledge/08-Pendientes-y-validacion.md",
+        "supabase/migrations"
+      ],
+      "evidence": "Memoria reconciliada el 14/10/2026; contrastar código y SQL aplicado antes de operar"
+    },
+    {
+      "id": "ia-plan-validado",
+      "title": "IA usa planes permitidos, no SQL arbitrario",
+      "module": "asistente",
+      "description": "Catálogo semántico y plan JSON con datasets/métricas/dimensiones autorizados; servidor valida sesión/alcance. Las notas de Obsidian no se alimentan al asistente automáticamente por esta configuración.",
+      "check": "Verificar guardas y límites, no exponer service role en frontend ni copiar conversaciones a la bóveda.",
+      "entities": [
+        "asistente",
+        "usuario",
+        "permiso"
+      ],
+      "sources": [
+        "supabase/functions/ai-data-assistant/index.ts",
+        "supabase/functions/_shared/assistant-semantic.ts",
+        "docs/AI_ASSISTANT_ANALYTICS.md"
+      ],
+      "evidence": "Memoria reconciliada el 14/10/2026; contrastar código y SQL aplicado antes de operar"
+    }
+  ],
+  "flows": [
+    {
+      "id": "planificar-trabajo",
+      "title": "De trabajo a intervención programada",
+      "module": "servicios",
+      "description": "Planificación operacional separada de OS importada y facturación.",
+      "steps": [
+        "Registrar trabajo, cliente, problema y prioridad.",
+        "Programar intervención con fecha, responsable y auxiliares.",
+        "Consultar calendario y disponibilidades.",
+        "Cargar estado/horas en la jornada propia y seguir el trabajo."
+      ],
+      "entities": [
+        "trabajo",
+        "jornada",
+        "tecnico",
+        "cliente"
+      ],
+      "rules": [
+        "cuadrilla-propia",
+        "horas-os-persona",
+        "visual-planificador-movil"
+      ],
+      "sources": [
+        "src/components/trabajos/NuevoTrabajoDialog.tsx",
+        "src/components/trabajos/ProgramarIntervencionDialog.tsx",
+        "src/components/trabajos/CargarJornadaDialog.tsx",
+        "src/pages/Calendario.tsx",
+        "src/pages/Planificador.tsx",
+        "src/components/calendar/PlannerMobileAgenda.tsx"
+      ]
+    },
+    {
+      "id": "analizar-ordenes-servicio",
+      "title": "Consultar OS, productividad y cumplimiento",
+      "module": "servicios",
+      "description": "Tres poblaciones temporales separadas en una sección: OS operativas, intervalos realmente trabajados y cumplimiento de agenda; facturación solo para ficha y eficiencia.",
+      "steps": [
+        "Filtrar órdenes y abrir ficha por os_numero sin perder ceros ni confundir cierre operativo con factura.",
+        "Para Productividad, recortar el tramo medible desde julio y calcular horas válidas, capacidad e incidencias por técnico y período.",
+        "Conciliar MO y tarifas por tipo para eficiencia de OS cerradas; si una respuesta financiera es incompleta, no publicar importe ni porcentaje parcial.",
+        "Para Cumplimiento, agrupar automáticamente jornadas por día/semana/mes/año y consultar detalle de la matriz sin liquidar ni alterar estados."
+      ],
+      "entities": [
+        "OS",
+        "jornada-comision",
+        "jornada",
+        "tecnico",
+        "factura"
+      ],
+      "rules": [
+        "horas-os-persona",
+        "productividad-jornadas-reales",
+        "eficiencia-mo-os",
+        "cumplimiento-matriz",
+        "sql-manual"
+      ],
+      "sources": [
+        "docs/knowledge/26-Ordenes-servicio-y-productividad.md",
+        "src/pages/OrdenesServicio.tsx",
+        "src/features/service-orders/workedProductivity.ts",
+        "src/features/service-orders/billing.ts",
+        "src/lib/matrixCompletion.ts"
+      ]
+    },
+    {
+      "id": "liquidar-comision",
+      "title": "De participación importada a comisión",
+      "module": "servicios",
+      "description": "Validación, corrección, liquidación y pago necesitan estados separados y trazabilidad.",
+      "steps": [
+        "Importar participantes/jornadas con identidades estables.",
+        "Validar horas y vigencia; resolver tipo de tiempo manual cuando corresponda.",
+        "Revisar jornadas elegibles y preparar liquidación.",
+        "Confirmar estado/pago sin incluir OS excluidas ni duplicar participantes."
+      ],
+      "entities": [
+        "OS",
+        "jornada-comision",
+        "ajuste-tiempo",
+        "liquidacion",
+        "tecnico"
+      ],
+      "rules": [
+        "tiempo-manual",
+        "exclusion-os",
+        "horas-os-persona"
+      ],
+      "sources": [
+        "src/pages/Comisiones.tsx",
+        "src/lib/imports/commissionTime.ts",
+        "src/lib/commissionMetrics.ts"
+      ]
+    },
+    {
+      "id": "historial-maquina",
+      "title": "Consultar historial por máquina",
+      "module": "servicios",
+      "description": "Unificar actividad operativa y repuestos facturados por chasis sin inventar relaciones, distribuciones ni agregaciones.",
+      "steps": [
+        "Normalizar chasis y buscar identidad física.",
+        "Determinar propietario actual y conservar contexto histórico.",
+        "Expandir cada OS en una fila por tipo de tiempo con desglose real; clasificar el legado con evidencia de facturación y conservar Sin desglose/Por confirmar cuando falta evidencia.",
+        "Mostrar el valor real por tipo; usar el total de MO solo en OS de un tipo y nunca repartir un total mixto.",
+        "Desglosar Kilometraje por el mismo tipo de tiempo; omitir todo movimiento con importe conocido igual a cero y conservar importes ausentes solo con cantidad real.",
+        "Añadir Terceros solo con evidencia y cada repuesto como línea financiera independiente, aunque factura u OS se repitan.",
+        "Normalizar la presentación de factura sin guiones, preservando ceros y repeticiones.",
+        "Bloquear lista y exportación si falla OS o repuestos, sin resultados parciales."
+      ],
+      "entities": [
+        "chasis",
+        "OS",
+        "cliente",
+        "linea-factura"
+      ],
+      "rules": [
+        "historial-sin-factura",
+        "historial-tipo-cliente",
+        "historial-movimiento-facturado",
+        "dueno-no-facturado",
+        "exclusion-os",
+        "visual-ventas"
+      ],
+      "sources": [
+        "src/components/ventas/MachineHistorySheet.tsx",
+        "src/components/ventas/MachineHistorySheet.test.tsx",
+        "src/lib/serviceHistory.ts",
+        "supabase/migrations/20260921130000_complete_machine_history_ledger.sql",
+        "supabase/migrations/20260921150000_refine_machine_history_time_type.sql"
+      ]
+    },
+    {
+      "id": "facturar-servicios",
+      "title": "Analizar facturación de Servicios",
+      "module": "ventas",
+      "description": "Población financiera seleccionada por fecha de emisión, no por fecha de jornada. Filtros financieros anteriores a agregación y filtros de presentación tienen alcances distintos.",
+      "steps": [
+        "Seleccionar rango calendario, sucursal y filtros financieros; agosto termina el 31/08.",
+        "Obtener movimientos canónicos enriquecidos y tipo de tiempo efectivo mediante la RPC original o variante filtrada; informar SQL faltante sin fallback.",
+        "Aplicar [[SIG CDM/Generado/Reglas/refacturacion-servicio-sin-os|alcance operativo sin OS]]: el grupo 008 solo no basta, no inventar vínculo ni tipo Cliente y conservar facturación general.",
+        "Desglosar MO/Km/Repuestos/Terceros y conciliar Total del período con conteos distintos del rango.",
+        "Analizar técnicos por participación, clientes por perspectiva y máquinas por agrupación. Al filtrar técnico no redistribuir MO.",
+        "Ordenar valores originales y exportar respuesta completa de tablas montadas desde el único menú de sección, preservando filas y centavos."
+      ],
+      "entities": [
+        "factura",
+        "OS",
+        "linea-factura",
+        "jornada-comision",
+        "cliente",
+        "tecnico"
+      ],
+      "rules": [
+        "fechas-facturacion",
+        "refacturacion-servicio-sin-os",
+        "reparto-mo",
+        "dueno-no-facturado",
+        "tiempo-manual",
+        "conteos-unicos",
+        "filtros-servicios-poblacion",
+        "acciones-exportacion-unica",
+        "visual-ventas"
+      ],
+      "sources": [
+        "src/pages/Ventas.tsx",
+        "src/components/ventas/ServiciosResumen.tsx",
+        "src/components/ventas/ServiciosTecnicos.tsx",
+        "src/components/ventas/ServiciosClientes.tsx",
+        "src/components/ventas/SalesDataTable.tsx",
+        "src/components/ventas/SalesSectionExports.tsx",
+        "supabase/migrations/20260922130000_include_unlinked_service_refacturations.sql"
+      ]
+    },
+    {
+      "id": "facturar-maquinas",
+      "title": "Analizar ventas históricas y actuales de máquinas",
+      "module": "ventas",
+      "description": "Unificar fuente comercial preservando condición, NC y vendedores canónicos.",
+      "steps": [
+        "Combinar líneas históricas y actuales sin doble conteo.",
+        "Normalizar marca/tipo/modelo, condición nueva/usada y vendedor.",
+        "Analizar por período, marca/tipo, cliente y vendedor.",
+        "Conciliar neto y documentos sin agregar NP como otra venta.",
+        "Si una factura positiva repite un chasis existente, revisar NC/propietario/estado y confirmar Refacturación o Venta antes de modificar Parque."
+      ],
+      "entities": [
+        "factura",
+        "maquina",
+        "modelo",
+        "NP",
+        "chasis",
+        "stock-maquina"
+      ],
+      "rules": [
+        "nc-signos",
+        "marca-agrupada",
+        "nombres-comerciales",
+        "conteos-unicos",
+        "chasis-nc-refacturacion-manual"
+      ],
+      "sources": [
+        "src/components/ventas/MaquinasVentas.tsx",
+        "src/lib/imports/machineSalesLegacy.ts",
+        "src/components/parque/MachineSaleNotificationDialog.tsx",
+        "supabase/migrations/20260923120000_reconcile_machine_credit_notes_and_resales.sql"
+      ]
+    },
+    {
+      "id": "facturar-repuestos",
+      "title": "Analizar ventas de repuestos por línea",
+      "module": "ventas",
+      "description": "Finanzas completas, sin reducir la fuente al histórico agregado del importador.",
+      "steps": [
+        "Seleccionar histórico detallado o fuente actual según corte.",
+        "Conservar ventas y NC con signo, incluso sin producto inequívoco.",
+        "Agrupar por período, vendedor/cliente/repuesto con identidades canónicas.",
+        "Mostrar cada línea en Detalle y conciliar el total del rango."
+      ],
+      "entities": [
+        "factura",
+        "producto",
+        "venta-historica",
+        "linea-factura"
+      ],
+      "rules": [
+        "corte-sistemas",
+        "nc-signos",
+        "finance-vs-demanda",
+        "nombres-comerciales",
+        "conteos-unicos"
+      ],
+      "sources": [
+        "src/components/ventas/RepuestosVentas.tsx",
+        "docs/ventas-repuestos.md"
+      ]
+    },
+    {
+      "id": "conciliar-dashboard",
+      "title": "Conciliar dashboard con ventas por área",
+      "module": "ventas",
+      "description": "Comparar componentes compatibles, no sumar ciegamente dos totales con cobertura diferente. La fuente conciliada se carga en trimestres disjuntos con hasta dos solicitudes simultáneas: reduce el conjunto de los cruces sin paginar, omitir ni repetir días; cualquier lote fallido invalida el resultado completo.",
+      "steps": [
+        "Igualar período, sucursales, moneda, signos y filtros por área.",
+        "Partir el rango en trimestres sin solapamientos y validar filas/cantidad de cada lote.",
+        "Separar componentes de Servicios, incluidos repuestos de OS.",
+        "Revisar fuente histórica completa y exclusión monetaria de GRID duplicado.",
+        "Separar Otros y explicar líneas desconocidas sin reclasificar por conveniencia."
+      ],
+      "entities": [
+        "factura",
+        "linea-factura",
+        "venta-historica"
+      ],
+      "rules": [
+        "fuente-canonica",
+        "otros-no-mo",
+        "moneda-no-implicita",
+        "conteos-unicos",
+        "loader-error"
+      ],
+      "sources": [
+        "src/pages/Dashboard.tsx",
+        "src/components/dashboard/cargarFacturacion.ts",
+        "src/components/dashboard/cargarFacturacion.test.ts",
+        "src/lib/facturacionReglas.ts",
+        "docs/conciliacion-postventa-dashboard.md",
+        "docs/knowledge/03-Ventas-y-conciliacion.md"
+      ]
+    },
+    {
+      "id": "gestionar-propiedad",
+      "title": "De máquina a propietario e historial",
+      "module": "parque",
+      "description": "Mantener identidad, transferencia y contexto de actividad por cliente sin confundir receptor de factura.",
+      "steps": [
+        "Seleccionar o crear cliente y máquina desde catálogo.",
+        "Registrar propiedad/transferencia con identidad física.",
+        "Autorizar parte de pago antes de pasar Parque a Stock; si luego aparece una factura, revisar refacturación/venta y compensar el movimiento sin borrar historia.",
+        "Consultar actividad e importes atribuidos con vínculos inequívocos.",
+        "Preservar historial y diferencia entre dueño actual/histórico/facturado."
+      ],
+      "entities": [
+        "cliente",
+        "maquina",
+        "chasis",
+        "modelo",
+        "stock-maquina",
+        "factura"
+      ],
+      "rules": [
+        "dueno-no-facturado",
+        "campos-canonico",
+        "catalogo-no-fuzzy",
+        "chasis-nc-refacturacion-manual"
+      ],
+      "sources": [
+        "src/components/parque/ClientePanel.tsx",
+        "src/components/parque/TransferirMaquinaDialog.tsx",
+        "src/components/parque/NuevaMaquinaDialog.tsx",
+        "src/components/parque/MachineStockReturnNotificationDialog.tsx",
+        "src/components/parque/MachineSaleNotificationDialog.tsx",
+        "supabase/migrations/20260922200000_authorize_stock_returns_from_park.sql",
+        "supabase/migrations/20260923120000_reconcile_machine_credit_notes_and_resales.sql"
+      ]
+    },
+    {
+      "id": "proyectar-stock-maquinas",
+      "title": "Proyectar stock de máquinas nuevas",
+      "module": "parque",
+      "description": "Reconstruir por modelo el saldo disponible y comprometido desde una apertura conocida, manteniendo separados hechos físicos, compras y ventas.",
+      "steps": [
+        "Fijar corte desde el 31/08/2026 y cargar la apertura por modelo canónico.",
+        "Aplicar arribos por ATA y facturas/NC netas posteriores al corte.",
+        "Consumir OC conocidas con arribos sin producir negativos.",
+        "Sumar NP nuevas pendientes y cerrar por factura positiva del mismo chasis.",
+        "Aplicar ajustes explícitos y exponer límites o contradicciones de apertura."
+      ],
+      "entities": [
+        "stock-proyectado-maquina",
+        "stock-maquina",
+        "unidad-importacion",
+        "NP",
+        "factura",
+        "modelo"
+      ],
+      "rules": [
+        "stock-proyectado-corte",
+        "catalogo-no-fuzzy",
+        "nc-signos",
+        "acceso-servidor",
+        "sql-manual"
+      ],
+      "sources": [
+        "docs/knowledge/04-Parque-y-operaciones.md",
+        "docs/knowledge/24-Condiciones-visuales-ventas.md"
+      ]
+    },
+    {
+      "id": "gestionar-np",
+      "title": "De NP a unidades disponibles",
+      "module": "parque",
+      "description": "Separar pedido comercial, asignación de unidades, facturación parcial y avance físico.",
+      "steps": [
+        "Registrar cliente/comercial y líneas de modelos/cantidades, interpretando el importe por unidad con formato local.",
+        "Asignar stock o importaciones a unidades del pedido.",
+        "Adjuntar cada factura como documento sin cambiar por sí sola el estado de las máquinas.",
+        "Confirmar por unidad únicamente las ventas positivas cuyo chasis coincida y cuya fecha no antecede a la NP; una hermana sin coincidencia permanece pendiente.",
+        "Completar la facturación solo cuando todas las unidades tengan evidencia y seguir entrega/recepción por separado.",
+        "Editar datos sin retroceder avance físico."
+      ],
+      "entities": [
+        "NP",
+        "modelo",
+        "stock-maquina",
+        "unidad-importacion",
+        "factura",
+        "chasis"
+      ],
+      "rules": [
+        "np-preservar-avance",
+        "np-facturacion-por-chasis",
+        "np-importe-local",
+        "catalogo-no-fuzzy",
+        "llegada-fisica"
+      ],
+      "sources": [
+        "src/pages/MaquinariaOperaciones.tsx",
+        "src/lib/localizedAmount.ts",
+        "src/lib/machineOrderValidation.ts",
+        "supabase/migrations/20260922180000_bill_machine_orders_by_unit.sql",
+        "supabase/migrations/20260923170000_confirm_machine_order_billing_by_chassis.sql",
+        "supabase/migrations/20260930120000_optimize_machine_order_confirmed_billing.sql"
+      ]
+    },
+    {
+      "id": "comprar-importar-maquina",
+      "title": "De OC a embarques individuales",
+      "module": "importaciones",
+      "description": "Pedido de proveedor con generales heredados y excepciones por unidad.",
+      "steps": [
+        "Registrar OC y alcance/moneda del valor de compra.",
+        "Desagregar cantidad en unidades con llaves únicas.",
+        "Cargar ETA general y ajustes individuales de embarque/valor.",
+        "Asociar documentos/factura proveedor y comparar importes compatibles."
+      ],
+      "entities": [
+        "OC",
+        "importacion",
+        "unidad-importacion",
+        "factura-proveedor"
+      ],
+      "rules": [
+        "llave-por-unidad",
+        "herencia-independiente",
+        "oc-proveedor-costo",
+        "moneda-no-implicita"
+      ],
+      "sources": [
+        "src/pages/MaquinariaOperaciones.tsx",
+        "src/components/maquinaria/ImportUnitFields.tsx",
+        "src/lib/machineImportValues.ts"
+      ]
+    },
+    {
+      "id": "recibir-importacion",
+      "title": "De tránsito a chasis confirmado en sistema",
+      "module": "importaciones",
+      "description": "Flujo por unidad independiente de reserva/facturación de NP; Parque también acredita ingreso.",
+      "steps": [
+        "Confirmar inicio de tránsito sin usar ETA como prueba.",
+        "Registrar arribo manual con fecha real y chasis, sin inventar ATA histórica.",
+        "Cruzar el mismo chasis normalizado en Stock positivo y Parque activo, sin deducir desde NP.",
+        "Completar por coincidencia única aunque falte ATA; separar habilitación de costo y dejar duplicados explícitos."
+      ],
+      "entities": [
+        "unidad-importacion",
+        "chasis",
+        "stock-maquina",
+        "maquina",
+        "NP"
+      ],
+      "rules": [
+        "llegada-fisica",
+        "oc-proveedor-costo",
+        "situacion-importacion-cinco"
+      ],
+      "sources": [
+        "src/lib/machineImportStatus.ts",
+        "src/pages/MaquinariaOperaciones.tsx",
+        "supabase/migrations/20260918170000_complete_imports_by_stock_or_park_chassis.sql",
+        "docs/importaciones-unidades-oc-y-costos.md"
+      ]
+    },
+    {
+      "id": "comprar-repuestos",
+      "title": "De solicitud a pedido de repuestos",
+      "module": "repuestos",
+      "description": "Seguimiento por línea con matching auditable entre solicitudes y pedidos.",
+      "steps": [
+        "Importar solicitudes y pedidos con producto/sucursal/fechas/precio.",
+        "Buscar candidatos y autoenlazar únicamente si son inequívocos.",
+        "Resolver vínculos ambiguos manualmente.",
+        "Seguir cantidades entregadas y pendientes sin confundirlas con ventas."
+      ],
+      "entities": [
+        "solicitud-compra",
+        "pedido-compra",
+        "producto"
+      ],
+      "rules": [
+        "matching-compra",
+        "moneda-no-implicita"
+      ],
+      "sources": [
+        "src/pages/RepuestosCompras.tsx",
+        "src/hooks/useCompras.ts",
+        "src/lib/imports/comprasMatching.ts"
+      ]
+    },
+    {
+      "id": "sugerir-compra",
+      "title": "De demanda confirmada a sugerencia explicada",
+      "module": "repuestos",
+      "description": "Motor de planificación con identidad física, versión de parámetros y evidencia de recurrencia/calidad.",
+      "steps": [
+        "Preparar maestro legacy y vínculos de códigos, unidades y duplicados.",
+        "Consolidar histórico/demanda mensual confirmada antes de activar cálculo.",
+        "Seleccionar marca, fecha y versión del modelo; aplicar segmentación y horizonte.",
+        "Guardar corrida con snapshots, resultados y explicación por pieza.",
+        "Revisar confianza, stock objetivo y necesidad neta antes de decidir compra."
+      ],
+      "entities": [
+        "producto",
+        "demanda",
+        "modelo-sugerencia",
+        "corrida",
+        "stock-repuesto"
+      ],
+      "rules": [
+        "finance-vs-demanda",
+        "sugerencia-auditable",
+        "fuente-canonica",
+        "nc-signos"
+      ],
+      "sources": [
+        "src/pages/RepuestosSugerencias.tsx",
+        "src/hooks/useSugerenciasCompra.ts"
+      ]
+    },
+    {
+      "id": "stock-repuestos",
+      "title": "Consultar stock, contadores y export",
+      "module": "repuestos",
+      "description": "Operaciones diferentes de lectura no deben multiplicar agregaciones costosas.",
+      "steps": [
+        "Aplicar búsqueda, marca/familia/estado de stock y orden.",
+        "Obtener página acotada y contadores compatibles.",
+        "Exportar universo filtrado con una operación controlada.",
+        "Mostrar error real cuando falle la base y evitar tormentas de reintentos."
+      ],
+      "entities": [
+        "producto",
+        "stock-repuesto"
+      ],
+      "rules": [
+        "loader-error"
+      ],
+      "sources": [
+        "src/pages/Repuestos.tsx",
+        "src/hooks/useRepuestos.ts"
+      ]
+    },
+    {
+      "id": "cargar-datos",
+      "title": "De archivos a identidades canónicas",
+      "module": "datos",
+      "description": "Canonización y persistencia de fuentes externas sin tomar instrucciones de los archivos como autorización.",
+      "steps": [
+        "Leer estructura y origen del archivo, sin ejecutar su contenido.",
+        "Normalizar fechas, moneda/IVA, clientes, productos y OS conservando raw para auditoría en la app.",
+        "Aplicar corte de sistema, clave de fila/snapshot y reglas de reemplazo.",
+        "Cruzar Stock de Maquinarias con Maquinarias por CODPRO único para completar solo chasis-placeholder, sin ampliar la foto.",
+        "Reconciliar vínculos, ajustes/exclusiones y duplicados; informar rechazos/ambigüedad."
+      ],
+      "entities": [
+        "venta-historica",
+        "linea-factura",
+        "OS",
+        "demanda",
+        "stock-maquina",
+        "chasis"
+      ],
+      "rules": [
+        "corte-sistemas",
+        "tiempo-manual",
+        "exclusion-os",
+        "fuente-canonica",
+        "stock-chasis-respaldo-codpro",
+        "calidad-xml-nuevo"
+      ],
+      "sources": [
+        "src/lib/imports/canonical.ts",
+        "src/lib/imports/machineStock.ts",
+        "src/lib/imports/totvsFileKind.ts",
+        "src/lib/imports/newSystemBundle.ts",
+        "src/lib/imports/newSystemPersist.ts",
+        "src/lib/imports/persist.ts",
+        "docs/knowledge/31-Calidad-XML-sistema-nuevo-reunion-TI.md"
+      ]
+    },
+    {
+      "id": "importar-cxc-totvs",
+      "title": "De archivo de CxC a snapshot conciliado",
+      "module": "datos",
+      "description": "Carga de cuotas de cuentas por cobrar con corte confirmado y versión auditable; no equivale a publicar un KPI gerencial.",
+      "steps": [
+        "Exigir corte confirmado; leer SpreadsheetML y validar columnas, moneda, fechas y claves documentales sin inferir aplicación de anticipos.",
+        "Calcular SHA-256; reutilizar la carga completa idéntica o crear versión nueva del mismo corte sin mezclar saldos.",
+        "Enviar lotes de hasta 500 en modo validate y luego import, preservando fila fuente.",
+        "Finalizar solo si SQL recalcula y concilia controles; ante fallo cancelar la carga abierta y no sustituir la versión completa anterior."
+      ],
+      "entities": [
+        "cxc-snapshot",
+        "factura",
+        "cliente"
+      ],
+      "rules": [
+        "mora-cxc-fuente",
+        "sql-manual"
+      ],
+      "sources": [
+        "src/lib/imports/receivablesPreflight.ts",
+        "src/lib/imports/receivablesPersist.ts",
+        "src/components/parque/ImportarTotvsTab.tsx",
+        "supabase/migrations/20261007130000_import_totvs_accounts_receivable.sql"
+      ]
+    },
+    {
+      "id": "dar-acceso",
+      "title": "De nuevo usuario a acceso efectivo",
+      "module": "administracion",
+      "description": "Registrar operativo no requiere cuenta; crear usuario no garantiza menú/ruta. Conceder accesos dentro de autoridad del administrador y comprobar continuidad en Servicios al pasar de perfil sin cuenta a cuenta vinculada.",
+      "steps": [
+        "Sin acceso: registrar operativo de Servicios activo con nombre y sucursal mediante inserción de perfil protegida por RLS, sin Auth ni permisos; invalidar caché de nómina.",
+        "Con acceso: exigir correo y contraseña y crear cuenta mediante función protegida; al asociar cuenta después, reutilizar profile_id.",
+        "Asignar rol Operativo y módulo/secciones de Servicios cuando corresponda y comprobar nómina antes/después: linkedProfile no inserta automáticamente rol.",
+        "Validar menú, ruta y acción del servidor con usuario no superadmin.",
+        "Revisar defaultRoute/sin acceso cuando no existan permisos."
+      ],
+      "entities": [
+        "usuario",
+        "permiso",
+        "tecnico"
+      ],
+      "rules": [
+        "acceso-servidor",
+        "sql-manual",
+        "operativo-sin-cuenta"
+      ],
+      "sources": [
+        "src/pages/Admin.tsx",
+        "src/lib/admin-create-person.ts",
+        "docs/alta-operativos-servicios.md",
+        "src/hooks/useAuth.tsx",
+        "src/lib/permissions.ts",
+        "supabase/functions/admin-create-user/index.ts",
+        "supabase/migrations/20260821150000_consolidate_active_commission_technicians.sql"
+      ]
+    },
+    {
+      "id": "preguntar-ia",
+      "title": "De pregunta a respuesta analítica autorizada",
+      "module": "asistente",
+      "description": "Interpretación separada de cálculos y controles semánticos.",
+      "steps": [
+        "Validar JWT/rol/alcance en Edge Function.",
+        "Resolver contexto solo cuando corresponda y construir plan permitido.",
+        "Validar datasets, métricas, dimensiones y filtros contra catálogo.",
+        "Calcular con fuentes permitidas y responder con período/fuentes, sin SQL libre."
+      ],
+      "entities": [
+        "asistente",
+        "permiso",
+        "factura",
+        "OS"
+      ],
+      "rules": [
+        "ia-plan-validado",
+        "acceso-servidor"
+      ],
+      "sources": [
+        "supabase/functions/ai-data-assistant/index.ts",
+        "supabase/functions/_shared/assistant-semantic.ts",
+        "supabase/functions/_shared/assistant-answer.ts"
+      ]
+    }
+  ],
+  "screens": [
+    {
+      "id": "servicios.planificador",
+      "title": "Planificador",
+      "module": "servicios",
+      "description": "Planificación por jornada, no facturación. Menor a 640 px usa agenda plana: fecha lateral, cliente prioritario, tarea secundaria de dos líneas y referencia/estado/continuidad. Sin horas ni total al pie aunque existan datos; se conservan en ficha, Excel y tabla desde 640 px. Semana/navegación/orden visibles y programar discreto. Mantiene identidad de jornadas del mismo servicio/día, cuadrilla propia, callback de detalle/marcado visto, error/reintento y exportador especializado completo. Implementación 7a377f9; no despliegue comprobado.",
+      "sources": [
+        "src/pages/Planificador.tsx",
+        "src/components/lists/CompactListTable.tsx",
+        "src/components/lists/ServiceLists.test.tsx",
+        "src/components/calendar/PlannerMobileAgenda.tsx",
+        "docs/knowledge/25-Revision-movil-transversal.md"
+      ],
+      "flows": [
+        "planificar-trabajo"
+      ]
+    },
+    {
+      "id": "servicios.os-vinculadas",
+      "title": "OS vinculadas de Trabajos",
+      "module": "servicios",
+      "description": "Lista compacta con estados originales, importes negativos/ausentes y metadatos por OS. Excel conserva factura/chasis/responsable además de las columnas originales. Error/reintento sin descargar datos viejos; no cambia indicadores, validaciones ni liquidación.",
+      "sources": [
+        "src/components/trabajos/TrabajosOSTab.tsx",
+        "src/components/lists/ServiceLists.test.tsx"
+      ],
+      "flows": [
+        "planificar-trabajo"
+      ]
+    },
+    {
+      "id": "servicios.historial-maquina",
+      "title": "Historial completo de máquina",
+      "module": "servicios",
+      "description": "Una lista sin pestañas ni tarjetas: una fila por tipo de tiempo real de OS y una por cada repuesto facturado; Kilometraje/Terceros solo con evidencia. Clasifica el legado de cliente externo, deja los ambiguos Por confirmar y no reparte ni duplica MO mixta sin evidencia. Omite importes conocidos en cero y conserva actividad sin importe solo con cantidad real. Facturas sin guiones, importes por tipo, filtros completos y búsqueda/orden/Excel únicos. OS y repuestos son fuentes requeridas y un fallo bloquea resultados parciales.",
+      "sources": [
+        "src/components/ventas/MachineHistorySheet.tsx",
+        "src/components/ventas/MachineHistorySheet.test.tsx",
+        "src/components/lists/CompactListTable.tsx",
+        "supabase/migrations/20260921130000_complete_machine_history_ledger.sql",
+        "supabase/migrations/20260921150000_refine_machine_history_time_type.sql"
+      ],
+      "flows": [
+        "historial-maquina"
+      ]
+    },
+    {
+      "id": "servicios.trabajos",
+      "title": "Trabajos",
+      "module": "servicios",
+      "description": "Teléfono: estados con conteos y filas planas, no cinco paneles altos ni Ver más por estado; escritorio conserva tablero. Seguimiento de trabajos macro por estado/prioridad, detalle e intervenciones asociadas.",
+      "sources": [
+        "src/pages/Trabajos.tsx",
+        "docs/knowledge/25-Revision-movil-transversal.md"
+      ],
+      "flows": [
+        "planificar-trabajo"
+      ]
+    },
+    {
+      "id": "servicios.calendario",
+      "title": "Calendario y disponibilidad",
+      "module": "servicios",
+      "description": "Teléfono: Mes/Semana/Técnicos visibles y agenda para Semana/Técnicos; consultar no reprograma ni deduplica jornadas. Vistas mes/semana/técnicos; programación, disponibilidad y días no laborales. No inferir capacidad real sin sus reglas.",
+      "sources": [
+        "src/pages/Calendario.tsx",
+        "docs/knowledge/25-Revision-movil-transversal.md"
+      ],
+      "flows": [
+        "planificar-trabajo"
+      ]
+    },
+    {
+      "id": "servicios.ventas",
+      "title": "Ventas de Servicios",
+      "module": "ventas",
+      "description": "Teléfono menor a 640 px: composición continua, rango, tres indicadores y Períodos/Resumen/Detalle visibles. Identidad puede envolver. La condición de columnas separadas de abajo corresponde a tablet/escritorio. Panorama por período y Resumen/Técnicos/Clientes/Máquinas/Detalle sobre facturación. Detalle: una fila visual compacta por línea de factura, columnas separadas sin datos apilados ni párrafos explicativos; textos con elipsis y título completo, OS/chasis complementarios y repeticiones legítimas, sin scroll horizontal. Refacturaciones explícitas del grupo 008 pueden aparecer sin OS; no se inventa el vínculo. Historial de máquina conserva evidencia operacional distinta y se carga bajo demanda.",
+      "sources": [
+        "src/components/ventas/ServiciosPanorama.tsx",
+        "src/components/ventas/ServiciosResumen.tsx",
+        "src/components/ventas/ServiciosTecnicos.tsx",
+        "src/components/ventas/ServiciosClientes.tsx",
+        "src/components/ventas/ServiciosMaquinas.tsx",
+        "src/components/ventas/ServiciosDetalleOS.tsx",
+        "supabase/migrations/20260922130000_include_unlinked_service_refacturations.sql",
+        "docs/knowledge/25-Revision-movil-transversal.md"
+      ],
+      "flows": [
+        "facturar-servicios",
+        "historial-maquina"
+      ]
+    },
+    {
+      "id": "servicios.dashboard",
+      "title": "Dashboard anterior (ruta redirigida)",
+      "module": "ventas",
+      "description": "Pantalla conservada en código pero fuera del menú; /dashboard redirige a /servicios/ordenes. Su conciliación financiera y gráficos no se trasladan sin más a Productividad ni prueban una nueva sección transversal. Las reglas históricas de sus consultas siguen documentadas para reutilización y contraste, no como pantalla activa.",
+      "sources": [
+        "src/pages/Dashboard.tsx",
+        "src/App.tsx",
+        "src/components/dashboard/cargarFacturacion.ts",
+        "docs/knowledge/26-Ordenes-servicio-y-productividad.md"
+      ],
+      "flows": [
+        "conciliar-dashboard"
+      ]
+    },
+    {
+      "id": "servicios.ordenes",
+      "title": "Órdenes de servicio",
+      "module": "servicios",
+      "description": "Ruta activa /servicios/ordenes con Órdenes, Productividad y Cumplimiento. OS por clave textual, técnico activo por defecto en Productividad, matriz como única vista de Cumplimiento. KPI de cierre usa estado OS y días apertura→factura; eficiencia usa MO conciliada, no horas-persona. En móvil pestañas bajo título y datos agrupados; desde 640 px pestañas junto al título. Errores de jornadas o dinero no se convierten en ceros ni en resultados parciales.",
+      "sources": [
+        "docs/knowledge/26-Ordenes-servicio-y-productividad.md",
+        "src/pages/OrdenesServicio.tsx",
+        "src/features/service-orders/OrdersTable.tsx",
+        "src/features/service-orders/ProductivityTable.tsx",
+        "src/features/service-orders/MobileTechnicianMatrix.tsx"
+      ],
+      "flows": [
+        "analizar-ordenes-servicio"
+      ]
+    },
+    {
+      "id": "servicios.comisiones",
+      "title": "Comisiones",
+      "module": "servicios",
+      "description": "Teléfono: OS/cliente/pago/validación agrupados, horas separadas y selección; no hereda la excepción sin horas de Planificador. Abrir no liquida. Revisión de jornadas técnicas, validaciones, correcciones de tiempo, liquidaciones y pagos. No tratar todos estos estados como uno.",
+      "sources": [
+        "src/pages/Comisiones.tsx",
+        "docs/knowledge/25-Revision-movil-transversal.md"
+      ],
+      "flows": [
+        "liquidar-comision"
+      ]
+    },
+    {
+      "id": "parque.ventas",
+      "title": "Ventas de Máquinas",
+      "module": "ventas",
+      "description": "Teléfono: composición continua con rango, tres indicadores y Períodos/Resumen/Detalle visibles; sin plegado predeterminado. Resumen por período y dimensiones comerciales: marca/tipo/condición, vendedores, clientes y detalle histórico/actual.",
+      "sources": [
+        "src/components/ventas/MaquinasVentas.tsx",
+        "docs/knowledge/25-Revision-movil-transversal.md"
+      ],
+      "flows": [
+        "facturar-maquinas"
+      ]
+    },
+    {
+      "id": "parque.clientes",
+      "title": "Parque por clientes",
+      "module": "parque",
+      "description": "Lista de una línea con encabezados completos y flechas, importes negativos y carga/error explícito. Sucursal y actividad Repuestos/Servicios se conservan en filtros, ficha y Excel, no como columnas visibles. Seis campos a 768–1279 px, diez desde 1280; teléfono Cliente/Maq./Facturación. Secundarios al pulsar Cliente y Excel completo. Cancelar solicitudes obsoletas y no repetir automáticamente timeout; coberturas no disponibles durante carga/error, sin conservar porcentajes anteriores. Atribución filtrada optimizada sin alterar prioridades o importes; requiere SQL manual. Cliente facturado no necesariamente dueño; historiales interiores fuera de este paso.",
+      "sources": [
+        "src/pages/ParqueClientes.tsx",
+        "src/components/parque/ParqueTab.tsx",
+        "src/components/parque/ClientePanel.tsx",
+        "src/components/lists/CompactListTable.tsx",
+        "src/components/parque/ParqueListTables.test.tsx",
+        "docs/parque-facturacion-filtros.md",
+        "supabase/migrations/20260918220000_optimize_filtered_park_billing.sql",
+        "scripts/test-filtered-park-billing.mjs"
+      ],
+      "flows": [
+        "gestionar-propiedad"
+      ]
+    },
+    {
+      "id": "parque.maquinas",
+      "title": "Máquinas del parque",
+      "module": "parque",
+      "description": "Teléfono: modelo/chasis/propietario agrupados; una línea rígida sólo corresponde a tablet/escritorio. Inventario de una línea y ejes compartidos, antigüedad numérica, secundarios accesibles por Modelo y Excel. Edición/transferencias preservan identidad física, payloads y permisos.",
+      "sources": [
+        "src/pages/ParqueClientes.tsx",
+        "src/components/parque/MaquinasTab.tsx",
+        "src/components/lists/CompactListTable.tsx",
+        "src/components/parque/ParqueListTables.test.tsx",
+        "docs/knowledge/25-Revision-movil-transversal.md"
+      ],
+      "flows": [
+        "gestionar-propiedad"
+      ]
+    },
+    {
+      "id": "parque.stock",
+      "title": "Stock de máquinas",
+      "module": "parque",
+      "description": "Teléfono: modelo/chasis/contexto agrupados y saldo separado; alerta de chasis repetido visible. Una línea rígida sólo corresponde a tablet/escritorio. Existencia física de una línea, cantidades fraccionarias centradas y aviso de chasis repetido. La foto de Stock puede completar placeholders desde Maquinarias por CODPRO único sin incorporar el universo histórico. Secundarios por Modelo y Excel completo; disponibilidad comercial y relación de pedidos/importaciones separadas.",
+      "sources": [
+        "src/pages/ParqueClientes.tsx",
+        "src/components/parque/StockMaquinasTab.tsx",
+        "src/components/parque/ImportarTotvsTab.tsx",
+        "src/lib/imports/machineStock.ts",
+        "src/components/lists/CompactListTable.tsx",
+        "src/components/parque/ParqueListTables.test.tsx",
+        "docs/knowledge/25-Revision-movil-transversal.md"
+      ],
+      "flows": [
+        "cargar-datos",
+        "gestionar-np",
+        "recibir-importacion"
+      ]
+    },
+    {
+      "id": "parque.stock-proyectado",
+      "title": "Stock proyectado",
+      "module": "parque",
+      "description": "Teléfono: corte visible, modelo/stock/proyectado; otros términos de fórmula en detalle/Excel, sin ocultar negativos. Tabla por marca, tipo y modelo para máquinas nuevas desde la apertura del 31/08/2026. Presenta Stock, OC, Disponible, Ventas pendientes y Proyectado; Programa queda interno y el permiso es independiente de Stock físico.",
+      "sources": [
+        "docs/knowledge/04-Parque-y-operaciones.md",
+        "docs/knowledge/24-Condiciones-visuales-ventas.md",
+        "docs/knowledge/07-Accesos-y-asistente.md",
+        "docs/knowledge/25-Revision-movil-transversal.md"
+      ],
+      "flows": [
+        "proyectar-stock-maquinas"
+      ]
+    },
+    {
+      "id": "parque.operaciones",
+      "title": "Operaciones y NP",
+      "module": "parque",
+      "description": "Teléfono: NP/cliente agrupados y estados facturación/entrega independientes; columnas previas en tablet/escritorio. Pedidos por líneas/unidades en lista compacta única; USD con $, otras monedas sin conversión. Documentos conserva una NP y varios PDF, pero Facturado se calcula por unidad a partir de una venta canónica coincidente por chasis; el documento y la cabecera no se propagan a máquinas hermanas. Campos secundarios en Ver pedido y Excel completo. Conserva comerciales, clientes, asignaciones y estados físicos/comerciales. Consulta confirmada por lotes; ante error conserva filas con estado No disponible, KPI desconocidos, exportación bloqueada y reintento. El detalle reutiliza la respuesta de lista solo con cobertura completa.",
+      "sources": [
+        "src/pages/MaquinariaOperaciones.tsx",
+        "src/components/lists/CompactListTable.tsx",
+        "src/components/parque/ParqueListTables.test.tsx",
+        "supabase/migrations/20260922180000_bill_machine_orders_by_unit.sql",
+        "supabase/migrations/20260923170000_confirm_machine_order_billing_by_chassis.sql",
+        "docs/knowledge/25-Revision-movil-transversal.md",
+        "supabase/migrations/20260930120000_optimize_machine_order_confirmed_billing.sql",
+        "docs/knowledge/04-Parque-y-operaciones.md"
+      ],
+      "flows": [
+        "gestionar-np"
+      ]
+    },
+    {
+      "id": "parque.importaciones",
+      "title": "Importaciones por unidad",
+      "module": "importaciones",
+      "description": "Teléfono: llave/chasis agrupados, llegada/situación independientes y ficha/Excel completos. La condición de una sola línea de abajo corresponde a tablet/escritorio. Lista única de una línea sin tarjetas apiladas, cinco situaciones y posición 1/3 centrada. Secundarios en Ver importación y Excel completo. Conserva OC, ETA general/individual, llaves, documentos, recepción y confirmación de stock/parque por unidad.",
+      "sources": [
+        "src/pages/MaquinariaOperaciones.tsx",
+        "src/components/maquinaria/ImportUnitFields.tsx",
+        "src/components/lists/CompactListTable.tsx",
+        "src/components/parque/ParqueListTables.test.tsx",
+        "docs/knowledge/25-Revision-movil-transversal.md"
+      ],
+      "flows": [
+        "comprar-importar-maquina",
+        "recibir-importacion"
+      ]
+    },
+    {
+      "id": "repuestos.ventas",
+      "title": "Ventas de Repuestos",
+      "module": "ventas",
+      "description": "Teléfono: composición continua con rango, tres indicadores y Períodos/Resumen/Detalle visibles; paginación/orden del servidor intactos. Resumen por período, vendedores/clientes/repuestos y detalle por línea con NC y fuentes históricas completas.",
+      "sources": [
+        "src/components/ventas/RepuestosVentas.tsx",
+        "docs/knowledge/25-Revision-movil-transversal.md"
+      ],
+      "flows": [
+        "facturar-repuestos"
+      ]
+    },
+    {
+      "id": "repuestos.stock",
+      "title": "Stock de repuestos",
+      "module": "repuestos",
+      "description": "Teléfono: descripción/código/marca agrupados y total separado; reemplaza tres columnas rígidas de identidad. Tablet/escritorio conserva ejes separados y filtros, orden, avisos y Excel originales. Catálogo paginado de una línea y once campos, marcas con color y existencias centradas. Familia solo en Excel; seis sucursales visibles desde 768 px y Fabricante desde 1024 px. Tres campos principales en teléfonos (Código, Descripción, Total), Marca desde 768 px y desglose en ficha/Excel. Conserva filtros, contadores, nueve claves de orden global y export completo; Marca/Fabricante aún no ordenables en servidor.",
+      "sources": [
+        "src/pages/Repuestos.tsx",
+        "src/components/repuestos/PartsStockTable.tsx",
+        "src/hooks/useRepuestos.ts",
+        "docs/knowledge/24-Condiciones-visuales-ventas.md",
+        "docs/knowledge/25-Revision-movil-transversal.md"
+      ],
+      "flows": [
+        "stock-repuestos"
+      ]
+    },
+    {
+      "id": "repuestos.compras",
+      "title": "Compras de repuestos",
+      "module": "repuestos",
+      "description": "Teléfono: documento/sucursal/estado agrupados; ítems descripción/código con cantidades/importes separados. La condición de una línea de abajo corresponde a tablet/escritorio. Solicitudes y pedidos con ítems de una línea, ejes compartidos, cantidades numéricas y símbolos sin conversión monetaria. Conservar seguimiento/edición, candidatos y evidencia probable/manual. Campos secundarios y Vincular accesibles por Código en teléfonos; resumen por Pedido. Export completo filtrado y ordenado; errores y fuentes parciales bloquean exportar.",
+      "sources": [
+        "src/pages/RepuestosCompras.tsx",
+        "src/components/repuestos/ComprasPedidosTab.tsx",
+        "src/components/repuestos/SolicitudesCompraTab.tsx",
+        "src/components/repuestos/PurchaseTableHeading.tsx",
+        "src/components/repuestos/purchaseTableFormat.ts",
+        "src/hooks/useCompras.ts",
+        "docs/knowledge/24-Condiciones-visuales-ventas.md",
+        "docs/knowledge/25-Revision-movil-transversal.md"
+      ],
+      "flows": [
+        "comprar-repuestos"
+      ]
+    },
+    {
+      "id": "repuestos.sugerencias",
+      "title": "Sugerencias de compra",
+      "module": "repuestos",
+      "description": "Teléfono: descripción/código/marca agrupados, stock y sugerencia separados; avisos de calidad visibles. Una sola línea rígida de abajo corresponde a tablet/escritorio. Historial/maestro, vínculos, versiones por marca y resultados explicables. Tabla de una línea con marca/código/fabricante y Clase separada de Segmento; doce encabezados con orden global. Cobertura real 12m distinta de demanda ponderada; conservar advertencias de calidad y fórmulas de compra.",
+      "sources": [
+        "src/pages/RepuestosSugerencias.tsx",
+        "src/hooks/useSugerenciasCompra.ts",
+        "src/components/repuestos/PurchaseSuggestionTable.tsx",
+        "src/lib/suggestionTableOrder.ts",
+        "supabase/migrations/20260918210000_purchase_suggestion_identity_sort.sql",
+        "docs/knowledge/24-Condiciones-visuales-ventas.md",
+        "docs/knowledge/25-Revision-movil-transversal.md"
+      ],
+      "flows": [
+        "sugerir-compra"
+      ]
+    },
+    {
+      "id": "admin.usuarios",
+      "title": "Administración de usuarios",
+      "module": "administracion",
+      "description": "Teléfono: nombre/estado/ficha y pestañas visibles; alta/credenciales con desplazamiento acotado. No otorgar permisos al navegar. Usuarios, perfiles, roles, credenciales y permisos de secciones. Datos de acceso no se copian a Obsidian.",
+      "sources": [
+        "src/pages/Admin.tsx",
+        "docs/knowledge/25-Revision-movil-transversal.md"
+      ],
+      "flows": [
+        "dar-acceso"
+      ]
+    },
+    {
+      "id": "admin.importaciones",
+      "title": "Administración de cargas de datos",
+      "module": "administracion",
+      "description": "Importación de archivos y reconciliación de datos externos; distinta de logística de importaciones de máquinas.",
+      "sources": [
+        "src/pages/Admin.tsx",
+        "src/lib/imports/newSystemBundle.ts",
+        "src/lib/imports/newSystemPersist.ts"
+      ],
+      "flows": [
+        "cargar-datos"
+      ]
+    },
+    {
+      "id": "admin.parametros",
+      "title": "Parámetros de la app",
+      "module": "administracion",
+      "description": "Configuración autorizada y parámetros compartidos. Comparar valores vigentes del servidor, no defaults de documentación antigua.",
+      "sources": [
+        "src/pages/Admin.tsx",
+        "src/lib/appSettings.ts"
+      ],
+      "flows": [
+        "dar-acceso",
+        "sugerir-compra"
+      ]
+    }
+  ]
+}
