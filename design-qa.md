@@ -431,3 +431,6 @@ Validación productiva posterior, 15/10: migración 20261015190000 aplicada con 
 
 
 15/10 — Filtros y doble indicador: revisión local con datos ficticios en escritorio, 390 y 320 px. Detalle muestra 2026/2025/2024 en columnas independientes y una línea; sucursales muestran dos indicadores. Ajuste posterior a la revisión de 320 px: espacio reservado a importe y colores, porcentaje oculto bajo 640. Navegador desconectado antes de revisar el ajuste final, panel de filtros y anchos restantes. Validación visual completa pendiente; no acreditar producción.
+
+
+15/10 — Verificación posterior a activación SQL: vista previa actual con fabrizio.vega. Se verifican ambos indicadores por sucursal/resumen, Lila 519/USD228.538,35 sin etiquetas duplicadas, panel de cuatro filtros y columnas 2026/2025/2024. Revisión real escritorio y teléfonos 320/390; encabezados de indicadores móviles corregidos (sin flechas, orden conservado en menú) y comprobados localmente a 320. No se pulsa Publish. Comparación SQL independiente: 40 grupos, cero diferencias en color/días; baseline monetario y promedios preservados.
