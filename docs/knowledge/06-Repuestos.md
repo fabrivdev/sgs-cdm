@@ -105,3 +105,8 @@ La migración `20261015130000_grid_purchase_history.sql` y la ficha CSV completa
 `v_repuestos_ultima_compra` toma la mayor fecha entre ficha activa por equivalencias confirmadas, NF TOTVS positivas C/STOCK e importaciones conciliadas. El reporte anterior permanece auditable pero deja de participar globalmente al activar la ficha, incluso para códigos sin compra real, para no reintroducir fechas de devoluciones. No confirmar equivalencias ambiguas automáticamente.
 
 RPC productivo: 10.043 códigos con stock, USD 4.748.961,27 sin cambio; 9.961 con fecha y 82 sin fecha. Se recuperaron 2.480 fechas, se corrigieron 759 fechas existentes y tres quedaron sin fecha al excluir evidencia no válida. Las 1.485 fechas posteriores a junio de TOTVS permanecen idénticas. Franjas: hasta 365 días 2.814/USD 1.989.450,94; 366–730 días 1.503/USD 796.519,43; más de 730 días 5.644/USD 1.904.870,67; sin fecha 82/USD 58.120,23. Las sumas coinciden con el total. Pruebas locales de parser y SQL cubren exclusiones, activación incompleta, precedencia y equivalencias pendientes.
+
+
+## Permiso independiente de Análisis — 15/10/2026
+
+Análisis usa `repuestos.analisis` en registro de rutas, menú y ruta protegida. La migración `20261015150000_parts_analysis_section_access.sql` registra la sección activa en `app_secciones` para la asignación existente de Administración y exige módulo Repuestos más la sección en ambos RPC del semáforo. No copia permisos de Stock ni asigna usuarios automáticamente; superadmin conserva su acceso global. Repetir el SQL no restaura permisos revocados. Las pruebas SQL verifican denegación sin sección, acceso concedido y revocación; no se alteran cálculos ni diseño.

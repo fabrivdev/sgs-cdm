@@ -115,3 +115,23 @@ describe('valorización por ubicación', () => {
     await expect(report()).rejects.toThrow('Sin acceso');
   });
 });
+
+
+describe('permiso independiente de Análisis', () => {
+  it('deniega Stock solo, permite Análisis y respeta la revocación', async () => {
+    await db.exec(`CREATE OR REPLACE FUNCTION public.has_module_access(uuid,text) RETURNS boolean LANGUAGE sql STABLE AS $$ SELECT true $$;
+      CREATE TABLE app_secciones(id text PRIMARY KEY,modulo_id text,nombre text,orden integer,activo boolean);
+      CREATE FUNCTION public.has_section_access(uuid,text) RETURNS boolean LANGUAGE sql AS $$
+      SELECT coalesce(current_setting('test.analysis_access',true),'false')='true' $$;`);
+    const migration=readFileSync('supabase/migrations/20261015150000_parts_analysis_section_access.sql','utf8');
+    await db.exec(migration);
+    await expect(report()).rejects.toThrow(/Sin acceso/);
+    await expect(db.query('SELECT repuestos_semaforo_historico_paginado()')).rejects.toThrow(/Sin acceso/);
+    await db.exec("SET test.analysis_access='true'");
+    expect((await report()).lineas).toBe(3);
+    await db.exec("SET test.analysis_access='false'");
+    await db.exec(migration);
+    await expect(report()).rejects.toThrow(/Sin acceso/);
+    expect((await db.query("SELECT nombre FROM app_secciones WHERE id='repuestos.analisis'")).rows).toEqual([{nombre:'Análisis'}]);
+  });
+});

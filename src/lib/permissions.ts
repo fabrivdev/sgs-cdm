@@ -17,6 +17,7 @@ export const SECTION_ROUTES = [
   { id: "parque.importaciones", module: "parque", route: "/parque-importaciones" },
   { id: "repuestos.ventas", module: "repuestos", route: "/repuestos/ventas" },
   { id: "repuestos.stock", module: "repuestos", route: "/repuestos" },
+  { id: "repuestos.analisis", module: "repuestos", route: "/repuestos/analisis" },
   { id: "repuestos.compras", module: "repuestos", route: "/repuestos/compras" },
   { id: "repuestos.sugerencias", module: "repuestos", route: "/repuestos/sugerencias" },
   { id: "admin.usuarios", module: "admin", route: "/admin" },

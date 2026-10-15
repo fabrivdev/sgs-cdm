@@ -2,6 +2,10 @@ import { describe, expect, it } from "vitest";
 import { firstAccessibleRoute, roleHasCapability, SECTION_ROUTES } from "@/lib/permissions";
 
 describe("matriz de permisos", () => {
+  it("separa las rutas de Stock y Análisis", () => {
+    expect(firstAccessibleRoute(["repuestos"], ["gerencia"], false, ["repuestos.analisis"])).toBe("/repuestos/analisis");
+    expect(firstAccessibleRoute(["repuestos"], ["gerencia"], false, ["repuestos.stock"])).toBe("/repuestos");
+  });
   it("sustituye Dashboard por Órdenes sin conceder análisis a operativo/jefatura", () => {
     expect(SECTION_ROUTES.some(s => s.id === "servicios.ordenes" && s.route === "/servicios/ordenes")).toBe(true);
     expect(SECTION_ROUTES.map(s => s.id)).not.toContain("servicios.dashboard");

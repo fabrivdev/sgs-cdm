@@ -165,7 +165,7 @@ const App = () => (
                 <Route
                   path="/repuestos/analisis"
                   element={
-                    <ProtectedRoute requireModulo="repuestos" requireSection="repuestos.stock">
+                    <ProtectedRoute requireModulo="repuestos" requireSection="repuestos.analisis">
                       <RepuestosAnalisis />
                     </ProtectedRoute>
                   }

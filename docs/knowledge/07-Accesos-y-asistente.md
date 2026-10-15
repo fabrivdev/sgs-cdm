@@ -47,3 +47,8 @@ Se generan reglas, referencias e inventarios técnicos. No copiar `.env`, tokens
 ## Ajuste local móvil del 07/10/2026
 
 Las altas de operativos/usuarios y la edición de credenciales usan `ResponsiveDrawer`, con encabezado fijo, cuerpo desplazable y acciones accesibles. Se preservan borradores, bloqueo durante guardado, validaciones, payloads, permisos y la distinción entre operativo sin cuenta y usuario con acceso. Las confirmaciones destructivas siguen como `AlertDialog`. Pruebas locales correctas; revisión visual real pendiente y sin altas productivas.
+
+
+## Permiso independiente de Análisis — 15/10/2026
+
+Análisis usa `repuestos.analisis` en registro de rutas, menú y ruta protegida. La migración `20261015150000_parts_analysis_section_access.sql` registra la sección activa en `app_secciones` para la asignación existente de Administración y exige módulo Repuestos más la sección en ambos RPC del semáforo. No copia permisos de Stock ni asigna usuarios automáticamente; superadmin conserva su acceso global. Repetir el SQL no restaura permisos revocados. Las pruebas SQL verifican denegación sin sección, acceso concedido y revocación; no se alteran cálculos ni diseño.
