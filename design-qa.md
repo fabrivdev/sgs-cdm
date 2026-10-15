@@ -1,3 +1,11 @@
+# Design QA — filtros de Ventas de Servicios, 15/10/2026
+
+Revisión directa de la vista previa de la revisión Git `e46b4d1`, con perfil `fabrizio.vega`. A 320/390/639/640/768/1280 px, el documento no desborda horizontalmente. El único buscador visible, los tres indicadores y las pestañas móviles conservan el patrón de Ventas; desde 640 px, Períodos mantiene una línea por registro. A 390 y 1280 px se abrió “Más filtros”: seis selectores útiles, sin campos textuales separados ni Origen, con pie Aplicar/Limpiar accesible. Captura de escritorio en la carpeta local de visualizaciones (`ventas-servicios-filtros-2026-10-15.png`). La revisión independiente requerida por la regla madre sigue pendiente.
+
+La vista previa mostró el mismo total general de $ 421.357 antes y después del cambio de interfaz; es un control de regresión del corte visible, no certifica todos los rangos. En pruebas locales pasaron 59 casos únicos en dos tandas (47 y 16, con cuatro compartidos) de vistas, totales, notas de crédito, orden y Excel; también TypeScript, lint y build. PGlite comprobó que la migración nueva conserva 430 USD del fixture y encuentra 100 USD por código financiero/fabricante; la migración no estaba aplicada a producción durante esta revisión. No se ejecutaron exportaciones reales con datos privados.
+
+---
+
 # Design QA — valorización por sucursal y tabla analítica, 14/10/2026
 
 Resultado: revisión visual independiente aprobada, sin P0/P1/P2 pendientes. Esta revisión sustituye las decisiones de distribución por códigos y color solo en detalle del registro anterior, preservado debajo como historia.
