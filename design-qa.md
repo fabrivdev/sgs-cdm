@@ -419,3 +419,6 @@ Local browser check: desktop accessibility confirmed the active initial selectio
 ## 2026-10-15 — Ayudas de Análisis y tabla
 
 Revisión local con StockSemaphoreSection real y RPC simulado (120 filas HORSCH; no datos productivos). Escritorio: ayuda de ocho colores, anillo, indicadores de antigüedad por sucursal y HORSCH completo; detalle carga 50 → 100 → 120 al desplazar, sin paginador. Teléfono 390 × 844: detalle de una línea, columnas compactas y botón Cargar más registros. Encabezado opaco evita superposición de textos al desplazar. Captura privada: outputs/analysis-branch-average.png en el espacio de trabajo. El tooltip del anillo está implementado; no se verificó movimiento de puntero con la API disponible. Promedio requiere migración remota pendiente, probado con PGlite; no afirmar verificación productiva.
+
+
+Validación productiva posterior, 15/10: migración 20261015190000 aplicada con autorización. Seis promedios cotejados contra cálculo independiente, colores y etiquetas comprobados en vista previa con fabrizio.vega. Ayuda Campo 9: 688,8 días/99,8% cobertura; total USD 4.748.961,27. Evidencia privada outputs/branch-average-live.png. Esto cierra el pendiente de migración del apartado anterior; no implica Publish de Lovable.
