@@ -2,7 +2,7 @@
 import { readFileSync } from "node:fs";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { PGlite } from "@electric-sql/pglite";
-const sql = readFileSync("supabase/migrations/20261003010500_honor_confirmed_totvs_exclusions.sql", "utf8");
+const sql = readFileSync("supabase/migrations/20261003010500_honor_confirmed_totvs_exclusions.sql", "utf8").replace(/\r\n/g, "\n");
 const db = new PGlite();
 beforeAll(async () => { await db.exec(`
  CREATE TABLE tmp_facturacion_totvs_unicas(identidad text,linea jsonb);

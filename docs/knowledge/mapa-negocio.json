@@ -244,7 +244,7 @@
       "id": "factura",
       "title": "Documento de facturación y NC",
       "module": "ventas",
-      "description": "Documento comercial identificado con origen, sucursal, fecha, número y clase. Factura y nota de crédito requieren signo y conteo correctos.",
+      "description": "Documento comercial identificado con origen, sucursal, fecha, número y clase. Factura y nota de crédito requieren signo y conteo correctos. El preflight TOTVS ejecuta la validación transaccional con rollback antes de las demás cargas. Optimización 20261015110000 preparada, no aplicada: acota búsquedas por identidad a orígenes TOTVS sin alterar reglas, permisos ni timeout.",
       "tables": [
         "facturacion",
         "facturacion_lineas_importadas"
