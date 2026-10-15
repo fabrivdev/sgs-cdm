@@ -124,3 +124,6 @@ Implementación: StockSemaphoreSection, PartsAnalysisTable, useSemaforoListado y
 
 
 Vista previa real comprobada el 15/10 con fabrizio.vega: las seis etiquetas y colores coinciden con el SQL; ayuda Campo 9 muestra 688,8 días y cobertura 99,8%. Dashboard carga correctamente con total USD 4.748.961,27. No se pulsó Publish de Lovable; la comprobación visual corresponde a la vista previa conectada a la base real.
+
+
+Verificación de entrega de criterios: 31 pruebas, TypeScript y build locales correctos; ayudas revisadas visualmente en compilación local y compartidas por leyenda, tooltip y hoja Colores del Excel exportado. La vista previa remota consultada tras el push aún servía textos anteriores aunque los importes ya reflejaban el SQL nuevo. No declarar actualizadas las ayudas remotas hasta comprobar la sincronización de Lovable. No se pulsó Publish.

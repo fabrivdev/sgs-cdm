@@ -422,3 +422,6 @@ Revisión local con StockSemaphoreSection real y RPC simulado (120 filas HORSCH;
 
 
 Validación productiva posterior, 15/10: migración 20261015190000 aplicada con autorización. Seis promedios cotejados contra cálculo independiente, colores y etiquetas comprobados en vista previa con fabrizio.vega. Ayuda Campo 9: 688,8 días/99,8% cobertura; total USD 4.748.961,27. Evidencia privada outputs/branch-average-live.png. Esto cierra el pendiente de migración del apartado anterior; no implica Publish de Lovable.
+
+
+15/10 — Criterios históricos confirmados: nueva leyenda local revisada en pantalla (outputs/criteria-corrected-local.png, datos sintéticos). SQL real aplicado, 10.043 códigos coinciden y grupos USD suman 4.748.961,27; snapshot de sucursales/franjas/RPC idéntico antes-después. Vista previa remota aún mostraba textos anteriores tras push; revisión visual remota de la leyenda queda pendiente de sincronización. Sin Publish.
