@@ -94,3 +94,14 @@ Verificación productiva posterior del 15/10: Kardex analítico=0, compras=0, de
 
 
 Actualización de archivos del 15/10 posterior a la activación: el despacho ahora contiene 1.949 líneas, 1.904 de REP. Cruce local actualizado concilia las 1.904 entradas IMP del Kardex en 1.814 grupos, sin diferencias de cantidad ni fecha documental; cero pendientes de archivo de octubre. Esto sustituye el pendiente de 127 del export anterior, pero no constituye importación: producción todavía conserva 1.817 filas de despacho y cero Kardex/compras. El intento del usuario se detuvo en billing.validate; ver [[03-Ventas-y-conciliacion]].
+
+
+## Estado vigente: ficha de compras reales — 15/10/2026
+
+Esta verificación sustituye los estados anteriores de fuentes vacías. Tras el reintento del usuario, producción contiene 37.492 movimientos de Kardex, 3.731 líneas de compras y 1.949 de despacho; las entradas IMP concilian en 1.814 grupos sin pendientes.
+
+La migración `20261015130000_grid_purchase_history.sql` y la ficha CSV completa están aplicadas y activas. Se verificaron 292.144 movimientos: 69.635 entradas de compra/importación cerradas y positivas, 20.559 códigos de cobertura y 20.310 fechas reales. Se excluyen devoluciones, notas de crédito y ventas. El XLS de la ficha está truncado y no es la fuente de carga. `scripts/prepare-grid-purchase-history.py` genera lotes privados; la activación comprueba cantidad, fechas y huella antes de exponerlos.
+
+`v_repuestos_ultima_compra` toma la mayor fecha entre ficha activa por equivalencias confirmadas, NF TOTVS positivas C/STOCK e importaciones conciliadas. El reporte anterior permanece auditable pero deja de participar globalmente al activar la ficha, incluso para códigos sin compra real, para no reintroducir fechas de devoluciones. No confirmar equivalencias ambiguas automáticamente.
+
+RPC productivo: 10.043 códigos con stock, USD 4.748.961,27 sin cambio; 9.961 con fecha y 82 sin fecha. Se recuperaron 2.480 fechas, se corrigieron 759 fechas existentes y tres quedaron sin fecha al excluir evidencia no válida. Las 1.485 fechas posteriores a junio de TOTVS permanecen idénticas. Franjas: hasta 365 días 2.814/USD 1.989.450,94; 366–730 días 1.503/USD 796.519,43; más de 730 días 5.644/USD 1.904.870,67; sin fecha 82/USD 58.120,23. Las sumas coinciden con el total. Pruebas locales de parser y SQL cubren exclusiones, activación incompleta, precedencia y equivalencias pendientes.
