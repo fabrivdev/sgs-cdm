@@ -219,3 +219,34 @@ describe('criterios históricos confirmados del Excel', () => {
     } finally { await db.exec('ROLLBACK'); }
   });
 });
+
+
+describe('clasificación combinada de ventas y compra', () => {
+  it('reclasifica sin ventas por compra, sin cambiar promedios, franjas ni importes', async () => {
+    const before=await report();
+    const migration=readFileSync('supabase/migrations/20261015210000_historical_colors_sales_and_purchase.sql','utf8');
+    await db.exec(migration); await db.exec(migration);
+    const after=await report();
+    expect(after.sucursales).toEqual(before.sucursales);
+    expect(after.franjas).toEqual(before.franjas);
+    expect(after.valor_kardex_usd).toBe(before.valor_kardex_usd);
+    expect(after.lineas).toBe(before.lineas);
+    await db.exec('BEGIN');
+    try {
+      await db.exec("DELETE FROM repuestos_ventas_vinculacion WHERE producto_codigo='REP1'");
+      for(const [days,color] of [[365,'LILA'],[366,'GRIS'],[1000,'GRIS'],[1001,'ROJO']] as const) {
+        await db.exec(`UPDATE totvs_facturas_compra_lineas SET fecha_emision=current_date-${days} WHERE producto_codigo='REP1' AND especie='NF' AND cantidad>0 AND fecha_emision<=current_date;
+          DELETE FROM repuestos_compras_historicas WHERE codigo_legacy_norm='8';`);
+        expect((await report()).rows.find(r=>r.codigo_interno==='REP1')?.color).toBe(color);
+        expect((await report({color})).rows.some(r=>r.codigo_interno==='REP1')).toBe(true);
+      }
+      await db.exec("DELETE FROM totvs_facturas_compra_lineas WHERE producto_codigo='REP1'");
+      expect((await report()).rows.find(r=>r.codigo_interno==='REP1')?.color).toBe('SIN_DATOS');
+      await db.exec("INSERT INTO repuestos_ventas_vinculacion VALUES ('REP1',current_date,1,'CONFIRMADA')");
+      expect((await report()).rows.find(r=>r.codigo_interno==='REP1')?.color).toBe('VERDE_CLARO');
+    } finally { await db.exec('ROLLBACK'); }
+  });
+  it.each([[10,10,10,null,'VERDE_OSCURO'],[1,0,0,1001,'VERDE_CLARO'],[0,1,0,1,'AMARILLO'],[0,0,1,1,'NARANJA'],[0,0,0,0,'LILA'],[0,0,0,365,'LILA'],[0,0,0,366,'GRIS'],[0,0,0,1000,'GRIS'],[0,0,0,1001,'ROJO'],[0,0,0,null,'SIN_DATOS'],[0,0,0,-1,'SIN_DATOS']])('prioridad ventas/compra %s/%s/%s días %s => %s',async(a,b,c,d,color)=>{
+    expect((await db.query<{color:string}>('SELECT repuestos_color_ventas_compra($1,$2,$3,$4) color',[a,b,c,d])).rows[0].color).toBe(color);
+  });
+});

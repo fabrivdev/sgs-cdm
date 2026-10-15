@@ -8,10 +8,10 @@ export const SEMAFORO_COLORES = [
   { id: "VERDE_CLARO", label: "Verde claro", descripcion: "Ventas en el año actual, sin cumplir verde oscuro", className: "bg-emerald-400" },
   { id: "AMARILLO", label: "Amarillo", descripcion: "Ventas el año anterior y ninguna en el actual", className: "bg-amber-400" },
   { id: "NARANJA", label: "Naranja", descripcion: "Ventas solo en el más antiguo de los tres años calendario", className: "bg-orange-500" },
-  { id: "LILA", label: "Lila", descripcion: "Sin ventas en los tres años evaluados; última venta real hasta 365 días", className: "bg-violet-400" },
-  { id: "GRIS", label: "Gris", descripcion: "Sin ventas en los tres años evaluados; última venta real de 366 a 1.000 días", className: "bg-slate-400" },
-  { id: "ROJO", label: "Rojo", descripcion: "Sin ventas en los tres años evaluados; última venta real hace más de 1.000 días", className: "bg-red-500" },
-  { id: "SIN_DATOS", label: "Sin datos", descripcion: "Sin fecha de venta real confirmada ni ventas en los tres años evaluados", className: "bg-slate-200" },
+  { id: "LILA", label: "Lila", descripcion: "Sin ventas en los tres años evaluados; última compra hasta 365 días", className: "bg-violet-400" },
+  { id: "GRIS", label: "Gris", descripcion: "Sin ventas en los tres años evaluados; última compra de 366 a 1.000 días", className: "bg-slate-400" },
+  { id: "ROJO", label: "Rojo", descripcion: "Sin ventas en los tres años evaluados; última compra hace más de 1.000 días", className: "bg-red-500" },
+  { id: "SIN_DATOS", label: "Sin datos", descripcion: "Sin fecha de compra comprobada ni ventas en los tres años evaluados", className: "bg-slate-200" },
 ] as const;
 
 export type SemaforoColor = typeof SEMAFORO_COLORES[number]["id"];
