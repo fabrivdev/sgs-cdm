@@ -44,7 +44,7 @@ export function buildNotes(root,vault){
  const graph=buildKnowledgeGraph(root,tracked,n=>read(root,n));
  for(const n of catalog.filter(n=>!n.includes('/')&&!['10-Mapa-del-codigo.md','11-Migraciones.md','14-Atlas-de-la-app.md'].includes(n)))notes.set(n,read(root,'docs/knowledge/'+n));
  for(const [n,s]of graph)if(allowed.has(n))notes.set(n,s);
- const stamp=`Referencia de código revisada: ${review.codeRevision}. Árbol funcional comprobado contra HEAD ${revision}. No acredita despliegue ni SQL aplicado.`;
+ const stamp=`Referencia de código revisada: ${review.codeRevision}. Árbol funcional coincidente con esa referencia. No acredita despliegue ni SQL aplicado.`;
  const code=tracked.filter(n=>/^(src|supabase\/functions)\/.*\.(ts|tsx)$/.test(n)&&!/[.]test[.]|\/ui\/|\/integrations\/|vite-env/.test(n));
  const migrations=tracked.filter(n=>/^supabase\/migrations\/.*\.sql$/.test(n));
  const list=items=>items.map(n=>'- `'+n+'`').join('\n');
