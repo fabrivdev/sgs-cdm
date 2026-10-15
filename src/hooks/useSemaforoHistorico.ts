@@ -1,4 +1,4 @@
-import { useQuery } from "@tanstack/react-query";
+import { useInfiniteQuery, useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 
 export const SEMAFORO_PAGE_SIZE = 50;
@@ -96,7 +96,7 @@ export interface SemaforoResultado {
   saldos_coincidentes: number;
   kardex_cargado_en: string | null;
   por_color: SemaforoResumenColor[];
-  sucursales: Array<{ nombre: string; lineas: number; unidades: number; valor_kardex_usd: number | null }>;
+  sucursales: Array<{ nombre: string; lineas: number; unidades: number; valor_kardex_usd: number | null; dias_compra_promedio?: number | null; valor_compra_con_fecha_usd?: number; valor_positivo_usd?: number; ubicaciones_fuera_promedio?: number }>;
   rows: SemaforoFila[];
 }
 
@@ -134,5 +134,23 @@ export function useSemaforoHistorico(filtros: SemaforoFiltros, page: number, agr
     staleTime: 5 * 60_000,
     retry: false,
     refetchOnWindowFocus: false,
+  });
+}
+
+export function useSemaforoListado(filtros: SemaforoFiltros, agrupacion: SemaforoAgrupacion) {
+  return useInfiniteQuery({
+    queryKey: ["repuestos", "semaforo_listado", filtros, agrupacion],
+    initialPageParam: { page: 0, version: null as string | null, total: null as number | null },
+    queryFn: async ({ pageParam }) => {
+      const result = await fetchSemaforoHistorico(filtros, pageParam.page, SEMAFORO_PAGE_SIZE, agrupacion);
+      if (pageParam.version !== null && (result.version !== pageParam.version || result.lineas !== pageParam.total)) {
+        throw new Error("El inventario cambió. Actualizá la tabla antes de continuar.");
+      }
+      if (result.rows.length !== Math.min(SEMAFORO_PAGE_SIZE, Math.max(0, result.lineas - pageParam.page * SEMAFORO_PAGE_SIZE))) throw new Error("La página de inventario está incompleta.");
+      return result;
+    },
+    getNextPageParam: (last, pages) => pages.reduce((sum,p) => sum+p.rows.length,0) < last.lineas
+      ? { page: pages.length, version: pages[0].version, total: pages[0].lineas } : undefined,
+    staleTime: 5 * 60_000, retry: false, refetchOnWindowFocus: false,
   });
 }

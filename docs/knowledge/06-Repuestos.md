@@ -110,3 +110,12 @@ RPC productivo: 10.043 códigos con stock, USD 4.748.961,27 sin cambio; 9.961 co
 ## Permiso independiente de Análisis — 15/10/2026
 
 Análisis usa `repuestos.analisis` en registro de rutas, menú y ruta protegida. La migración `20261015150000_parts_analysis_section_access.sql` registra la sección activa en `app_secciones` para la asignación existente de Administración y exige módulo Repuestos más la sección en ambos RPC del semáforo. No copia permisos de Stock ni asigna usuarios automáticamente; superadmin conserva su acceso global. Repetir el SQL no restaura permisos revocados. Las pruebas SQL verifican denegación sin sección, acceso concedido y revocación; no se alteran cálculos ni diseño.
+
+
+## Ayudas y promedio por sucursal — 15/10/2026
+
+La clasificación histórica explica sus criterios mediante un botón de información y el tooltip del anillo (color, USD y participación); no agrega subtítulos ni texto permanente. Marca dispone de 110 px para mostrar HORSCH. El detalle conserva una línea por registro y usa el patrón de Ventas: RowCount, carga progresiva en escritorio y Cargar más registros en teléfono, sin selector de páginas. Cambiar filtros u orden inicia otro conjunto; se rechazan páginas incompletas o con versión/conteo diferente.
+
+El usuario definió el color de sucursal por días desde última compra ponderados por USD local: suma(días × USD positivos con fecha) / suma(USD positivos con fecha). La fecha es global del producto, no FIFO ni fecha de recepción local. Verde ≤365, amarillo >365 y ≤730, rojo >730; sin base válida queda gris. Se clasifica sin redondear el promedio. La ayuda muestra cobertura sobre USD positivos y excluye registros sin fecha/valor positivo; los totales monetarios mantienen su tratamiento anterior.
+
+Implementación: StockSemaphoreSection, PartsAnalysisTable, useSemaforoListado y migración 20261015190000_parts_branch_purchase_age.sql. SQL probado localmente con pesos distintos, filtros, denominador nulo, valores negativos, idempotencia y permiso independiente. Migración remota pendiente de autorización y ejecución; no declarar el promedio disponible en producción hasta verificarla. Revisión visual local con datos sintéticos: escritorio y teléfono de 390 px, HORSCH completo, ayudas y carga progresiva. No sustituye comprobación de datos productivos.

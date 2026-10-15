@@ -414,3 +414,8 @@ Local browser check: desktop accessibility confirmed the active initial selectio
 - Filtro de franja, limpieza, desglose marca→familia, detalle con última compra/fuente y Excel de10044 filas únicas/seis hojas comprobados. Estados carga/error/vacío e importes grandes revisados; $123456789,12 conservado en detalle móvil.
 - 16 pruebas de SQL y contrato: fechas, equivalencias activas, compra posterior, NC/futuro/cantidad negativa, límites365/366/730/731, filtros, sumas, orden global y permisos. Lint/build correctos. TypeScript global conserva errores ajenos en importadores/otras vistas, sin errores en archivos del análisis.
 - Datos reales: GRID7183 filas,7167 fechas válidas,16 vacías; equivalencias confirmadas7017filas→7016productos. SQL privado probado dos veces localmente sin duplicados. Facturas de compra TOTVS/Kardex movimientos0filas en consulta remota. Migración y carga histórica nuevas NO aplicadas; no se acredita pantalla pública.
+
+
+## 2026-10-15 — Ayudas de Análisis y tabla
+
+Revisión local con StockSemaphoreSection real y RPC simulado (120 filas HORSCH; no datos productivos). Escritorio: ayuda de ocho colores, anillo, indicadores de antigüedad por sucursal y HORSCH completo; detalle carga 50 → 100 → 120 al desplazar, sin paginador. Teléfono 390 × 844: detalle de una línea, columnas compactas y botón Cargar más registros. Encabezado opaco evita superposición de textos al desplazar. Captura privada: outputs/analysis-branch-average.png en el espacio de trabajo. El tooltip del anillo está implementado; no se verificó movimiento de puntero con la API disponible. Promedio requiere migración remota pendiente, probado con PGlite; no afirmar verificación productiva.

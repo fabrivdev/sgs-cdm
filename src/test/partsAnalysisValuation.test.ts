@@ -135,3 +135,33 @@ describe('permiso independiente de Análisis', () => {
     expect((await db.query("SELECT nombre FROM app_secciones WHERE id='repuestos.analisis'")).rows).toEqual([{nombre:'Análisis'}]);
   });
 });
+
+
+describe('antigüedad ponderada por sucursal', () => {
+  it('pondera USD de cada ubicación, excluye ausencias/no positivos y respeta filtros y permisos', async () => {
+    await db.exec("SET test.analysis_access='true'");
+    const migration = readFileSync('supabase/migrations/20261015190000_parts_branch_purchase_age.sql','utf8');
+    await db.exec(migration);
+    await db.exec(migration);
+    await db.exec("UPDATE totvs_facturas_compra_lineas SET fecha_emision=current_date-365 WHERE producto_codigo='REP1' AND especie='NF' AND cantidad>0 AND fecha_emision<=current_date");
+    const original = await report();
+    expect(original.sucursales.find(b=>b.nombre==='Santa Rita')?.dias_compra_promedio).toBe(365);
+    expect(original.sucursales.find(b=>b.nombre==='99')?.dias_compra_promedio).toBeNull();
+    await db.exec('BEGIN');
+    try {
+      await db.exec(`INSERT INTO totvs_facturas_compra_lineas VALUES ('REP2',current_date-1000,'NF',1,300);
+        INSERT INTO totvs_kardex_sintetico VALUES ('REP2','01','01',4,300,now(),'k.xml');`);
+      const all = await report();
+      const branch = all.sucursales.find(b=>b.nombre==='Santa Rita')!;
+      expect(branch.dias_compra_promedio).toBe(841.25);
+      expect(branch.valor_compra_con_fecha_usd).toBe(400);
+      expect(branch.valor_positivo_usd).toBe(400);
+      expect(all.sucursales.find(b=>b.nombre==='Katuete')?.dias_compra_promedio).toBe(365);
+      expect((await report({marca:'GATES'})).sucursales.find(b=>b.nombre==='Santa Rita')?.dias_compra_promedio).toBe(1000);
+      expect((await report({deposito:'52'})).sucursales.every(b=>b.dias_compra_promedio===null)).toBe(true);
+      expect((await report({},'marca',1)).sucursales).toEqual(all.sucursales);
+      await db.exec("SET test.analysis_access='false'");
+      await expect(report()).rejects.toThrow(/Sin acceso/);
+    } finally { await db.exec('ROLLBACK'); }
+  });
+});

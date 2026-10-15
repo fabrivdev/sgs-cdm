@@ -4,7 +4,7 @@ const client = vi.hoisted(() => ({
   rest: { ready: true },
   rpc(this: { rest: { ready: boolean } }) {
     if (!this.rest.ready) throw new Error("RPC perdió el contexto del cliente");
-    return Promise.resolve({ data: { rows: [], por_color: [], sucursales: [], lineas: 0 }, error: null });
+    return Promise.resolve({ data: { rows: [], por_color: [], sucursales: [], lineas: 0, grupos: [], franjas: [], facetas: { familias: [], depositos: [], sucursales: [] }, version: "fixture", base_antiguedad: "ULTIMA_COMPRA_V1" }, error: null });
   },
 }));
 vi.mock("@/integrations/supabase/client", () => ({ supabase: client }));

@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { AlertTriangle, ChevronLeft, ChevronRight, Package, Boxes, Coins, X } from "lucide-react";
+import { AlertTriangle, ChevronLeft, ChevronRight, Package, Boxes, Coins, Info, X } from "lucide-react";
 import { toast } from "sonner";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { MarcaBadge } from "@/components/StatusBadges";
@@ -9,7 +9,7 @@ import { KpiItem, KpiStrip, PageHeader, Panel } from "@/components/layout/AppPri
 import { FiltersBar, FilterSelect, FilterCustom } from "@/components/filters/FiltersBar";
 import { SectionActionsMenu } from "@/components/exports/SectionActionsMenu";
 import { type CompactListColumn } from "@/components/lists/CompactListTable";
-import { PieChart, Pie, Cell, ResponsiveContainer } from "recharts";
+import { PieChart, Pie, Cell, ResponsiveContainer, Tooltip as ChartTooltip } from "recharts";
 import { ResponsiveDrawer, ResponsiveDrawerBody, ResponsiveDrawerHeader } from "@/components/ui/responsive-drawer";
 
 import { sectionTitle, tableText } from "@/lib/ui-classes";
@@ -17,10 +17,11 @@ import { useDebouncedValue } from "@/hooks/useDebouncedValue";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { PartsAnalysisTable } from "./PartsAnalysisTable";
 import { sortSalesRows, type SalesSort } from "@/components/ventas/salesTableInteraction";
+import { Popover, PopoverTrigger, PopoverContent } from "@/components/ui/popover";
 import { Input } from "@/components/ui/input";
 import { MARCAS } from "@/lib/constants";
 import {
-  fetchSemaforoHistorico, SEMAFORO_COLORES, SEMAFORO_PAGE_SIZE,
+  fetchSemaforoHistorico, SEMAFORO_COLORES, useSemaforoListado,
   useSemaforoHistorico, type SemaforoFila, type SemaforoFiltros, type SemaforoAgrupacion, type SemaforoGrupo,
 } from "@/hooks/useSemaforoHistorico";
 
@@ -76,6 +77,13 @@ function ColorLabel({ color, compact = false }: { color: string; compact?: boole
   </span>;
 }
 
+function BranchAge({ branch }: { branch: import("@/hooks/useSemaforoHistorico").SemaforoResultado["sucursales"][number] }) {
+  const band = purchaseAgeBand(branch.dias_compra_promedio);
+  const days = branch.dias_compra_promedio;
+  const label = days == null ? "Sin base para calcular" : `${Number(days).toLocaleString("es-PY", { maximumFractionDigits: 1 })} días promedio`;
+  return <Popover><PopoverTrigger asChild><button className="flex h-8 w-5 shrink-0 items-center justify-center rounded focus-visible:ring-2 focus-visible:ring-ring" aria-label={`Antigüedad de ${branch.nombre}: ${label}`} title={`${label}. Ponderado por USD. ${band.label}`}><span className={`h-2.5 w-2.5 rounded-full ${band.className}`} /></button></PopoverTrigger><PopoverContent className="w-64 text-xs" align="start"><div className="font-medium">{branch.nombre} · {label}</div><p className="mt-2">Días desde la última compra global, ponderados por el valor USD positivo de esta sucursal.</p><p className="mt-2">Cobertura: {percent(branch.valor_compra_con_fecha_usd, branch.valor_positivo_usd)} del valor USD positivo. Sin fecha o sin valor positivo quedan fuera del promedio.</p><p className="mt-2">Verde: hasta 365 días. Amarillo: más de 365 y hasta 730. Rojo: más de 730.</p></PopoverContent></Popover>;
+}
+
 function DetailFields({ row }: { row: SemaforoFila }) {
   const year = Number(row.fecha_analisis.slice(0, 4));
   const fields = [
@@ -99,31 +107,29 @@ function DetailFields({ row }: { row: SemaforoFila }) {
 }
 
 
-import { GROUP_LABELS, STOCK_BANDS } from "./partsAnalysisDefinitions";
+import { GROUP_LABELS, STOCK_BANDS, purchaseAgeBand } from "./partsAnalysisDefinitions";
 
 export function StockSemaphoreSection({ canExport }: { canExport: boolean }) {
   const [search, setSearch] = useState("");
   const debounced = useDebouncedValue(search, 300);
   const [filtros, setFiltros] = useState<SemaforoFiltros>(INITIAL_FILTERS);
-  const [page, setPage] = useState(0);
   const [tab, setTab] = useState("resumen");
   const [agrupacion, setAgrupacion] = useState<SemaforoAgrupacion>("marca");
   const [path, setPath] = useState<Array<{ key: SemaforoAgrupacion; value: string }>>([]);
   const [selected, setSelected] = useState<SemaforoFila | null>(null);
   const [detailSort, setDetailSort] = useState<SalesSort>({ key: "usd", direction: "desc" });
   const [groupSort, setGroupSort] = useState<SalesSort>({ key: "valor", direction: "desc" });
-  const toggleSort = (key: string) => { setPage(0); const setter = tab === "resumen" ? setGroupSort : setDetailSort; setter(prev => ({ key, direction: prev.key === key && prev.direction === "asc" ? "desc" : "asc" })); };
+  const toggleSort = (key: string) => { const setter = tab === "resumen" ? setGroupSort : setDetailSort; setter(prev => ({ key, direction: prev.key === key && prev.direction === "asc" ? "desc" : "asc" })); };
   const [exporting, setExporting] = useState(false);
   useEffect(() => { setFiltros(current => ({ ...current, busqueda: debounced })); }, [debounced]);
-  useEffect(() => { setPage(0); setSelected(null); setPath([]); }, [filtros]);
-  useEffect(() => { setPage(0); }, [path]);
+  useEffect(() => { setSelected(null); setPath([]); }, [filtros]);
   const detailFilters = { ...filtros, orden: detailSort.key, direccion: detailSort.direction, ...Object.fromEntries(path.map(item => [item.key, item.value])) };
   const overview = useSemaforoHistorico(filtros, 0);
-  const report = useSemaforoHistorico(detailFilters, page, agrupacion);
+  const listing = useSemaforoListado(detailFilters, agrupacion);
+  const report = { ...listing, data: listing.data?.pages[0] };
   const data = overview.data;
-  const rows = report.data?.rows ?? [];
+  const rows = listing.data?.pages.flatMap(page => page.rows) ?? [];
   const byColor = new Map(data?.por_color.map(item => [item.color, item]) ?? []);
-  const pages = Math.max(1, Math.ceil((report.data?.lineas ?? 0) / SEMAFORO_PAGE_SIZE));
   const update = (key: keyof SemaforoFiltros, value: string) => setFiltros(current => ({ ...current, [key]: value === "all" ? "" : value }));
   const toggle = (key: keyof SemaforoFiltros, value: string) => update(key, filtros[key] === value ? "" : value);
   const filter = (key: keyof SemaforoFiltros, label: string, options: Array<{value: string; label: string}>) => <FilterSelect label={label} value={filtros[key] || "all"} onChange={value => update(key, value)} placeholder="Todos" options={[{ value: "all", label: "Todos" }, ...options]} />;
@@ -164,7 +170,7 @@ export function StockSemaphoreSection({ canExport }: { canExport: boolean }) {
   const columns: CompactListColumn<SemaforoFila>[] = [
     { key: "codigo", label: "Código", kind: "text", width: "w-[110px]", value: row => row.codigo_interno, render: row => <button className="block min-h-11 w-full truncate text-left font-mono focus-visible:ring-2 focus-visible:ring-ring sm:min-h-0" onClick={() => setSelected(row)} aria-label={`Ver ${row.codigo_interno}`}>{row.codigo_interno}</button> },
     { key: "descripcion", label: "Descripción", kind: "text", width: "w-auto", value: row => row.descripcion },
-    { key: "marca", label: "Marca", kind: "text", width: "w-[85px]", hiddenBelow: "xl", value: row => row.marca, render: row => <MarcaBadge marca={row.marca} /> },
+    { key: "marca", label: "Marca", kind: "text", width: "w-[110px]", hiddenBelow: "xl", value: row => row.marca, render: row => <MarcaBadge marca={row.marca} className="px-1.5 py-0 text-[10px]" /> },
     { key: "stock", label: "Stock", kind: "number", align: "center", width: "w-[100px]", hiddenBelow: "lg", value: row => row.stock_total, render: row => quantity(row.stock_total) },
     { key: "usd", label: "Valor USD", kind: "number", align: "right", width: "w-[150px]", value: row => row.valor_kardex_usd, render: row => usd(row.valor_kardex_usd) },
     { key: "dias", label: "Días venta", kind: "number", align: "center", width: "w-[100px]", hiddenBelow: "lg", value: row => row.dias_ultima_venta, render: row => quantity(row.dias_ultima_venta) },
@@ -204,11 +210,16 @@ export function StockSemaphoreSection({ canExport }: { canExport: boolean }) {
         <KpiItem label="Valor del inventario" value={<span title={`USD. ${data.lineas_valorizadas} códigos con valor; ${data.ubicaciones_sin_valor} ubicaciones de stock sin valor. La fecha de carga no es la fecha de corte.`}>{usd(data.valor_kardex_usd)}</span>} icon={<Coins />} className="[&>div:nth-child(2)]:whitespace-nowrap [&>div:nth-child(2)]:text-[clamp(14px,1.6vw,20px)]" />
       </KpiStrip>
       <div className="grid min-w-0 gap-3 [grid-template-columns:repeat(auto-fit,minmax(min(100%,520px),1fr))]">
-        <Card className="min-w-0"><CardHeader className="px-3 py-3"><CardTitle className={sectionTitle}>Clasificación histórica de ventas</CardTitle></CardHeader><CardContent className="grid min-w-0 items-center gap-3 px-3 pb-3 sm:grid-cols-[minmax(200px,0.9fr)_minmax(0,1fr)]">
-          <div className="mx-auto aspect-square w-full max-w-[340px] min-w-0" aria-hidden title={canChart ? "Participación en USD" : "Distribución no representable con total nulo o categorías negativas"}><ResponsiveContainer width="100%" height="100%"><PieChart><Pie data={canChart ? chart : [{ value: 1, fill: "#e2e8f0" }]} dataKey="value" innerRadius="58%" outerRadius="96%" stroke="hsl(var(--card))" strokeWidth={2} isAnimationActive={false} onClick={(_, index) => { if (canChart && chart[index]) toggle("color", chart[index].id); }}>{(canChart ? chart : [{ fill: "#e2e8f0" }]).map((item, index) => <Cell key={index} fill={item.fill} />)}</Pie></PieChart></ResponsiveContainer></div>
+        <Card className="min-w-0"><CardHeader className="px-3 py-3"><div className="flex items-center justify-between gap-2"><CardTitle className={sectionTitle}>Clasificación histórica de ventas</CardTitle><Popover><PopoverTrigger asChild><button className="flex h-8 w-8 shrink-0 items-center justify-center rounded text-muted-foreground focus-visible:ring-2 focus-visible:ring-ring" aria-label="Criterios de los colores"><Info className="h-4 w-4" /></button></PopoverTrigger><PopoverContent className="w-80 max-w-[calc(100vw-2rem)] text-xs" align="end"><div className="space-y-3">{SEMAFORO_COLORES.map(color => <div key={color.id}><ColorLabel color={color.id} /><p className="mt-1 text-muted-foreground">{color.descripcion}</p></div>)}</div></PopoverContent></Popover></div></CardHeader><CardContent className="grid min-w-0 items-center gap-3 px-3 pb-3 sm:grid-cols-[minmax(200px,0.9fr)_minmax(0,1fr)]">
+          <div className="mx-auto aspect-square w-full max-w-[340px] min-w-0" title={canChart ? undefined : "Distribución no representable con total nulo o categorías negativas"}><ResponsiveContainer width="100%" height="100%"><PieChart><Pie data={canChart ? chart : [{ value: 1, fill: "#e2e8f0" }]} dataKey="value" innerRadius="58%" outerRadius="96%" stroke="hsl(var(--card))" strokeWidth={2} isAnimationActive={false} onClick={(_, index) => { if (canChart && chart[index]) toggle("color", chart[index].id); }}>{(canChart ? chart : [{ fill: "#e2e8f0" }]).map((item, index) => <Cell key={index} fill={item.fill} />)}</Pie>{canChart && <ChartTooltip content={({ active, payload }) => {
+            if (!active || !payload?.length) return null;
+            const item = payload[0].payload;
+            const color = SEMAFORO_COLORES.find(c => c.id === item.id);
+            return <div className="max-w-[260px] rounded-md border bg-popover px-3 py-2 text-xs text-popover-foreground shadow-md"><div className="font-medium">{item.name}</div><div className="mt-1 tabular-nums">{usd(item.value)} · {percent(item.value, data.valor_kardex_usd)}</div><div className="mt-1">{color?.descripcion}</div></div>;
+          }} />}</PieChart></ResponsiveContainer></div>
           <table aria-label="Distribución por color" className="w-full table-fixed text-[12px] tabular-nums"><thead className="text-muted-foreground"><tr className="border-b"><th className="py-2 text-left font-medium">Color</th><th className="w-[47%] py-2 text-right font-medium">Valor USD</th><th className="w-[20%] py-2 text-right font-medium">%</th></tr></thead><tbody>{SEMAFORO_COLORES.map(color => { const item = byColor.get(color.id); return <tr key={color.id} className="h-11 border-b last:border-0"><td className="overflow-hidden"><button className="min-h-11 w-full min-w-0 text-left focus-visible:ring-2 focus-visible:ring-ring" onClick={() => toggle("color", color.id)} aria-label={`Filtrar ${color.label}`} aria-pressed={filtros.color === color.id}><ColorLabel color={color.id} /></button></td><td className="whitespace-nowrap text-right">{usd(item?.valor_kardex_usd)}</td><td className="whitespace-nowrap text-right">{percent(item?.valor_kardex_usd, data.valor_kardex_usd)}</td></tr>; })}</tbody></table>
         </CardContent></Card>
-        <Card className="min-w-0"><CardHeader className="px-3 py-3"><CardTitle className={sectionTitle}>Distribución del inventario por sucursal</CardTitle></CardHeader><CardContent className="px-3 pb-3"><table aria-label="Valor por sucursal" className="w-full table-fixed text-[12px] tabular-nums"><thead className="text-muted-foreground"><tr className="border-b"><th className="py-2 text-left font-medium">Sucursal</th><th className="hidden w-[20%] sm:table-cell" aria-label="Participación USD" /><th className="w-[47%] py-2 text-right font-medium sm:w-[32%]">Valor USD</th><th className="w-[20%] py-2 text-right font-medium sm:w-[13%]">%</th></tr></thead><tbody>{data.sucursales.map(branch => <tr key={branch.nombre} className="h-11 border-b last:border-0"><td className="overflow-hidden pr-1"><button className="block min-h-11 w-full truncate text-left focus-visible:ring-2 focus-visible:ring-ring" onClick={() => toggle("sucursal", branch.nombre)} aria-label={`Filtrar ${branch.nombre}`} aria-pressed={filtros.sucursal === branch.nombre}>{branch.nombre}</button></td><td className="hidden pr-3 sm:table-cell"><div aria-hidden className="h-2 rounded-full bg-muted"><div className="h-full rounded-full bg-primary" style={{ width: `${Math.max(0, branch.valor_kardex_usd ?? 0) / maxBranch * 100}%` }} /></div></td><td className="whitespace-nowrap text-right">{usd(branch.valor_kardex_usd)}</td><td className="whitespace-nowrap text-right">{percent(branch.valor_kardex_usd, data.valor_kardex_usd)}</td></tr>)}</tbody></table></CardContent></Card>
+        <Card className="min-w-0"><CardHeader className="px-3 py-3"><CardTitle className={sectionTitle}>Distribución del inventario por sucursal</CardTitle></CardHeader><CardContent className="px-3 pb-3"><table aria-label="Valor por sucursal" className="w-full table-fixed text-[12px] tabular-nums"><thead className="text-muted-foreground"><tr className="border-b"><th className="py-2 text-left font-medium">Sucursal</th><th className="hidden w-[20%] sm:table-cell" aria-label="Participación USD" /><th className="w-[47%] py-2 text-right font-medium sm:w-[32%]">Valor USD</th><th className="w-[20%] py-2 text-right font-medium sm:w-[13%]">%</th></tr></thead><tbody>{data.sucursales.map(branch => <tr key={branch.nombre} className="h-11 border-b last:border-0"><td className="pr-1"><div className="flex min-w-0 items-center gap-1"><BranchAge branch={branch} /><button className="block min-h-11 w-full truncate text-left focus-visible:ring-2 focus-visible:ring-ring" onClick={() => toggle("sucursal", branch.nombre)} aria-label={`Filtrar ${branch.nombre}`} aria-pressed={filtros.sucursal === branch.nombre}>{branch.nombre}</button></div></td><td className="hidden pr-3 sm:table-cell"><div aria-hidden className="h-2 rounded-full bg-muted"><div className={`h-full rounded-full ${purchaseAgeBand(branch.dias_compra_promedio).className}`} style={{ width: `${Math.max(0, branch.valor_kardex_usd ?? 0) / maxBranch * 100}%` }} /></div></td><td className="whitespace-nowrap text-right">{usd(branch.valor_kardex_usd)}</td><td className="whitespace-nowrap text-right">{percent(branch.valor_kardex_usd, data.valor_kardex_usd)}</td></tr>)}</tbody></table></CardContent></Card>
       </div>
       <Card className="min-w-0"><CardHeader className="flex-row flex-wrap items-center justify-between gap-2 px-3 py-3"><CardTitle className={sectionTitle}>Antigüedad del inventario</CardTitle><button className="flex min-h-11 items-center gap-2 text-xs sm:min-h-8" onClick={() => toggle("franja", "SIN_FECHA")} aria-pressed={filtros.franja === "SIN_FECHA"}><span className="h-2.5 w-2.5 rounded-full bg-slate-300" />Sin fecha <span className="tabular-nums">{usd(data.franjas.find(item => item.franja === "SIN_FECHA")?.valor_kardex_usd)}</span><span>{percent(data.franjas.find(item => item.franja === "SIN_FECHA")?.valor_kardex_usd, data.valor_kardex_usd)}</span></button></CardHeader><CardContent className="space-y-2 px-3 pb-3">
         {canBandChart && <div className="flex h-3 overflow-hidden rounded-full" aria-hidden>{STOCK_BANDS.map(band => <div key={band.id} className={band.className} style={{ width: `${(data.franjas.find(item => item.franja === band.id)?.valor_kardex_usd ?? 0) / data.valor_kardex_usd! * 100}%` }} />)}</div>}
@@ -223,8 +234,7 @@ export function StockSemaphoreSection({ canExport }: { canExport: boolean }) {
         {path.length > 0 && <div className="flex flex-wrap items-center gap-1 px-3 pb-2" aria-label="Desglose de la tabla"><Button variant="ghost" size="sm" className="min-h-11 sm:min-h-8" onClick={() => setPath([])}>Todo</Button>{path.map((item, index) => <Button key={item.key} variant="outline" size="sm" className="max-w-full min-h-11 sm:min-h-8" onClick={() => setPath(path.slice(0, index + 1))}><span className="truncate">{item.value}</span></Button>)}<Button variant="ghost" size="sm" className="min-h-11 sm:min-h-8" onClick={() => { setAgrupacion(path[path.length - 1].key); setPath(path.slice(0, -1)); }} aria-label="Volver un nivel"><ChevronLeft className="h-4 w-4" /></Button></div>}
         <div className="mt-3">
           {tab === "resumen" ? <PartsAnalysisTable rows={sortSalesRows(report.data?.grupos ?? [],groupColumns,groupSort)} columns={groupColumns} mobileColumns={[groupColumns[0],{ ...groupColumns[3],width:"w-[150px]" }]} id={row=>row.nombre} label="Resumen de repuestos" sort={groupSort} onSort={toggleSort} status={status} onSelect={drill} total={report.data?.grupos.length ?? 0} /> : <>
-            <PartsAnalysisTable<SemaforoFila> rows={rows} columns={columns} mobileColumns={mobileColumns} id={row=>row.codigo_interno} label="Detalle de repuestos" sort={detailSort} onSort={toggleSort} status={status} onSelect={row=>setSelected(row)} total={report.data?.lineas ?? 0} />
-            <div className="flex items-center justify-between gap-2 pt-2 text-xs text-muted-foreground"><span>{page+1} / {pages}</span><div className="flex gap-1"><Button variant="outline" size="sm" className="min-h-11 min-w-11 sm:min-h-8 sm:min-w-8" disabled={page===0 || report.isLoading} onClick={()=>setPage(p=>p-1)} aria-label="Página anterior"><ChevronLeft className="h-4 w-4" /></Button><Button variant="outline" size="sm" className="min-h-11 min-w-11 sm:min-h-8 sm:min-w-8" disabled={page+1>=pages || report.isLoading || report.isError} onClick={()=>setPage(p=>p+1)} aria-label="Página siguiente"><ChevronRight className="h-4 w-4" /></Button></div></div>
+            <PartsAnalysisTable<SemaforoFila> rows={rows} columns={columns} mobileColumns={mobileColumns} id={row=>row.codigo_interno} label="Detalle de repuestos" sort={detailSort} onSort={toggleSort} status={status} onSelect={row=>setSelected(row)} total={report.data?.lineas ?? 0} hasMore={listing.hasNextPage} loadingMore={listing.isFetchingNextPage} onLoadMore={listing.fetchNextPage} />
           </>}
         </div>
       </Panel>
