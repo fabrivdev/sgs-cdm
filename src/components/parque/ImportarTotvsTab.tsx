@@ -1,8 +1,9 @@
-import { useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
 import { cargarTodo } from "@/hooks/useCatalogos";
+import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -44,6 +45,10 @@ import {
   mapBranchTransferSheet,
   mapStockSheet,
   parseSpreadsheetXml,
+  persistReceivablesFile,
+  readReceivablesPreflightFile,
+  type ReceivablesPreflight,
+  type ReceivablesRpcClient,
   persistMayorFile,
   readMayorPreflightFile,
   readXmlFileText,
@@ -97,6 +102,7 @@ import {
   type TotvsFileKind,
 } from "@/lib/imports";
 import { cn } from "@/lib/utils";
+import { suggestReceivablesCutoff } from "@/lib/imports/receivablesMetadata";
 import { identifySourceFile } from "@/lib/imports/sourceIdentity";
 
 type FileKind = TotvsFileKind;
@@ -128,6 +134,7 @@ interface HistoricalBillingLoad {
 }
 
 interface Preview {
+  receivables: { file: File; sha256: string; preflight: ReceivablesPreflight } | null;
   mayor: MayorPreflight[];
   productos: CanonicalProductRow[];
   stock: CanonicalStockRow[];
@@ -164,7 +171,8 @@ interface Preview {
 
 function hasPersistablePreview(preview: Preview) {
   return Boolean(
-    preview.mayor.length
+    preview.receivables
+    || preview.mayor.length
     || preview.bundleFiles
     || preview.productos.length
     || preview.stock.length
@@ -250,6 +258,19 @@ export function ImportarTotvsTab({ onChanged }: { onChanged: () => void }) {
   const queryClient = useQueryClient();
   const [detected, setDetected] = useState<DetectedFile[]>([]);
   const [preview, setPreview] = useState<Preview | null>(null);
+  const [receivablesCutoff, setReceivablesCutoff] = useState("");
+  const receivablesFile = detected.find(item => item.kind === "cuentas_cobrar")?.file;
+  useEffect(() => {
+    let active = true;
+    setReceivablesCutoff("");
+    setPreview(null);
+    if (receivablesFile) {
+      void suggestReceivablesCutoff(receivablesFile).then(date => {
+        if (active) setReceivablesCutoff(current => current || date);
+      }).catch(() => { /* Sin metadatos fiables, el corte se indica manualmente. */ });
+    }
+    return () => { active = false; };
+  }, [receivablesFile]);
   const [busy, setBusy] = useState(false);
   const [importProgress, setImportProgress] = useState<ImportProgressEvent | null>(null);
   const [importError, setImportError] = useState<{ summary: string; detail: string } | null>(null);
@@ -393,10 +414,17 @@ export function ImportarTotvsTab({ onChanged }: { onChanged: () => void }) {
       return;
     }
 
+    const cxcFiles = usableFiles.filter(item => item.kind === "cuentas_cobrar");
+    if (cxcFiles.length > 1 || (cxcFiles.length && !receivablesCutoff)) {
+      toast.error(cxcFiles.length > 1 ? "Seleccioná un único XML de Cuentas por cobrar por corte." : "Indicá la fecha de corte de Cuentas por cobrar.");
+      return;
+    }
+    setPreview(null);
     setBusy(true);
     setImportProgress(null);
     setImportError(null);
     try {
+      let receivables: Preview["receivables"] = null;
       const mayor: MayorPreflight[] = [];
       const productos: CanonicalProductRow[] = [];
       const stock: CanonicalStockRow[] = [];
@@ -418,6 +446,11 @@ export function ImportarTotvsTab({ onChanged }: { onChanged: () => void }) {
 
       for (const { file, kind } of usableFiles) {
         try {
+          if (kind === "cuentas_cobrar") {
+            const preflight = await readReceivablesPreflightFile(file, file.name, { cutoffDate: receivablesCutoff, sourceLastModified: file.lastModified });
+            receivables = { file, preflight, sha256: (await identifySourceFile(file)).sha256 };
+            continue;
+          }
           if (kind === "mayor") {
             mayor.push(await readMayorPreflightFile(file, file.name));
             continue;
@@ -579,6 +612,7 @@ export function ImportarTotvsTab({ onChanged }: { onChanged: () => void }) {
       }
 
       setPreview({
+        receivables,
         mayor,
         productos,
         stock,
@@ -614,6 +648,7 @@ export function ImportarTotvsTab({ onChanged }: { onChanged: () => void }) {
       });
 
       const partes = [
+        receivables ? `${receivables.preflight.documentRows} documentos de Cuentas por cobrar` : null,
         mayor.length ? `${mayor.reduce((sum, item) => sum + item.movementRows, 0)} movimientos de Mayor (preflight)` : null,
         bundleFiles ? "OS + Facturación" : null,
         productos.length ? `${productos.length} productos` : null,
@@ -656,6 +691,7 @@ export function ImportarTotvsTab({ onChanged }: { onChanged: () => void }) {
       })
       : null;
     let importedServiceOrders = 0;
+    let importedReceivables = 0;
     let activeImportStage: string | undefined;
     const handleImportProgress = (event: ImportProgressEvent) => {
       activeImportStage = event.phase;
@@ -665,6 +701,18 @@ export function ImportarTotvsTab({ onChanged }: { onChanged: () => void }) {
     setImportProgress(null);
     setImportError(null);
     try {
+      if (preview.receivables) {
+        activeImportStage = "cxc.persist";
+        const result = await persistReceivablesFile({
+          file: preview.receivables.file,
+          client: supabase as unknown as ReceivablesRpcClient,
+          cutoffDate: preview.receivables.preflight.cutoffDate,
+          expectedSha256: preview.receivables.sha256,
+        });
+        importedReceivables = result.preflight.documentRows;
+        toast.success(`Cuentas por cobrar: ${result.preflight.documentRows.toLocaleString("es-PY")} documentos · corte ${result.preflight.cutoffDate}${result.reusedCompleteSnapshot ? " · ya cargado" : " · actualizado"}`);
+        await queryClient.invalidateQueries();
+      }
       let facturacionLineas = 0;
       let facturacionExcluidas = 0;
       let ordenesServicioOmitidas = 0;
@@ -1159,6 +1207,7 @@ export function ImportarTotvsTab({ onChanged }: { onChanged: () => void }) {
       }
 
       const partes = [
+        preview.receivables ? "Cuentas por cobrar" : null,
         mayorResultados.length
           ? `${mayorResultados.reduce((sum, item) => sum + item.preflight.movementRows, 0)} movimientos de Mayor (${mayorResultados.reduce((sum, item) => sum + item.insertadas, 0)} versiones nuevas, ${mayorResultados.reduce((sum, item) => sum + item.versionadas, 0)} claves corregidas, ${mayorResultados.reduce((sum, item) => sum + item.sinCambios, 0)} sin cambios, ${mayorResultados.reduce((sum, item) => sum + item.cuarentena, 0)} en cuarentena)`
           : null,
@@ -1198,9 +1247,13 @@ export function ImportarTotvsTab({ onChanged }: { onChanged: () => void }) {
       const confirmed = e instanceof ServiceOrderImportFailure
         ? e.confirmedServiceOrders
         : importedServiceOrders;
+      const completed = [
+        importedReceivables ? `${importedReceivables} documentos de Cuentas por cobrar` : null,
+        confirmed ? `${confirmed} OS` : null,
+      ].filter(Boolean);
       const summary = conciseImportErrorSummary(
-        confirmed
-          ? `${confirmed} OS quedaron importadas; la etapa siguiente no se completó`
+        completed.length
+          ? `${completed.join(" y ")} quedaron importados; la etapa siguiente no se completó`
           : "No se pudo completar la importación",
         detail,
       );
@@ -1327,13 +1380,20 @@ export function ImportarTotvsTab({ onChanged }: { onChanged: () => void }) {
             ))}
 
             {[...duplicateKinds.entries()]
-              .filter(([, count]) => count > 1)
+              .filter(([kind, count]) => count > 1 && kind !== "cuentas_cobrar")
               .map(([kind]) => (
                 <p key={kind} className="text-[11px] text-amber-700">
                   Hay más de un archivo asignado a "{KIND_LABELS[kind]}" — se van a combinar.
                 </p>
               ))}
 
+            {usableFiles.some(item => item.kind === "cuentas_cobrar") && (
+              <label className="flex items-center gap-2 text-[12px]">
+                Corte de Cuentas por cobrar
+                <Input type="date" aria-label="Corte de Cuentas por cobrar" className="h-8 w-40" value={receivablesCutoff} disabled={busy}
+                  onChange={event => { setReceivablesCutoff(event.target.value); setPreview(null); }} />
+              </label>
+            )}
             <div className="flex flex-wrap gap-2 pt-1">
               <Button type="button" size="sm" onClick={leerArchivos} disabled={busy || usableFiles.length === 0}>
                 Leer archivos
@@ -1363,6 +1423,7 @@ export function ImportarTotvsTab({ onChanged }: { onChanged: () => void }) {
               {preview.mayor.map((item) => (
                 <Badge key={item.sourceFileName} variant="secondary">{item.movementRows.toLocaleString("es-PY")} movimientos de Mayor</Badge>
               ))}
+              {preview.receivables && <Badge variant="secondary">Cuentas por cobrar · {preview.receivables.preflight.documentRows} documentos · {preview.receivables.preflight.cutoffDate}</Badge>}
               {preview.bundleFiles && <Badge variant="secondary">OS + Facturación listas para cruzar</Badge>}
               {preview.productos.length > 0 && <Badge variant="secondary">{preview.productos.length} productos</Badge>}
               {preview.stock.length > 0 && <Badge variant="secondary">{preview.stock.length} filas de stock</Badge>}

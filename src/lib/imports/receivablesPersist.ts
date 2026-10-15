@@ -85,11 +85,13 @@ export async function persistReceivablesFile(options: {
   file: File;
   client: ReceivablesRpcClient;
   cutoffDate: string;
+  expectedSha256?: string;
 }): Promise<ReceivablesPersistResult> {
   const { file, client, cutoffDate } = options;
   if (!/^\d{4}-\d{2}-\d{2}$/.test(cutoffDate)) throw new Error("Confirmá una fecha de corte válida para cuentas por cobrar.");
   const preflight = await readReceivablesPreflightFile(file, file.name, { cutoffDate, sourceLastModified: file.lastModified });
   const fileSha256 = await sha256Hex(file);
+  if (options.expectedSha256 && options.expectedSha256 !== fileSha256) throw new Error("El XML de Cuentas por cobrar cambió después del preflight; volvé a leerlo.");
   let cargaId: string | null = null;
   let lotes = 0;
   let insertadas = 0;

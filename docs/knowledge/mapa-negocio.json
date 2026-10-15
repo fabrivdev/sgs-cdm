@@ -684,6 +684,7 @@
       ],
       "sources": [
         "src/lib/imports/receivablesPreflight.ts",
+        "src/lib/imports/receivablesMetadata.ts",
         "src/lib/imports/receivablesPersist.ts",
         "supabase/migrations/20261007130000_import_totvs_accounts_receivable.sql",
         "docs/knowledge/03-Ventas-y-conciliacion.md"
@@ -2245,7 +2246,7 @@
       "module": "datos",
       "description": "Carga de cuotas de cuentas por cobrar con corte confirmado y versión auditable; no equivale a publicar un KPI gerencial.",
       "steps": [
-        "Exigir corte confirmado; leer SpreadsheetML y validar columnas, moneda, fechas y claves documentales sin inferir aplicación de anticipos.",
+        "En el importador unificado, admitir un único XML de CxC y proponer corte desde DocumentProperties/Created en Paraguay, editable y confirmado al leer; sin propiedad, exigir fecha manual. Validar columnas, moneda, fechas y claves sin inferir aplicación de anticipos.",
         "Calcular SHA-256; reutilizar la carga completa idéntica o crear versión nueva del mismo corte sin mezclar saldos.",
         "Enviar lotes de hasta 500 en modo validate y luego import, preservando fila fuente.",
         "Finalizar solo si SQL recalcula y concilia controles; ante fallo cancelar la carga abierta y no sustituir la versión completa anterior."
@@ -2261,6 +2262,7 @@
       ],
       "sources": [
         "src/lib/imports/receivablesPreflight.ts",
+        "src/lib/imports/receivablesMetadata.ts",
         "src/lib/imports/receivablesPersist.ts",
         "src/components/parque/ImportarTotvsTab.tsx",
         "supabase/migrations/20261007130000_import_totvs_accounts_receivable.sql"

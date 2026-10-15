@@ -87,3 +87,10 @@ describe("persistReceivablesFile", () => {
     expect(calls).not.toContain("totvs_finalizar_cxc_carga_v1");
   });
 });
+
+it("rechaza un archivo distinto al revisado antes de escribir", async () => {
+  let called = false;
+  const client: ReceivablesRpcClient = { rpc: async () => { called = true; return { data: null, error: null }; } };
+  await expect(persistReceivablesFile({ file: xmlFile(), client, cutoffDate: "2026-10-15", expectedSha256: "different" })).rejects.toThrow(/cambió después del preflight/);
+  expect(called).toBe(false);
+});
