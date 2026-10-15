@@ -428,3 +428,6 @@ Validación productiva posterior, 15/10: migración 20261015190000 aplicada con 
 
 
 15/10 — Criterio definitivo ventas + compra: migración 20261015210000 aplicada. Vista previa real con fabrizio.vega muestra ayudas nuevas, lila/gris/rojo por última compra y las ocho categorías con importes. Filtro Lila devuelve 519 códigos/USD 228.538,35. Snapshot SQL de sucursales, compras, total y RPC idéntico antes/después. Evidencia outputs/combined-colors-live.png; esta verificación cierra el pendiente anterior de leyenda remota. Sin Publish.
+
+
+15/10 — Filtros y doble indicador: revisión local con datos ficticios en escritorio, 390 y 320 px. Detalle muestra 2026/2025/2024 en columnas independientes y una línea; sucursales muestran dos indicadores. Ajuste posterior a la revisión de 320 px: espacio reservado a importe y colores, porcentaje oculto bajo 640. Navegador desconectado antes de revisar el ajuste final, panel de filtros y anchos restantes. Validación visual completa pendiente; no acreditar producción.

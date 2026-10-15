@@ -250,3 +250,41 @@ describe('clasificación combinada de ventas y compra', () => {
     expect((await db.query<{color:string}>('SELECT repuestos_color_ventas_compra($1,$2,$3,$4) color',[a,b,c,d])).rows[0].color).toBe(color);
   });
 });
+
+
+describe('dos indicadores por grupo', () => {
+  it('conserva promedios de sucursal, fechas, totales y permisos al ampliar el informe', async () => {
+    const before=await report();
+    const sql=readFileSync('supabase/migrations/20261015220000_parts_analysis_group_indicators.sql','utf8');
+    await db.exec(sql); await db.exec(sql);
+    const after=await report();
+    expect(after.sucursales.map(({color_historico,...rest})=>rest)).toEqual(before.sucursales);
+    expect(after.rows).toEqual(before.rows);
+    expect(after.valor_kardex_usd).toBe(before.valor_kardex_usd);
+    expect(after.franjas).toEqual(before.franjas);
+    await db.exec("SET test.analysis_access='false'");
+    await expect(report()).rejects.toThrow(/Sin acceso/);
+    await db.exec("SET test.analysis_access='true'");
+  });
+  it('usa USD de las ubicaciones filtradas y deja sin base el grupo sin valor', async () => {
+    const r=await report({},'marca',1);
+    expect(r.grupos.find(g=>g.nombre==='CLAAS')?.color_historico).toBe('VERDE_CLARO');
+    expect(r.grupos.find(g=>g.nombre==='CLAAS')?.dias_compra_promedio).toBe(365);
+    expect(r.grupos.find(g=>g.nombre==='GATES')?.color_historico).toBeNull();
+    for(const group of ['marca','familia','sucursal','deposito']) {
+      const filtered=await report({sucursal:'Katuete'},group);
+      expect(filtered.grupos.every(g=>g.color_historico==='VERDE_CLARO' && g.dias_compra_promedio===365)).toBe(true);
+      expect(filtered.grupos.reduce((sum,g)=>sum+(g.valor_kardex_usd??0),0)).toBe(filtered.valor_kardex_usd);
+    }
+  });
+  it('ordena los tres años antes de paginar en ambas direcciones', async () => {
+    for(const key of ['unidades_anio_actual','unidades_anio_anterior','unidades_hace_dos_anios'] as const) {
+      for(const direction of ['asc','desc']) {
+        const r=await report({orden:key,direccion:direction});
+        const expected=[...r.rows].sort((a,b)=>(direction==='asc'?1:-1)*(a[key]-b[key])||a.codigo_interno.localeCompare(b.codigo_interno));
+        expect(r.rows.map(x=>x.codigo_interno)).toEqual(expected.map(x=>x.codigo_interno));
+        expect((await report({orden:key,direccion:direction},'marca',1,1)).rows[0].codigo_interno).toBe(expected[1].codigo_interno);
+      }
+    }
+  });
+});

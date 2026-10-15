@@ -78,7 +78,8 @@ export interface SemaforoResumenColor {
 }
 
 export type SemaforoAgrupacion = "marca" | "familia" | "sucursal" | "deposito";
-export interface SemaforoGrupo { nombre: string; lineas: number; unidades: number; valor_kardex_usd: number | null; ubicaciones_sin_valor: number; rotacion: number | null }
+export interface SemaforoIndicadores { color_historico?: SemaforoColor | null; dias_compra_promedio?: number | null; valor_compra_con_fecha_usd?: number; valor_positivo_usd?: number; ubicaciones_fuera_promedio?: number }
+export interface SemaforoGrupo extends SemaforoIndicadores { nombre: string; lineas: number; unidades: number; valor_kardex_usd: number | null; ubicaciones_sin_valor: number; rotacion: number | null }
 
 export interface SemaforoResultado {
   base_antiguedad: "ULTIMA_COMPRA_V1";
@@ -96,7 +97,7 @@ export interface SemaforoResultado {
   saldos_coincidentes: number;
   kardex_cargado_en: string | null;
   por_color: SemaforoResumenColor[];
-  sucursales: Array<{ nombre: string; lineas: number; unidades: number; valor_kardex_usd: number | null; dias_compra_promedio?: number | null; valor_compra_con_fecha_usd?: number; valor_positivo_usd?: number; ubicaciones_fuera_promedio?: number }>;
+  sucursales: Array<SemaforoIndicadores & { nombre: string; lineas: number; unidades: number; valor_kardex_usd: number | null; dias_compra_promedio?: number | null; valor_compra_con_fecha_usd?: number; valor_positivo_usd?: number; ubicaciones_fuera_promedio?: number }>;
   rows: SemaforoFila[];
 }
 

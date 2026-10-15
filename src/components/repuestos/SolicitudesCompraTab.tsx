@@ -27,7 +27,7 @@ import { SUCURSALES } from "@/lib/constants";
 import { useSortable } from "@/hooks/useSortable";
 import { metaText } from "@/lib/ui-classes";
 import { cn } from "@/lib/utils";
-import { FiltersBar, FilterCustom } from "@/components/filters/FiltersBar";
+import { FiltersBar, FilterSelect } from "@/components/filters/FiltersBar";
 import { FilterMultiSelect } from "@/components/filters/FilterMultiSelect";
 import { TableExportButton, type TableExportOption } from "@/components/exports/TableExportButton";
 
@@ -131,12 +131,12 @@ export function SolicitudesCompraTab() {
       if (filtros.sucursales.length > 0 && !filtros.sucursales.includes(grupo.sucursal)) return false;
       if (filtros.nroSolicitud && !grupo.nroSolicitud.toLowerCase().includes(filtros.nroSolicitud.trim().toLowerCase()))
         return false;
-      if (filtros.solicitante && !(grupo.solicitante ?? "").toLowerCase().includes(filtros.solicitante.trim().toLowerCase()))
+      if (filtros.solicitante && grupo.solicitante !== filtros.solicitante)
         return false;
 
       if (busqueda) {
         const matchLinea = grupo.lineas.some((linea) => lineaCoincideBusqueda(linea, busqueda));
-        if (!matchLinea) return false;
+        if (!matchLinea && ![grupo.nroSolicitud, grupo.solicitante].some(value => value?.toLowerCase().includes(busqueda))) return false;
       }
 
       return true;
@@ -163,7 +163,7 @@ export function SolicitudesCompraTab() {
     {key:"estado",label:"Estado",kind:"text",value:r=>resolution(r)?.estado==="reposicion_stock"?"Reposición de stock":"Cotizada"},
     {key:"pedido",label:"Pedido",kind:"text",value:r=>{const p=resolution(r)?.pedidoVinculado;return p?`${p.sucursal}-${p.nroPedido}`:null;}},
   ];
-  const orderItems = (rows:SolicitudLinea[]) => sortSalesRows(rows.filter(r=>!filtros.busqueda.trim()||lineaCoincideBusqueda(r,filtros.busqueda.trim().toLowerCase())),itemColumns,itemSort);
+  const orderItems = (rows:SolicitudLinea[]) => sortSalesRows(rows.filter(r=>!filtros.busqueda.trim()||[r.nroSolicitud,r.solicitante].some(value=>value?.toLowerCase().includes(filtros.busqueda.trim().toLowerCase()))||lineaCoincideBusqueda(r,filtros.busqueda.trim().toLowerCase())),itemColumns,itemSort);
   const toggleItemSort = (key:string) => setItemSort(p=>({key,direction:p.key===key&&p.direction==="asc"?"desc":"asc"}));
 
   const renderPedidoLink = (linea:SolicitudLinea) => {
@@ -274,7 +274,7 @@ export function SolicitudesCompraTab() {
     <div className="space-y-3">
       <div className="space-y-3">
         <FiltersBar
-          search={{ value: filtros.busqueda, onChange: (busqueda) => setFiltros((f) => ({ ...f, busqueda })), placeholder: "REPIN000406, 2181800, anillo…", width: "min-w-0 flex-1" }}
+          search={{ value: filtros.busqueda, onChange: (busqueda) => setFiltros((f) => ({ ...f, busqueda })), placeholder: "Solicitud, solicitante, código o descripción…", width: "min-w-0 flex-1" }}
           activeCount={Number(Boolean(filtros.busqueda)) + Number(filtros.sucursales.length > 0) + Number(Boolean(filtros.nroSolicitud)) + Number(Boolean(filtros.solicitante))}
           onClear={() => setFiltros(FILTROS_VACIOS)}
           secondaryActions={can("datos:exportar") && !solicitudesLineasQuery.isError && !pedidosLineasQuery.isError ? <TableExportButton options={exportOptions} /> : undefined}
@@ -287,12 +287,7 @@ export function SolicitudesCompraTab() {
             options={SUCURSALES.map((sucursal) => ({ value: sucursal, label: sucursal }))}
             width="w-40"
           />
-          <FilterCustom label="N° Solicitud" width="w-32">
-            <Input value={filtros.nroSolicitud} onChange={(e) => setFiltros((f) => ({ ...f, nroSolicitud: e.target.value }))} />
-          </FilterCustom>
-          <FilterCustom label="Solicitante" width="min-w-[160px] flex-1">
-            <Input value={filtros.solicitante} onChange={(e) => setFiltros((f) => ({ ...f, solicitante: e.target.value }))} />
-          </FilterCustom>
+          <FilterSelect placeholder="Todos" label="Solicitante" value={filtros.solicitante || "all"} onChange={value => setFiltros(f => ({...f, solicitante: value === "all" ? "" : value}))} options={[{value:"all",label:"Todos"}, ...Array.from(new Set((solicitudesAgrupadas).map(r => r.solicitante).filter((v): v is string => Boolean(v)))).sort().map(value => ({value,label:value}))]} />
         </FiltersBar>
 
         {filtrosActivos && (
@@ -324,7 +319,7 @@ export function SolicitudesCompraTab() {
                 const key = rowKey(grupo);
                 const isOpen = filtrosActivos ? true : expanded.has(key);
                 const busquedaActiva = filtros.busqueda.trim().toLowerCase();
-                const lineasVisibles = busquedaActiva
+                const lineasVisibles = busquedaActiva && ![grupo.nroSolicitud,grupo.solicitante].some(value => value?.toLowerCase().includes(busquedaActiva))
                   ? grupo.lineas.filter((linea) => lineaCoincideBusqueda(linea, busquedaActiva))
                   : grupo.lineas;
 

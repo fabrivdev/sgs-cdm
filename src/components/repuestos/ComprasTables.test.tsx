@@ -116,3 +116,17 @@ describe("purchase table presentation",()=>{
     fireEvent.keyDown(help,{key:"Escape"}); await waitFor(()=>expect(screen.queryByRole("dialog",{name:"Detalle REPIN000001"})).toBeNull());
   });
 });
+
+
+describe("búsqueda unificada de compras",()=>{
+  it("busca pedido por número sin perder sus líneas ni su exportación",async()=>{
+    setup(); fireEvent.change(screen.getAllByRole("searchbox",{name:"Buscar"})[0],{target:{value:"000010"}});
+    await waitFor(()=>expect(itemRows("Ítems del pedido 000010")).toHaveLength(2));
+    expect(await exportItems("Exportar Ítems de pedidos")).toHaveLength(2);
+  });
+  it("busca solicitud por número y exporta sus líneas completas",async()=>{
+    setup("requests"); fireEvent.change(screen.getAllByRole("searchbox",{name:"Buscar"})[0],{target:{value:"000003"}});
+    await waitFor(()=>expect(itemRows("Ítems de la solicitud 000003")).toHaveLength(1));
+    expect(await exportItems("Exportar Ítems de solicitudes")).toHaveLength(1);
+  });
+});

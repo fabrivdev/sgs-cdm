@@ -38,7 +38,7 @@ import { SUCURSALES } from "@/lib/constants";
 import { useSortable } from "@/hooks/useSortable";
 import { metaText } from "@/lib/ui-classes";
 import { cn } from "@/lib/utils";
-import { FiltersBar, FilterCustom } from "@/components/filters/FiltersBar";
+import { FiltersBar, FilterSelect } from "@/components/filters/FiltersBar";
 import { FilterMultiSelect } from "@/components/filters/FilterMultiSelect";
 import { TableExportButton, type TableExportOption } from "@/components/exports/TableExportButton";
 
@@ -164,12 +164,12 @@ export function ComprasPedidosTab() {
     return rows.filter((row) => {
       if (filtros.sucursales.length > 0 && (!row.sucursal || !filtros.sucursales.includes(row.sucursal))) return false;
       if (filtros.nroPedido && !row.nro_pedido.toLowerCase().includes(filtros.nroPedido.trim().toLowerCase())) return false;
-      if (filtros.proveedor && !(row.proveedor_nombre ?? "").toLowerCase().includes(filtros.proveedor.trim().toLowerCase())) return false;
+      if (filtros.proveedor && row.proveedor_nombre !== filtros.proveedor) return false;
 
       if (busqueda) {
         const lineas = lineasPorPedido.get(rowKey(row)) ?? [];
         const matchLinea = lineas.some((linea) => lineaCoincideBusqueda(linea, busqueda, fabricanteMap));
-        if (!matchLinea) return false;
+        if (!matchLinea && ![row.nro_pedido, row.proveedor_nombre].some(value => value?.toLowerCase().includes(busqueda))) return false;
       }
 
       return true;
@@ -202,7 +202,7 @@ export function ComprasPedidosTab() {
 
   const exportOptions: TableExportOption[] = (() => {
     const term = filtros.busqueda.trim().toLowerCase();
-    const lineas = filasOrdenadas.flatMap(row=>orderItems((lineasPorPedido.get(rowKey(row))??[]).filter(linea=>!term||lineaCoincideBusqueda(linea,term,fabricanteMapQuery.data))));
+    const lineas = filasOrdenadas.flatMap(row=>orderItems((lineasPorPedido.get(rowKey(row))??[]).filter(linea=>!term||[row.nro_pedido,row.proveedor_nombre].some(value=>value?.toLowerCase().includes(term))||lineaCoincideBusqueda(linea,term,fabricanteMapQuery.data))));
 
     return [
       {
@@ -309,7 +309,7 @@ export function ComprasPedidosTab() {
     <div className="space-y-3">
       <div className="space-y-3">
         <FiltersBar
-          search={{ value: filtros.busqueda, onChange: (busqueda) => setFiltros((f) => ({ ...f, busqueda })), placeholder: "REPIN003187, 06673230, casquillo…", width: "min-w-0 flex-1" }}
+          search={{ value: filtros.busqueda, onChange: (busqueda) => setFiltros((f) => ({ ...f, busqueda })), placeholder: "Pedido, proveedor, código o descripción…", width: "min-w-0 flex-1" }}
           activeCount={Number(Boolean(filtros.busqueda)) + Number(filtros.sucursales.length > 0) + Number(Boolean(filtros.nroPedido)) + Number(Boolean(filtros.proveedor))}
           onClear={() => setFiltros(FILTROS_VACIOS)}
           secondaryActions={can("datos:exportar") && !resumenQuery.isError && !pedidosLineasQuery.isError ? <TableExportButton options={exportOptions} /> : undefined}
@@ -322,12 +322,7 @@ export function ComprasPedidosTab() {
             options={SUCURSALES.map((sucursal) => ({ value: sucursal, label: sucursal }))}
             width="w-40"
           />
-          <FilterCustom label="N° Pedido" width="w-32">
-            <Input value={filtros.nroPedido} onChange={(e) => setFiltros((f) => ({ ...f, nroPedido: e.target.value }))} />
-          </FilterCustom>
-          <FilterCustom label="Proveedor" width="min-w-[160px] flex-1">
-            <Input value={filtros.proveedor} onChange={(e) => setFiltros((f) => ({ ...f, proveedor: e.target.value }))} />
-          </FilterCustom>
+          <FilterSelect placeholder="Todos" label="Proveedor" value={filtros.proveedor || "all"} onChange={value => setFiltros(f => ({...f, proveedor: value === "all" ? "" : value}))} options={[{value:"all",label:"Todos"}, ...Array.from(new Set((resumenQuery.data ?? []).map(r => r.proveedor_nombre).filter((v): v is string => Boolean(v)))).sort().map(value => ({value,label:value}))]} />
         </FiltersBar>
 
         {filtrosActivos && (
@@ -361,7 +356,7 @@ export function ComprasPedidosTab() {
                 const key = rowKey(row);
                 const isOpen = filtrosActivos ? true : expanded.has(key);
                 const busquedaActiva = filtros.busqueda.trim().toLowerCase();
-                const lineas = busquedaActiva
+                const lineas = busquedaActiva && ![row.nro_pedido,row.proveedor_nombre].some(value => value?.toLowerCase().includes(busquedaActiva))
                   ? (lineasPorPedido.get(key) ?? []).filter((linea) =>
                       lineaCoincideBusqueda(linea, busquedaActiva, fabricanteMapQuery.data),
                     )

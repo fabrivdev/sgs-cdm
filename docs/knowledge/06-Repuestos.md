@@ -137,3 +137,12 @@ Migración aplicada con autorización explícita. Snapshot exacto antes/después
 
 
 Entrega final comprobada en vista previa remota con fabrizio.vega: las ocho explicaciones ahora muestran ventas anuales y última compra según corresponde; se cierra el pendiente anterior de textos desactualizados. Importes por color coinciden con SQL, promedio por sucursal sin cambios. Filtro Lila verificado: 519 códigos/USD 228.538,35. No se pulsó Publish de Lovable.
+
+
+## Filtros e indicadores por grupo — 15/10/2026
+
+Análisis elimina las etiquetas repetidas de filtros activos y los seis campos numéricos manuales. Conserva un buscador para código interno/fabricante/anterior y descripción, selectores de marca/sucursal/color, y cuatro adicionales: familia, depósito, antigüedad y valorización. Pedidos y Solicitudes de compra unifican documento, proveedor/solicitante y producto en el buscador; proveedor/solicitante pasan a selector. La coincidencia por cabecera conserva todas las líneas tanto en pantalla como en Excel.
+
+Las sucursales y cada agrupación de Resumen (marca/familia/sucursal/depósito) muestran dos indicadores independientes: color histórico con mayor suma USD y antigüedad desde última compra ponderada por USD positivo con fecha. La ponderación por sucursal permanece idéntica. El predominio conserva los residuos negativos al sumar por color; solo una suma positiva permite elegir un color; sin base monetaria devuelve nulo, distinto del color SIN_DATOS. Empates monetarios se resuelven por identificador de color en orden alfabético. Las ventas históricas siguen siendo globales por producto. Detalle separa unidades de los tres años calendario con encabezados dinámicos y orden global antes de paginar; 365 días continúa en ficha y exportación.
+
+Migración preparada `20261015220000_parts_analysis_group_indicators.sql`; **no aplicada en producción**. Pruebas locales: 49 de análisis/contratos, 13 de compras, tipos y compilación. Comprobación visual local inicial en escritorio, 390 y 320 px; detectó ajuste de espacio en sucursales móvil, corregido en código. El navegador dejó de estar disponible antes de verificar el ajuste final y los demás anchos: validación visual completa pendiente. No se importaron datos. La revisión transversal de filtros fuera de Repuestos sigue pendiente; no se retiraron controles financieros/operativos sin revisar su búsqueda equivalente.
