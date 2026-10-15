@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { mapPurchaseInvoiceSheet } from "@/lib/imports/purchaseInvoices";
+import { mapPurchaseInvoiceSheet, mapCanonicalPurchaseInvoiceToRow } from "@/lib/imports/purchaseInvoices";
 import type { SpreadsheetXmlSheet } from "@/lib/imports/xmlSpreadsheet";
 
 const row = {
@@ -22,5 +22,34 @@ describe("facturas de compra TOTVS", () => {
 
   it("bloquea claves repetidas dentro del mismo informe", () => {
     expect(() => mapPurchaseInvoiceSheet("compras.xml", sheet([row, row]))).toThrow(/repetida/);
+  });
+});
+
+
+describe("variantes de columnas de compras", () => {
+  it("lee por nombre las 34 columnas y conserva chapa/kilometraje sin desplazar usuario", () => {
+    const extended = { ...row, "Num. Chapa": "ABC123", Kilometraje: "12000" };
+    const headers = [...Object.keys(row).filter(h => h !== "USRALT"), "Num. Chapa", "Kilometraje", "USRALT"];
+    const parsed = mapPurchaseInvoiceSheet("compras.xml", { name: "Compras", headers, rows: [extended] }).rows[0];
+    expect(parsed.createdBy).toBe(row.USRALT);
+    expect(mapCanonicalPurchaseInvoiceToRow(parsed).datos_fuente).toMatchObject({ "Num. Chapa": "ABC123", Kilometraje: "12000" });
+    const changed = mapPurchaseInvoiceSheet("compras.xml", { name: "Compras", headers: headers.reverse(), rows: [{ ...extended, Kilometraje: "13000" }] }).rows[0];
+    expect(changed.sourceFingerprint).not.toBe(parsed.sourceFingerprint);
+    expect(changed.rowId).toBe(parsed.rowId);
+  });
+  it("conserva la huella anterior cuando las columnas opcionales están vacías", () => {
+    const original = mapPurchaseInvoiceSheet("a.xml", sheet([row])).rows[0];
+    const extended = { ...row, "Num. Chapa": "", Kilometraje: "" };
+    const parsed = mapPurchaseInvoiceSheet("b.xml", { name: "Compras", headers: Object.keys(extended), rows: [extended] }).rows[0];
+    expect(parsed.sourceFingerprint).toBe(original.sourceFingerprint);
+  });
+  it("sigue bloqueando columnas faltantes, desconocidas o duplicadas", () => {
+    for (const headers of [Object.keys(row).filter(h => h !== "TOTALUSD"), [...Object.keys(row), "Nuevo"], [...Object.keys(row), "USRALT"]]) {
+      expect(() => mapPurchaseInvoiceSheet("x.xml", { name: "Compras", headers, rows: [row] })).toThrow(/estructura inesperada/);
+    }
+  });
+  it("cuenta documentos homónimos de proveedores distintos por separado", () => {
+    const result = mapPurchaseInvoiceSheet("x.xml", sheet([row, { ...row, PROVEEDOR: "OTRO" }]));
+    expect(result.diagnostics.documents).toBe(2);
   });
 });

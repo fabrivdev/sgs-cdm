@@ -75,7 +75,9 @@ export function mapKardexSheet(sourceFileName: string, sheet: SpreadsheetXmlShee
 
     const missingValues = [
       ["FECHA", movementDate], ["FILIAL", branch], ["DEPOSITO", warehouse],
-      ["PRODUCTO", productCode], ["CF", documentKind], ["DOCUMENTO", documentNumber],
+      ["PRODUCTO", productCode],
+      // SB9 is an opening balance, not an invoice; preserve empty source fields.
+      ...(sourceTable === "SB9" && direction === "E" ? [] : [["CF", documentKind], ["DOCUMENTO", documentNumber]]),
       ["SECUENCIA", sequence], ["MONEDA", currencyCode], ["TABLA", sourceTable], ["RECNO", sourceRecno],
     ].filter(([, fieldValue]) => !fieldValue).map(([name]) => name);
     if (missingValues.length) {

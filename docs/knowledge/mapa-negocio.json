@@ -533,7 +533,7 @@
       "id": "stock-repuesto",
       "title": "Stock de repuestos por sucursal",
       "module": "repuestos",
-      "description": "Disponibilidad física de artículos. El análisis histórico por última venta confirmada se presenta en Repuestos > Análisis, conserva separado el valor de la foto del Kardex y comparte acceso de lectura con Stock. Las consultas de lista, KPI y export tienen costos distintos y no deben disparar agregados completos por cada render.",
+      "description": "Disponibilidad física de artículos. El análisis histórico por última venta confirmada se presenta en Repuestos > Análisis, conserva separado el valor de la foto del Kardex y comparte acceso de lectura con Stock. Las consultas de lista, KPI y export tienen costos distintos y no deben disparar agregados completos por cada render. La última compra combina GRID confirmado y NF TOTVS con entrada a stock; SQL preparado el 15/10 restringe TIPOES a C/STOCK, pendiente de aplicación. Kardex conserva aperturas SB9 separadas de compras y movimientos firmados; sus entradas IMP requieren conciliación antes de alimentar la fecha de compra.",
       "tables": [
         "repuestos_stock"
       ],

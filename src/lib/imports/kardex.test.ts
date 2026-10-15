@@ -81,3 +81,22 @@ describe("Kardex anal\u00edtico TOTVS", () => {
       .toThrow(/C_U_G no num/);
   });
 });
+
+
+describe("saldos iniciales SB9", () => {
+  const opening = { ...baseRow, TABLA: "SB9", TIPO: "E", CANTIDAD: "120", CF: "", DOCUMENTO: "", FECHA: "20260630", SECUENCIA: "0", MONEDA: "0", T_C: "0" };
+  it("conserva la apertura sin inventar documento, moneda ni fecha de compra", () => {
+    const parsed = mapKardexSheet("kardex.xml", sheet([opening])).rows[0];
+    expect(parsed).toMatchObject({ sourceTable: "SB9", movementDate: "2026-06-30", documentKind: "", documentNumber: "", currencyCode: "0", sequence: "0", quantity: 120 });
+  });
+  it("exige documentos fuera de SB9 de entrada y mantiene claves/fechas obligatorias", () => {
+    for (const overrides of [{ TABLA: "SD1" }, { TABLA: "SD3" }, { TIPO: "S" }, { FECHA: "" }, { RECNO: "" }, { PRODUCTO: "" }]) {
+      expect(() => mapKardexSheet("kardex.xml", sheet([{ ...opening, ...overrides }]))).toThrow();
+    }
+  });
+  it("conserva filas de ajuste con cantidad cero y costos originales", () => {
+    const parsed = mapKardexSheet("kardex.xml", sheet([{ ...baseRow, CANTIDAD: "0" }])).rows[0];
+    expect(parsed.quantity).toBe(0);
+    expect(parsed.totalCostCurrency2).toBe(-25);
+  });
+});

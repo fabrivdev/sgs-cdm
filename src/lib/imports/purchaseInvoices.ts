@@ -15,12 +15,14 @@ const value = (row: Record<string, unknown>, header: string) => row[header];
 const text = (row: Record<string, unknown>, header: string) => normalizeText(value(row, header));
 const display = (row: Record<string, unknown>, header: string) => String(value(row, header) ?? "").trim().replace(/\s+/g, " ");
 
+const OPTIONAL_HEADERS = ["Num. Chapa", "Kilometraje"];
+
 function validateHeaders(sheet: SpreadsheetXmlSheet) {
-  const mismatches = EXPECTED_HEADERS.flatMap((expected, index) =>
-    sheet.headers[index] === expected ? [] : [`columna ${index + 1}: se esperaba "${expected}" y llegó "${sheet.headers[index] ?? "vacía"}"`],
-  );
-  if (mismatches.length || sheet.headers.length !== EXPECTED_HEADERS.length) {
-    throw new Error(`Facturas de compra: estructura inesperada. ${mismatches.slice(0, 3).join("; ")}`);
+  const present = new Set(sheet.headers);
+  const missing = EXPECTED_HEADERS.filter((header) => !present.has(header));
+  const unknown = sheet.headers.filter((header) => !EXPECTED_HEADERS.includes(header) && !OPTIONAL_HEADERS.includes(header));
+  if (missing.length || unknown.length || present.size !== sheet.headers.length) {
+    throw new Error(`Facturas de compra: estructura inesperada. Faltantes: ${missing.join(", ") || "ninguna"}; no reconocidas: ${unknown.join(", ") || "ninguna"}; encabezados duplicados: ${sheet.headers.length - present.size}.`);
   }
 }
 
@@ -84,6 +86,7 @@ export function mapPurchaseInvoiceSheet(sourceFileName: string, sheet: Spreadshe
       unitValueUsd, totalValueUsd, display(raw, "TIPOES"), display(raw, "CUENTA"), display(raw, "CCOSTO"),
       exchangeRate, text(raw, "PEDIDO"), text(raw, "ITEMPC"), dueDate, display(raw, "OBSERV"),
       text(raw, "NROREI"), display(raw, "REINTEGRO"), display(raw, "USRALT"),
+      ...OPTIONAL_HEADERS.filter((header) => display(raw, header)).map((header) => [header, display(raw, header)]),
     ]);
     return {
       rowId, sourceFileName, sourceRow, branch, emissionDate, entryDate, supplierCode, supplierStore,
@@ -106,7 +109,7 @@ export function mapPurchaseInvoiceSheet(sourceFileName: string, sheet: Spreadshe
     diagnostics: {
       rows: rows.length, from: dates[0] ?? null, to: dates[dates.length - 1] ?? null,
       suppliers: new Set(rows.map((row) => `${row.supplierCode}|${row.supplierStore}`)).size,
-      documents: new Set(rows.map((row) => `${row.branch}|${row.series}|${row.documentNumber}`)).size,
+      documents: new Set(rows.map((row) => `${row.branch}|${row.supplierCode}|${row.supplierStore}|${row.series}|${row.documentNumber}`)).size,
       sourceCurrencies: [...new Set(rows.map((row) => row.sourceCurrency))].sort(),
       documentKinds: [...new Set(rows.map((row) => row.documentKind))].sort(),
     },
