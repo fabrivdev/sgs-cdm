@@ -1,6 +1,6 @@
-// Run from repo root after: npm install --prefix output/sql-check @electric-sql/pglite --no-save --package-lock=false
+// Run from repo root with the project's installed PGlite dependency.
 // Isolated fixture database only: never connects to production.
-import { PGlite } from '../output/sql-check/node_modules/@electric-sql/pglite/dist/index.js';
+import { PGlite } from '../node_modules/@electric-sql/pglite/dist/index.js';
 import { readFileSync } from 'node:fs';
 import assert from 'node:assert/strict';
 const db = new PGlite();
@@ -55,10 +55,16 @@ await db.exec(readFileSync('supabase/migrations/20260911210000_reconcile_service
 await db.exec(readFileSync('supabase/migrations/20260915100000_unify_service_sales_identity_and_search.sql','utf8'));
 // Idempotent when pasted again.
 await db.exec(readFileSync('supabase/migrations/20260915100000_unify_service_sales_identity_and_search.sql','utf8'));
+await db.exec("update movements set codigo='REP1',codigo_fabricante='FAB1' where linea_id='00000000-0000-0000-0000-000000000010';");
+const searchCodeMigration = readFileSync('supabase/migrations/20261015230000_include_service_codes_in_unified_search.sql','utf8');
+await db.exec(searchCodeMigration);
+await db.exec(searchCodeMigration);
 const call = async sql => (await db.query('select '+sql+' as result')).rows[0].result;
 const h = (await db.query("select * from ventas_servicios_movimientos_enriquecidos('2026-01-01','2026-08-31')")).rows;
 assert.equal(h.length,5);
 assert.equal(h.reduce((sum,r)=>sum+Number(r.total_venta),0),430);
+assert.equal(h.filter(r=>r.texto_busqueda.includes('REP1')).reduce((sum,r)=>sum+Number(r.total_venta),0),100);
+assert.equal(h.filter(r=>r.texto_busqueda.includes('FAB1')).reduce((sum,r)=>sum+Number(r.total_venta),0),100);
 assert.equal(h.find(r=>r.linea_id==='H1').os_numero,'5734');
 assert.equal(h.find(r=>r.linea_id==='H1').nro_chasis,'C7501463');
 assert.equal(h.find(r=>r.linea_id==='H1').propietario_os,'VALDECIR MOHR');
@@ -84,6 +90,8 @@ assert.equal(current.propietario,'Dueño'); assert.equal(current.cliente_factura
 const panorama=await call("ventas_servicios_panorama_v2('2026-01-01','2026-08-31',null,null,'mes','Valdécir Mohr')");
 const indicators=await call("ventas_servicios_indicadores_v1('2026-01-01','2026-08-31',null,null,null,null,'Valdécir Mohr')");
 assert.equal(panorama.resumen.total,320); assert.equal(indicators.totales.neto,320);
+assert.equal((await call("ventas_servicios_panorama_v2('2026-01-01','2026-08-31',null,null,'mes','REP1')")).resumen.total,100);
+assert.equal((await call("ventas_servicios_indicadores_v1('2026-01-01','2026-08-31',null,null,null,null,'FAB1')")).totales.neto,100);
 assert.equal(panorama.resumen.ordenes,2); assert.equal(indicators.totales.ordenes,2);
 const lines=await call("ventas_servicios_lineas_v2('2026-01-01','2026-08-31')");
 assert.equal(lines.filter(r=>r.texto_busqueda.includes('VALDECIR MOHR')).reduce((sum,r)=>sum+Number(r.total_venta),0),320);

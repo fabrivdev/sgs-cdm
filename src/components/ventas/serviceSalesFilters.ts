@@ -5,11 +5,6 @@ export type ServiceSalesFilters = {
   chasis?: string; descripcion?: string; codigo?: string; componente?: string;
   origen?: string; documento?: string; vinculo?: string;
 };
-export const SERVICE_FILTER_FIELDS = [
-  ["cliente", "Cliente facturado"], ["propietario", "Propietario actual"],
-  ["factura", "Factura"], ["os", "OS"], ["chasis", "Chasis"], ["descripcion", "Descripción"], ["codigo", "Código"],
-] as const;
-
 export function serviceFiltersKey(filters?: ServiceSalesFilters): string {
   return JSON.stringify(Object.fromEntries(Object.entries(filters ?? {})
     .map(([key, value]) => [key, value?.trim()]).filter(([, value]) => value)

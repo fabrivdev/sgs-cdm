@@ -1,5 +1,5 @@
 import type { ReactNode } from "react";
-import { act, cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import Ventas from "./Ventas";
 
@@ -44,42 +44,43 @@ const openFilters=()=>{
 };
 afterEach(()=>{cleanup();rpc.mockReset();});
 describe('Ventas Servicios global filter routing',()=>{
-  it('clears pending text without restoring it after debounce',async()=>{
+  it('uses one search and clears it across the sales panels',async()=>{
     setup();await screen.findByText('Total del período');
-    fireEvent.change(screen.getByLabelText('Filtrar Cliente facturado'),{target:{value:'pendiente'}});
+    expect(screen.queryByLabelText(/Filtrar Cliente facturado|Filtrar Factura|Filtrar Código/)).not.toBeInTheDocument();
+    fireEvent.change(screen.getByRole('textbox',{name:'Buscar'}),{target:{value:'Pagador A'}});
+    await waitFor(()=>expect(rpc).toHaveBeenCalledWith('ventas_servicios_panorama_v2',expect.objectContaining({p_buscar:'Pagador A'})));
+    await waitFor(()=>expect(rpc).toHaveBeenCalledWith('ventas_servicios_indicadores_v1',expect.objectContaining({p_buscar:'Pagador A'})));
     fireEvent.click(screen.getByRole('button',{name:'Limpiar filtros'}));
-    expect(screen.getByLabelText('Filtrar Cliente facturado')).toHaveValue('');
-    await act(async()=>{await new Promise(resolve=>setTimeout(resolve,450));});
-    expect(rpc.mock.calls.some(([name])=>String(name).endsWith('_filtrado'))).toBe(false);
+    expect(screen.getByRole('textbox',{name:'Buscar'})).toHaveValue('');
+    await waitFor(()=>expect(rpc).toHaveBeenCalledWith('ventas_servicios_panorama_v2',expect.objectContaining({p_buscar:null})));
   });
   it('passes one filter population to periods and every tab; August ends August 31',async()=>{
     setup();
-    for(const label of ['Cliente facturado','Propietario actual','Factura','OS','Chasis','Descripción','Código']) expect(screen.getByLabelText(`Filtrar ${label}`)).toBeInTheDocument();
-    fireEvent.change(screen.getByLabelText('Filtrar Cliente facturado'),{target:{value:'Pagador A'}});
-    await waitFor(()=>expect(rpc).toHaveBeenCalledWith('ventas_servicios_panorama_v2_filtrado',expect.objectContaining({p_filtros:{cliente:'Pagador A'}})));
-    await waitFor(()=>expect(rpc).toHaveBeenCalledWith('ventas_servicios_indicadores_v1_filtrado',expect.objectContaining({p_filtros:{cliente:'Pagador A'}})));
+    fireEvent.change(screen.getByLabelText('Componente'),{target:{value:'Servicio'}});
+    fireEvent.change(screen.getByRole('textbox',{name:'Buscar'}),{target:{value:'Pagador A'}});
+    await waitFor(()=>expect(rpc).toHaveBeenCalledWith('ventas_servicios_panorama_v2_filtrado',expect.objectContaining({p_buscar:'Pagador A',p_filtros:{componente:'Servicio'}})));
+    await waitFor(()=>expect(rpc).toHaveBeenCalledWith('ventas_servicios_indicadores_v1_filtrado',expect.objectContaining({p_buscar:'Pagador A',p_filtros:{componente:'Servicio'}})));
     fireEvent.click(screen.getByRole('button',{name:'Clientes'}));
-    await waitFor(()=>expect(rpc).toHaveBeenCalledWith('ventas_servicios_lineas_v2_filtrado',expect.objectContaining({p_filtros:{cliente:'Pagador A'}})));
+    await waitFor(()=>expect(rpc).toHaveBeenCalledWith('ventas_servicios_lineas_v2_filtrado',expect.objectContaining({p_filtros:{componente:'Servicio'}})));
     fireEvent.click(screen.getByRole('button',{name:'Técnicos'}));
-    await waitFor(()=>expect(rpc).toHaveBeenCalledWith('ventas_servicios_tecnicos_v2',expect.objectContaining({p_filtros:{cliente:'Pagador A'}})));
+    await waitFor(()=>expect(rpc).toHaveBeenCalledWith('ventas_servicios_tecnicos_v2',expect.objectContaining({p_buscar:'Pagador A',p_filtros:{componente:'Servicio'}})));
     fireEvent.click(screen.getByRole('button',{name:'Máquinas'}));
     await screen.findByText('No hay facturación por máquina en el período.');
     fireEvent.click(screen.getByRole('button',{name:'Detalle'}));
     await screen.findByText('No hay líneas facturadas para estos filtros.');
     fireEvent.click(screen.getByText(/ago.*2026/i).closest('button')!);
-    await waitFor(()=>expect(rpc).toHaveBeenCalledWith('ventas_servicios_lineas_v2_filtrado',expect.objectContaining({p_desde:'2026-08-01',p_hasta:'2026-08-31',p_filtros:{cliente:'Pagador A'}})));
+    await waitFor(()=>expect(rpc).toHaveBeenCalledWith('ventas_servicios_lineas_v2_filtrado',expect.objectContaining({p_desde:'2026-08-01',p_hasta:'2026-08-31',p_filtros:{componente:'Servicio'}})));
   });
   it('combines selectors and clears back to compatible original RPCs',async()=>{
     setup();
     fireEvent.change(screen.getByLabelText('Documento'),{target:{value:'nc'}});
     fireEvent.change(screen.getByLabelText('Componente'),{target:{value:'Servicio'}});
-    fireEvent.change(screen.getByLabelText('Origen'),{target:{value:'historico'}});
     fireEvent.change(screen.getByLabelText('Vínculo OS'),{target:{value:'sin_os'}});
-    await waitFor(()=>expect(rpc).toHaveBeenCalledWith('ventas_servicios_indicadores_v1_filtrado',expect.objectContaining({p_filtros:{documento:'nc',componente:'Servicio',origen:'historico',vinculo:'sin_os'}})));
+    await waitFor(()=>expect(rpc).toHaveBeenCalledWith('ventas_servicios_indicadores_v1_filtrado',expect.objectContaining({p_filtros:{documento:'nc',componente:'Servicio',vinculo:'sin_os'}})));
     rpc.mockClear();fireEvent.click(screen.getByRole('button',{name:'Limpiar filtros'}));
     await waitFor(()=>expect(rpc).toHaveBeenCalledWith('ventas_servicios_indicadores_v1',expect.not.objectContaining({p_filtros:expect.anything()})));
     expect(screen.getByLabelText('Documento')).toHaveValue('TODOS');
-    expect(screen.getByLabelText('Origen')).toHaveValue('TODOS');
+    expect(screen.queryByLabelText('Origen')).not.toBeInTheDocument();
   });
   it('reports missing new SQL instead of falling back to unfiltered data',async()=>{
     setup();await screen.findByText('Total del período');

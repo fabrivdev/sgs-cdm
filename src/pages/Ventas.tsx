@@ -25,8 +25,7 @@ import { MaquinasExplorer, MaquinasPanorama, type MaquinasDashboardResponse } fr
 import { RepuestosVentas } from "@/components/ventas/RepuestosVentas";
 import { serviceSalesError } from "@/lib/serviceSalesError";
 import { money as formatMoney } from "@/components/dashboard/utils";
-import { SERVICE_FILTER_FIELDS, serviceFiltersKey, type ServiceSalesFilters } from "@/components/ventas/serviceSalesFilters";
-import { ServiceSalesTextFilter } from "@/components/ventas/ServiceSalesTextFilter";
+import { serviceFiltersKey, type ServiceSalesFilters } from "@/components/ventas/serviceSalesFilters";
 import { partsSellerName } from "@/lib/partsSellerName";
 
 export type VentasArea = "servicios" | "repuestos" | "maquinas";
@@ -65,7 +64,7 @@ type ClientComparison = {
 type ClientResponse = { clientes: ClientComparison[]; comparable: boolean; desde_anterior: string; hasta_anterior: string };
 
 const AREA_COPY = {
-  servicios: { title: "Ventas de Servicios", search: "OS, factura o cliente…", primary: "OS", primaryValue: "concepto" as const, empty: "No hay ventas de Servicios en el período." },
+  servicios: { title: "Ventas de Servicios", search: "OS, factura, cliente, chasis, código o descripción…", primary: "OS", primaryValue: "concepto" as const, empty: "No hay ventas de Servicios en el período." },
   repuestos: { title: "Ventas de Repuestos", search: "Código, repuesto, factura o cliente…", primary: "Repuesto", primaryValue: "repuesto" as const, empty: "No hay ventas de Repuestos en el período." },
   maquinas: { title: "Ventas de Máquinas", search: "Modelo, chasis, factura o cliente…", primary: "Máquina", primaryValue: "subgrupo" as const, empty: "No hay ventas de Máquinas en el período." },
 };
@@ -301,7 +300,6 @@ function VentasContent({ area }: { area: VentasArea }) {
   const [partsBrand, setPartsBrand] = useState("");
   const [partsSeller, setPartsSeller] = useState("");
   const [serviceFilters, setServiceFilters] = useState<ServiceSalesFilters>({});
-  const [serviceFiltersReset, setServiceFiltersReset] = useState(0);
   const serviceFilterKey = serviceFiltersKey(serviceFilters);
   const changeServiceFilter = useCallback((key: keyof ServiceSalesFilters, value: string) => {
     setServiceFilters(previous => previous[key] === value ? previous : { ...previous, [key]: value });
@@ -427,14 +425,12 @@ function VentasContent({ area }: { area: VentasArea }) {
   return (
     <SalesSectionExportsProvider><PageShell className="sales-workspace">
       <PageHeader className="sales-page-header" title={copy.title} />
-      <FiltersBar className="sales-toolbar" secondaryActions={<SalesSectionExportMenu />} search={{ value: buscar, onChange: setBuscar, placeholder: copy.search }} activeCount={activeFilters} onClear={() => { setBuscar(""); setSucursal("TODAS"); setTipoTiempo("TODOS"); setMarca(""); setTipoMaquina(""); setPartsBrand(""); setPartsSeller(""); setServiceFilters({}); setServiceFiltersReset(value=>value+1); }} expanded={<>
+      <FiltersBar className="sales-toolbar" secondaryActions={<SalesSectionExportMenu />} search={{ value: buscar, onChange: setBuscar, placeholder: copy.search }} activeCount={activeFilters} onClear={() => { setBuscar(""); setSucursal("TODAS"); setTipoTiempo("TODOS"); setMarca(""); setTipoMaquina(""); setPartsBrand(""); setPartsSeller(""); setServiceFilters({}); }} expanded={<>
         {area === "servicios" && <>
           <FilterSelect label="Tipo de tiempo" value={tipoTiempo} onChange={setTipoTiempo} placeholder="Todos" width="w-full" options={[{ value: "TODOS", label: "Todos" }, { value: "Cliente", label: "Cliente" }, { value: "Garantia", label: "Garantía" }, { value: "Interno", label: "Interno" }, { value: "No informado", label: "No informado" }]} />
           <FilterSelect label="Marca" value={marca || "TODAS"} onChange={v => setMarca(v === "TODAS" ? "" : v)} placeholder="Todas" width="w-full" options={[{value:"TODAS",label:"Todas"}, ...dimensionOptions.marcas.map(value=>({value,label:value}))]} />
           <FilterSelect label="Tipo de máquina" value={tipoMaquina || "TODOS"} onChange={v => setTipoMaquina(v === "TODOS" ? "" : v)} placeholder="Todos" width="w-full" options={[{value:"TODOS",label:"Todos"}, ...dimensionOptions.tipos.map(value=>({value,label:value}))]} />
-          {SERVICE_FILTER_FIELDS.map(([key,label]) => <ServiceSalesTextFilter key={`${key}-${serviceFiltersReset}`} label={label} value={serviceFilters[key] ?? ""} onChange={value=>changeServiceFilter(key,value)} />)}
           <FilterSelect label="Componente" value={serviceFilters.componente || "TODOS"} onChange={v=>changeServiceFilter("componente",v === "TODOS" ? "" : v)} placeholder="Todos" width="w-full" options={[{value:"TODOS",label:"Todos"}, ...["Servicio","Kilometraje","Repuestos","Terceros"].map(value=>({value,label:value === "Servicio" ? "Mano de obra" : value}))]} />
-          <FilterSelect label="Origen" value={serviceFilters.origen || "TODOS"} onChange={v=>changeServiceFilter("origen",v === "TODOS" ? "" : v)} placeholder="Todos" width="w-full" options={[{value:"TODOS",label:"Todos"},{value:"historico",label:"Histórico"},{value:"actual",label:"Actual"}]} />
           <FilterSelect label="Documento" value={serviceFilters.documento || "TODOS"} onChange={v=>changeServiceFilter("documento",v === "TODOS" ? "" : v)} placeholder="Todos" width="w-full" options={[{value:"TODOS",label:"Todos"},{value:"factura",label:"Factura"},{value:"nc",label:"Nota de crédito"}]} />
           <FilterSelect label="Vínculo OS" value={serviceFilters.vinculo || "TODOS"} onChange={v=>changeServiceFilter("vinculo",v === "TODOS" ? "" : v)} placeholder="Todos" width="w-full" options={[{value:"TODOS",label:"Todos"},{value:"con_os",label:"Con OS"},{value:"sin_os",label:"Sin OS"}]} />
         </>}

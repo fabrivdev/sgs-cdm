@@ -2,6 +2,12 @@
 
 Estado al 14/10/2026: 8295892 unifica los dos nombres de Agustín y retira filtro local/aviso rojo; cac486c unifica “Facturación por período” y elimina el desplegable/título interno duplicado de Servicios. Integrado en main, publicación no verificada. Orden y exportación de Máquinas/Repuestos ya fueron ampliados: los pasos históricos de abajo no son pendientes. En teléfono prevalece [[25-Revision-movil-transversal]].
 
+## Búsqueda y filtros de Servicios — cambio local del 15/10/2026
+
+`src/pages/Ventas.tsx` deja un solo buscador para OS, factura, clientes, propietario, chasis, código financiero/fabricante y descripción. `20261015230000_include_service_codes_in_unified_search.sql` añade los dos códigos al texto normalizado de la base enriquecida, sin alterar la población ni los importes. La migración está preparada; commit/push no la ejecuta. Los códigos operativos derivados únicamente de la OS pueden requerir la inspección de Detalle si no constan en la línea financiera.
+
+“Más filtros” de Servicios conserva selectores de tipo de tiempo, marca, tipo de máquina, componente, documento y vínculo OS; los siete campos de escritura separados y el selector Origen se retiran de la interfaz. La capacidad SQL de origen y filtros textuales permanece en la base para compatibilidad, pero no se ofrece como controles duplicados. Las variantes filtradas, los totales por período y las exportaciones conservan su contrato. Pruebas locales de interfaz y SQL aislado; la revisión visual y la aplicación productiva se registran por separado.
+
 ## Período y totales
 
 Usar fecha de factura para facturación. Agosto calendario termina el 31/08, no el 01/09. Todos los paneles deben respetar rango, sucursal, búsqueda y dimensiones aplicables. Los resúmenes por período de Servicios, Máquinas y Repuestos incluyen `Total del período`.

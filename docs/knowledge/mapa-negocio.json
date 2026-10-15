@@ -2404,7 +2404,7 @@
       "id": "servicios.ventas",
       "title": "Ventas de Servicios",
       "module": "ventas",
-      "description": "Teléfono menor a 640 px: composición continua, rango, tres indicadores y Períodos/Resumen/Detalle visibles. Identidad puede envolver. La condición de columnas separadas de abajo corresponde a tablet/escritorio. Panorama por período y Resumen/Técnicos/Clientes/Máquinas/Detalle sobre facturación. Detalle: una fila visual compacta por línea de factura, columnas separadas sin datos apilados ni párrafos explicativos; textos con elipsis y título completo, OS/chasis complementarios y repeticiones legítimas, sin scroll horizontal. Refacturaciones explícitas del grupo 008 pueden aparecer sin OS; no se inventa el vínculo. Historial de máquina conserva evidencia operacional distinta y se carga bajo demanda.",
+      "description": "Teléfono menor a 640 px: composición continua, rango, tres indicadores y Períodos/Resumen/Detalle visibles. Identidad puede envolver. La condición de columnas separadas de abajo corresponde a tablet/escritorio. Panorama por período y Resumen/Técnicos/Clientes/Máquinas/Detalle sobre facturación. Un buscador normalizado común cubre identidades, documentos, chasis, códigos financieros/fabricante y descripción; los selectores de tiempo, marca, tipo de máquina, componente, documento y vínculo OS se aplican antes de agregar. Detalle: una fila visual compacta por línea de factura, columnas separadas sin datos apilados ni párrafos explicativos; textos con elipsis y título completo, OS/chasis complementarios y repeticiones legítimas, sin scroll horizontal. Refacturaciones explícitas del grupo 008 pueden aparecer sin OS; no se inventa el vínculo. Historial de máquina conserva evidencia operacional distinta y se carga bajo demanda.",
       "sources": [
         "src/components/ventas/ServiciosPanorama.tsx",
         "src/components/ventas/ServiciosResumen.tsx",
@@ -2412,6 +2412,8 @@
         "src/components/ventas/ServiciosClientes.tsx",
         "src/components/ventas/ServiciosMaquinas.tsx",
         "src/components/ventas/ServiciosDetalleOS.tsx",
+        "src/pages/Ventas.tsx",
+        "supabase/migrations/20261015230000_include_service_codes_in_unified_search.sql",
         "supabase/migrations/20260922130000_include_unlinked_service_refacturations.sql",
         "docs/knowledge/25-Revision-movil-transversal.md"
       ],
