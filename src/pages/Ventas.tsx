@@ -27,6 +27,7 @@ import { serviceSalesError } from "@/lib/serviceSalesError";
 import { money as formatMoney } from "@/components/dashboard/utils";
 import { serviceFiltersKey, type ServiceSalesFilters } from "@/components/ventas/serviceSalesFilters";
 import { partsSellerName } from "@/lib/partsSellerName";
+import { machineSalesSellerName } from "@/lib/machineSalesSellerName";
 
 export type VentasArea = "servicios" | "repuestos" | "maquinas";
 type ExplorerView = "facturas" | "clientes" | "analisis" | "resumen" | "tecnicos" | "maquinas";
@@ -341,6 +342,7 @@ function VentasContent({ area }: { area: VentasArea }) {
     return () => { alive = false; };
   }, [area, desde, hasta, sucursal]);
   const [tipoTiempo, setTipoTiempo] = useState("TODOS");
+  const [machineSeller, setMachineSeller] = useState("");
   const [selectedPeriod, setSelectedPeriod] = useState<string | null>(null);
   const [serviciosSummary, setServiciosSummary] = useState<ServiciosSummary | null>(null);
   const [maquinasData, setMaquinasData] = useState<MaquinasDashboardResponse | null>(null);
@@ -353,13 +355,14 @@ function VentasContent({ area }: { area: VentasArea }) {
     if (area === "servicios" || area === "repuestos") { setData(null); setMaquinasData(null); setLoading(false); return; }
     if (area === "maquinas") {
       try {
-        const { data: response, error: rpcError } = await (supabase as any).rpc("ventas_maquinas_dashboard_v1", {
+        const { data: response, error: rpcError } = await (supabase as any).rpc("ventas_maquinas_dashboard_filtros_v2", {
           p_desde: desde,
           p_hasta: hasta,
           p_sucursal: sucursal === "TODAS" ? null : sucursal,
           p_buscar: buscar.trim() || null,
           p_marca: marca || null,
           p_tipo_maquina: tipoMaquina || null,
+          p_vendedor: machineSeller || null,
           p_agrupacion: periodMode,
         });
         if (request !== loadRequest.current) return;
@@ -373,12 +376,12 @@ function VentasContent({ area }: { area: VentasArea }) {
         if (request === loadRequest.current) { setData(null); setLoading(false); }
       }
     }
-  }, [area, buscar, desde, hasta, marca, periodMode, sucursal, tipoMaquina]);
+  }, [area, buscar, desde, hasta, machineSeller, marca, periodMode, sucursal, tipoMaquina]);
   useEffect(() => {
     void load();
     return () => { loadRequest.current += 1; };
   }, [load]);
-  useEffect(() => { setSelectedPeriod(null); setServiciosSummary(null); }, [area, desde, hasta, periodMode, sucursal, tipoTiempo, marca, tipoMaquina, partsBrand, partsSeller, serviceFilterKey]);
+  useEffect(() => { setSelectedPeriod(null); setServiciosSummary(null); }, [area, desde, hasta, periodMode, sucursal, tipoTiempo, machineSeller, marca, tipoMaquina, partsBrand, partsSeller, serviceFilterKey]);
 
   const weekStart = useMemo(() => startOfWeek(now, { weekStartsOn: 1 }), [now]);
   const previousWeekStart = useMemo(() => subWeeks(weekStart, 1), [weekStart]);
@@ -411,7 +414,7 @@ function VentasContent({ area }: { area: VentasArea }) {
     return { desde: selectedPeriod > desde ? selectedPeriod : desde, hasta: periodEndIso < hasta ? periodEndIso : hasta };
   }, [selectedPeriod, desde, hasta, periodMode]);
   const copy = AREA_COPY[area];
-  const activeFilters = Number(sucursal !== "TODAS") + Number(Boolean(buscar)) + Number(area === "servicios" && tipoTiempo !== "TODOS") + Number((area === "servicios" || area === "maquinas") && Boolean(marca)) + Number((area === "servicios" || area === "maquinas") && Boolean(tipoMaquina)) + Number(area === "repuestos" && Boolean(partsBrand)) + Number(area === "repuestos" && Boolean(partsSeller)) + (area === "servicios" ? Object.keys(JSON.parse(serviceFilterKey)).length : 0);
+  const activeFilters = Number(sucursal !== "TODAS") + Number(Boolean(buscar)) + Number(area === "servicios" && tipoTiempo !== "TODOS") + Number((area === "servicios" || area === "maquinas") && Boolean(marca)) + Number((area === "servicios" || area === "maquinas") && Boolean(tipoMaquina)) + Number(area === "maquinas" && Boolean(machineSeller)) + Number(area === "repuestos" && Boolean(partsBrand)) + Number(area === "repuestos" && Boolean(partsSeller)) + (area === "servicios" ? Object.keys(JSON.parse(serviceFilterKey)).length : 0);
   
   const summary = area === "servicios" ? serviciosSummary : area === "maquinas" ? maquinasData?.resumen : data;
   const averageValue = area === "maquinas"
@@ -423,12 +426,13 @@ function VentasContent({ area }: { area: VentasArea }) {
     ? {
         marcas: [...new Set([...(maquinasData?.dimensiones.marcas ?? []), ...(marca ? [marca] : [])])].sort(),
         tipos: [...new Set([...(maquinasData?.dimensiones.tipos ?? []), ...(tipoMaquina ? [tipoMaquina] : [])])].sort(),
+        vendedores: [...new Set([...(maquinasData?.dimensiones.vendedores ?? []), ...(machineSeller ? [machineSeller] : [])])].sort(),
       }
-    : { marcas: [...new Set(machineOptions.map(option => option.marca))].sort(), tipos: [...new Set(machineOptions.map(option => option.tipo_maquina))].sort() };
+    : { marcas: [...new Set(machineOptions.map(option => option.marca))].sort(), tipos: [...new Set(machineOptions.map(option => option.tipo_maquina))].sort(), vendedores: [] };
   return (
     <SalesSectionExportsProvider><PageShell className="sales-workspace">
       <PageHeader className="sales-page-header" title={copy.title} />
-      <FiltersBar className="sales-toolbar" secondaryActions={<SalesSectionExportMenu />} search={{ value: buscar, onChange: setBuscar, placeholder: copy.search }} activeCount={activeFilters} onClear={() => { setBuscar(""); setSucursal("TODAS"); setTipoTiempo("TODOS"); setMarca(""); setTipoMaquina(""); setPartsBrand(""); setPartsSeller(""); setServiceFilters({}); }} expanded={<>
+      <FiltersBar className="sales-toolbar" secondaryActions={<SalesSectionExportMenu />} search={{ value: buscar, onChange: setBuscar, placeholder: copy.search }} activeCount={activeFilters} onClear={() => { setBuscar(""); setSucursal("TODAS"); setTipoTiempo("TODOS"); setMarca(""); setTipoMaquina(""); setMachineSeller(""); setPartsBrand(""); setPartsSeller(""); setServiceFilters({}); }} expanded={<>
         {area === "servicios" && <>
           <FilterSelect label="Tipo de tiempo" value={tipoTiempo} onChange={setTipoTiempo} placeholder="Todos" width="w-full" options={[{ value: "TODOS", label: "Todos" }, { value: "Cliente", label: "Cliente" }, { value: "Garantia", label: "Garantía" }, { value: "Interno", label: "Interno" }, { value: "No informado", label: "No informado" }]} />
           <FilterSelect label="Marca" value={marca || "TODAS"} onChange={v => setMarca(v === "TODAS" ? "" : v)} placeholder="Todas" width="w-full" options={[{value:"TODAS",label:"Todas"}, ...dimensionOptions.marcas.map(value=>({value,label:value}))]} />
@@ -440,6 +444,7 @@ function VentasContent({ area }: { area: VentasArea }) {
         {area === "maquinas" && <>
           <FilterSelect label="Marca" value={marca || "TODAS"} onChange={v => setMarca(v === "TODAS" ? "" : v)} placeholder="Todas" width="w-full" options={[{value:"TODAS",label:"Todas"}, ...dimensionOptions.marcas.map(value=>({value,label:value}))]} />
           <FilterSelect label="Tipo de máquina" value={tipoMaquina || "TODOS"} onChange={v => setTipoMaquina(v === "TODOS" ? "" : v)} placeholder="Todos" width="w-full" options={[{value:"TODOS",label:"Todos"}, ...dimensionOptions.tipos.map(value=>({value,label:value}))]} />
+          <FilterSelect label="Vendedor" value={machineSeller || "TODOS"} onChange={v => setMachineSeller(v === "TODOS" ? "" : v)} placeholder="Todos" width="w-full" options={[{value:"TODOS",label:"Todos"}, ...dimensionOptions.vendedores.map(value=>({value,label:value === "__SIN_VENDEDOR__" ? "Sin vendedor" : machineSalesSellerName(value)}))]} />
         </>}
         {area === "repuestos" && <>
           <FilterSelect label="Marca" value={partsBrand || "TODAS"} onChange={value => setPartsBrand(value === "TODAS" ? "" : value)} placeholder="Todas" width="w-full" options={[{ value: "TODAS", label: "Todas" }, { value: "CLAAS", label: "CLAAS" }, { value: "HORSCH", label: "HORSCH" }, { value: "OTROS", label: "Otros" }]} />

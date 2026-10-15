@@ -35,7 +35,7 @@ import { TableExportButton, type TableExportOption } from "@/components/exports/
 import { useSectionTable } from "@/components/exports/useSectionTable";
 import { cargarTodo } from "@/hooks/useCatalogos";
 import type { SalesColumn } from "@/components/ventas/salesTableInteraction";
-import { FiltersBar } from "@/components/filters/FiltersBar";
+import { FiltersBar, FilterSelect } from "@/components/filters/FiltersBar";
 import { Sheet, SheetContent, SheetDescription, SheetFooter, SheetHeader, SheetTitle } from "@/components/ui/sheet";
 import { Switch } from "@/components/ui/switch";
 import { createAdminPerson } from "@/lib/admin-create-person";
@@ -174,6 +174,8 @@ export default function Admin() {
   const [savingParameters, setSavingParameters] = useState(false);
   const [adminTab, setAdminTab] = useState("equipo");
   const [tableSearch, setTableSearch] = useState("");
+  const [profileStatus, setProfileStatus] = useState("all");
+  const [profileRole, setProfileRole] = useState("all");
   const availableAdminTabs = useMemo(() => [
     hasSectionAccess("admin.usuarios") ? "equipo" : null,
     hasSectionAccess("admin.importaciones") ? "importar" : null,
@@ -249,8 +251,11 @@ export default function Admin() {
   );
   const normalizedTableSearch = normalizeAdminSearch(tableSearch);
   const profileMatchesSearch = (profile: Profile) => {
-    if (!normalizedTableSearch) return true;
     const role = primaryRoleForProfile(profile);
+    if (profileStatus === "active" && profile.activo === false) return false;
+    if (profileStatus === "inactive" && profile.activo !== false) return false;
+    if (profileRole === "none" ? role !== undefined : profileRole !== "all" && role !== profileRole) return false;
+    if (!normalizedTableSearch) return true;
     return normalizeAdminSearch([
       profile.nombre,
       emailByProfile(profile),
@@ -684,10 +689,14 @@ export default function Admin() {
               placeholder: "Nombre, email, sucursal o nivel…",
               width: "w-[min(420px,34vw)]",
             }}
-            activeCount={normalizedTableSearch ? 1 : 0}
-            onClear={() => setTableSearch("")}
+            activeCount={Number(Boolean(normalizedTableSearch)) + Number(profileStatus !== "all") + Number(profileRole !== "all")}
+            onClear={() => { setTableSearch(""); setProfileStatus("all"); setProfileRole("all"); }}
             meta={`${filteredProfiles.length} persona${filteredProfiles.length === 1 ? "" : "s"}`}
             secondaryActions={can("datos:exportar") ? <TableExportButton options={tableLoading || tableLoadError ? [] : [exportOptions[0]]} /> : undefined}
+            expanded={<>
+              <FilterSelect label="Estado" value={profileStatus} onChange={setProfileStatus} placeholder="Todos" width="w-full" options={[{ value: "all", label: "Todos" }, { value: "active", label: "Activos" }, { value: "inactive", label: "Inactivos" }]} />
+              <FilterSelect label="Rol" value={profileRole} onChange={setProfileRole} placeholder="Todos" width="w-full" options={[{ value: "all", label: "Todos" }, ...(["superadmin", ...ROLES] as Role[]).map(value => ({ value, label: ROLE_LABELS[value] })), { value: "none", label: "Sin rol" }]} />
+            </>}
           />
         )}
 

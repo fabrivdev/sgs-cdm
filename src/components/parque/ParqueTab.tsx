@@ -47,6 +47,8 @@ const RUBRO_OPTIONS = [
 type Cliente = {
   id: string;
   nombre: string;
+  ruc: string | null;
+  cod_entidad: string | null;
   sucursal: Sucursal | null;
   activo: boolean;
 };
@@ -279,7 +281,7 @@ export function ParqueTab({
       const [c, ct, s, t] = await Promise.all([
         cargarTodo<Cliente>(supabase
           .from("clientes")
-          .select("id, nombre, sucursal, activo")
+          .select("id, nombre, ruc, cod_entidad, sucursal, activo")
           .in("id", clienteIds).order("id")),
 
         cargarTodo<Contacto>(supabase
@@ -573,7 +575,7 @@ export function ParqueTab({
     const ql = q.trim().toLowerCase();
     return rows.filter((r) => {
       if (r.cantTotal === 0) return false;
-      if (ql && !r.cliente.nombre.toLowerCase().includes(ql)) return false;
+      if (ql && ![r.cliente.nombre, r.cliente.ruc, r.cliente.cod_entidad].some(value => value?.toLowerCase().includes(ql))) return false;
       if (fSucursal !== "all" && !r.sucursales.includes(fSucursal as Sucursal)) return false;
 
       if (fMarca !== "all") {
@@ -674,7 +676,7 @@ export function ParqueTab({
     <div className="space-y-3">
       <FiltersBar
         secondaryActions={can("datos:exportar") ? <SectionActionsMenu options={[{ id: "excel", label: "Exportar clientes", disabled: loading || loadError || factLoading || !!factError || !ordenadas.length, onSelect: exportar }]} /> : undefined}
-        search={{ value: q, onChange: setQ, placeholder: "Nombre del cliente…", label: "Buscar" }}
+        search={{ value: q, onChange: setQ, placeholder: "Nombre, RUC o código de cliente…", label: "Buscar" }}
         activeCount={filtrosActivos + (q ? 1 : 0)}
         onClear={() => { setQ(""); limpiarFiltros(); }}
         expanded={(

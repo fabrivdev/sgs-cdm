@@ -2,7 +2,6 @@ import { sortSalesRows, type SalesColumn } from "@/components/ventas/salesTableI
 import { SectionActionsMenu } from "@/components/exports/SectionActionsMenu";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
-import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { CompactListInfo, CompactListTable, type CompactListColumn } from "@/components/lists/CompactListTable";
@@ -10,7 +9,7 @@ import { MobileRecord } from "@/components/lists/MobileRecord";
 import { ArrowRightLeft } from "lucide-react";
 import { MarcaBadge } from "@/components/StatusBadges";
 import { SUCURSALES, type Sucursal } from "@/lib/constants";
-import { FiltersBar, FilterSelect, FilterCustom } from "@/components/filters/FiltersBar";
+import { FiltersBar, FilterSelect } from "@/components/filters/FiltersBar";
 import { cn } from "@/lib/utils";
 import { TransferirMaquinaDialog, type MaquinaParaTransferir } from "./TransferirMaquinaDialog";
 import { NuevaMaquinaDialog } from "./NuevaMaquinaDialog";
@@ -309,7 +308,8 @@ export function MaquinasTab({
     XLSX.writeFile(wb, `maquinas-${new Date().toISOString().slice(0, 10)}.xlsx`);
   };
 
-  const hoy = new Date().getFullYear();
+  const yearOptions = [...new Set(maquinas.map(m => m.anio).filter((year): year is number => typeof year === "number"))]
+    .sort((a, b) => b - a).map(year => ({ value: String(year), label: String(year) }));
 
   const limpiar = () => {
     setQ(""); setFSucursal("all"); setFMarca("all"); setFSubgrupo("all");
@@ -330,12 +330,8 @@ export function MaquinasTab({
         secondaryActions={canExport ? <SectionActionsMenu options={[{ id: "excel", label: "Exportar máquinas", disabled: loading || loadError || !ordenadas.length, onSelect: exportar }]} /> : undefined}
         expanded={
           <div className="flex flex-col gap-3">
-            <FilterCustom label="Año desde" width="w-full">
-              <Input type="number" value={añoDesde} onChange={(e) => setAñoDesde(e.target.value)} className="h-8 text-[12px]" placeholder="2010" />
-            </FilterCustom>
-            <FilterCustom label="Año hasta" width="w-full">
-              <Input type="number" value={añoHasta} onChange={(e) => setAñoHasta(e.target.value)} className="h-8 text-[12px]" placeholder={String(hoy)} />
-            </FilterCustom>
+            <FilterSelect label="Año desde" value={añoDesde || "all"} onChange={value => setAñoDesde(value === "all" ? "" : value)} placeholder="Todos" width="w-full" options={[{ value: "all", label: "Todos" }, ...yearOptions]} />
+            <FilterSelect label="Año hasta" value={añoHasta || "all"} onChange={value => setAñoHasta(value === "all" ? "" : value)} placeholder="Todos" width="w-full" options={[{ value: "all", label: "Todos" }, ...yearOptions]} />
             <FilterSelect
               label="Estado" value={fEstado} onChange={setFEstado} placeholder="Estado" width="w-full"
               options={[{ value: "activa", label: "Activas" }, { value: "inactiva", label: "Inactivas" }, { value: "all", label: "Todos" }]}

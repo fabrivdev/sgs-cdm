@@ -149,6 +149,20 @@ describe("Parque and imports compact lists",()=>{
     await waitFor(()=>expect(screen.queryByText("000999")).not.toBeInTheDocument());await exportTable("Exportar máquinas");
     expect(mocks.json.mock.calls[0][0]).toHaveLength(1);expect(mocks.json.mock.calls[0][0][0]).toMatchObject({Serie:"000123456789",Vendedor:"VENDEDOR COMPLETO",Sucursal:"Santa Rita",Año:2020});
   });
+  it("filters machine years with selectors instead of extra text fields",async()=>{
+    setup(<MaquinasTab/>);await screen.findByRole("table",{name:"Máquinas del parque"});
+    fireEvent.click(screen.getByRole("button",{name:"Más filtros"}));
+    const panel=screen.getByRole("dialog");
+    expect(within(panel).queryByRole("spinbutton")).not.toBeInTheDocument();
+    const yearField=within(panel).getByText("Año desde").closest("[data-filter-field]")!;
+    fireEvent.click(within(yearField as HTMLElement).getByRole("combobox"));
+    fireEvent.click(screen.getByRole("option",{name:"2022"}));
+    fireEvent.click(within(panel).getByRole("button",{name:"Aplicar"}));
+    expect(screen.getByRole("table",{name:"Máquinas del parque"})).not.toHaveTextContent("000123456789");
+    await exportTable("Exportar máquinas");
+    expect(mocks.json.mock.calls[0][0]).toHaveLength(1);
+    expect(mocks.json.mock.calls[0][0][0]).toMatchObject({Serie:"000999",Año:2022});
+  });
   it("clients opens the existing detail directly from the primary target without crowding visible headings",async()=>{
     const open=vi.fn();setup(<ParqueTab onOpenCliente={open}/>);await screen.findByRole("button",{name:"Abrir cliente CLIENTE CON NOMBRE MUY LARGO"});
     await waitFor(()=>expect(screen.queryByText("cargando facturación...")).not.toBeInTheDocument());
@@ -167,6 +181,18 @@ describe("Parque and imports compact lists",()=>{
     fireEvent.change(screen.getAllByRole("searchbox",{name:"Buscar"})[0],{target:{value:"CLIENTE CON NOMBRE"}});
     await waitFor(()=>expect(screen.queryByText("OTRO CLIENTE")).not.toBeInTheDocument());
     await exportTable("Exportar clientes");expect(mocks.json.mock.calls[0][0]).toHaveLength(1);expect(mocks.json.mock.calls[0][0][0]).toMatchObject({"Fact. YTD":125.55,Teléfono:"000123456",Sucursal:"Santa Rita",Repuesto:"Sí",Servicio:"Sí"});
+  });
+  it("finds park clients by RUC or entity code using the single search",async()=>{
+    mocks.tables.clientes[0].ruc="80012345-6";
+    mocks.tables.clientes[0].cod_entidad="CLI001";
+    setup(<ParqueTab/>);await screen.findByText("CLIENTE CON NOMBRE MUY LARGO");
+    const search=screen.getAllByRole("searchbox",{name:"Buscar"})[0];
+    fireEvent.change(search,{target:{value:"80012345-6"}});
+    await waitFor(()=>expect(screen.queryByText("OTRO CLIENTE")).not.toBeInTheDocument());
+    fireEvent.change(search,{target:{value:"CLI001"}});
+    await waitFor(()=>expect(screen.queryByText("CLIENTE CON NOMBRE MUY LARGO")).toBeInTheDocument());
+    await exportTable("Exportar clientes");
+    expect(mocks.json.mock.calls[0][0]).toHaveLength(1);
   });
   it("client machine sorting still works both ways and exports every branch",async()=>{
     mocks.tables.parque_maquinas.push({...machine,id:"M3",sucursal:"Santa Rosa",serie:"000333"});

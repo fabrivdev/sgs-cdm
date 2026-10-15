@@ -34,13 +34,12 @@ import { TableExportButton, type TableExportOption } from "@/components/exports/
 interface Filtros {
   busqueda: string;
   sucursales: string[];
-  nroSolicitud: string;
   solicitante: string;
 }
 
 type SolicitudSortKey = "sucursal" | "nroSolicitud" | "fechaEmision" | "solicitante" | "itemsCount";
 
-const FILTROS_VACIOS: Filtros = { busqueda: "", sucursales: [], nroSolicitud: "", solicitante: "" };
+const FILTROS_VACIOS: Filtros = { busqueda: "", sucursales: [], solicitante: "" };
 
 const rowKey = (row: { sucursal: string; nroSolicitud: string }) => `${row.sucursal}-${row.nroSolicitud}`;
 
@@ -120,7 +119,7 @@ export function SolicitudesCompraTab() {
     return Array.from(grupos.values()).sort((a, b) => (b.fechaEmision ?? "").localeCompare(a.fechaEmision ?? ""));
   }, [solicitudesLineasQuery.data]);
 
-  const filtrosActivos = Boolean(filtros.busqueda || filtros.sucursales.length || filtros.nroSolicitud || filtros.solicitante);
+  const filtrosActivos = Boolean(filtros.busqueda || filtros.sucursales.length || filtros.solicitante);
 
   const gruposFiltrados = useMemo(() => {
     if (!filtrosActivos) return solicitudesAgrupadas;
@@ -129,8 +128,6 @@ export function SolicitudesCompraTab() {
 
     return solicitudesAgrupadas.filter((grupo) => {
       if (filtros.sucursales.length > 0 && !filtros.sucursales.includes(grupo.sucursal)) return false;
-      if (filtros.nroSolicitud && !grupo.nroSolicitud.toLowerCase().includes(filtros.nroSolicitud.trim().toLowerCase()))
-        return false;
       if (filtros.solicitante && grupo.solicitante !== filtros.solicitante)
         return false;
 
@@ -275,7 +272,7 @@ export function SolicitudesCompraTab() {
       <div className="space-y-3">
         <FiltersBar
           search={{ value: filtros.busqueda, onChange: (busqueda) => setFiltros((f) => ({ ...f, busqueda })), placeholder: "Solicitud, solicitante, código o descripción…", width: "min-w-0 flex-1" }}
-          activeCount={Number(Boolean(filtros.busqueda)) + Number(filtros.sucursales.length > 0) + Number(Boolean(filtros.nroSolicitud)) + Number(Boolean(filtros.solicitante))}
+          activeCount={Number(Boolean(filtros.busqueda)) + Number(filtros.sucursales.length > 0) + Number(Boolean(filtros.solicitante))}
           onClear={() => setFiltros(FILTROS_VACIOS)}
           secondaryActions={can("datos:exportar") && !solicitudesLineasQuery.isError && !pedidosLineasQuery.isError ? <TableExportButton options={exportOptions} /> : undefined}
         >

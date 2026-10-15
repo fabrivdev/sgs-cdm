@@ -85,11 +85,10 @@ interface SeguimientoForm {
 interface Filtros {
   busqueda: string;
   sucursales: string[];
-  nroPedido: string;
   proveedor: string;
 }
 
-const FILTROS_VACIOS: Filtros = { busqueda: "", sucursales: [], nroPedido: "", proveedor: "" };
+const FILTROS_VACIOS: Filtros = { busqueda: "", sucursales: [], proveedor: "" };
 
 const rowKey = (row: { sucursal: string | null; nro_pedido: string }) => `${row.sucursal}-${row.nro_pedido}`;
 
@@ -152,7 +151,7 @@ export function ComprasPedidosTab() {
     return solicitudesPorPedido(resoluciones);
   }, [pedidosLineasQuery.data, solicitudesLineasQuery.data, vinculosQuery.data]);
 
-  const filtrosActivos = Boolean(filtros.busqueda || filtros.sucursales.length || filtros.nroPedido || filtros.proveedor);
+  const filtrosActivos = Boolean(filtros.busqueda || filtros.sucursales.length || filtros.proveedor);
 
   const filasFiltradas = useMemo(() => {
     const rows = resumenQuery.data ?? [];
@@ -163,7 +162,6 @@ export function ComprasPedidosTab() {
 
     return rows.filter((row) => {
       if (filtros.sucursales.length > 0 && (!row.sucursal || !filtros.sucursales.includes(row.sucursal))) return false;
-      if (filtros.nroPedido && !row.nro_pedido.toLowerCase().includes(filtros.nroPedido.trim().toLowerCase())) return false;
       if (filtros.proveedor && row.proveedor_nombre !== filtros.proveedor) return false;
 
       if (busqueda) {
@@ -310,7 +308,7 @@ export function ComprasPedidosTab() {
       <div className="space-y-3">
         <FiltersBar
           search={{ value: filtros.busqueda, onChange: (busqueda) => setFiltros((f) => ({ ...f, busqueda })), placeholder: "Pedido, proveedor, código o descripción…", width: "min-w-0 flex-1" }}
-          activeCount={Number(Boolean(filtros.busqueda)) + Number(filtros.sucursales.length > 0) + Number(Boolean(filtros.nroPedido)) + Number(Boolean(filtros.proveedor))}
+          activeCount={Number(Boolean(filtros.busqueda)) + Number(filtros.sucursales.length > 0) + Number(Boolean(filtros.proveedor))}
           onClear={() => setFiltros(FILTROS_VACIOS)}
           secondaryActions={can("datos:exportar") && !resumenQuery.isError && !pedidosLineasQuery.isError ? <TableExportButton options={exportOptions} /> : undefined}
         >

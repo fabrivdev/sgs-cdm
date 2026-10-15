@@ -60,7 +60,7 @@ export type MaquinasDashboardResponse = {
   por_maquina: Array<MaquinasResumen & { marca: string; tipo_maquina: string; condicion?: string }>;
   por_modelo: Array<MaquinasResumen & { marca: string; tipo_maquina: string; modelo: string; condicion?: string }>;
   lineas: MaquinaVentaLinea[];
-  dimensiones: { marcas: string[]; tipos: string[] };
+  dimensiones: { marcas: string[]; tipos: string[]; vendedores?: string[] };
   comparacion?: { desde: string; hasta: string; total: number; netas: number; vendidas: number; notas_credito_monto: number };
 };
 

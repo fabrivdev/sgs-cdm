@@ -18,7 +18,7 @@ vi.mock("@/integrations/supabase/client", () => ({ supabase: {
 vi.mock("@/components/parque/ImportarTab", () => ({ ImportarTab: () => null }));
 vi.mock("@/components/parque/ImportarTotvsTab", () => ({ ImportarTotvsTab: () => null }));
 vi.mock("@/components/exports/TableExportButton", () => ({ TableExportButton: () => null }));
-vi.mock("@/components/filters/FiltersBar", () => ({ FiltersBar: () => null }));
+vi.mock("@/components/filters/FiltersBar", () => ({ FiltersBar: () => null, FilterSelect: () => null }));
 
 beforeEach(() => { vi.clearAllMocks(); canManage.value = true; parametersAccess.value = false; createPerson.mockResolvedValue(undefined); goalRead.mockResolvedValue({ value: 160, warning: null }); goalSave.mockResolvedValue(undefined); });
 afterEach(() => { cleanup(); vi.unstubAllGlobals(); });

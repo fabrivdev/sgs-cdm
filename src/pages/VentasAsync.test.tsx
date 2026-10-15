@@ -51,7 +51,7 @@ beforeEach(() => {
   requests = [];
   viewport.mobile = true;
   rpc.mockImplementation((name: string) => {
-    if (name !== "ventas_maquinas_dashboard_v1") return Promise.resolve({ data: [], error: null });
+    if (name !== "ventas_maquinas_dashboard_filtros_v2") return Promise.resolve({ data: [], error: null });
     const request = deferred();
     requests.push(request);
     return request.promise;
@@ -95,7 +95,7 @@ describe("Ventas machine request ownership", () => {
     const expanded = panel.querySelector("[data-expanded-filter-panel]") as HTMLElement;
     fireEvent.click(within(expanded).getAllByRole("combobox")[0]);
     fireEvent.click(screen.getByRole("option", { name: "CLAAS" }));
-    expect(rpc).toHaveBeenLastCalledWith("ventas_maquinas_dashboard_v1", expect.objectContaining({ p_marca: "CLAAS" }));
+    expect(rpc).toHaveBeenLastCalledWith("ventas_maquinas_dashboard_filtros_v2", expect.objectContaining({ p_marca: "CLAAS" }));
     const narrowed = response(50);
     narrowed.data!.dimensiones = { marcas: ["HORSCH"], tipos: ["COSECHADORAS"] };
     await act(async () => { requests[1].resolve(narrowed); });
@@ -104,14 +104,34 @@ describe("Ventas machine request ownership", () => {
     expect(screen.getByRole("option", { name: "CLAAS" })).toBeInTheDocument();
   });
 
+  it("filters machine sales by canonical seller and keeps the missing-seller option", async () => {
+    render(<Ventas area="maquinas" />);
+    const initial = response(100);
+    initial.data!.dimensiones.vendedores = ["CARLOS JAVIER BENITEZ ZARZA", "__SIN_VENDEDOR__"];
+    await act(async () => { requests[0].resolve(initial); });
+    fireEvent.click(screen.getByRole("button", { name: "Más filtros" }));
+    const secondary = screen.getByRole("dialog").querySelector("[data-expanded-filter-panel]") as HTMLElement;
+    const seller = within(secondary).getAllByRole("combobox")[2];
+    fireEvent.click(seller);
+    expect(screen.getByRole("option", { name: "Sin vendedor" })).toBeInTheDocument();
+    fireEvent.click(screen.getByRole("option", { name: "CARLOS BENITEZ" }));
+    expect(rpc).toHaveBeenLastCalledWith("ventas_maquinas_dashboard_filtros_v2", expect.objectContaining({ p_vendedor: "CARLOS JAVIER BENITEZ ZARZA" }));
+    const narrowed = response(40);
+    narrowed.data!.dimensiones.vendedores = ["__SIN_VENDEDOR__"];
+    await act(async () => { requests[1].resolve(narrowed); });
+    expect(seller).toHaveTextContent("CARLOS BENITEZ");
+    fireEvent.click(screen.getByRole("button", { name: /Limpiar \(1\)/ }));
+    expect(rpc).toHaveBeenLastCalledWith("ventas_maquinas_dashboard_filtros_v2", expect.objectContaining({ p_vendedor: null }));
+  });
+
   it.each([true, false])("keeps latest KPIs and periods when older success arrives last (mobile: %s)", async mobile => {
     viewport.mobile = mobile;
     render(<Ventas area="maquinas" />);
     changeStart("2026-09-01");
     expect(requests).toHaveLength(2);
-    expect(rpc).toHaveBeenLastCalledWith("ventas_maquinas_dashboard_v1", {
+    expect(rpc).toHaveBeenLastCalledWith("ventas_maquinas_dashboard_filtros_v2", {
       p_desde: "2026-09-01", p_hasta: "2026-10-03", p_sucursal: null, p_buscar: null,
-      p_marca: null, p_tipo_maquina: null, p_agrupacion: "mes",
+      p_marca: null, p_tipo_maquina: null, p_vendedor: null, p_agrupacion: "mes",
     });
     await succeed(1, 222);
     expect(billing()).toHaveTextContent("$ 222");
@@ -185,10 +205,10 @@ describe("Ventas machine request ownership", () => {
     await succeed(0, 100);
     fireEvent.change(screen.getAllByRole("searchbox", { name: "Buscar" })[0], { target: { value: "chasis" } });
     await waitFor(() => expect(requests).toHaveLength(2));
-    expect(rpc).toHaveBeenLastCalledWith("ventas_maquinas_dashboard_v1", expect.objectContaining({ p_buscar: "chasis" }));
+    expect(rpc).toHaveBeenLastCalledWith("ventas_maquinas_dashboard_filtros_v2", expect.objectContaining({ p_buscar: "chasis" }));
     fireEvent.click(screen.getAllByRole("button", { name: "Limpiar búsqueda" })[0]);
     await waitFor(() => expect(requests).toHaveLength(3));
-    expect(rpc).toHaveBeenLastCalledWith("ventas_maquinas_dashboard_v1", expect.objectContaining({ p_buscar: null }));
+    expect(rpc).toHaveBeenLastCalledWith("ventas_maquinas_dashboard_filtros_v2", expect.objectContaining({ p_buscar: null }));
     await succeed(2, 222);
     await succeed(1, 111);
     expect(billing()).toHaveTextContent("$ 222");
@@ -204,7 +224,7 @@ describe("Ventas machine request ownership", () => {
     fireEvent.click(screen.getByRole("button", { name: /Limpiar \(1\)/ }));
     fireEvent.click(screen.getByRole("button", { name: "Aplicar" }));
     await waitFor(() => expect(requests).toHaveLength(3));
-    expect(rpc).toHaveBeenLastCalledWith("ventas_maquinas_dashboard_v1", expect.objectContaining({ p_buscar: null }));
+    expect(rpc).toHaveBeenLastCalledWith("ventas_maquinas_dashboard_filtros_v2", expect.objectContaining({ p_buscar: null }));
     await succeed(2, 222);
     await fail(1, "RPC error", "Error anterior al reinicio");
     expect(billing()).toHaveTextContent("$ 222");

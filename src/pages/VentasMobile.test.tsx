@@ -16,7 +16,7 @@ const line = { id: "demo", fecha: "2026-08-15", factura: "0000123", cliente_fact
 const partsMetrics = { facturado: summary.total, ventas: 1500000, notas_credito: -250.25, documentos: 2, clientes: 1, documentos_nc: 1, lineas: 2, unidades_netas: 1 };
 const components = { mo: 100, km: 10, repuestos: 20, terceros: 0, neto: 130, horas: 4 };
 const responses: Record<string, unknown> = {
-  ventas_maquinas_dashboard_v1: { resumen: summary, periodos: periods, por_maquina: [], por_modelo: [], lineas: [line], dimensiones: { marcas: [], tipos: [] } },
+  ventas_maquinas_dashboard_filtros_v2: { resumen: summary, periodos: periods, por_maquina: [], por_modelo: [], lineas: [line], dimensiones: { marcas: [], tipos: [] } },
   ventas_servicios_dimensiones: [],
   ventas_servicios_panorama_v2: { resumen: { ...summary, ordenes: 1, promedio: summary.total }, periodos: [{ ...periods[0], ...components, metodologia: "actual" }] },
   ventas_servicios_indicadores_v1: { totales: { ...components, ordenes: 1, documentos: 2 }, por_tipo: [], por_marca_tipo: [], por_maquina: [] },

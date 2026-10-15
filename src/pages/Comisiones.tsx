@@ -815,7 +815,7 @@ export default function Comisiones() {
               </KpiStrip>
 
               <FiltersBar search={{value:daySearch,onChange:setDaySearch,placeholder:"Buscar técnico, fecha o horario…"}}
-                activeCount={dayTypes.length} onClear={()=>{setDaySearch("");setDayTypes([]);}}
+                activeCount={Number(Boolean(daySearch.trim())) + Number(dayTypes.length > 0)} onClear={()=>{setDaySearch("");setDayTypes([]);}}
                 expanded={<FilterMultiSelect label="Tipo" values={dayTypes} options={["Cliente","Garantia","Interno","Desconocido"].map(value=>({value,label:value === "Garantia" ? "Garantía" : value === "Desconocido" ? "Sin tipo" : value}))} onChange={setDayTypes}/>}
                 secondaryActions={<SectionActionsMenu options={dailyExport ? [dailyExport] : []}/>}/>
               <div className="overflow-hidden rounded-md border">
