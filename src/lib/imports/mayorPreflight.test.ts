@@ -52,7 +52,7 @@ describe("readMayorPreflightFile", () => {
 
     await readMayorPreflightFile(new NodeBlob([xml]) as Blob, "mayor.xml", {
       batchSize: 1,
-      onMovementBatch: (batch) => batches.push(batch),
+      onMovementBatch: (batch) => { batches.push(batch); },
     });
 
     expect(batches).toHaveLength(2);

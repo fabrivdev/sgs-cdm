@@ -194,7 +194,7 @@ function addMoney(left: number, right: number) {
 export async function readReceivablesPreflightFile(
   file: Blob,
   sourceFileName = "cuentas-por-cobrar.xml",
-  options: ReceivablesReadOptions = {},
+  options: ReceivablesReadOptions = { cutoffDate: "" },
 ): Promise<ReceivablesPreflight> {
   const batchSize = options.batchSize ?? 500;
   if (!Number.isInteger(batchSize) || batchSize < 1 || batchSize > 500) {

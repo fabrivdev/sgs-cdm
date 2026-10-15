@@ -24,20 +24,20 @@ it.skipIf(!fixture)("persiste el XML completo, concilia y permite reintentar sin
       if (!casts) throw new Error("RPC inesperado");
       const args = Object.values(params);
       try {
-        const result = await db.query(`SELECT public.${name}(${casts.map((cast,i)=>`$${i+1}::${cast}`).join(",")}) result`, args);
+        const result = await db.query<Record<string, unknown>>(`SELECT public.${name}(${casts.map((cast,i)=>`$${i+1}::${cast}`).join(",")}) result`, args);
         return { data: result.rows[0].result, error: null };
       } catch (error) { return { data: null, error: { message: (error as Error).message } }; }
     } };
     const file = new NodeFile([await readFile(fixture!)], "cuentas_por_cobrar_a_la_fecha_114844.xml") as unknown as File;
     const result = await persistReceivablesFile({ file, client, cutoffDate: cutoff });
     expect(result.insertadas).toBe(result.preflight.documentRows);
-    const summary = (await db.query("SELECT public.totvs_consultar_cxc_resumen_v1($1::date) result", [cutoff])).rows[0].result as Record<string, unknown>;
+    const summary = (await db.query<Record<string, unknown>>("SELECT public.totvs_consultar_cxc_resumen_v1($1::date) result", [cutoff])).rows[0].result as Record<string, unknown>;
     expect(Number(summary.saldo_pendiente_elegible_usd)).toBe(result.preflight.eligiblePendingUsd);
     expect(Number(summary.saldo_vencido_usd)).toBe(result.preflight.overdueUsd);
     const retry = await persistReceivablesFile({ file, client, cutoffDate: cutoff });
     expect(retry.reusedCompleteSnapshot).toBe(true);
     expect(retry.cargaId).toBe(result.cargaId);
-    const count = (await db.query("SELECT count(*) n FROM public.totvs_cxc_documentos")).rows[0].n;
+    const count = (await db.query<Record<string, unknown>>("SELECT count(*) n FROM public.totvs_cxc_documentos")).rows[0].n;
     expect(Number(count)).toBe(result.preflight.documentRows);
     console.log(JSON.stringify({ documentos: result.preflight.documentRows, lotes: result.lotes, corte: cutoff, saldo: result.preflight.eligiblePendingUsd, vencido: result.preflight.overdueUsd, reintentoSinDuplicados: true }));
   } finally { await db.close(); }

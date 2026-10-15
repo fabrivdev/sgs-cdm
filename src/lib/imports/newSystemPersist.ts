@@ -281,7 +281,9 @@ export async function persistNewSystemServiceOrders({
       actualizado_en: new Date().toISOString(),
     }));
     batch += 1;
+    const batchStartedAt = performance.now();
     emitImportProgress(onProgress, {
+      durationMs: performance.now() - batchStartedAt,
       phase: "service-orders.persist",
       sourceFile: fileNames.ordenesServicio ?? undefined,
       status: "started",
@@ -296,6 +298,7 @@ export async function persistNewSystemServiceOrders({
     );
     if (error) {
       emitImportProgress(onProgress, {
+        durationMs: performance.now() - batchStartedAt,
         phase: "service-orders.persist",
         sourceFile: fileNames.ordenesServicio ?? undefined,
         status: "failed",
@@ -334,6 +337,7 @@ export async function persistNewSystemServiceOrders({
       : null;
     if (verificationFailure) {
       emitImportProgress(onProgress, {
+        durationMs: performance.now() - batchStartedAt,
         phase: "service-orders.persist",
         sourceFile: fileNames.ordenesServicio ?? undefined,
         status: "failed",
@@ -348,6 +352,7 @@ export async function persistNewSystemServiceOrders({
     excluded += excludedNumbers.length;
     for (const osNumero of excludedNumbers) excludedServiceOrderNumbers.add(osNumero);
     emitImportProgress(onProgress, {
+      durationMs: performance.now() - batchStartedAt,
       phase: "service-orders.persist",
       sourceFile: fileNames.ordenesServicio ?? undefined,
       status: "succeeded",
@@ -557,7 +562,7 @@ export async function persistNewSystemBundle({
       technicalLoadState: "COMPLETE_ON_RPC_SUCCESS",
     },
   };
-  const billingResponse = await runImportProgressStep({
+  const billingResponse = await runImportProgressStep<{ data: unknown; error: { code?: string; message?: string } | null }>({
     callback: onProgress,
     phase: mode === "validate" ? "billing.validate" : mode === "accredit" ? "billing.accredit" : "billing.persist",
     sourceFile: fileNames.facturacion ?? undefined,

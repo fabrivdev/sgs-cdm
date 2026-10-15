@@ -164,8 +164,8 @@ describe("orders workspace", () => {
     expect(record?.children).toHaveLength(2);
     expect(record?.children[0]).toHaveTextContent("OS 01-00000001");
     expect(record?.children[1]).toHaveTextContent("CLIENTE DEMO");
-    expect(within(record!).getByText("OS 01-00000001")).toHaveClass("text-foreground");
-    expect(within(record!).getByText("CLIENTE DEMOSTRACIÓN")).toHaveClass("text-foreground");
+    expect(within(record as HTMLElement).getByText("OS 01-00000001")).toHaveClass("text-foreground");
+    expect(within(record as HTMLElement).getByText("CLIENTE DEMOSTRACIÓN")).toHaveClass("text-foreground");
     const table = within(screen.getByRole("table", { name: "Órdenes de servicio" }));
     const row = within(open.closest("tr")!);
     expect(table.getByRole("columnheader", { name: "Horas" })).toBeVisible();
@@ -897,7 +897,7 @@ describe("orders workspace", () => {
     const row = screen.getByRole("button", { name: "TECNICO UNO" }).closest('[role="row"]')!;
     expect(row).toHaveTextContent("No disponible");
     expect(row).toHaveTextContent("-");
-    expect(within(row).queryByRole("meter")).not.toBeInTheDocument();
+    expect(within(row as HTMLElement).queryByRole("meter")).not.toBeInTheDocument();
     expect(row).not.toHaveTextContent("0%");
   });
   it("never exposes stale figures or exports after source errors", () => {

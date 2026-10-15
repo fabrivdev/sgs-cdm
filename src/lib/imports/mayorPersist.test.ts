@@ -13,7 +13,7 @@ function xmlFile() {
   const cells = (values: string[]) => values.map((value) => `<Cell><Data>${value}</Data></Cell>`).join("");
   const values = ["01", "202607", "2026-07-01T00:00:00", "1", "1", "10", "1", "100", "2.5", "APERTURA", "", "", "10", "Centro", "", "", "ORI", "1", "1"];
   const xml = `<Workbook><Worksheet><Table><Row>${cells(headers)}</Row><Row>${cells(values)}</Row><Row>${cells(["Totales"])}</Row></Table></Worksheet></Workbook>`;
-  return new NodeFile([xml], "mayor.xml", { type: "application/xml" }) as File;
+  return new NodeFile([xml], "mayor.xml", { type: "application/xml" }) as unknown as File;
 }
 
 describe("persistMayorFile", () => {

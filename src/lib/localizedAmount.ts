@@ -23,14 +23,14 @@ export function parseLocalizedNonNegativeAmount(value: number | string | null | 
     const decimalPart = unsigned.slice(decimalIndex + 1);
     const groupingPattern = new RegExp(`^\\d{1,3}(?:\\${groupingSeparator}\\d{3})*$`);
     if (!decimalPart || !groupingPattern.test(integerPart)) return undefined;
-    normalized = `${integerPart.replaceAll(groupingSeparator, "")}.${decimalPart}`;
+    normalized = `${integerPart.split(groupingSeparator).join("")}.${decimalPart}`;
   } else if (dotCount) {
-    if (/^\d{1,3}(?:\.\d{3})+$/.test(unsigned)) normalized = unsigned.replaceAll(".", "");
+    if (/^\d{1,3}(?:\.\d{3})+$/.test(unsigned)) normalized = unsigned.split(".").join("");
     else if (dotCount !== 1) return undefined;
   } else if (commaCount) {
     if (commaCount > 1) {
       if (!/^\d{1,3}(?:,\d{3})+$/.test(unsigned)) return undefined;
-      normalized = unsigned.replaceAll(",", "");
+      normalized = unsigned.split(",").join("");
     } else {
       normalized = unsigned.replace(",", ".");
     }

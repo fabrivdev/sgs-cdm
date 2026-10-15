@@ -1,3 +1,4 @@
+import { identifySourceFile } from "@/lib/imports/sourceIdentity";
 import { useEffect, useRef, useState } from "react";
 import { useQueryClient } from "@tanstack/react-query";
 import * as XLSX from "xlsx";
@@ -149,6 +150,8 @@ interface FacturacionGridRow {
 type NewSystemXmlKind = "facturacion" | "ordenesServicio" | "productos";
 
 interface NewSystemXmlFile {
+  byteSize: number;
+  sha256: string;
   fileName: string;
   xmlText: string;
 }
@@ -523,10 +526,11 @@ export function ImportarTab({ onChanged }: { onChanged: () => void }) {
   const procesarNuevoSistemaXml = async (kind: NewSystemXmlKind, file: File) => {
     try {
       const xmlText = await file.text();
+      const sourceIdentity = await identifySourceFile(file);
       const nextFiles: NewSystemXmlFilesState = {
         ...newSystemFiles,
         [kind]: {
-          fileName: file.name,
+          ...sourceIdentity,
           xmlText,
         },
       };

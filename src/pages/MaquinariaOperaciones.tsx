@@ -1867,7 +1867,7 @@ export function ImportDetailDrawer({ row, onOpenChange, onEditHeader, onSaved }:
       const { data, error } = await db.rpc("maquinaria_eliminar_unidad_importacion", { p_importacion_unidad_id: row.id });
       if (error) throw error;
       if (data?.linea_eliminada) {
-        await deleteStoredMachineFiles([ocDocument?.storage_path, supplierDocument?.storage_path]);
+        await deleteStoredMachineFiles([ocDocument?.storage_path, supplierDocumentForUnit?.storage_path]);
       }
       toast.success(data?.linea_eliminada ? "Línea de importación eliminada" : "Unidad de importación eliminada");
       onOpenChange(false);
