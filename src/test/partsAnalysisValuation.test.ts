@@ -165,3 +165,57 @@ describe('antigüedad ponderada por sucursal', () => {
     } finally { await db.exec('ROLLBACK'); }
   });
 });
+
+
+describe('criterios históricos confirmados del Excel', () => {
+  it('corrige colores sin cambiar compras, valorización, sucursales ni permisos', async () => {
+    await db.exec("SET test.analysis_access='true'");
+    const before = await report();
+    const migration = readFileSync('supabase/migrations/20261015200000_restore_historical_color_criteria.sql','utf8');
+    await db.exec(migration);
+    await db.exec(migration);
+    const after = await report();
+    expect(after.sucursales).toEqual(before.sucursales);
+    expect(after.franjas).toEqual(before.franjas);
+    expect(after.valor_kardex_usd).toBe(before.valor_kardex_usd);
+    expect(after.lineas).toBe(before.lineas);
+    expect(after.rows.find(r=>r.codigo_interno==='REP1')?.color).toBe('VERDE_CLARO');
+    expect(after.rows.find(r=>r.codigo_interno==='REP3')?.color).toBe('SIN_DATOS');
+    expect(after.por_color.reduce((s,c)=>s+(c.valor_kardex_usd??0),0)).toBe(after.valor_kardex_usd);
+    expect((await report({color:'VERDE_CLARO'})).rows.every(r=>r.color==='VERDE_CLARO')).toBe(true);
+    await db.exec("SET test.analysis_access='false'");
+    await expect(report()).rejects.toThrow(/Sin acceso/);
+    await db.exec("SET test.analysis_access='true'");
+  });
+  it.each([
+    [10,10,10,1,'VERDE_OSCURO'],[10,9,10,1,'VERDE_CLARO'],
+    [9,100,100,1,'VERDE_CLARO'],[0.5,0,0,1,'VERDE_CLARO'],
+    [0,1,0,500,'AMARILLO'],[0,1,20,500,'AMARILLO'],
+    [0,0,1,900,'NARANJA'],[0,0,0,365,'LILA'],
+    [0,0,0,366,'GRIS'],[0,0,0,1000,'GRIS'],[0,0,0,1001,'ROJO'],
+    [0,0,0,null,'SIN_DATOS'],[0,0,0,-1,'SIN_DATOS'],
+  ])('respeta prioridad y límites: %s/%s/%s, días %s => %s', async (a,b,c,days,color) => {
+    const r=await db.query<{color:string}>('SELECT repuestos_color_historico($1,$2,$3,$4) color',[a,b,c,days]);
+    expect(r.rows[0].color).toBe(color);
+  });
+  it('usa los tres años calendario y solo ventas positivas confirmadas hasta hoy', async () => {
+    await db.exec('BEGIN');
+    try {
+      await db.exec(`DELETE FROM repuestos_ventas_vinculacion WHERE producto_codigo='REP1';
+        INSERT INTO repuestos_ventas_vinculacion VALUES
+        ('REP1',current_date,10,'CONFIRMADA'),
+        ('REP1',make_date(extract(year from current_date)::int-1,1,1),10,'CONFIRMADA'),
+        ('REP1',make_date(extract(year from current_date)::int-2,1,1),10,'CONFIRMADA'),
+        ('REP1',current_date,-50,'CONFIRMADA'),
+        ('REP1',current_date+1,100,'CONFIRMADA'),
+        ('REP1',current_date,100,'PENDIENTE');`);
+      const row=(await report()).rows.find(r=>r.codigo_interno==='REP1')!;
+      expect([row.unidades_anio_actual,row.unidades_anio_anterior,row.unidades_hace_dos_anios]).toEqual([10,10,10]);
+      expect(row.color).toBe('VERDE_OSCURO');
+      await db.exec("DELETE FROM repuestos_ventas_vinculacion WHERE producto_codigo='REP1' AND fecha_efectiva=current_date");
+      expect((await report()).rows.find(r=>r.codigo_interno==='REP1')?.color).toBe('AMARILLO');
+      await db.exec("DELETE FROM repuestos_ventas_vinculacion WHERE producto_codigo='REP1' AND extract(year from fecha_efectiva)=extract(year from current_date)-1");
+      expect((await report()).rows.find(r=>r.codigo_interno==='REP1')?.color).toBe('NARANJA');
+    } finally { await db.exec('ROLLBACK'); }
+  });
+});
