@@ -85,6 +85,25 @@ describe("Ventas machine request ownership", () => {
     expect(within(secondary as HTMLElement).getByText("Vendedor")).toBeInTheDocument();
   });
 
+  it("keeps selected machine dimensions visible when results narrow the available options", async () => {
+    render(<Ventas area="maquinas" />);
+    const first = response(100);
+    first.data!.dimensiones = { marcas: ["CLAAS", "HORSCH"], tipos: ["TRACTORES", "COSECHADORAS"] };
+    await act(async () => { requests[0].resolve(first); });
+    fireEvent.click(screen.getByRole("button", { name: "Más filtros" }));
+    const panel = screen.getByRole("dialog");
+    const expanded = panel.querySelector("[data-expanded-filter-panel]") as HTMLElement;
+    fireEvent.click(within(expanded).getAllByRole("combobox")[0]);
+    fireEvent.click(screen.getByRole("option", { name: "CLAAS" }));
+    expect(rpc).toHaveBeenLastCalledWith("ventas_maquinas_dashboard_v1", expect.objectContaining({ p_marca: "CLAAS" }));
+    const narrowed = response(50);
+    narrowed.data!.dimensiones = { marcas: ["HORSCH"], tipos: ["COSECHADORAS"] };
+    await act(async () => { requests[1].resolve(narrowed); });
+    expect(within(expanded).getAllByRole("combobox")[0]).toHaveTextContent("CLAAS");
+    fireEvent.click(within(expanded).getAllByRole("combobox")[0]);
+    expect(screen.getByRole("option", { name: "CLAAS" })).toBeInTheDocument();
+  });
+
   it.each([true, false])("keeps latest KPIs and periods when older success arrives last (mobile: %s)", async mobile => {
     viewport.mobile = mobile;
     render(<Ventas area="maquinas" />);

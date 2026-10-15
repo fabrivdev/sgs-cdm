@@ -66,7 +66,7 @@ type ClientResponse = { clientes: ClientComparison[]; comparable: boolean; desde
 const AREA_COPY = {
   servicios: { title: "Ventas de Servicios", search: "OS, factura, cliente, chasis, código o descripción…", primary: "OS", primaryValue: "concepto" as const, empty: "No hay ventas de Servicios en el período." },
   repuestos: { title: "Ventas de Repuestos", search: "Código, repuesto, factura o cliente…", primary: "Repuesto", primaryValue: "repuesto" as const, empty: "No hay ventas de Repuestos en el período." },
-  maquinas: { title: "Ventas de Máquinas", search: "Modelo, chasis, factura o cliente…", primary: "Máquina", primaryValue: "subgrupo" as const, empty: "No hay ventas de Máquinas en el período." },
+  maquinas: { title: "Ventas de Máquinas", search: "Modelo, chasis, factura, cliente, vendedor o código…", primary: "Máquina", primaryValue: "subgrupo" as const, empty: "No hay ventas de Máquinas en el período." },
 };
 
 const usd = { format: (value: number) => formatMoney(value) };
@@ -420,7 +420,10 @@ function VentasContent({ area }: { area: VentasArea }) {
       ? serviciosSummary?.promedio ?? 0
       : data?.promedio ?? 0;
   const dimensionOptions = area === "maquinas"
-    ? { marcas: maquinasData?.dimensiones.marcas ?? [], tipos: maquinasData?.dimensiones.tipos ?? [] }
+    ? {
+        marcas: [...new Set([...(maquinasData?.dimensiones.marcas ?? []), ...(marca ? [marca] : [])])].sort(),
+        tipos: [...new Set([...(maquinasData?.dimensiones.tipos ?? []), ...(tipoMaquina ? [tipoMaquina] : [])])].sort(),
+      }
     : { marcas: [...new Set(machineOptions.map(option => option.marca))].sort(), tipos: [...new Set(machineOptions.map(option => option.tipo_maquina))].sort() };
   return (
     <SalesSectionExportsProvider><PageShell className="sales-workspace">

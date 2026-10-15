@@ -25,6 +25,8 @@
 | Administración, Calendario, Compras y solicitudes auxiliares | Ninguno adicional respaldado cuando todos los primarios caben | Escritorio oculta el disparador; móvil/desborde conserva acceso a primarios. |
 | Detalle de repuesto | Ninguno adicional respaldado | Se elimina el panel que duplicaba la misma búsqueda visible. |
 
+En Ventas de Máquinas, el único buscador cubre modelo, chasis, factura, cliente, vendedor y código, además de los demás campos contemplados por `ventas_maquinas_dashboard_v1`. Marca y Tipo de máquina siguen siendo los únicos selectores secundarios. Si una búsqueda reduce las opciones devueltas por la RPC, el valor ya seleccionado permanece visible y se puede quitar; KPI, períodos, detalle y exportación siguen recibiendo el mismo resultado filtrado de la RPC. La comprobación de este ajuste fue local mediante prueba de componente y compilación, sin validar aún el código nuevo en producción.
+
 ## Selectores rápidos en teléfono - 07/10/2026
 
 Bajo 640 px, los selectores que cambian el subconjunto o período visible y no son navegación de sección se muestran dentro de `Más filtros`: semana de Planificador, estado visible de Trabajos, estado de técnicos de Productividad y período/medida de Cumplimiento. No se duplican fuera del panel. Órdenes/Productividad/Cumplimiento permanecen como pestañas visibles porque cambian de sección, no son filtros.
