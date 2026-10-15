@@ -1,5 +1,9 @@
 # Revisión del conocimiento
 
+## Revisión dirigida de Ventas de Servicios — 15/10/2026
+
+Contrastados `src/pages/Ventas.tsx`, `serviceSalesFilters.ts`, las vistas de Servicios y el texto normalizado de `ventas_servicios_movimientos_enriquecidos`. Se retiraron siete controles textuales duplicados y Origen de la interfaz; un buscador común y seis selectores aplican a Períodos, Resumen, Técnicos, Clientes, Máquinas y Detalle. La migración `20261015230000_include_service_codes_in_unified_search.sql` agrega código financiero y fabricante a esa búsqueda sin cambiar la población. Pruebas locales de interfaz, exportación y SQL aislado correctas; aplicación productiva y revisión visual se informan por separado. No se crearon notas nuevas ni se avanzó un checkpoint global.
+
 ## Reconciliación funcional del 14/10/2026: Mayor y procedencia TOTVS
 
 Se contrastó el XML actualizado del Mayor con 29.040 claves de la última carga completa: 3.421 nuevas, 1.041 con huella distinta y nueve con cambio contable. Se preparó un contrato de versiones por foto completa, con aceptación explícita de cambios contables y pruebas PGlite. La carga de facturación acreditó 4.117 líneas fechadas y dos exclusiones; 775 vínculos históricos sin fecha figuran adicionalmente en la relación de procedencia. Se preparó una reparación puntual auditada y un guard de reincidencia, probados localmente. Ver [[08-Pendientes-y-validacion]], [[35-Libro-Mayor-TOTVS]] y la regla `mayor-foto-versionada` del mapa funcional. El SQL y la publicación pública permanecen separados del commit y requieren verificación productiva posterior.
