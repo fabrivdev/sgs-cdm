@@ -425,3 +425,6 @@ Validación productiva posterior, 15/10: migración 20261015190000 aplicada con 
 
 
 15/10 — Criterios históricos confirmados: nueva leyenda local revisada en pantalla (outputs/criteria-corrected-local.png, datos sintéticos). SQL real aplicado, 10.043 códigos coinciden y grupos USD suman 4.748.961,27; snapshot de sucursales/franjas/RPC idéntico antes-después. Vista previa remota aún mostraba textos anteriores tras push; revisión visual remota de la leyenda queda pendiente de sincronización. Sin Publish.
+
+
+15/10 — Criterio definitivo ventas + compra: migración 20261015210000 aplicada. Vista previa real con fabrizio.vega muestra ayudas nuevas, lila/gris/rojo por última compra y las ocho categorías con importes. Filtro Lila devuelve 519 códigos/USD 228.538,35. Snapshot SQL de sucursales, compras, total y RPC idéntico antes/después. Evidencia outputs/combined-colors-live.png; esta verificación cierra el pendiente anterior de leyenda remota. Sin Publish.
