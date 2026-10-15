@@ -176,6 +176,27 @@ export type Database = {
           },
         ]
       }
+      app_configuracion: {
+        Row: {
+          actualizado_en: string
+          clave: string
+          descripcion: string | null
+          valor_numero: number
+        }
+        Insert: {
+          actualizado_en?: string
+          clave: string
+          descripcion?: string | null
+          valor_numero: number
+        }
+        Update: {
+          actualizado_en?: string
+          clave?: string
+          descripcion?: string | null
+          valor_numero?: number
+        }
+        Relationships: []
+      }
       app_secciones: {
         Row: {
           activo: boolean
@@ -847,6 +868,128 @@ export type Database = {
           },
         ]
       }
+      facturacion_dedupe_repair_backup: {
+        Row: {
+          repair_key: string
+          respaldado_en: string
+          row_data: Json
+          row_id: string
+          tabla: string
+        }
+        Insert: {
+          repair_key: string
+          respaldado_en?: string
+          row_data: Json
+          row_id: string
+          tabla: string
+        }
+        Update: {
+          repair_key?: string
+          respaldado_en?: string
+          row_data?: Json
+          row_id?: string
+          tabla?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "facturacion_dedupe_repair_backup_repair_key_fkey"
+            columns: ["repair_key"]
+            isOneToOne: false
+            referencedRelation: "facturacion_dedupe_repair_runs"
+            referencedColumns: ["repair_key"]
+          },
+        ]
+      }
+      facturacion_dedupe_repair_pairs: {
+        Row: {
+          canonica_actualizado_en: string
+          clave_comercial: string
+          descartada_actualizado_en: string
+          linea_canonica_id: string
+          linea_descartada_id: string
+          repair_key: string
+        }
+        Insert: {
+          canonica_actualizado_en: string
+          clave_comercial: string
+          descartada_actualizado_en: string
+          linea_canonica_id: string
+          linea_descartada_id: string
+          repair_key: string
+        }
+        Update: {
+          canonica_actualizado_en?: string
+          clave_comercial?: string
+          descartada_actualizado_en?: string
+          linea_canonica_id?: string
+          linea_descartada_id?: string
+          repair_key?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "facturacion_dedupe_repair_pairs_linea_canonica_id_fkey"
+            columns: ["linea_canonica_id"]
+            isOneToOne: false
+            referencedRelation: "facturacion_lineas_importadas"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "facturacion_dedupe_repair_pairs_linea_canonica_id_fkey"
+            columns: ["linea_canonica_id"]
+            isOneToOne: false
+            referencedRelation: "v_repuestos_ventas_unificadas"
+            referencedColumns: ["linea_id"]
+          },
+          {
+            foreignKeyName: "facturacion_dedupe_repair_pairs_linea_descartada_id_fkey"
+            columns: ["linea_descartada_id"]
+            isOneToOne: false
+            referencedRelation: "facturacion_lineas_importadas"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "facturacion_dedupe_repair_pairs_linea_descartada_id_fkey"
+            columns: ["linea_descartada_id"]
+            isOneToOne: false
+            referencedRelation: "v_repuestos_ventas_unificadas"
+            referencedColumns: ["linea_id"]
+          },
+          {
+            foreignKeyName: "facturacion_dedupe_repair_pairs_repair_key_fkey"
+            columns: ["repair_key"]
+            isOneToOne: false
+            referencedRelation: "facturacion_dedupe_repair_runs"
+            referencedColumns: ["repair_key"]
+          },
+        ]
+      }
+      facturacion_dedupe_repair_runs: {
+        Row: {
+          aplicado_en: string | null
+          creado_en: string
+          detalles: Json
+          estado: string
+          repair_key: string
+          revertido_en: string | null
+        }
+        Insert: {
+          aplicado_en?: string | null
+          creado_en?: string
+          detalles?: Json
+          estado: string
+          repair_key: string
+          revertido_en?: string | null
+        }
+        Update: {
+          aplicado_en?: string | null
+          creado_en?: string
+          detalles?: Json
+          estado?: string
+          repair_key?: string
+          revertido_en?: string | null
+        }
+        Relationships: []
+      }
       facturacion_lineas_importadas: {
         Row: {
           actualizado_en: string
@@ -965,9 +1108,718 @@ export type Database = {
           },
         ]
       }
+      facturacion_rescate_20261009_ejecuciones: {
+        Row: {
+          aplicado_en: string
+          dependencias_respaldadas: number
+          detalle_esperado: number
+          estado: string
+          rescate_key: string
+          restaurado_en: string | null
+          resumen_esperado: number
+        }
+        Insert: {
+          aplicado_en?: string
+          dependencias_respaldadas: number
+          detalle_esperado: number
+          estado: string
+          rescate_key: string
+          restaurado_en?: string | null
+          resumen_esperado: number
+        }
+        Update: {
+          aplicado_en?: string
+          dependencias_respaldadas?: number
+          detalle_esperado?: number
+          estado?: string
+          rescate_key?: string
+          restaurado_en?: string | null
+          resumen_esperado?: number
+        }
+        Relationships: []
+      }
+      facturacion_rescate_20261009_filas: {
+        Row: {
+          clase: string
+          fila: Json
+          ordinal: number
+          rescate_key: string
+          respaldado_en: string
+          tabla_esquema: string
+          tabla_nombre: string
+        }
+        Insert: {
+          clase: string
+          fila: Json
+          ordinal: number
+          rescate_key: string
+          respaldado_en?: string
+          tabla_esquema: string
+          tabla_nombre: string
+        }
+        Update: {
+          clase?: string
+          fila?: Json
+          ordinal?: number
+          rescate_key?: string
+          respaldado_en?: string
+          tabla_esquema?: string
+          tabla_nombre?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "facturacion_rescate_20261009_filas_rescate_key_fkey"
+            columns: ["rescate_key"]
+            isOneToOne: false
+            referencedRelation: "facturacion_rescate_20261009_ejecuciones"
+            referencedColumns: ["rescate_key"]
+          },
+        ]
+      }
+      facturacion_totvs_carga_lineas: {
+        Row: {
+          documento_fuente_sha256: string
+          importacion_id: string
+          linea_id: string
+        }
+        Insert: {
+          documento_fuente_sha256: string
+          importacion_id: string
+          linea_id: string
+        }
+        Update: {
+          documento_fuente_sha256?: string
+          importacion_id?: string
+          linea_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "facturacion_totvs_carga_lineas_importacion_id_fkey"
+            columns: ["importacion_id"]
+            isOneToOne: false
+            referencedRelation: "importaciones"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "facturacion_totvs_carga_lineas_linea_id_fkey"
+            columns: ["linea_id"]
+            isOneToOne: false
+            referencedRelation: "facturacion_lineas_importadas"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "facturacion_totvs_carga_lineas_linea_id_fkey"
+            columns: ["linea_id"]
+            isOneToOne: false
+            referencedRelation: "v_repuestos_ventas_unificadas"
+            referencedColumns: ["linea_id"]
+          },
+        ]
+      }
+      facturacion_totvs_correcciones_cientificas_20261013_v2: {
+        Row: {
+          actualizado_en_original: string
+          candidatas_antes: Json
+          cargas_antes: Json
+          ejecutado_por: string
+          evidencia_fuente: Json
+          fingerprint_antes: string
+          fingerprint_despues: string | null
+          identidad: string
+          importacion_original_id: string
+          linea_antes: Json
+          linea_despues: Json | null
+          linea_hash_original: string
+          linea_id: string
+          pares_antes: Json
+          repair_key: string
+          reparado_en: string
+          resolucion_dedupe: Json
+          resumen_antes: Json
+          resumen_despues: Json | null
+          resumen_id: string
+          revertido_en: string | null
+          revertido_por: string | null
+        }
+        Insert: {
+          actualizado_en_original: string
+          candidatas_antes: Json
+          cargas_antes: Json
+          ejecutado_por?: string
+          evidencia_fuente: Json
+          fingerprint_antes: string
+          fingerprint_despues?: string | null
+          identidad: string
+          importacion_original_id: string
+          linea_antes: Json
+          linea_despues?: Json | null
+          linea_hash_original: string
+          linea_id: string
+          pares_antes: Json
+          repair_key: string
+          reparado_en?: string
+          resolucion_dedupe: Json
+          resumen_antes: Json
+          resumen_despues?: Json | null
+          resumen_id: string
+          revertido_en?: string | null
+          revertido_por?: string | null
+        }
+        Update: {
+          actualizado_en_original?: string
+          candidatas_antes?: Json
+          cargas_antes?: Json
+          ejecutado_por?: string
+          evidencia_fuente?: Json
+          fingerprint_antes?: string
+          fingerprint_despues?: string | null
+          identidad?: string
+          importacion_original_id?: string
+          linea_antes?: Json
+          linea_despues?: Json | null
+          linea_hash_original?: string
+          linea_id?: string
+          pares_antes?: Json
+          repair_key?: string
+          reparado_en?: string
+          resolucion_dedupe?: Json
+          resumen_antes?: Json
+          resumen_despues?: Json | null
+          resumen_id?: string
+          revertido_en?: string | null
+          revertido_por?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "facturacion_totvs_correcciones_cie_importacion_original_id_fkey"
+            columns: ["importacion_original_id"]
+            isOneToOne: false
+            referencedRelation: "importaciones"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "facturacion_totvs_correcciones_cientificas_202610_linea_id_fkey"
+            columns: ["linea_id"]
+            isOneToOne: false
+            referencedRelation: "facturacion_lineas_importadas"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "facturacion_totvs_correcciones_cientificas_202610_linea_id_fkey"
+            columns: ["linea_id"]
+            isOneToOne: false
+            referencedRelation: "v_repuestos_ventas_unificadas"
+            referencedColumns: ["linea_id"]
+          },
+        ]
+      }
+      facturacion_totvs_descriptor_preservaciones: {
+        Row: {
+          creado_en: string
+          descriptores: string[]
+          entrada_efectiva: Json
+          entrada_recibida: Json
+          id: string
+          identidad: string
+          importacion_id: string
+          linea_id: string
+        }
+        Insert: {
+          creado_en?: string
+          descriptores: string[]
+          entrada_efectiva: Json
+          entrada_recibida: Json
+          id?: string
+          identidad: string
+          importacion_id: string
+          linea_id: string
+        }
+        Update: {
+          creado_en?: string
+          descriptores?: string[]
+          entrada_efectiva?: Json
+          entrada_recibida?: Json
+          id?: string
+          identidad?: string
+          importacion_id?: string
+          linea_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "facturacion_totvs_descriptor_preservaciones_importacion_id_fkey"
+            columns: ["importacion_id"]
+            isOneToOne: false
+            referencedRelation: "importaciones"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "facturacion_totvs_descriptor_preservaciones_linea_id_fkey"
+            columns: ["linea_id"]
+            isOneToOne: false
+            referencedRelation: "facturacion_lineas_importadas"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "facturacion_totvs_descriptor_preservaciones_linea_id_fkey"
+            columns: ["linea_id"]
+            isOneToOne: false
+            referencedRelation: "v_repuestos_ventas_unificadas"
+            referencedColumns: ["linea_id"]
+          },
+        ]
+      }
+      facturacion_totvs_grupo_descriptivo_cambios: {
+        Row: {
+          accion: string
+          actualizado_en_anterior: string
+          actualizado_en_nuevo: string
+          codigo_producto: string
+          creado_en: string
+          entrada_recibida: Json
+          grupo_anterior: string | null
+          grupo_nuevo: string
+          id: string
+          identidad: string
+          importacion_id: string
+          linea_id: string
+          raw_anterior: Json
+          raw_nuevo: Json
+          subgrupo_anterior: string | null
+          subgrupo_nuevo: string
+        }
+        Insert: {
+          accion: string
+          actualizado_en_anterior: string
+          actualizado_en_nuevo: string
+          codigo_producto: string
+          creado_en?: string
+          entrada_recibida: Json
+          grupo_anterior?: string | null
+          grupo_nuevo: string
+          id?: string
+          identidad: string
+          importacion_id: string
+          linea_id: string
+          raw_anterior: Json
+          raw_nuevo: Json
+          subgrupo_anterior?: string | null
+          subgrupo_nuevo: string
+        }
+        Update: {
+          accion?: string
+          actualizado_en_anterior?: string
+          actualizado_en_nuevo?: string
+          codigo_producto?: string
+          creado_en?: string
+          entrada_recibida?: Json
+          grupo_anterior?: string | null
+          grupo_nuevo?: string
+          id?: string
+          identidad?: string
+          importacion_id?: string
+          linea_id?: string
+          raw_anterior?: Json
+          raw_nuevo?: Json
+          subgrupo_anterior?: string | null
+          subgrupo_nuevo?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "facturacion_totvs_grupo_descriptivo_cambios_importacion_id_fkey"
+            columns: ["importacion_id"]
+            isOneToOne: false
+            referencedRelation: "importaciones"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "facturacion_totvs_grupo_descriptivo_cambios_linea_id_fkey"
+            columns: ["linea_id"]
+            isOneToOne: false
+            referencedRelation: "facturacion_lineas_importadas"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "facturacion_totvs_grupo_descriptivo_cambios_linea_id_fkey"
+            columns: ["linea_id"]
+            isOneToOne: false
+            referencedRelation: "v_repuestos_ventas_unificadas"
+            referencedColumns: ["linea_id"]
+          },
+        ]
+      }
+      facturacion_totvs_importador_versiones: {
+        Row: {
+          capturado_en: string
+          definicion_rpc: string
+          version: string
+        }
+        Insert: {
+          capturado_en?: string
+          definicion_rpc: string
+          version: string
+        }
+        Update: {
+          capturado_en?: string
+          definicion_rpc?: string
+          version?: string
+        }
+        Relationships: []
+      }
+      facturacion_totvs_preservaciones_auditadas: {
+        Row: {
+          creado_en: string
+          identidad: string
+          linea_actualizado_en: string
+          linea_canonica_id: string
+          linea_fingerprint: string
+          marca_verificada: Database["public"]["Enums"]["marca"]
+          motivo: string
+          os_verificada: string
+          tipo_tiempo_verificado: string | null
+        }
+        Insert: {
+          creado_en?: string
+          identidad: string
+          linea_actualizado_en: string
+          linea_canonica_id: string
+          linea_fingerprint: string
+          marca_verificada: Database["public"]["Enums"]["marca"]
+          motivo: string
+          os_verificada: string
+          tipo_tiempo_verificado?: string | null
+        }
+        Update: {
+          creado_en?: string
+          identidad?: string
+          linea_actualizado_en?: string
+          linea_canonica_id?: string
+          linea_fingerprint?: string
+          marca_verificada?: Database["public"]["Enums"]["marca"]
+          motivo?: string
+          os_verificada?: string
+          tipo_tiempo_verificado?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "facturacion_totvs_preservaciones_auditad_linea_canonica_id_fkey"
+            columns: ["linea_canonica_id"]
+            isOneToOne: false
+            referencedRelation: "facturacion_lineas_importadas"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "facturacion_totvs_preservaciones_auditad_linea_canonica_id_fkey"
+            columns: ["linea_canonica_id"]
+            isOneToOne: false
+            referencedRelation: "v_repuestos_ventas_unificadas"
+            referencedColumns: ["linea_id"]
+          },
+        ]
+      }
+      facturacion_totvs_reimportacion_cambios: {
+        Row: {
+          cambios: Json
+          creado_en: string
+          fingerprint_anterior: string
+          fingerprint_resultante: string | null
+          id: string
+          importacion_id: string
+          linea_id: string
+          raw_data_anterior: Json
+        }
+        Insert: {
+          cambios: Json
+          creado_en?: string
+          fingerprint_anterior: string
+          fingerprint_resultante?: string | null
+          id?: string
+          importacion_id: string
+          linea_id: string
+          raw_data_anterior: Json
+        }
+        Update: {
+          cambios?: Json
+          creado_en?: string
+          fingerprint_anterior?: string
+          fingerprint_resultante?: string | null
+          id?: string
+          importacion_id?: string
+          linea_id?: string
+          raw_data_anterior?: Json
+        }
+        Relationships: [
+          {
+            foreignKeyName: "facturacion_totvs_reimportacion_cambios_importacion_id_fkey"
+            columns: ["importacion_id"]
+            isOneToOne: false
+            referencedRelation: "importaciones"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "facturacion_totvs_reimportacion_cambios_linea_id_fkey"
+            columns: ["linea_id"]
+            isOneToOne: false
+            referencedRelation: "facturacion_lineas_importadas"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "facturacion_totvs_reimportacion_cambios_linea_id_fkey"
+            columns: ["linea_id"]
+            isOneToOne: false
+            referencedRelation: "v_repuestos_ventas_unificadas"
+            referencedColumns: ["linea_id"]
+          },
+        ]
+      }
+      facturacion_totvs_tipo_tiempo_correcciones: {
+        Row: {
+          aplicado_en: string
+          firma_after: Json | null
+          firma_before: Json
+          identidad: string
+          linea_id: string
+          raw_data_after: Json | null
+          raw_data_before: Json
+          repair_key: string
+          revertido_en: string | null
+          tipo_tiempo_after: string | null
+          tipo_tiempo_before: string | null
+        }
+        Insert: {
+          aplicado_en?: string
+          firma_after?: Json | null
+          firma_before: Json
+          identidad: string
+          linea_id: string
+          raw_data_after?: Json | null
+          raw_data_before: Json
+          repair_key: string
+          revertido_en?: string | null
+          tipo_tiempo_after?: string | null
+          tipo_tiempo_before?: string | null
+        }
+        Update: {
+          aplicado_en?: string
+          firma_after?: Json | null
+          firma_before?: Json
+          identidad?: string
+          linea_id?: string
+          raw_data_after?: Json | null
+          raw_data_before?: Json
+          repair_key?: string
+          revertido_en?: string | null
+          tipo_tiempo_after?: string | null
+          tipo_tiempo_before?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "facturacion_totvs_tipo_tiempo_correcciones_linea_id_fkey"
+            columns: ["linea_id"]
+            isOneToOne: false
+            referencedRelation: "facturacion_lineas_importadas"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "facturacion_totvs_tipo_tiempo_correcciones_linea_id_fkey"
+            columns: ["linea_id"]
+            isOneToOne: false
+            referencedRelation: "v_repuestos_ventas_unificadas"
+            referencedColumns: ["linea_id"]
+          },
+        ]
+      }
+      facturacion_totvs_vinculos_retirados_auditoria: {
+        Row: {
+          documento_fuente_sha256: string
+          importacion_id: string
+          linea_id: string
+          motivo: string
+          retirado_en: string
+        }
+        Insert: {
+          documento_fuente_sha256: string
+          importacion_id: string
+          linea_id: string
+          motivo: string
+          retirado_en?: string
+        }
+        Update: {
+          documento_fuente_sha256?: string
+          importacion_id?: string
+          linea_id?: string
+          motivo?: string
+          retirado_en?: string
+        }
+        Relationships: []
+      }
+      fleet_odometer_readings: {
+        Row: {
+          correction_of: string | null
+          created_at: string
+          created_by: string
+          created_by_name: string
+          id: string
+          odometer_km: number
+          reading_date: string
+          reading_kind: string
+          vehicle_id: string
+          void_reason: string | null
+          voided_at: string | null
+          voided_by: string | null
+          voided_by_name: string | null
+        }
+        Insert: {
+          correction_of?: string | null
+          created_at?: string
+          created_by: string
+          created_by_name: string
+          id?: string
+          odometer_km: number
+          reading_date: string
+          reading_kind: string
+          vehicle_id: string
+          void_reason?: string | null
+          voided_at?: string | null
+          voided_by?: string | null
+          voided_by_name?: string | null
+        }
+        Update: {
+          correction_of?: string | null
+          created_at?: string
+          created_by?: string
+          created_by_name?: string
+          id?: string
+          odometer_km?: number
+          reading_date?: string
+          reading_kind?: string
+          vehicle_id?: string
+          void_reason?: string | null
+          voided_at?: string | null
+          voided_by?: string | null
+          voided_by_name?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "fleet_odometer_readings_correction_of_fkey"
+            columns: ["correction_of"]
+            isOneToOne: false
+            referencedRelation: "fleet_odometer_readings"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "fleet_odometer_readings_vehicle_id_fkey"
+            columns: ["vehicle_id"]
+            isOneToOne: false
+            referencedRelation: "fleet_vehicles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      fleet_vehicle_responsibility_events: {
+        Row: {
+          effective_date: string | null
+          id: string
+          recorded_at: string
+          recorded_by: string
+          recorded_by_name: string
+          responsible_name_snapshot: string | null
+          responsible_profile_id: string | null
+          vehicle_id: string
+        }
+        Insert: {
+          effective_date?: string | null
+          id?: string
+          recorded_at?: string
+          recorded_by: string
+          recorded_by_name: string
+          responsible_name_snapshot?: string | null
+          responsible_profile_id?: string | null
+          vehicle_id: string
+        }
+        Update: {
+          effective_date?: string | null
+          id?: string
+          recorded_at?: string
+          recorded_by?: string
+          recorded_by_name?: string
+          responsible_name_snapshot?: string | null
+          responsible_profile_id?: string | null
+          vehicle_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "fleet_vehicle_responsibility_events_responsible_profile_id_fkey"
+            columns: ["responsible_profile_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "fleet_vehicle_responsibility_events_vehicle_id_fkey"
+            columns: ["vehicle_id"]
+            isOneToOne: false
+            referencedRelation: "fleet_vehicles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      fleet_vehicles: {
+        Row: {
+          active: boolean
+          brand: string
+          created_at: string
+          created_by: string
+          created_by_name: string
+          id: string
+          image_license: string | null
+          image_source_url: string | null
+          image_url: string | null
+          model: string | null
+          model_year: number | null
+          plate: string
+          plate_normalized: string
+        }
+        Insert: {
+          active?: boolean
+          brand: string
+          created_at?: string
+          created_by: string
+          created_by_name: string
+          id?: string
+          image_license?: string | null
+          image_source_url?: string | null
+          image_url?: string | null
+          model?: string | null
+          model_year?: number | null
+          plate: string
+          plate_normalized: string
+        }
+        Update: {
+          active?: boolean
+          brand?: string
+          created_at?: string
+          created_by?: string
+          created_by_name?: string
+          id?: string
+          image_license?: string | null
+          image_source_url?: string | null
+          image_url?: string | null
+          model?: string | null
+          model_year?: number | null
+          plate?: string
+          plate_normalized?: string
+        }
+        Relationships: []
+      }
       importaciones: {
         Row: {
+          archivo_identidad_acreditada_en: string | null
+          archivo_identidad_acreditada_por: string | null
+          archivo_identidad_origen: string | null
+          archivo_manifest_sha256: string | null
           archivo_nombre: string | null
+          archivo_sha256: string | null
+          archivo_tamano: number | null
           creado_en: string
           duplicados: number
           id: string
@@ -979,7 +1831,13 @@ export type Database = {
           usuario_id: string | null
         }
         Insert: {
+          archivo_identidad_acreditada_en?: string | null
+          archivo_identidad_acreditada_por?: string | null
+          archivo_identidad_origen?: string | null
+          archivo_manifest_sha256?: string | null
           archivo_nombre?: string | null
+          archivo_sha256?: string | null
+          archivo_tamano?: number | null
           creado_en?: string
           duplicados?: number
           id?: string
@@ -991,7 +1849,13 @@ export type Database = {
           usuario_id?: string | null
         }
         Update: {
+          archivo_identidad_acreditada_en?: string | null
+          archivo_identidad_acreditada_por?: string | null
+          archivo_identidad_origen?: string | null
+          archivo_manifest_sha256?: string | null
           archivo_nombre?: string | null
+          archivo_sha256?: string | null
+          archivo_tamano?: number | null
           creado_en?: string
           duplicados?: number
           id?: string
@@ -1264,6 +2128,67 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "maquinaria_stock_trazabilidad"
             referencedColumns: ["operacion_id"]
+          },
+        ]
+      }
+      maquinaria_documentos_factura_importacion_unidades: {
+        Row: {
+          creado_en: string
+          documento_id: string
+          importacion_unidad_id: string
+        }
+        Insert: {
+          creado_en?: string
+          documento_id: string
+          importacion_unidad_id: string
+        }
+        Update: {
+          creado_en?: string
+          documento_id?: string
+          importacion_unidad_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "maquinaria_documentos_factura_import_importacion_unidad_id_fkey"
+            columns: ["importacion_unidad_id"]
+            isOneToOne: true
+            referencedRelation: "maquinaria_facturas_importacion_detalle"
+            referencedColumns: ["importacion_unidad_id"]
+          },
+          {
+            foreignKeyName: "maquinaria_documentos_factura_import_importacion_unidad_id_fkey"
+            columns: ["importacion_unidad_id"]
+            isOneToOne: true
+            referencedRelation: "maquinaria_importacion_unidades"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "maquinaria_documentos_factura_import_importacion_unidad_id_fkey"
+            columns: ["importacion_unidad_id"]
+            isOneToOne: true
+            referencedRelation: "maquinaria_importacion_unidades_asignables"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "maquinaria_documentos_factura_import_importacion_unidad_id_fkey"
+            columns: ["importacion_unidad_id"]
+            isOneToOne: true
+            referencedRelation: "maquinaria_importacion_unidades_historicas"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "maquinaria_documentos_factura_import_importacion_unidad_id_fkey"
+            columns: ["importacion_unidad_id"]
+            isOneToOne: true
+            referencedRelation: "maquinaria_importacion_unidades_operativas"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "maquinaria_documentos_factura_importacion_uni_documento_id_fkey"
+            columns: ["documento_id"]
+            isOneToOne: false
+            referencedRelation: "maquinaria_documentos"
+            referencedColumns: ["id"]
           },
         ]
       }
@@ -3188,6 +4113,96 @@ export type Database = {
           },
         ]
       }
+      parque_stock_proyectado_ajustes: {
+        Row: {
+          creado_en: string
+          creado_por: string | null
+          fecha: string
+          id: string
+          marca: string
+          modelo: string
+          motivo: string
+          pedidos_compra_delta: number
+          referencia: string | null
+          stock_delta: number
+          tipo: string
+          ventas_pendientes_delta: number
+        }
+        Insert: {
+          creado_en?: string
+          creado_por?: string | null
+          fecha: string
+          id?: string
+          marca: string
+          modelo: string
+          motivo: string
+          pedidos_compra_delta?: number
+          referencia?: string | null
+          stock_delta?: number
+          tipo: string
+          ventas_pendientes_delta?: number
+        }
+        Update: {
+          creado_en?: string
+          creado_por?: string | null
+          fecha?: string
+          id?: string
+          marca?: string
+          modelo?: string
+          motivo?: string
+          pedidos_compra_delta?: number
+          referencia?: string | null
+          stock_delta?: number
+          tipo?: string
+          ventas_pendientes_delta?: number
+        }
+        Relationships: []
+      }
+      parque_stock_proyectado_apertura: {
+        Row: {
+          creado_en: string
+          fecha_corte: string
+          fuente: string
+          id: string
+          marca: string
+          modelo: string
+          modelo_clave: string | null
+          pedidos_compra_inicial: number
+          programa: string
+          stock_inicial: number
+          tipo: string
+          ventas_pendientes_inicial: number
+        }
+        Insert: {
+          creado_en?: string
+          fecha_corte: string
+          fuente: string
+          id?: string
+          marca: string
+          modelo: string
+          modelo_clave?: string | null
+          pedidos_compra_inicial?: number
+          programa: string
+          stock_inicial?: number
+          tipo: string
+          ventas_pendientes_inicial?: number
+        }
+        Update: {
+          creado_en?: string
+          fecha_corte?: string
+          fuente?: string
+          id?: string
+          marca?: string
+          modelo?: string
+          modelo_clave?: string | null
+          pedidos_compra_inicial?: number
+          programa?: string
+          stock_inicial?: number
+          tipo?: string
+          ventas_pendientes_inicial?: number
+        }
+        Relationships: []
+      }
       parque_ultima_actividad: {
         Row: {
           actualizado_en: string
@@ -3296,27 +4311,6 @@ export type Database = {
           id?: string
           nombre?: string
           sucursal?: Database["public"]["Enums"]["sucursal"] | null
-        }
-        Relationships: []
-      }
-      user_presence: {
-        Row: {
-          disconnected_at: string | null
-          last_activity_at: string
-          last_heartbeat_at: string
-          user_id: string
-        }
-        Insert: {
-          disconnected_at?: string | null
-          last_activity_at?: string
-          last_heartbeat_at?: string
-          user_id: string
-        }
-        Update: {
-          disconnected_at?: string | null
-          last_activity_at?: string
-          last_heartbeat_at?: string
-          user_id?: string
         }
         Relationships: []
       }
@@ -3439,6 +4433,13 @@ export type Database = {
             foreignKeyName: "repuestos_articulo_planificacion_producto_codigo_fkey"
             columns: ["producto_codigo"]
             isOneToOne: true
+            referencedRelation: "v_repuestos_semaforo_historico"
+            referencedColumns: ["codigo_interno"]
+          },
+          {
+            foreignKeyName: "repuestos_articulo_planificacion_producto_codigo_fkey"
+            columns: ["producto_codigo"]
+            isOneToOne: true
             referencedRelation: "v_repuestos_stock_matriz"
             referencedColumns: ["codigo_interno"]
           },
@@ -3500,6 +4501,13 @@ export type Database = {
             foreignKeyName: "repuestos_codigo_equivalencias_producto_codigo_fkey"
             columns: ["producto_codigo"]
             isOneToOne: false
+            referencedRelation: "v_repuestos_semaforo_historico"
+            referencedColumns: ["codigo_interno"]
+          },
+          {
+            foreignKeyName: "repuestos_codigo_equivalencias_producto_codigo_fkey"
+            columns: ["producto_codigo"]
+            isOneToOne: false
             referencedRelation: "v_repuestos_stock_matriz"
             referencedColumns: ["codigo_interno"]
           },
@@ -3511,6 +4519,33 @@ export type Database = {
             referencedColumns: ["producto_codigo"]
           },
         ]
+      }
+      repuestos_compras_historicas: {
+        Row: {
+          archivo_nombre: string
+          archivo_sha256: string
+          cargado_en: string
+          codigo_legacy_norm: string
+          fila_origen: number
+          ultima_compra: string
+        }
+        Insert: {
+          archivo_nombre: string
+          archivo_sha256: string
+          cargado_en?: string
+          codigo_legacy_norm: string
+          fila_origen: number
+          ultima_compra: string
+        }
+        Update: {
+          archivo_nombre?: string
+          archivo_sha256?: string
+          cargado_en?: string
+          codigo_legacy_norm?: string
+          fila_origen?: number
+          ultima_compra?: string
+        }
+        Relationships: []
       }
       repuestos_conversiones_unidad_historica: {
         Row: {
@@ -3715,6 +4750,13 @@ export type Database = {
             foreignKeyName: "repuestos_corrida_resultados_producto_codigo_fkey"
             columns: ["producto_codigo"]
             isOneToOne: false
+            referencedRelation: "v_repuestos_semaforo_historico"
+            referencedColumns: ["codigo_interno"]
+          },
+          {
+            foreignKeyName: "repuestos_corrida_resultados_producto_codigo_fkey"
+            columns: ["producto_codigo"]
+            isOneToOne: false
             referencedRelation: "v_repuestos_stock_matriz"
             referencedColumns: ["codigo_interno"]
           },
@@ -3844,6 +4886,13 @@ export type Database = {
             foreignKeyName: "repuestos_demanda_mensual_producto_codigo_fkey"
             columns: ["producto_codigo"]
             isOneToOne: false
+            referencedRelation: "v_repuestos_semaforo_historico"
+            referencedColumns: ["codigo_interno"]
+          },
+          {
+            foreignKeyName: "repuestos_demanda_mensual_producto_codigo_fkey"
+            columns: ["producto_codigo"]
+            isOneToOne: false
             referencedRelation: "v_repuestos_stock_matriz"
             referencedColumns: ["codigo_interno"]
           },
@@ -3912,6 +4961,80 @@ export type Database = {
           publicado_en?: string | null
         }
         Relationships: []
+      }
+      repuestos_ficha_grid_cargas: {
+        Row: {
+          activo: boolean
+          archivo_nombre: string
+          archivo_sha256: string
+          cargado_en: string
+          codigos_esperados: number
+          compras_esperadas: number
+          contenido_md5: string
+          fecha_corte: string
+          movimientos: number
+        }
+        Insert: {
+          activo?: boolean
+          archivo_nombre: string
+          archivo_sha256: string
+          cargado_en?: string
+          codigos_esperados: number
+          compras_esperadas: number
+          contenido_md5: string
+          fecha_corte: string
+          movimientos: number
+        }
+        Update: {
+          activo?: boolean
+          archivo_nombre?: string
+          archivo_sha256?: string
+          cargado_en?: string
+          codigos_esperados?: number
+          compras_esperadas?: number
+          contenido_md5?: string
+          fecha_corte?: string
+          movimientos?: number
+        }
+        Relationships: []
+      }
+      repuestos_ficha_grid_compras: {
+        Row: {
+          archivo_sha256: string
+          cantidad: number | null
+          codigo_legacy_norm: string
+          codigo_movimiento: string | null
+          fila_origen: number | null
+          tipo_movimiento: string | null
+          ultima_compra: string | null
+        }
+        Insert: {
+          archivo_sha256: string
+          cantidad?: number | null
+          codigo_legacy_norm: string
+          codigo_movimiento?: string | null
+          fila_origen?: number | null
+          tipo_movimiento?: string | null
+          ultima_compra?: string | null
+        }
+        Update: {
+          archivo_sha256?: string
+          cantidad?: number | null
+          codigo_legacy_norm?: string
+          codigo_movimiento?: string | null
+          fila_origen?: number | null
+          tipo_movimiento?: string | null
+          ultima_compra?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "repuestos_ficha_grid_compras_archivo_sha256_fkey"
+            columns: ["archivo_sha256"]
+            isOneToOne: false
+            referencedRelation: "repuestos_ficha_grid_cargas"
+            referencedColumns: ["archivo_sha256"]
+          },
+        ]
       }
       repuestos_historial_actualizaciones: {
         Row: {
@@ -3989,6 +5112,13 @@ export type Database = {
             foreignKeyName: "repuestos_legacy_vinculos_manuales_producto_codigo_fkey"
             columns: ["producto_codigo"]
             isOneToOne: false
+            referencedRelation: "v_repuestos_semaforo_historico"
+            referencedColumns: ["codigo_interno"]
+          },
+          {
+            foreignKeyName: "repuestos_legacy_vinculos_manuales_producto_codigo_fkey"
+            columns: ["producto_codigo"]
+            isOneToOne: false
             referencedRelation: "v_repuestos_stock_matriz"
             referencedColumns: ["codigo_interno"]
           },
@@ -4014,8 +5144,11 @@ export type Database = {
           estado_vinculo: string
           metodo_vinculo: string | null
           producto_codigo: string | null
+          saldo_legacy: number | null
           situacion: string | null
           tipo: string | null
+          ultima_compra: string | null
+          ultima_venta: string | null
         }
         Insert: {
           actualizado_en?: string
@@ -4029,8 +5162,11 @@ export type Database = {
           estado_vinculo?: string
           metodo_vinculo?: string | null
           producto_codigo?: string | null
+          saldo_legacy?: number | null
           situacion?: string | null
           tipo?: string | null
+          ultima_compra?: string | null
+          ultima_venta?: string | null
         }
         Update: {
           actualizado_en?: string
@@ -4044,8 +5180,11 @@ export type Database = {
           estado_vinculo?: string
           metodo_vinculo?: string | null
           producto_codigo?: string | null
+          saldo_legacy?: number | null
           situacion?: string | null
           tipo?: string | null
+          ultima_compra?: string | null
+          ultima_venta?: string | null
         }
         Relationships: [
           {
@@ -4060,6 +5199,13 @@ export type Database = {
             columns: ["producto_codigo"]
             isOneToOne: false
             referencedRelation: "productos"
+            referencedColumns: ["codigo_interno"]
+          },
+          {
+            foreignKeyName: "repuestos_maestro_legacy_producto_codigo_fkey"
+            columns: ["producto_codigo"]
+            isOneToOne: false
+            referencedRelation: "v_repuestos_semaforo_historico"
             referencedColumns: ["codigo_interno"]
           },
           {
@@ -4314,6 +5460,13 @@ export type Database = {
             foreignKeyName: "repuestos_productos_alias_alias_codigo_fkey"
             columns: ["alias_codigo"]
             isOneToOne: true
+            referencedRelation: "v_repuestos_semaforo_historico"
+            referencedColumns: ["codigo_interno"]
+          },
+          {
+            foreignKeyName: "repuestos_productos_alias_alias_codigo_fkey"
+            columns: ["alias_codigo"]
+            isOneToOne: true
             referencedRelation: "v_repuestos_stock_matriz"
             referencedColumns: ["codigo_interno"]
           },
@@ -4329,6 +5482,13 @@ export type Database = {
             columns: ["producto_canonico"]
             isOneToOne: false
             referencedRelation: "productos"
+            referencedColumns: ["codigo_interno"]
+          },
+          {
+            foreignKeyName: "repuestos_productos_alias_producto_canonico_fkey"
+            columns: ["producto_canonico"]
+            isOneToOne: false
+            referencedRelation: "v_repuestos_semaforo_historico"
             referencedColumns: ["codigo_interno"]
           },
           {
@@ -4508,6 +5668,13 @@ export type Database = {
             columns: ["producto_codigo"]
             isOneToOne: false
             referencedRelation: "productos"
+            referencedColumns: ["codigo_interno"]
+          },
+          {
+            foreignKeyName: "repuestos_ventas_vinculacion_producto_codigo_fkey"
+            columns: ["producto_codigo"]
+            isOneToOne: false
+            referencedRelation: "v_repuestos_semaforo_historico"
             referencedColumns: ["codigo_interno"]
           },
           {
@@ -4804,6 +5971,1684 @@ export type Database = {
           },
         ]
       }
+      totvs_absorcion_reglas: {
+        Row: {
+          categoria: string
+          centro_costo: string
+          cuenta_codigo: string
+          fundamento: string
+          id: number
+          regla_importe: string
+          version: number
+          vigente_desde: string
+          vigente_hasta: string | null
+        }
+        Insert: {
+          categoria: string
+          centro_costo: string
+          cuenta_codigo: string
+          fundamento: string
+          id?: number
+          regla_importe: string
+          version?: number
+          vigente_desde?: string
+          vigente_hasta?: string | null
+        }
+        Update: {
+          categoria?: string
+          centro_costo?: string
+          cuenta_codigo?: string
+          fundamento?: string
+          id?: number
+          regla_importe?: string
+          version?: number
+          vigente_desde?: string
+          vigente_hasta?: string | null
+        }
+        Relationships: []
+      }
+      totvs_consolidacion_actual: {
+        Row: {
+          actualizado_en: string
+          observacion_id: string
+          periodo: string
+        }
+        Insert: {
+          actualizado_en?: string
+          observacion_id: string
+          periodo: string
+        }
+        Update: {
+          actualizado_en?: string
+          observacion_id?: string
+          periodo?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "totvs_consolidacion_actual_observacion_id_fkey"
+            columns: ["observacion_id"]
+            isOneToOne: true
+            referencedRelation: "totvs_consolidacion_observaciones"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      totvs_consolidacion_cola: {
+        Row: {
+          creada_en: string
+          estado: string
+          evento: string
+          facturacion_carga_id: string | null
+          id: number
+          intentos: number
+          mayor_carga_id: string | null
+          procesada_en: string | null
+          revision: number
+          ultimo_error: string | null
+        }
+        Insert: {
+          creada_en?: string
+          estado?: string
+          evento: string
+          facturacion_carga_id?: string | null
+          id?: never
+          intentos?: number
+          mayor_carga_id?: string | null
+          procesada_en?: string | null
+          revision: number
+          ultimo_error?: string | null
+        }
+        Update: {
+          creada_en?: string
+          estado?: string
+          evento?: string
+          facturacion_carga_id?: string | null
+          id?: never
+          intentos?: number
+          mayor_carga_id?: string | null
+          procesada_en?: string | null
+          revision?: number
+          ultimo_error?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "totvs_consolidacion_cola_facturacion_carga_id_fkey"
+            columns: ["facturacion_carga_id"]
+            isOneToOne: false
+            referencedRelation: "importaciones"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "totvs_consolidacion_cola_mayor_carga_id_fkey"
+            columns: ["mayor_carga_id"]
+            isOneToOne: false
+            referencedRelation: "totvs_mayor_cargas"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      totvs_consolidacion_componentes_cero: {
+        Row: {
+          componente: string
+          fuente_referencia: string
+          fundamento: string
+          periodo: string
+          registrado_en: string
+          registrado_por: string
+        }
+        Insert: {
+          componente: string
+          fuente_referencia: string
+          fundamento: string
+          periodo: string
+          registrado_en?: string
+          registrado_por: string
+        }
+        Update: {
+          componente?: string
+          fuente_referencia?: string
+          fundamento?: string
+          periodo?: string
+          registrado_en?: string
+          registrado_por?: string
+        }
+        Relationships: []
+      }
+      totvs_consolidacion_evidencia_negocio: {
+        Row: {
+          creada_en: string
+          fundamento: string
+          periodo: string
+          tipo: string
+        }
+        Insert: {
+          creada_en?: string
+          fundamento: string
+          periodo: string
+          tipo: string
+        }
+        Update: {
+          creada_en?: string
+          fundamento?: string
+          periodo?: string
+          tipo?: string
+        }
+        Relationships: []
+      }
+      totvs_consolidacion_observaciones: {
+        Row: {
+          bloque_componentes: boolean
+          bloque_conciliacion: boolean
+          bloque_fuente: boolean
+          causas: Json
+          corrida_id: string
+          criterio_version: string
+          dependencia_revision: number
+          estado: string
+          evento: string
+          facturacion_carga_id: string | null
+          facturacion_sha256: string | null
+          id: string
+          mayor_carga_id: string | null
+          mayor_sha256: string | null
+          metricas: Json
+          observada_en: string
+          periodo: string
+        }
+        Insert: {
+          bloque_componentes: boolean
+          bloque_conciliacion: boolean
+          bloque_fuente: boolean
+          causas: Json
+          corrida_id: string
+          criterio_version: string
+          dependencia_revision: number
+          estado: string
+          evento: string
+          facturacion_carga_id?: string | null
+          facturacion_sha256?: string | null
+          id?: string
+          mayor_carga_id?: string | null
+          mayor_sha256?: string | null
+          metricas: Json
+          observada_en?: string
+          periodo: string
+        }
+        Update: {
+          bloque_componentes?: boolean
+          bloque_conciliacion?: boolean
+          bloque_fuente?: boolean
+          causas?: Json
+          corrida_id?: string
+          criterio_version?: string
+          dependencia_revision?: number
+          estado?: string
+          evento?: string
+          facturacion_carga_id?: string | null
+          facturacion_sha256?: string | null
+          id?: string
+          mayor_carga_id?: string | null
+          mayor_sha256?: string | null
+          metricas?: Json
+          observada_en?: string
+          periodo?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "totvs_consolidacion_observaciones_facturacion_carga_id_fkey"
+            columns: ["facturacion_carga_id"]
+            isOneToOne: false
+            referencedRelation: "importaciones"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "totvs_consolidacion_observaciones_mayor_carga_id_fkey"
+            columns: ["mayor_carga_id"]
+            isOneToOne: false
+            referencedRelation: "totvs_mayor_cargas"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      totvs_consolidacion_revision: {
+        Row: {
+          actualizada_en: string
+          revision: number
+          singleton: boolean
+        }
+        Insert: {
+          actualizada_en?: string
+          revision?: number
+          singleton?: boolean
+        }
+        Update: {
+          actualizada_en?: string
+          revision?: number
+          singleton?: boolean
+        }
+        Relationships: []
+      }
+      totvs_cxc_carga_documentos: {
+        Row: {
+          carga_id: string
+          documento_id: string
+        }
+        Insert: {
+          carga_id: string
+          documento_id: string
+        }
+        Update: {
+          carga_id?: string
+          documento_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "totvs_cxc_carga_documentos_carga_id_fkey"
+            columns: ["carga_id"]
+            isOneToOne: false
+            referencedRelation: "totvs_cxc_cargas"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "totvs_cxc_carga_documentos_carga_id_fkey"
+            columns: ["carga_id"]
+            isOneToOne: false
+            referencedRelation: "totvs_cxc_resumen_agregado"
+            referencedColumns: ["carga_id"]
+          },
+          {
+            foreignKeyName: "totvs_cxc_carga_documentos_documento_id_fkey"
+            columns: ["documento_id"]
+            isOneToOne: false
+            referencedRelation: "totvs_cxc_documentos"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      totvs_cxc_cargas: {
+        Row: {
+          anticipos_cliente: number
+          anticipos_cliente_saldo_cero: number
+          anticipos_cliente_saldo_negativo: number
+          anticipos_cliente_saldo_positivo: number
+          anticipos_cliente_vinculados: number
+          archivo_nombre: string
+          archivo_sha256: string
+          archivo_tamano: number
+          cancelado_en: string | null
+          cobertura_aplicacion_anticipos: string
+          completado_en: string | null
+          corte_evidencia: string
+          creado_en: string
+          creado_por: string
+          estado: string
+          facturas_elegibles: number
+          facturas_futuras: number
+          facturas_vence_hoy: number
+          facturas_vencidas: number
+          fecha_corte: string
+          filas_documento: number
+          filas_saldo_cero: number
+          filas_saldo_negativo: number
+          filas_saldo_positivo: number
+          id: string
+          positivos_no_factura: number
+          reemplaza_carga_id: string | null
+          saldo_anticipos_cliente_usd: number
+          saldo_anticipos_negativo_usd: number
+          saldo_anticipos_positivo_usd: number
+          saldo_futuro_usd: number
+          saldo_negativo: number
+          saldo_neto_fuente: number
+          saldo_pendiente_elegible_usd: number
+          saldo_positivo: number
+          saldo_positivo_no_factura_usd: number
+          saldo_vence_hoy_usd: number
+          saldo_vencido_usd: number
+          snapshot_version: number
+          valor_bruto: number
+        }
+        Insert: {
+          anticipos_cliente?: number
+          anticipos_cliente_saldo_cero?: number
+          anticipos_cliente_saldo_negativo?: number
+          anticipos_cliente_saldo_positivo?: number
+          anticipos_cliente_vinculados?: number
+          archivo_nombre: string
+          archivo_sha256: string
+          archivo_tamano: number
+          cancelado_en?: string | null
+          cobertura_aplicacion_anticipos?: string
+          completado_en?: string | null
+          corte_evidencia: string
+          creado_en?: string
+          creado_por: string
+          estado?: string
+          facturas_elegibles?: number
+          facturas_futuras?: number
+          facturas_vence_hoy?: number
+          facturas_vencidas?: number
+          fecha_corte: string
+          filas_documento?: number
+          filas_saldo_cero?: number
+          filas_saldo_negativo?: number
+          filas_saldo_positivo?: number
+          id?: string
+          positivos_no_factura?: number
+          reemplaza_carga_id?: string | null
+          saldo_anticipos_cliente_usd?: number
+          saldo_anticipos_negativo_usd?: number
+          saldo_anticipos_positivo_usd?: number
+          saldo_futuro_usd?: number
+          saldo_negativo?: number
+          saldo_neto_fuente?: number
+          saldo_pendiente_elegible_usd?: number
+          saldo_positivo?: number
+          saldo_positivo_no_factura_usd?: number
+          saldo_vence_hoy_usd?: number
+          saldo_vencido_usd?: number
+          snapshot_version: number
+          valor_bruto?: number
+        }
+        Update: {
+          anticipos_cliente?: number
+          anticipos_cliente_saldo_cero?: number
+          anticipos_cliente_saldo_negativo?: number
+          anticipos_cliente_saldo_positivo?: number
+          anticipos_cliente_vinculados?: number
+          archivo_nombre?: string
+          archivo_sha256?: string
+          archivo_tamano?: number
+          cancelado_en?: string | null
+          cobertura_aplicacion_anticipos?: string
+          completado_en?: string | null
+          corte_evidencia?: string
+          creado_en?: string
+          creado_por?: string
+          estado?: string
+          facturas_elegibles?: number
+          facturas_futuras?: number
+          facturas_vence_hoy?: number
+          facturas_vencidas?: number
+          fecha_corte?: string
+          filas_documento?: number
+          filas_saldo_cero?: number
+          filas_saldo_negativo?: number
+          filas_saldo_positivo?: number
+          id?: string
+          positivos_no_factura?: number
+          reemplaza_carga_id?: string | null
+          saldo_anticipos_cliente_usd?: number
+          saldo_anticipos_negativo_usd?: number
+          saldo_anticipos_positivo_usd?: number
+          saldo_futuro_usd?: number
+          saldo_negativo?: number
+          saldo_neto_fuente?: number
+          saldo_pendiente_elegible_usd?: number
+          saldo_positivo?: number
+          saldo_positivo_no_factura_usd?: number
+          saldo_vence_hoy_usd?: number
+          saldo_vencido_usd?: number
+          snapshot_version?: number
+          valor_bruto?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "totvs_cxc_cargas_reemplaza_carga_id_fkey"
+            columns: ["reemplaza_carga_id"]
+            isOneToOne: false
+            referencedRelation: "totvs_cxc_cargas"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "totvs_cxc_cargas_reemplaza_carga_id_fkey"
+            columns: ["reemplaza_carga_id"]
+            isOneToOne: false
+            referencedRelation: "totvs_cxc_resumen_agregado"
+            referencedColumns: ["carga_id"]
+          },
+        ]
+      }
+      totvs_cxc_documentos: {
+        Row: {
+          archivo_origen: string
+          asesor: string
+          clave_origen: string
+          cliente_codigo: string
+          cliente_nombre: string
+          condicion: string
+          creado_en: string
+          cuota: string | null
+          datos_fuente: Json
+          documento: string
+          elegible_kpi: boolean
+          fecha_corte: string
+          fecha_emision: string
+          fecha_vencimiento: string
+          fecha_vencimiento_original: string | null
+          fila_origen: number
+          huella_origen: string
+          id: string
+          modalidad: string
+          moneda: string
+          moneda_codigo: string
+          naturaleza_documento: string
+          primera_carga_id: string
+          saldo_pendiente: number
+          serie: string
+          snapshot_sha256: string
+          sucursal: string
+          tasa_moneda: number
+          tipo_documento: string
+          valor_original: number
+        }
+        Insert: {
+          archivo_origen: string
+          asesor: string
+          clave_origen: string
+          cliente_codigo: string
+          cliente_nombre: string
+          condicion: string
+          creado_en?: string
+          cuota?: string | null
+          datos_fuente?: Json
+          documento: string
+          elegible_kpi: boolean
+          fecha_corte: string
+          fecha_emision: string
+          fecha_vencimiento: string
+          fecha_vencimiento_original?: string | null
+          fila_origen: number
+          huella_origen: string
+          id?: string
+          modalidad: string
+          moneda: string
+          moneda_codigo: string
+          naturaleza_documento: string
+          primera_carga_id: string
+          saldo_pendiente: number
+          serie: string
+          snapshot_sha256: string
+          sucursal: string
+          tasa_moneda: number
+          tipo_documento: string
+          valor_original: number
+        }
+        Update: {
+          archivo_origen?: string
+          asesor?: string
+          clave_origen?: string
+          cliente_codigo?: string
+          cliente_nombre?: string
+          condicion?: string
+          creado_en?: string
+          cuota?: string | null
+          datos_fuente?: Json
+          documento?: string
+          elegible_kpi?: boolean
+          fecha_corte?: string
+          fecha_emision?: string
+          fecha_vencimiento?: string
+          fecha_vencimiento_original?: string | null
+          fila_origen?: number
+          huella_origen?: string
+          id?: string
+          modalidad?: string
+          moneda?: string
+          moneda_codigo?: string
+          naturaleza_documento?: string
+          primera_carga_id?: string
+          saldo_pendiente?: number
+          serie?: string
+          snapshot_sha256?: string
+          sucursal?: string
+          tasa_moneda?: number
+          tipo_documento?: string
+          valor_original?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "totvs_cxc_documentos_primera_carga_id_fkey"
+            columns: ["primera_carga_id"]
+            isOneToOne: false
+            referencedRelation: "totvs_cxc_cargas"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "totvs_cxc_documentos_primera_carga_id_fkey"
+            columns: ["primera_carga_id"]
+            isOneToOne: false
+            referencedRelation: "totvs_cxc_resumen_agregado"
+            referencedColumns: ["carga_id"]
+          },
+        ]
+      }
+      totvs_facturas_compra_lineas: {
+        Row: {
+          actualizado_en: string
+          archivo_origen: string
+          cantidad: number
+          carga_id: string
+          centro_costo: string | null
+          creado_en: string
+          cuenta_contable: string | null
+          datos_fuente: Json
+          documento: string
+          documento_electronico: string | null
+          especie: string
+          fecha_digitacion: string
+          fecha_emision: string
+          fecha_vencimiento: string | null
+          fila_origen: number
+          filial: string
+          huella_origen: string
+          id: string
+          item: string
+          item_pedido_compra: string | null
+          modalidad: string | null
+          moneda_origen: string
+          nro_reintegro: string | null
+          observacion: string | null
+          pedido_compra: string | null
+          producto_codigo: string
+          producto_descripcion: string | null
+          proveedor_codigo: string
+          proveedor_nombre: string | null
+          proveedor_tienda: string
+          reintegro: string | null
+          serie: string
+          timbrado: string | null
+          tipo_cambio: number
+          tipo_entrada: string | null
+          total_gs: number
+          total_usd: number
+          usuario_alta: string | null
+          valor_unitario_gs: number
+          valor_unitario_usd: number
+        }
+        Insert: {
+          actualizado_en?: string
+          archivo_origen: string
+          cantidad: number
+          carga_id: string
+          centro_costo?: string | null
+          creado_en?: string
+          cuenta_contable?: string | null
+          datos_fuente?: Json
+          documento: string
+          documento_electronico?: string | null
+          especie: string
+          fecha_digitacion: string
+          fecha_emision: string
+          fecha_vencimiento?: string | null
+          fila_origen: number
+          filial: string
+          huella_origen: string
+          id?: string
+          item: string
+          item_pedido_compra?: string | null
+          modalidad?: string | null
+          moneda_origen: string
+          nro_reintegro?: string | null
+          observacion?: string | null
+          pedido_compra?: string | null
+          producto_codigo: string
+          producto_descripcion?: string | null
+          proveedor_codigo: string
+          proveedor_nombre?: string | null
+          proveedor_tienda: string
+          reintegro?: string | null
+          serie: string
+          timbrado?: string | null
+          tipo_cambio: number
+          tipo_entrada?: string | null
+          total_gs: number
+          total_usd: number
+          usuario_alta?: string | null
+          valor_unitario_gs: number
+          valor_unitario_usd: number
+        }
+        Update: {
+          actualizado_en?: string
+          archivo_origen?: string
+          cantidad?: number
+          carga_id?: string
+          centro_costo?: string | null
+          creado_en?: string
+          cuenta_contable?: string | null
+          datos_fuente?: Json
+          documento?: string
+          documento_electronico?: string | null
+          especie?: string
+          fecha_digitacion?: string
+          fecha_emision?: string
+          fecha_vencimiento?: string | null
+          fila_origen?: number
+          filial?: string
+          huella_origen?: string
+          id?: string
+          item?: string
+          item_pedido_compra?: string | null
+          modalidad?: string | null
+          moneda_origen?: string
+          nro_reintegro?: string | null
+          observacion?: string | null
+          pedido_compra?: string | null
+          producto_codigo?: string
+          producto_descripcion?: string | null
+          proveedor_codigo?: string
+          proveedor_nombre?: string | null
+          proveedor_tienda?: string
+          reintegro?: string | null
+          serie?: string
+          timbrado?: string | null
+          tipo_cambio?: number
+          tipo_entrada?: string | null
+          total_gs?: number
+          total_usd?: number
+          usuario_alta?: string | null
+          valor_unitario_gs?: number
+          valor_unitario_usd?: number
+        }
+        Relationships: []
+      }
+      totvs_importaciones_despacho: {
+        Row: {
+          actualizado_en: string
+          archivo_origen: string
+          cantidad: number
+          carga_id: string
+          condicion_pago: string | null
+          creado_en: string
+          datos_fuente: Json
+          despachante: string | null
+          fabricante_codigo: string | null
+          fecha_documento: string | null
+          fecha_finalizacion: string | null
+          fecha_proceso: string
+          fila_origen: number
+          generada: string | null
+          huella_origen: string
+          id: string
+          item_documento: string
+          item_proceso: string
+          moneda: string | null
+          numero_documento: string
+          precio_unitario: number
+          proceso: string
+          producto_codigo: string
+          producto_descripcion: string | null
+          proveedor_codigo: string | null
+          proveedor_nombre: string | null
+          referencia_orden_compra: string | null
+          serie: string | null
+          sucursal: string
+          timbrado: string | null
+          tipo_entrada: string | null
+        }
+        Insert: {
+          actualizado_en?: string
+          archivo_origen: string
+          cantidad: number
+          carga_id: string
+          condicion_pago?: string | null
+          creado_en?: string
+          datos_fuente?: Json
+          despachante?: string | null
+          fabricante_codigo?: string | null
+          fecha_documento?: string | null
+          fecha_finalizacion?: string | null
+          fecha_proceso: string
+          fila_origen: number
+          generada?: string | null
+          huella_origen: string
+          id?: string
+          item_documento: string
+          item_proceso: string
+          moneda?: string | null
+          numero_documento: string
+          precio_unitario: number
+          proceso: string
+          producto_codigo: string
+          producto_descripcion?: string | null
+          proveedor_codigo?: string | null
+          proveedor_nombre?: string | null
+          referencia_orden_compra?: string | null
+          serie?: string | null
+          sucursal: string
+          timbrado?: string | null
+          tipo_entrada?: string | null
+        }
+        Update: {
+          actualizado_en?: string
+          archivo_origen?: string
+          cantidad?: number
+          carga_id?: string
+          condicion_pago?: string | null
+          creado_en?: string
+          datos_fuente?: Json
+          despachante?: string | null
+          fabricante_codigo?: string | null
+          fecha_documento?: string | null
+          fecha_finalizacion?: string | null
+          fecha_proceso?: string
+          fila_origen?: number
+          generada?: string | null
+          huella_origen?: string
+          id?: string
+          item_documento?: string
+          item_proceso?: string
+          moneda?: string | null
+          numero_documento?: string
+          precio_unitario?: number
+          proceso?: string
+          producto_codigo?: string
+          producto_descripcion?: string | null
+          proveedor_codigo?: string | null
+          proveedor_nombre?: string | null
+          referencia_orden_compra?: string | null
+          serie?: string | null
+          sucursal?: string
+          timbrado?: string | null
+          tipo_entrada?: string | null
+        }
+        Relationships: []
+      }
+      totvs_kardex_movimientos: {
+        Row: {
+          actualizado_en: string
+          archivo_origen: string
+          cantidad: number
+          carga_id: string
+          contraparte_codigo: string | null
+          contraparte_tienda: string | null
+          costo_total_gs: number
+          costo_total_moneda_2: number
+          costo_total_moneda_3: number
+          costo_unitario_gs: number
+          costo_unitario_moneda_2: number
+          costo_unitario_moneda_3: number
+          creado_en: string
+          cuenta_contable: string | null
+          datos_fuente: Json
+          deposito: string
+          deposito_descripcion: string | null
+          direccion: string
+          documento: string
+          especie_documento: string
+          fecha_movimiento: string
+          fila_origen: number
+          filial: string
+          grupo_producto: string | null
+          huella_origen: string
+          id: string
+          moneda_codigo: string
+          movimiento_detalle: string | null
+          producto_codigo: string
+          producto_descripcion: string | null
+          recno_origen: string
+          secuencia: string
+          serie: string | null
+          tabla_origen: string
+          tipo_cambio: number
+        }
+        Insert: {
+          actualizado_en?: string
+          archivo_origen: string
+          cantidad: number
+          carga_id: string
+          contraparte_codigo?: string | null
+          contraparte_tienda?: string | null
+          costo_total_gs?: number
+          costo_total_moneda_2?: number
+          costo_total_moneda_3?: number
+          costo_unitario_gs?: number
+          costo_unitario_moneda_2?: number
+          costo_unitario_moneda_3?: number
+          creado_en?: string
+          cuenta_contable?: string | null
+          datos_fuente?: Json
+          deposito: string
+          deposito_descripcion?: string | null
+          direccion: string
+          documento: string
+          especie_documento: string
+          fecha_movimiento: string
+          fila_origen: number
+          filial: string
+          grupo_producto?: string | null
+          huella_origen: string
+          id?: string
+          moneda_codigo: string
+          movimiento_detalle?: string | null
+          producto_codigo: string
+          producto_descripcion?: string | null
+          recno_origen: string
+          secuencia: string
+          serie?: string | null
+          tabla_origen: string
+          tipo_cambio?: number
+        }
+        Update: {
+          actualizado_en?: string
+          archivo_origen?: string
+          cantidad?: number
+          carga_id?: string
+          contraparte_codigo?: string | null
+          contraparte_tienda?: string | null
+          costo_total_gs?: number
+          costo_total_moneda_2?: number
+          costo_total_moneda_3?: number
+          costo_unitario_gs?: number
+          costo_unitario_moneda_2?: number
+          costo_unitario_moneda_3?: number
+          creado_en?: string
+          cuenta_contable?: string | null
+          datos_fuente?: Json
+          deposito?: string
+          deposito_descripcion?: string | null
+          direccion?: string
+          documento?: string
+          especie_documento?: string
+          fecha_movimiento?: string
+          fila_origen?: number
+          filial?: string
+          grupo_producto?: string | null
+          huella_origen?: string
+          id?: string
+          moneda_codigo?: string
+          movimiento_detalle?: string | null
+          producto_codigo?: string
+          producto_descripcion?: string | null
+          recno_origen?: string
+          secuencia?: string
+          serie?: string | null
+          tabla_origen?: string
+          tipo_cambio?: number
+        }
+        Relationships: []
+      }
+      totvs_kardex_sintetico: {
+        Row: {
+          actualizado_en: string
+          archivo_origen: string
+          carga_id: string
+          chasis: string | null
+          chasis_clave: string | null
+          creado_en: string
+          datos_fuente: Json
+          deposito: string
+          fila_origen: number
+          huella_origen: string
+          id: string
+          ppp_1: number
+          ppp_2: number
+          ppp_3: number
+          producto_codigo: string
+          producto_descripcion: string | null
+          saldo: number
+          sucursal: string
+          valor_1: number
+          valor_2: number
+          valor_3: number
+        }
+        Insert: {
+          actualizado_en?: string
+          archivo_origen: string
+          carga_id: string
+          chasis?: string | null
+          chasis_clave?: string | null
+          creado_en?: string
+          datos_fuente?: Json
+          deposito: string
+          fila_origen: number
+          huella_origen: string
+          id?: string
+          ppp_1: number
+          ppp_2: number
+          ppp_3: number
+          producto_codigo: string
+          producto_descripcion?: string | null
+          saldo: number
+          sucursal: string
+          valor_1: number
+          valor_2: number
+          valor_3: number
+        }
+        Update: {
+          actualizado_en?: string
+          archivo_origen?: string
+          carga_id?: string
+          chasis?: string | null
+          chasis_clave?: string | null
+          creado_en?: string
+          datos_fuente?: Json
+          deposito?: string
+          fila_origen?: number
+          huella_origen?: string
+          id?: string
+          ppp_1?: number
+          ppp_2?: number
+          ppp_3?: number
+          producto_codigo?: string
+          producto_descripcion?: string | null
+          saldo?: number
+          sucursal?: string
+          valor_1?: number
+          valor_2?: number
+          valor_3?: number
+        }
+        Relationships: []
+      }
+      totvs_mayor_absorcion_evidencia_registros: {
+        Row: {
+          amount_usd: number
+          document_class_code: string
+          evidence_row_key: string
+          evidencia_id: string
+          invoice_document_sha256: string
+          movimiento_id: string
+          ordinal: number
+          post_sales_eligible: boolean
+          record_sha256: string
+        }
+        Insert: {
+          amount_usd: number
+          document_class_code: string
+          evidence_row_key: string
+          evidencia_id: string
+          invoice_document_sha256: string
+          movimiento_id: string
+          ordinal: number
+          post_sales_eligible: boolean
+          record_sha256: string
+        }
+        Update: {
+          amount_usd?: number
+          document_class_code?: string
+          evidence_row_key?: string
+          evidencia_id?: string
+          invoice_document_sha256?: string
+          movimiento_id?: string
+          ordinal?: number
+          post_sales_eligible?: boolean
+          record_sha256?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "totvs_mayor_absorcion_evidencia_registros_evidencia_id_fkey"
+            columns: ["evidencia_id"]
+            isOneToOne: false
+            referencedRelation: "totvs_mayor_absorcion_evidencias"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "totvs_mayor_absorcion_evidencia_registros_movimiento_id_fkey"
+            columns: ["movimiento_id"]
+            isOneToOne: false
+            referencedRelation: "totvs_mayor_movimientos"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      totvs_mayor_absorcion_evidencias: {
+        Row: {
+          creado_en: string
+          creado_por: string
+          eligible_record_count: number
+          evidence_set_sha256: string
+          id: string
+          ledger_load_id: string
+          ledger_source_byte_size: number
+          ledger_source_sha256: string
+          matched_record_count: number
+          opening_excluded: boolean
+          post_sales_adjustment_usd: number
+          row_type_filter: string
+          schema_version: string
+          supporting_load_id: string
+          supporting_source_byte_size: number
+          supporting_source_sha256: string
+          validation_status: string
+        }
+        Insert: {
+          creado_en?: string
+          creado_por: string
+          eligible_record_count: number
+          evidence_set_sha256: string
+          id?: string
+          ledger_load_id: string
+          ledger_source_byte_size: number
+          ledger_source_sha256: string
+          matched_record_count: number
+          opening_excluded: boolean
+          post_sales_adjustment_usd: number
+          row_type_filter: string
+          schema_version: string
+          supporting_load_id: string
+          supporting_source_byte_size: number
+          supporting_source_sha256: string
+          validation_status: string
+        }
+        Update: {
+          creado_en?: string
+          creado_por?: string
+          eligible_record_count?: number
+          evidence_set_sha256?: string
+          id?: string
+          ledger_load_id?: string
+          ledger_source_byte_size?: number
+          ledger_source_sha256?: string
+          matched_record_count?: number
+          opening_excluded?: boolean
+          post_sales_adjustment_usd?: number
+          row_type_filter?: string
+          schema_version?: string
+          supporting_load_id?: string
+          supporting_source_byte_size?: number
+          supporting_source_sha256?: string
+          validation_status?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "totvs_mayor_absorcion_evidencias_ledger_load_id_fkey"
+            columns: ["ledger_load_id"]
+            isOneToOne: false
+            referencedRelation: "totvs_mayor_cargas"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "totvs_mayor_absorcion_evidencias_supporting_load_id_fkey"
+            columns: ["supporting_load_id"]
+            isOneToOne: false
+            referencedRelation: "importaciones"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      totvs_mayor_carga_movimientos: {
+        Row: {
+          carga_id: string
+          movimiento_id: string
+        }
+        Insert: {
+          carga_id: string
+          movimiento_id: string
+        }
+        Update: {
+          carga_id?: string
+          movimiento_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "totvs_mayor_carga_movimientos_carga_id_fkey"
+            columns: ["carga_id"]
+            isOneToOne: false
+            referencedRelation: "totvs_mayor_cargas"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "totvs_mayor_carga_movimientos_movimiento_id_fkey"
+            columns: ["movimiento_id"]
+            isOneToOne: false
+            referencedRelation: "totvs_mayor_movimientos"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      totvs_mayor_cargas: {
+        Row: {
+          archivo_nombre: string
+          archivo_sha256: string
+          archivo_tamano: number
+          cancelado_en: string | null
+          completado_en: string | null
+          creado_en: string
+          creado_por: string
+          estado: string
+          fecha_desde: string | null
+          fecha_hasta: string | null
+          filas_apertura: number
+          filas_cuarentena: number
+          filas_tpsldo_1: number
+          filas_tpsldo_9: number
+          filas_vinculadas: number
+          id: string
+          neto_tpsldo_1_pyg: number
+          neto_tpsldo_1_usd: number
+          neto_tpsldo_9_pyg: number
+          neto_tpsldo_9_usd: number
+        }
+        Insert: {
+          archivo_nombre: string
+          archivo_sha256: string
+          archivo_tamano: number
+          cancelado_en?: string | null
+          completado_en?: string | null
+          creado_en?: string
+          creado_por: string
+          estado?: string
+          fecha_desde?: string | null
+          fecha_hasta?: string | null
+          filas_apertura?: number
+          filas_cuarentena?: number
+          filas_tpsldo_1?: number
+          filas_tpsldo_9?: number
+          filas_vinculadas?: number
+          id?: string
+          neto_tpsldo_1_pyg?: number
+          neto_tpsldo_1_usd?: number
+          neto_tpsldo_9_pyg?: number
+          neto_tpsldo_9_usd?: number
+        }
+        Update: {
+          archivo_nombre?: string
+          archivo_sha256?: string
+          archivo_tamano?: number
+          cancelado_en?: string | null
+          completado_en?: string | null
+          creado_en?: string
+          creado_por?: string
+          estado?: string
+          fecha_desde?: string | null
+          fecha_hasta?: string | null
+          filas_apertura?: number
+          filas_cuarentena?: number
+          filas_tpsldo_1?: number
+          filas_tpsldo_9?: number
+          filas_vinculadas?: number
+          id?: string
+          neto_tpsldo_1_pyg?: number
+          neto_tpsldo_1_usd?: number
+          neto_tpsldo_9_pyg?: number
+          neto_tpsldo_9_usd?: number
+        }
+        Relationships: []
+      }
+      totvs_mayor_cuarentena: {
+        Row: {
+          motivo: string
+          movimiento_id: string
+          resolucion: string | null
+          resuelta: boolean
+          resuelta_en: string | null
+          resuelta_por: string | null
+        }
+        Insert: {
+          motivo: string
+          movimiento_id: string
+          resolucion?: string | null
+          resuelta?: boolean
+          resuelta_en?: string | null
+          resuelta_por?: string | null
+        }
+        Update: {
+          motivo?: string
+          movimiento_id?: string
+          resolucion?: string | null
+          resuelta?: boolean
+          resuelta_en?: string | null
+          resuelta_por?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "totvs_mayor_cuarentena_movimiento_id_fkey"
+            columns: ["movimiento_id"]
+            isOneToOne: true
+            referencedRelation: "totvs_mayor_movimientos"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      totvs_mayor_cuentas_clasificacion: {
+        Row: {
+          aprobada_en: string | null
+          aprobada_por: string | null
+          categoria: string | null
+          creada_en: string
+          creada_por: string | null
+          cuenta_codigo: string
+          estado: string
+          fundamento: string | null
+          origen: string
+          subcategoria: string | null
+          version: number
+        }
+        Insert: {
+          aprobada_en?: string | null
+          aprobada_por?: string | null
+          categoria?: string | null
+          creada_en?: string
+          creada_por?: string | null
+          cuenta_codigo: string
+          estado: string
+          fundamento?: string | null
+          origen?: string
+          subcategoria?: string | null
+          version: number
+        }
+        Update: {
+          aprobada_en?: string | null
+          aprobada_por?: string | null
+          categoria?: string | null
+          creada_en?: string
+          creada_por?: string | null
+          cuenta_codigo?: string
+          estado?: string
+          fundamento?: string | null
+          origen?: string
+          subcategoria?: string | null
+          version?: number
+        }
+        Relationships: []
+      }
+      totvs_mayor_movimientos: {
+        Row: {
+          anio_mes: string | null
+          archivo_origen: string
+          asiento: string | null
+          centro_costo: string | null
+          centro_costo_descripcion: string | null
+          clave_origen: string
+          cliente: string | null
+          contraparte_codigo: string | null
+          contraparte_tienda: string | null
+          creado_en: string
+          cuenta_codigo: string | null
+          cuenta_descripcion: string | null
+          datos_fuente: Json
+          documento: string
+          documento_asociado: string | null
+          es_apertura: boolean
+          fecha_fuente: string
+          fecha_inclusion: string | null
+          fecha_movimiento: string
+          fila_origen: number
+          historial: string | null
+          huella_md5: string | null
+          huella_origen: string
+          id: string
+          importe_pyg: number
+          importe_usd: number
+          item_contable: string | null
+          linea: string
+          lote: string
+          origen: string | null
+          primera_carga_id: string
+          sublote: string
+          sucursal: string
+          tipo_asiento: string | null
+          tipo_movimiento: string
+          tipo_saldo: string
+          usuario_nombre: string | null
+        }
+        Insert: {
+          anio_mes?: string | null
+          archivo_origen: string
+          asiento?: string | null
+          centro_costo?: string | null
+          centro_costo_descripcion?: string | null
+          clave_origen: string
+          cliente?: string | null
+          contraparte_codigo?: string | null
+          contraparte_tienda?: string | null
+          creado_en?: string
+          cuenta_codigo?: string | null
+          cuenta_descripcion?: string | null
+          datos_fuente?: Json
+          documento: string
+          documento_asociado?: string | null
+          es_apertura: boolean
+          fecha_fuente: string
+          fecha_inclusion?: string | null
+          fecha_movimiento: string
+          fila_origen: number
+          historial?: string | null
+          huella_md5?: string | null
+          huella_origen: string
+          id?: string
+          importe_pyg: number
+          importe_usd: number
+          item_contable?: string | null
+          linea: string
+          lote: string
+          origen?: string | null
+          primera_carga_id: string
+          sublote: string
+          sucursal: string
+          tipo_asiento?: string | null
+          tipo_movimiento: string
+          tipo_saldo: string
+          usuario_nombre?: string | null
+        }
+        Update: {
+          anio_mes?: string | null
+          archivo_origen?: string
+          asiento?: string | null
+          centro_costo?: string | null
+          centro_costo_descripcion?: string | null
+          clave_origen?: string
+          cliente?: string | null
+          contraparte_codigo?: string | null
+          contraparte_tienda?: string | null
+          creado_en?: string
+          cuenta_codigo?: string | null
+          cuenta_descripcion?: string | null
+          datos_fuente?: Json
+          documento?: string
+          documento_asociado?: string | null
+          es_apertura?: boolean
+          fecha_fuente?: string
+          fecha_inclusion?: string | null
+          fecha_movimiento?: string
+          fila_origen?: number
+          historial?: string | null
+          huella_md5?: string | null
+          huella_origen?: string
+          id?: string
+          importe_pyg?: number
+          importe_usd?: number
+          item_contable?: string | null
+          linea?: string
+          lote?: string
+          origen?: string | null
+          primera_carga_id?: string
+          sublote?: string
+          sucursal?: string
+          tipo_asiento?: string | null
+          tipo_movimiento?: string
+          tipo_saldo?: string
+          usuario_nombre?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "totvs_mayor_movimientos_primera_carga_id_fkey"
+            columns: ["primera_carga_id"]
+            isOneToOne: false
+            referencedRelation: "totvs_mayor_cargas"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      totvs_mayor_periodos_estado: {
+        Row: {
+          actualizado_en: string
+          actualizado_por: string | null
+          estado: string
+          fundamento: string | null
+          origen: string
+          periodo: string
+        }
+        Insert: {
+          actualizado_en?: string
+          actualizado_por?: string | null
+          estado: string
+          fundamento?: string | null
+          origen?: string
+          periodo: string
+        }
+        Update: {
+          actualizado_en?: string
+          actualizado_por?: string | null
+          estado?: string
+          fundamento?: string | null
+          origen?: string
+          periodo?: string
+        }
+        Relationships: []
+      }
+      totvs_pedidos_venta_lineas: {
+        Row: {
+          actualizado_en: string
+          archivo_origen: string
+          cantidad: number
+          cantidad_entregada: number
+          cantidad_pendiente: number
+          carga_id: string
+          cliente_codigo: string | null
+          cliente_nombre: string | null
+          condicion_pago: string | null
+          creado_en: string
+          datos_fuente: Json
+          descripcion: string | null
+          estado: string | null
+          fabricante_codigo: string | null
+          factura: string | null
+          fecha_emision: string
+          fila_origen: number
+          filial: string
+          genera: string | null
+          huella_origen: string
+          id: string
+          item: string
+          item_presupuesto: string | null
+          moneda: string | null
+          naturaleza: string | null
+          nro_pedido: string
+          nro_presupuesto: string | null
+          precio_unitario: number
+          producto_codigo: string
+          serie_factura: string | null
+          tipo_entrada: string | null
+          unidad: string | null
+          valor_total: number
+          vendedor: string | null
+        }
+        Insert: {
+          actualizado_en?: string
+          archivo_origen: string
+          cantidad: number
+          cantidad_entregada: number
+          cantidad_pendiente: number
+          carga_id: string
+          cliente_codigo?: string | null
+          cliente_nombre?: string | null
+          condicion_pago?: string | null
+          creado_en?: string
+          datos_fuente?: Json
+          descripcion?: string | null
+          estado?: string | null
+          fabricante_codigo?: string | null
+          factura?: string | null
+          fecha_emision: string
+          fila_origen: number
+          filial: string
+          genera?: string | null
+          huella_origen: string
+          id?: string
+          item: string
+          item_presupuesto?: string | null
+          moneda?: string | null
+          naturaleza?: string | null
+          nro_pedido: string
+          nro_presupuesto?: string | null
+          precio_unitario: number
+          producto_codigo: string
+          serie_factura?: string | null
+          tipo_entrada?: string | null
+          unidad?: string | null
+          valor_total: number
+          vendedor?: string | null
+        }
+        Update: {
+          actualizado_en?: string
+          archivo_origen?: string
+          cantidad?: number
+          cantidad_entregada?: number
+          cantidad_pendiente?: number
+          carga_id?: string
+          cliente_codigo?: string | null
+          cliente_nombre?: string | null
+          condicion_pago?: string | null
+          creado_en?: string
+          datos_fuente?: Json
+          descripcion?: string | null
+          estado?: string | null
+          fabricante_codigo?: string | null
+          factura?: string | null
+          fecha_emision?: string
+          fila_origen?: number
+          filial?: string
+          genera?: string | null
+          huella_origen?: string
+          id?: string
+          item?: string
+          item_presupuesto?: string | null
+          moneda?: string | null
+          naturaleza?: string | null
+          nro_pedido?: string
+          nro_presupuesto?: string | null
+          precio_unitario?: number
+          producto_codigo?: string
+          serie_factura?: string | null
+          tipo_entrada?: string | null
+          unidad?: string | null
+          valor_total?: number
+          vendedor?: string | null
+        }
+        Relationships: []
+      }
+      totvs_proveedores: {
+        Row: {
+          actualizado_en: string
+          archivo_origen: string
+          carga_id: string
+          codigo: string
+          creado_en: string
+          datos_fuente: Json
+          departamento: string | null
+          direccion: string | null
+          email: string | null
+          estado: string | null
+          fila_origen: number
+          huella_origen: string
+          id: string
+          municipio: string | null
+          nombre_fantasia: string | null
+          pais: string | null
+          razon_social: string
+          retencion_bandera_1: string | null
+          retencion_bandera_2: string | null
+          ruc: string | null
+          telefono: string | null
+          tienda: string
+        }
+        Insert: {
+          actualizado_en?: string
+          archivo_origen: string
+          carga_id: string
+          codigo: string
+          creado_en?: string
+          datos_fuente?: Json
+          departamento?: string | null
+          direccion?: string | null
+          email?: string | null
+          estado?: string | null
+          fila_origen: number
+          huella_origen: string
+          id?: string
+          municipio?: string | null
+          nombre_fantasia?: string | null
+          pais?: string | null
+          razon_social: string
+          retencion_bandera_1?: string | null
+          retencion_bandera_2?: string | null
+          ruc?: string | null
+          telefono?: string | null
+          tienda: string
+        }
+        Update: {
+          actualizado_en?: string
+          archivo_origen?: string
+          carga_id?: string
+          codigo?: string
+          creado_en?: string
+          datos_fuente?: Json
+          departamento?: string | null
+          direccion?: string | null
+          email?: string | null
+          estado?: string | null
+          fila_origen?: number
+          huella_origen?: string
+          id?: string
+          municipio?: string | null
+          nombre_fantasia?: string | null
+          pais?: string | null
+          razon_social?: string
+          retencion_bandera_1?: string | null
+          retencion_bandera_2?: string | null
+          ruc?: string | null
+          telefono?: string | null
+          tienda?: string
+        }
+        Relationships: []
+      }
+      totvs_transferencias_transito: {
+        Row: {
+          actualizado_en: string
+          archivo_origen: string
+          cantidad: number
+          carga_id: string
+          creado_en: string
+          datos_fuente: Json
+          destino: string
+          fecha_emision: string
+          fila_origen: number
+          huella_origen: string
+          id: string
+          item: string
+          numero_documento: string
+          observacion: string | null
+          origen: string
+          producto_codigo: string
+          producto_descripcion: string | null
+          serie_documento: string
+          vigente: boolean
+        }
+        Insert: {
+          actualizado_en?: string
+          archivo_origen: string
+          cantidad: number
+          carga_id: string
+          creado_en?: string
+          datos_fuente?: Json
+          destino: string
+          fecha_emision: string
+          fila_origen: number
+          huella_origen: string
+          id?: string
+          item: string
+          numero_documento: string
+          observacion?: string | null
+          origen: string
+          producto_codigo: string
+          producto_descripcion?: string | null
+          serie_documento: string
+          vigente?: boolean
+        }
+        Update: {
+          actualizado_en?: string
+          archivo_origen?: string
+          cantidad?: number
+          carga_id?: string
+          creado_en?: string
+          datos_fuente?: Json
+          destino?: string
+          fecha_emision?: string
+          fila_origen?: number
+          huella_origen?: string
+          id?: string
+          item?: string
+          numero_documento?: string
+          observacion?: string | null
+          origen?: string
+          producto_codigo?: string
+          producto_descripcion?: string | null
+          serie_documento?: string
+          vigente?: boolean
+        }
+        Relationships: []
+      }
       trabajo_historial: {
         Row: {
           creado_en: string
@@ -4947,6 +7792,27 @@ export type Database = {
           },
         ]
       }
+      user_presence: {
+        Row: {
+          disconnected_at: string | null
+          last_activity_at: string
+          last_heartbeat_at: string
+          user_id: string
+        }
+        Insert: {
+          disconnected_at?: string | null
+          last_activity_at?: string
+          last_heartbeat_at?: string
+          user_id: string
+        }
+        Update: {
+          disconnected_at?: string | null
+          last_activity_at?: string
+          last_heartbeat_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
       user_roles: {
         Row: {
           creado_en: string
@@ -5001,34 +7867,108 @@ export type Database = {
         Row: {
           activo: boolean
           archivo_nombre: string
+          archivos: number
           completado_en: string | null
           creado_en: string
           creado_por: string | null
           estado: string
+          fecha_desde: string | null
+          fecha_hasta: string | null
           filas_archivo: number
           id: string
+          iva_estado: string
+          moneda: string
         }
         Insert: {
           activo?: boolean
           archivo_nombre: string
+          archivos?: number
           completado_en?: string | null
           creado_en?: string
           creado_por?: string | null
           estado?: string
+          fecha_desde?: string | null
+          fecha_hasta?: string | null
           filas_archivo: number
           id?: string
+          iva_estado?: string
+          moneda?: string
         }
         Update: {
           activo?: boolean
           archivo_nombre?: string
+          archivos?: number
           completado_en?: string | null
           creado_en?: string
           creado_por?: string | null
           estado?: string
+          fecha_desde?: string | null
+          fecha_hasta?: string | null
           filas_archivo?: number
           id?: string
+          iva_estado?: string
+          moneda?: string
         }
         Relationships: []
+      }
+      ventas_maquinas_historico_chasis_auditoria: {
+        Row: {
+          archivo_nombre: string
+          chasis_anterior: string | null
+          chasis_nuevo: string
+          creado_en: string
+          ejecutado_por_rol: string
+          estado: string
+          fila_fuente: number
+          fuente_hash: string
+          hoja: string
+          id: string
+          linea_clave: string
+          linea_id: string
+          marcador: string
+          texto_fuente: string
+        }
+        Insert: {
+          archivo_nombre: string
+          chasis_anterior?: string | null
+          chasis_nuevo: string
+          creado_en?: string
+          ejecutado_por_rol?: string
+          estado: string
+          fila_fuente: number
+          fuente_hash: string
+          hoja: string
+          id?: string
+          linea_clave: string
+          linea_id: string
+          marcador: string
+          texto_fuente: string
+        }
+        Update: {
+          archivo_nombre?: string
+          chasis_anterior?: string | null
+          chasis_nuevo?: string
+          creado_en?: string
+          ejecutado_por_rol?: string
+          estado?: string
+          fila_fuente?: number
+          fuente_hash?: string
+          hoja?: string
+          id?: string
+          linea_clave?: string
+          linea_id?: string
+          marcador?: string
+          texto_fuente?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "ventas_maquinas_historico_chasis_auditoria_linea_id_fkey"
+            columns: ["linea_id"]
+            isOneToOne: false
+            referencedRelation: "ventas_maquinas_historico_lineas"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       ventas_maquinas_historico_lineas: {
         Row: {
@@ -5064,6 +8004,7 @@ export type Database = {
           tipo_movimiento: string
           total_cobrado: number
           total_venta: number
+          unidades_fisicas: number
           valor_medio: number
           vendedor: string | null
         }
@@ -5100,6 +8041,7 @@ export type Database = {
           tipo_movimiento: string
           total_cobrado?: number
           total_venta: number
+          unidades_fisicas: number
           valor_medio?: number
           vendedor?: string | null
         }
@@ -5136,6 +8078,7 @@ export type Database = {
           tipo_movimiento?: string
           total_cobrado?: number
           total_venta?: number
+          unidades_fisicas?: number
           valor_medio?: number
           vendedor?: string | null
         }
@@ -6274,6 +9217,13 @@ export type Database = {
             foreignKeyName: "repuestos_ventas_vinculacion_producto_codigo_fkey"
             columns: ["producto_codigo"]
             isOneToOne: false
+            referencedRelation: "v_repuestos_semaforo_historico"
+            referencedColumns: ["codigo_interno"]
+          },
+          {
+            foreignKeyName: "repuestos_ventas_vinculacion_producto_codigo_fkey"
+            columns: ["producto_codigo"]
+            isOneToOne: false
             referencedRelation: "v_repuestos_stock_matriz"
             referencedColumns: ["codigo_interno"]
           },
@@ -6285,6 +9235,81 @@ export type Database = {
             referencedColumns: ["producto_codigo"]
           },
         ]
+      }
+      totvs_cxc_resumen_agregado: {
+        Row: {
+          anticipos_cliente: number | null
+          anticipos_cliente_saldo_cero: number | null
+          anticipos_cliente_saldo_negativo: number | null
+          anticipos_cliente_saldo_positivo: number | null
+          carga_id: string | null
+          clientes: number | null
+          completado_en: string | null
+          facturas_elegibles: number | null
+          facturas_futuras: number | null
+          facturas_vence_hoy: number | null
+          facturas_vencidas: number | null
+          fecha_corte: string | null
+          filas_documento: number | null
+          filas_saldo_cero: number | null
+          filas_saldo_negativo: number | null
+          moneda: string | null
+          porcentaje_saldo_vencido: number | null
+          positivos_no_factura: number | null
+          reemplaza_carga_id: string | null
+          saldo_anticipos_cliente: number | null
+          saldo_anticipos_negativo: number | null
+          saldo_anticipos_positivo: number | null
+          saldo_futuro: number | null
+          saldo_negativo: number | null
+          saldo_pendiente_elegible: number | null
+          saldo_positivo_no_factura: number | null
+          saldo_vence_hoy: number | null
+          saldo_vencido: number | null
+          snapshot_version: number | null
+          sucursal: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "totvs_cxc_cargas_reemplaza_carga_id_fkey"
+            columns: ["reemplaza_carga_id"]
+            isOneToOne: false
+            referencedRelation: "totvs_cxc_cargas"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "totvs_cxc_cargas_reemplaza_carga_id_fkey"
+            columns: ["reemplaza_carga_id"]
+            isOneToOne: false
+            referencedRelation: "totvs_cxc_resumen_agregado"
+            referencedColumns: ["carga_id"]
+          },
+        ]
+      }
+      totvs_mayor_resumen_agregado: {
+        Row: {
+          categoria: string | null
+          centro_costo: string | null
+          clasificacion_estado: string | null
+          clasificacion_version: number | null
+          cuenta_codigo: string | null
+          cuenta_descripcion: string | null
+          es_apertura: boolean | null
+          filas: number | null
+          filas_cuarentena: number | null
+          importe_absoluto_pyg: number | null
+          importe_absoluto_usd: number | null
+          importe_excluido_pyg: number | null
+          importe_excluido_usd: number | null
+          importe_pyg: number | null
+          importe_usd: number | null
+          periodo: string | null
+          periodo_estado: string | null
+          subcategoria: string | null
+          sucursal: string | null
+          tipo_saldo: string | null
+        }
+        Relationships: []
       }
       trabajos_horas: {
         Row: {
@@ -6337,6 +9362,48 @@ export type Database = {
         }
         Relationships: []
       }
+      v_repuestos_analisis_ubicaciones: {
+        Row: {
+          deposito: string | null
+          kardex_archivo: string | null
+          kardex_cargado_en: string | null
+          producto_codigo: string | null
+          saldo_kardex: number | null
+          stock: number | null
+          sucursal: string | null
+          valor_kardex_usd: number | null
+        }
+        Relationships: []
+      }
+      v_repuestos_compras_importadas_conciliacion: {
+        Row: {
+          cantidad_despacho: number | null
+          cantidad_kardex: number | null
+          documento: string | null
+          estado: string | null
+          fecha_documento: string | null
+          fecha_kardex: string | null
+          filas_despacho: number | null
+          filas_kardex: number | null
+          producto_codigo: string | null
+          proveedor: string | null
+          referencias_despacho: Json | null
+          referencias_kardex: Json | null
+          serie: string | null
+          sucursal: string | null
+        }
+        Relationships: []
+      }
+      v_repuestos_inventario_gerencial_fuente_v1: {
+        Row: {
+          codigo: string | null
+          estado_vinculo: string | null
+          fecha_corte: string | null
+          stock_total: number | null
+          ventas_12m: number | null
+        }
+        Relationships: []
+      }
       v_repuestos_reporte_claas: {
         Row: {
           codigo_fabricante: string | null
@@ -6348,6 +9415,38 @@ export type Database = {
           ventas_12m: number | null
           ventas_24m: number | null
           ventas_36m: number | null
+        }
+        Relationships: []
+      }
+      v_repuestos_semaforo_historico: {
+        Row: {
+          campo_9: number | null
+          codigo_anterior_ejemplo: string | null
+          codigo_fabricante: string | null
+          codigo_interno: string | null
+          codigos_anteriores: number | null
+          color: string | null
+          descripcion: string | null
+          dias_ultima_venta: number | null
+          familia: string | null
+          fecha_analisis: string | null
+          kardex_archivo: string | null
+          kardex_cargado_en: string | null
+          katuete: number | null
+          loma_plata: number | null
+          marca: Database["public"]["Enums"]["marca"] | null
+          misiones: number | null
+          saldo_coincide: boolean | null
+          saldo_kardex: number | null
+          santa_rita: number | null
+          santa_rosa: number | null
+          stock_total: number | null
+          ultima_venta: string | null
+          unidades_365d: number | null
+          unidades_anio_actual: number | null
+          unidades_anio_anterior: number | null
+          unidades_hace_dos_anios: number | null
+          valor_kardex_usd: number | null
         }
         Relationships: []
       }
@@ -6395,6 +9494,14 @@ export type Database = {
         }
         Relationships: []
       }
+      v_repuestos_ultima_compra: {
+        Row: {
+          fuente_compra: string | null
+          producto_codigo: string | null
+          ultima_compra: string | null
+        }
+        Relationships: []
+      }
       v_repuestos_ventas_unificadas: {
         Row: {
           cantidad: number | null
@@ -6438,7 +9545,6 @@ export type Database = {
       }
     }
     Functions: {
-      disconnect_user_presence: { Args: never; Returns: undefined }
       admin_actualizar_acceso_seccion: {
         Args: { p_activo: boolean; p_seccion_id: string; p_user_id: string }
         Returns: undefined
@@ -6566,6 +9672,7 @@ export type Database = {
         Args: { p_notificacion_id: string }
         Returns: undefined
       }
+      disconnect_user_presence: { Args: never; Returns: undefined }
       es_linea_facturacion_repuesto: {
         Args: {
           p_grupo_normalizado: string
@@ -6582,13 +9689,214 @@ export type Database = {
         Args: { p_descripcion: string }
         Returns: string
       }
+      facturacion_acreditar_fuente_existente_v1: {
+        Args: {
+          p_desde: string
+          p_hasta: string
+          p_importacion: Json
+          p_importacion_id: string
+          p_lineas: Json
+          p_reemplazar_resumen?: boolean
+          p_resumen: Json
+          p_source_identity: Json
+        }
+        Returns: Json
+      }
+      facturacion_importar_totvs_lote_con_fuente_v1: {
+        Args: {
+          p_desde?: string
+          p_hasta?: string
+          p_importacion: Json
+          p_lineas: Json
+          p_reemplazar_resumen?: boolean
+          p_resumen: Json
+        }
+        Returns: Json
+      }
+      facturacion_importar_totvs_lote_core_consolidacion_v1: {
+        Args: {
+          p_desde?: string
+          p_hasta?: string
+          p_importacion: Json
+          p_lineas: Json
+          p_reemplazar_resumen?: boolean
+          p_resumen: Json
+        }
+        Returns: Json
+      }
+      facturacion_importar_totvs_lote_core_group_enrichment_v1: {
+        Args: {
+          p_desde?: string
+          p_hasta?: string
+          p_importacion: Json
+          p_lineas: Json
+          p_reemplazar_resumen?: boolean
+          p_resumen: Json
+        }
+        Returns: Json
+      }
+      facturacion_importar_totvs_lote_core_procedencia_v1: {
+        Args: {
+          p_desde?: string
+          p_hasta?: string
+          p_importacion: Json
+          p_lineas: Json
+          p_reemplazar_resumen?: boolean
+          p_resumen: Json
+        }
+        Returns: Json
+      }
+      facturacion_importar_totvs_lote_v1: {
+        Args: {
+          p_desde?: string
+          p_hasta?: string
+          p_importacion: Json
+          p_lineas: Json
+          p_reemplazar_resumen?: boolean
+          p_resumen: Json
+        }
+        Returns: Json
+      }
       facturacion_tipo_tiempo_campos: {
         Args: { p_entidad: string; p_observacion: string }
+        Returns: string
+      }
+      facturacion_totvs_codigo_fabricante_equivalente: {
+        Args: {
+          p_entrante: string
+          p_guardado: string
+          p_sku_entrante: string
+          p_sku_guardado: string
+        }
+        Returns: boolean
+      }
+      facturacion_totvs_fingerprint_auditado: {
+        Args: { p_linea: Json }
+        Returns: string
+      }
+      facturacion_totvs_firma_base: { Args: { p_linea: Json }; Returns: Json }
+      facturacion_totvs_firma_comercial: {
+        Args: { p_linea: Json }
+        Returns: Json
+      }
+      facturacion_totvs_identidad: {
+        Args: {
+          p_documento: string
+          p_item: string
+          p_origen: string
+          p_sucursal: string
+          p_tipo_documento: string
+        }
+        Returns: string
+      }
+      facturacion_totvs_plan_grupo_descriptivo_v1: {
+        Args: { p_entrada: Json; p_guardada: Json }
+        Returns: Json
+      }
+      facturacion_totvs_preparar_reimportacion: {
+        Args: { p_entrada: Json; p_guardada: Json }
+        Returns: Json
+      }
+      facturacion_totvs_sucursal_canonica: {
+        Args: { p_sucursal: string }
+        Returns: string
+      }
+      facturacion_validar_totvs_lote_v1: {
+        Args: {
+          p_desde?: string
+          p_hasta?: string
+          p_importacion: Json
+          p_lineas: Json
+          p_reemplazar_resumen?: boolean
+          p_resumen: Json
+        }
+        Returns: Json
+      }
+      fleet_actor_name: { Args: { p_user_id: string }; Returns: string }
+      fleet_add_odometer_reading: {
+        Args: {
+          p_odometer_km: number
+          p_reading_date: string
+          p_vehicle_id: string
+        }
+        Returns: string
+      }
+      fleet_assert_write_access: { Args: never; Returns: string }
+      fleet_correct_odometer_reading: {
+        Args: {
+          p_odometer_km: number
+          p_reading_date: string
+          p_reading_id: string
+          p_reason: string
+        }
+        Returns: string
+      }
+      fleet_create_vehicle: {
+        Args: {
+          p_brand: string
+          p_initial_odometer_km?: number
+          p_initial_reading_date?: string
+          p_model?: string
+          p_plate: string
+        }
+        Returns: string
+      }
+      fleet_list_responsible_candidates: {
+        Args: never
+        Returns: {
+          es_tecnico: boolean
+          id: string
+          nombre: string
+          sucursal: Database["public"]["Enums"]["sucursal"]
+        }[]
+      }
+      fleet_normalize_plate: { Args: { p_plate: string }; Returns: string }
+      fleet_set_vehicle_responsible: {
+        Args: {
+          p_effective_date: string
+          p_responsible_profile_id: string
+          p_vehicle_id: string
+        }
         Returns: string
       }
       generar_notificacion_venta_maquina: {
         Args: { p_linea_id: string }
         Returns: string
+      }
+      generar_notificaciones_stock_en_parque: {
+        Args: { p_carga_id: string }
+        Returns: number
+      }
+      gerencial_clientes_movimientos_posventa_v1: {
+        Args: { p_desde: string; p_hasta: string }
+        Returns: {
+          cliente_id: string
+          contrato: string
+          fecha: string
+          sucursal: string
+          total_venta: number
+        }[]
+      }
+      gerencial_clientes_resumen_v1: {
+        Args: {
+          p_desde: string
+          p_hasta: string
+          p_prev_desde: string
+          p_prev_hasta: string
+          p_sucursal?: string
+        }
+        Returns: {
+          clientes_alerta: number
+          clientes_evaluables: number
+          clientes_historial_insuficiente: number
+          clientes_revision_ritmo: number
+          compradores_actual: number
+          compradores_base: number
+          compradores_base_sin_recompra: number
+          compradores_retenidos: number
+          propietarios_con_compra_actual: number
+          propietarios_elegibles: number
+        }[]
       }
       get_user_sucursal: {
         Args: { _user_id: string }
@@ -6605,18 +9913,29 @@ export type Database = {
         }
         Returns: boolean
       }
-      touch_user_presence: {
-        Args: { p_last_activity_at?: string }
-        Returns: undefined
-      }
       has_section_access: {
         Args: { _seccion_id: string; _user_id: string }
         Returns: boolean
+      }
+      inactividad_clientes_senal_v1: {
+        Args: { p_corte: string; p_sucursal?: string }
+        Returns: {
+          clientes_alerta: number
+          clientes_evaluables: number
+          clientes_historial_insuficiente: number
+          clientes_revision_ritmo: number
+        }[]
       }
       inferir_subgrupo_maquina_notificacion: {
         Args: { p_texto: string }
         Returns: Database["public"]["Enums"]["subgrupo_maquina"]
       }
+      is_active_app_user: { Args: { _user_id: string }; Returns: boolean }
+      managerial_facturacion_resumen_v1: {
+        Args: { p_desde: string; p_hasta: string; p_sucursal?: string }
+        Returns: Json
+      }
+      managerial_inventario_resumen_v1: { Args: never; Returns: Json }
       maquinaria_actualizar_operacion: {
         Args: { p_lineas: Json; p_operacion: Json; p_operacion_id: string }
         Returns: string
@@ -6771,6 +10090,20 @@ export type Database = {
         Args: { p_producto: string }
         Returns: Database["public"]["Enums"]["subgrupo_maquina"]
       }
+      maquinaria_unidad_tiene_venta_confirmada: {
+        Args: { p_unidad_id: string }
+        Returns: boolean
+      }
+      maquinaria_unidades_facturadas_confirmadas: {
+        Args: { p_unidad_ids: string[] }
+        Returns: {
+          unidad_id: string
+        }[]
+      }
+      maquinaria_vincular_documento_factura_importacion: {
+        Args: { p_documento_id: string; p_unidad_ids: string[] }
+        Returns: number
+      }
       maquinaria_vincular_factura_venta: {
         Args: { p_documento_id: string; p_unidad_ids: string[] }
         Returns: Json
@@ -6781,6 +10114,10 @@ export type Database = {
       }
       normalizar_chasis_notificacion: {
         Args: { p_valor: string }
+        Returns: string
+      }
+      normalizar_cliente_notificacion: {
+        Args: { p_nombre: string }
         Returns: string
       }
       normalizar_codigo_repuesto: {
@@ -6796,6 +10133,14 @@ export type Database = {
         Returns: string
       }
       normalizar_texto_repuesto: { Args: { p_texto: string }; Returns: string }
+      notificacion_venta_mismo_cliente: {
+        Args: {
+          p_cliente_facturado_id: string
+          p_cliente_facturado_nombre: string
+          p_parque_maquina_id: string
+        }
+        Returns: boolean
+      }
       notificaciones_marcar_vista: {
         Args: { p_notificacion_id: string }
         Returns: undefined
@@ -6947,6 +10292,16 @@ export type Database = {
           tiene_srv_rango: boolean
         }[]
       }
+      parque_stock_proyectado_identidad: {
+        Args: { p_marca: string; p_modelo: string; p_tipo: string }
+        Returns: {
+          marca: string
+          modelo: string
+          modelo_clave: string
+          tipo: string
+        }[]
+      }
+      parque_stock_proyectado_v1: { Args: { p_corte: string }; Returns: Json }
       parque_ultimas_facturas: {
         Args: never
         Returns: {
@@ -6985,6 +10340,17 @@ export type Database = {
       }
       repuestos_actualizar_ventas_periodo: {
         Args: { p_desde: string; p_hasta: string }
+        Returns: Json
+      }
+      repuestos_analisis_deposito: { Args: { p: string }; Returns: string }
+      repuestos_analisis_sucursal: { Args: { p: string }; Returns: string }
+      repuestos_analisis_valorizado: {
+        Args: {
+          p_agrupacion?: string
+          p_filtros?: Json
+          p_limite?: number
+          p_offset?: number
+        }
         Returns: Json
       }
       repuestos_aplicar_conversiones_unidad_historica: {
@@ -7144,6 +10510,27 @@ export type Database = {
         Args: { p_marca?: string }
         Returns: Json
       }
+      repuestos_semaforo_historico_paginado: {
+        Args: {
+          p_busqueda?: string
+          p_color?: string
+          p_limite?: number
+          p_marca?: string
+          p_offset?: number
+          p_sucursal?: string
+        }
+        Returns: Json
+      }
+      repuestos_stock_semaforo_resumen: {
+        Args: {
+          p_buscar?: string
+          p_estado?: string
+          p_limite?: number
+          p_offset?: number
+          p_sucursal?: string
+        }
+        Returns: Json
+      }
       repuestos_sucursal_legacy: {
         Args: { p_valor: string }
         Returns: Database["public"]["Enums"]["sucursal"]
@@ -7223,6 +10610,47 @@ export type Database = {
         Args: { p_codigo_legacy: string; p_producto_codigo: string }
         Returns: Json
       }
+      retencion_clientes_cohortes_v1: {
+        Args: {
+          p_desde: string
+          p_hasta: string
+          p_prev_desde: string
+          p_prev_hasta: string
+          p_sucursal?: string
+        }
+        Returns: {
+          compradores_actual: number
+          compradores_base: number
+          compradores_base_sin_recompra: number
+          compradores_retenidos: number
+        }[]
+      }
+      service_order_labor_hours_v1: {
+        Args: {
+          p_credit: boolean
+          p_invoice: string
+          p_rates: Json
+          p_reference_total: number
+          p_total: number
+        }
+        Returns: number
+      }
+      service_orders_billing_v1: {
+        Args: { p_hasta: string; p_os_numeros: string[] }
+        Returns: Json
+      }
+      service_orders_billing_v2: {
+        Args: { p_hasta: string; p_os_numeros: string[] }
+        Returns: Json
+      }
+      service_orders_work_log_v1: {
+        Args: { p_desde: string; p_hasta: string; p_os?: string }
+        Returns: {
+          entries: Json
+          order_data: Json
+          os: string
+        }[]
+      }
       servicios_es_tecnico_activo: {
         Args: { p_profile_id: string }
         Returns: boolean
@@ -7234,6 +10662,144 @@ export type Database = {
           nombre: string
           sucursal: Database["public"]["Enums"]["sucursal"]
         }[]
+      }
+      totvs_absorcion_numero_v1: { Args: { p_value: string }; Returns: number }
+      totvs_absorcion_sucursal_codigo_v1: {
+        Args: { p_sucursal: string }
+        Returns: string
+      }
+      totvs_cancelar_cxc_carga_v1: {
+        Args: { p_carga_id: string }
+        Returns: undefined
+      }
+      totvs_cancelar_mayor_carga_v1: {
+        Args: { p_carga_id: string }
+        Returns: undefined
+      }
+      totvs_consolidacion_documento_v1: {
+        Args: { p_documento: string }
+        Returns: string
+      }
+      totvs_consolidacion_sucursal_codigo_v1: {
+        Args: { p_sucursal: string }
+        Returns: string
+      }
+      totvs_consultar_absorcion_dinamica_v1: {
+        Args: { p_desde?: string; p_hasta?: string; p_sucursal?: string }
+        Returns: Json
+      }
+      totvs_consultar_componentes_absorcion_rapidos_v1: {
+        Args: { p_desde: string; p_hasta: string }
+        Returns: Json
+      }
+      totvs_consultar_consolidacion_tecnica_v1: {
+        Args: { p_desde: string; p_hasta: string }
+        Returns: Json
+      }
+      totvs_consultar_cxc_resumen_v1: {
+        Args: { p_corte?: string }
+        Returns: Json
+      }
+      totvs_consultar_mayor_absorcion_evidencia_v1: {
+        Args: never
+        Returns: Json
+      }
+      totvs_consultar_mayor_resumen_v1: {
+        Args: { p_desde?: string; p_hasta?: string }
+        Returns: Json
+      }
+      totvs_cron_drenar_consolidacion_v1: { Args: never; Returns: Json }
+      totvs_encolar_consolidacion_tecnica_v1: {
+        Args: {
+          p_evento: string
+          p_facturacion_carga_id?: string
+          p_mayor_carga_id?: string
+        }
+        Returns: number
+      }
+      totvs_finalizar_cxc_carga_v1: {
+        Args: { p_carga_id: string; p_control: Json }
+        Returns: Json
+      }
+      totvs_finalizar_mayor_carga_v1: {
+        Args: { p_carga_id: string; p_control: Json }
+        Returns: Json
+      }
+      totvs_finalizar_transferencias_transito_v1: {
+        Args: { p_carga_id: string }
+        Returns: undefined
+      }
+      totvs_importar_cxc_lote_v1: {
+        Args: { p_carga_id: string; p_filas: Json; p_modo: string }
+        Returns: Json
+      }
+      totvs_importar_despacho_lote_v1: {
+        Args: { p_carga_id: string; p_filas: Json }
+        Returns: Json
+      }
+      totvs_importar_facturas_compra_lote_v1: {
+        Args: { p_carga_id: string; p_filas: Json }
+        Returns: Json
+      }
+      totvs_importar_kardex_lote_v1: {
+        Args: { p_carga_id: string; p_filas: Json }
+        Returns: Json
+      }
+      totvs_importar_kardex_sintetico_lote_v1: {
+        Args: { p_carga_id: string; p_filas: Json }
+        Returns: Json
+      }
+      totvs_importar_mayor_lote_v1: {
+        Args: { p_carga_id: string; p_filas: Json; p_modo: string }
+        Returns: Json
+      }
+      totvs_importar_ordenes_servicio_lote_v1: {
+        Args: { p_filas: Json; p_importacion_id: string; p_lote_numero: number }
+        Returns: Json
+      }
+      totvs_importar_pedidos_venta_lote_v1: {
+        Args: { p_carga_id: string; p_filas: Json }
+        Returns: Json
+      }
+      totvs_importar_proveedores_lote_v1: {
+        Args: { p_carga_id: string; p_filas: Json }
+        Returns: Json
+      }
+      totvs_importar_transferencias_transito_lote_v1: {
+        Args: { p_carga_id: string; p_filas: Json }
+        Returns: Json
+      }
+      totvs_iniciar_cxc_carga_v1: { Args: { p_metadata: Json }; Returns: Json }
+      totvs_iniciar_mayor_carga_v1: {
+        Args: { p_metadata: Json }
+        Returns: string
+      }
+      totvs_procesar_cola_consolidacion_core_v1: { Args: never; Returns: Json }
+      totvs_procesar_cola_consolidacion_v1: { Args: never; Returns: Json }
+      totvs_recalcular_consolidacion_tecnica_v1: {
+        Args: {
+          p_evento: string
+          p_facturacion_carga_id?: string
+          p_mayor_carga_id?: string
+        }
+        Returns: string
+      }
+      totvs_refrescar_consolidacion_post_import_v1: {
+        Args: { p_facturacion_carga_id?: string; p_mayor_carga_id?: string }
+        Returns: Json
+      }
+      totvs_registrar_mayor_absorcion_evidencia_v1: {
+        Args: {
+          p_contract: Json
+          p_ledger_load_id: string
+          p_supporting_load_id: string
+        }
+        Returns: Json
+      }
+      totvs_sha256_text_v1: { Args: { p_value: string }; Returns: string }
+      touch_user_presence: {
+        Args: { p_last_activity_at?: string }
+        Returns: undefined
       }
       valor_json_insensible: {
         Args: { p_claves: string[]; p_datos: Json }
@@ -7342,11 +10908,29 @@ export type Database = {
         }
         Returns: boolean
       }
+      ventas_historial_tipo_tiempo_procedencia: {
+        Args: { p_tipo: string }
+        Returns: string
+      }
+      ventas_historial_vinculo_os_publicable: {
+        Args: {
+          p_chasis_solicitado: string
+          p_coincidencias_numero: number
+          p_factura_sucursal: string
+          p_os_chasis: string
+          p_os_sucursal: string
+        }
+        Returns: boolean
+      }
       ventas_linea_tipo_tiempo: {
         Args: { p_id: string; p_metodologia: string; p_os_tipo: string }
         Returns: string
       }
       ventas_maquinas_cancelar_historico_v1: {
+        Args: { p_carga_id: string }
+        Returns: undefined
+      }
+      ventas_maquinas_cancelar_historico_v2: {
         Args: { p_carga_id: string }
         Returns: undefined
       }
@@ -7362,8 +10946,26 @@ export type Database = {
         }
         Returns: Json
       }
+      ventas_maquinas_dashboard_v2: {
+        Args: {
+          p_agrupacion?: string
+          p_buscar?: string
+          p_desde: string
+          p_hasta: string
+          p_marca?: string
+          p_sucursal?: string
+          p_tipo_maquina?: string
+        }
+        Returns: Json
+      }
+      ventas_maquinas_es_fabrizio_v1: { Args: never; Returns: boolean }
       ventas_maquinas_estado_historico_v1: { Args: never; Returns: Json }
+      ventas_maquinas_estado_historico_v2: { Args: never; Returns: Json }
       ventas_maquinas_finalizar_historico_v1: {
+        Args: { p_carga_id: string }
+        Returns: Json
+      }
+      ventas_maquinas_finalizar_historico_v2: {
         Args: { p_carga_id: string }
         Returns: Json
       }
@@ -7395,9 +10997,29 @@ export type Database = {
         Args: { p_carga_id: string; p_lineas: Json }
         Returns: Json
       }
+      ventas_maquinas_importar_historico_lote_v2: {
+        Args: { p_carga_id: string; p_lineas: Json }
+        Returns: Json
+      }
       ventas_maquinas_iniciar_historico_v1: {
         Args: { p_archivo_nombre: string; p_filas_archivo: number }
         Returns: string
+      }
+      ventas_maquinas_iniciar_historico_v2: {
+        Args: {
+          p_archivo_nombre: string
+          p_archivos?: number
+          p_fecha_desde: string
+          p_fecha_hasta: string
+          p_filas_archivo: number
+          p_iva_estado?: string
+          p_moneda?: string
+        }
+        Returns: string
+      }
+      ventas_maquinas_previsualizar_historico_v2: {
+        Args: { p_lineas: Json }
+        Returns: Json
       }
       ventas_normalizar_vendedor_maquinas: {
         Args: { p_vendedor: string }
@@ -7405,6 +11027,23 @@ export type Database = {
       }
       ventas_orden_natural: { Args: { p_texto: string }; Returns: string }
       ventas_repuestos_estado_historico_v1: { Args: never; Returns: Json }
+      ventas_repuestos_listado_filtros_v1: {
+        Args: {
+          p_buscar?: string
+          p_desde: string
+          p_direccion?: string
+          p_exportar?: boolean
+          p_hasta: string
+          p_marca?: string
+          p_orden?: string
+          p_pagina?: number
+          p_por_pagina?: number
+          p_sucursal?: string
+          p_vendedor?: string
+          p_vista?: string
+        }
+        Returns: Json
+      }
       ventas_repuestos_listado_v1: {
         Args: {
           p_buscar?: string
@@ -7444,22 +11083,32 @@ export type Database = {
         }
         Returns: Json
       }
-      ventas_repuestos_listado_filtros_v1: {
+      ventas_repuestos_movimientos_filtrados_v1: {
         Args: {
-          p_buscar?: string
+          p_buscar: string
           p_desde: string
-          p_direccion?: string
-          p_exportar?: boolean
           p_hasta: string
-          p_marca?: string
-          p_orden?: string
-          p_pagina?: number
-          p_por_pagina?: number
-          p_sucursal?: string
-          p_vendedor?: string
-          p_vista?: string
+          p_marca: string
+          p_sucursal: string
+          p_vendedor: string
         }
-        Returns: Json
+        Returns: {
+          cantidad: number
+          cliente: string
+          codigo: string
+          codigo_fabricante: string
+          descripcion: string
+          documento: string
+          es_nota_credito: boolean
+          factura: string
+          fecha: string
+          id: string
+          importe: number
+          marca: string
+          metodologia: string
+          sucursal: string
+          vendedor: string
+        }[]
       }
       ventas_repuestos_movimientos_v1: {
         Args: {
@@ -7509,36 +11158,21 @@ export type Database = {
           vendedor: string
         }[]
       }
-      ventas_repuestos_movimientos_filtrados_v1: {
-        Args: {
-          p_buscar: string
-          p_desde: string
-          p_hasta: string
-          p_marca: string
-          p_sucursal: string
-          p_vendedor: string
-        }
-        Returns: {
-          cantidad: number
-          cliente: string
-          codigo: string
-          codigo_fabricante: string
-          descripcion: string
-          documento: string
-          es_nota_credito: boolean
-          factura: string
-          fecha: string
-          id: string
-          importe: number
-          marca: string
-          metodologia: string
-          sucursal: string
-          vendedor: string
-        }[]
-      }
       ventas_repuestos_normalizar_vendedor: {
         Args: { p_nombre: string }
         Returns: string
+      }
+      ventas_repuestos_panorama_filtros_v1: {
+        Args: {
+          p_agrupacion?: string
+          p_buscar?: string
+          p_desde: string
+          p_hasta: string
+          p_marca?: string
+          p_sucursal?: string
+          p_vendedor?: string
+        }
+        Returns: Json
       }
       ventas_repuestos_panorama_v1: {
         Args: {
@@ -7557,18 +11191,6 @@ export type Database = {
           p_desde: string
           p_hasta: string
           p_sucursal?: string
-        }
-        Returns: Json
-      }
-      ventas_repuestos_panorama_filtros_v1: {
-        Args: {
-          p_agrupacion?: string
-          p_buscar?: string
-          p_desde: string
-          p_hasta: string
-          p_marca?: string
-          p_sucursal?: string
-          p_vendedor?: string
         }
         Returns: Json
       }
