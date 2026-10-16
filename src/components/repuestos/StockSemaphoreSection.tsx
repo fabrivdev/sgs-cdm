@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import { useSearchParams } from "react-router-dom";
 import { AlertTriangle, ChevronLeft, ChevronRight, Package, Boxes, Coins, Info } from "lucide-react";
 import { toast } from "sonner";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
@@ -109,9 +110,13 @@ function DetailFields({ row }: { row: SemaforoFila }) {
 import { GROUP_LABELS, STOCK_BANDS, purchaseAgeBand } from "./partsAnalysisDefinitions";
 
 export function StockSemaphoreSection({ canExport }: { canExport: boolean }) {
+  const [searchParams] = useSearchParams();
   const [search, setSearch] = useState("");
   const debounced = useDebouncedValue(search, 300);
-  const [filtros, setFiltros] = useState<SemaforoFiltros>(INITIAL_FILTERS);
+  const [filtros, setFiltros] = useState<SemaforoFiltros>(() => ({ ...INITIAL_FILTERS, color: searchParams.get("color") === "ROJO" ? "ROJO" : "" }));
+  useEffect(() => {
+    if (searchParams.get("color") === "ROJO") setFiltros(current => ({ ...current, color: "ROJO" }));
+  }, [searchParams]);
   const [tab, setTab] = useState("resumen");
   const [agrupacion, setAgrupacion] = useState<SemaforoAgrupacion>("marca");
   const [path, setPath] = useState<Array<{ key: SemaforoAgrupacion; value: string }>>([]);

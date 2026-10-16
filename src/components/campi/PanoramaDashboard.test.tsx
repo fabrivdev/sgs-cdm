@@ -38,16 +38,16 @@ describe('Campi Panorama dashboard', () => {
       version: 'repuestos_analisis_valorizado:ultima_compra_v1', route: '/repuestos/analisis',
     }], insights: [{ id: 'repuestos.stock_antiguo', topic: 'repuestos_stock',
       title: 'Stock sin ventas en tres años y última compra hace más de 1.000 días',
-      value: 1000, total: 4000, count: 10, unit: 'USD', cutoff: '2026-10-16', route: '/repuestos/analisis' }] }]);
+      value: 1000, total: 4000, count: 10, unit: 'USD', cutoff: '2026-10-16', route: '/repuestos/analisis?color=ROJO' }] }]);
     const client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
     render(<QueryClientProvider client={client}><MemoryRouter><PanoramaDashboard userId="manager-a"
       topics={['repuestos_stock']} available={PANORAMA_TOPICS}
       hasAccess={section => section === 'repuestos.analisis'} onEdit={() => {}} />
     </MemoryRouter></QueryClientProvider>);
-    expect(await screen.findByText('USD 1.000')).toBeInTheDocument();
+    expect(await screen.findByText(/Sin ventas en tres años.*USD 1.000/)).toBeInTheDocument();
     expect(screen.getAllByText('USD 4.000')).toHaveLength(1);
     expect(screen.getByRole('img', { name: /25 por ciento/ })).toBeInTheDocument();
-    expect(screen.getByRole('link', { name: /Explorar en Análisis de repuestos/ })).toHaveAttribute('href', '/repuestos/analisis');
+    expect(screen.getByRole('link', { name: /Explorar en Análisis de repuestos/ })).toHaveAttribute('href', '/repuestos/analisis?color=ROJO');
   });
 
   it('shows authorized metrics, keeps topic order and never exposes another sales source', async () => {
@@ -71,7 +71,7 @@ describe('Campi Panorama dashboard', () => {
   it('does not record a partial visit after a source fails', async () => {
     load.mockResolvedValue([{ section: 'repuestos.ventas', metrics: [], error: 'timeout' }]);
     show();
-    await screen.findByText('Hay una fuente sin datos en este momento.');
+    await screen.findByText('Una fuente no respondió por ahora.');
     expect(record).not.toHaveBeenCalled();
   });
 
@@ -89,5 +89,16 @@ describe('Campi Panorama dashboard', () => {
     await screen.findByText('USD 150');
     expect(screen.queryByText(/USD 50 desde última visita/)).not.toBeInTheDocument();
     expect(screen.queryByText(/USD 50 desde última visita/)).not.toBeInTheDocument();
+  });
+
+  it('keeps selected topics actionable when no consolidated metric exists', async () => {
+    load.mockResolvedValue([]);
+    const client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+    render(<QueryClientProvider client={client}><MemoryRouter><PanoramaDashboard userId="manager-a"
+      topics={['maquinas_importacion']} available={PANORAMA_TOPICS}
+      hasAccess={section => section === 'parque.importaciones'} onEdit={() => {}} />
+    </MemoryRouter></QueryClientProvider>);
+    expect(await screen.findByRole('link', { name: /Abrir Importaciones y arribos de máquinas/ })).toHaveAttribute('href', '/parque-importaciones');
+    expect(screen.queryByText(/No hay indicadores consolidados/)).not.toBeInTheDocument();
   });
 });

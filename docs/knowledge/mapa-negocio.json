@@ -675,7 +675,7 @@
       "id": "panorama-permisos-y-comparacion",
       "title": "Panorama por permisos y visitas comparables",
       "module": "asistente",
-      "description": "Los temas ordenan solo indicadores autorizados por módulo y sección. El panel destaca hasta tres métricas de temas distintos y muestra por separado las cifras restantes. El hallazgo de stock rojo usa el valor y el total del mismo corte valorizado de Repuestos. La comparación entre visitas aún no se presenta: requiere cálculos y registro confiables en servidor; un dato faltante o un corte no comparable no es cero ni mejora.",
+      "description": "Los temas ordenan solo indicadores autorizados por módulo y sección. El panel destaca hasta tres métricas; los temas aún sin KPI mantienen un acceso útil al detalle. Las ventas comparan el mes en curso hasta el corte con el tramo equivalente del mes anterior, sin interpretar una variación como mejora. El hallazgo de stock rojo usa el valor y el total del mismo corte valorizado de Repuestos y abre ese grupo filtrado. La comparación entre visitas aún no se presenta: requiere cálculos y registro confiables en servidor; un dato faltante o un corte no comparable no es cero ni mejora.",
       "check": "Probar revocación de módulo/sección, fuente fallida, primer ingreso, recarga en la misma sesión, cambio de mes, moneda y fila histórica propia por RLS. No convertir el snapshot enviado por el cliente en alerta o síntesis causal hasta calcularlo en servidor.",
       "entities": ["usuario", "permiso"],
       "sources": ["src/lib/campi/panoramaPreferences.ts", "src/lib/campi/panoramaData.ts", "src/lib/campi/panoramaVisits.ts", "supabase/migrations/20261016190000_campi_panorama_visits.sql", "docs/knowledge/36-Campi-bienvenida.md"],
@@ -1706,7 +1706,7 @@
       "title": "Priorizar temas y leer Panorama",
       "module": "asistente",
       "description": "El usuario autorizado ordena temas específicos y abre un panel variable sin cifras ficticias.",
-      "steps": ["Filtrar el catálogo por rol, módulo y sección.", "Guardar el orden elegido por usuario y navegador.", "Consultar solo las fuentes autorizadas por los temas elegidos.", "Destacar hasta tres métricas y un hallazgo validado del semáforo, sin duplicar cifras, y abrir cada detalle autorizado."],
+      "steps": ["Filtrar el catálogo por rol, módulo y sección.", "Guardar el orden elegido por usuario y navegador.", "Consultar solo las fuentes autorizadas por los temas elegidos.", "Comparar tramos de venta equivalentes y contextualizar el stock proyectado.", "Destacar hasta tres métricas y un hallazgo validado del semáforo, sin duplicar cifras, y abrir cada detalle autorizado.", "Mantener una ruta autorizada y útil para cada tema sin KPI consolidado."],
       "entities": ["usuario", "permiso"],
       "rules": ["panorama-permisos-y-comparacion"],
       "sources": ["src/pages/CampiPanorama.tsx", "src/components/campi/PanoramaDashboard.tsx", "src/lib/campi/panoramaData.ts", "src/lib/campi/panoramaVisits.ts"]

@@ -155,6 +155,14 @@ No actionable P0, P1, or P2 mismatch remains. The reduced button count and simpl
 
 final result: passed
 
+## Panorama: comparación contextual y acceso al hallazgo — 16/10/2026
+
+En Chrome local autenticado se revisaron el estado sereno y el de atención. Campi puede sobresalir por arriba del recuadro sin invadir el título de la página; la parte inferior se desvanece en vez de terminar con un corte duro. El estado de atención usa fondo ámbar, expresión curiosa y gesto de consideración. El hallazgo muestra el criterio, la cantidad y el valor del grupo rojo. Su enlace abrió `/repuestos/analisis?color=ROJO` y el selector apareció en «Rojo».
+
+Las tarjetas de Ventas de Repuestos y Servicios muestran dos tramos equivalentes y variación numérica. Stock proyectado desglosa stock actual, compras y ventas pendientes, y proyectado con alcance y corte. Se quitó la cifra aislada de unidades netas. Si un tema elegido aún no tiene KPI, el panel ofrece su sección autorizada. En la pantalla local se comprobaron datos reales de ambos tramos; no se atribuye mejora ni se compara con la última visita.
+
+La captura de revisión se conserva en `output/campi-panorama-after.png`. Las prioridades usadas temporalmente para comprobar el hallazgo se restauraron al orden previo. Sin publicación en `main` ni aplicación de la migración de visitas.
+
 ---
 
 # Design QA — Órdenes de servicio

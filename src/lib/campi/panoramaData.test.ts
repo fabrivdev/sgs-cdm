@@ -21,7 +21,7 @@ describe('Panorama metric permissions and sources', () => {
     const result = await loadPanoramaData(topics, ['repuestos.ventas'], '2026-10-16');
     expect(rpc).toHaveBeenCalledOnce();
     expect(rpc).toHaveBeenCalledWith('ventas_repuestos_panorama_v2', expect.objectContaining({ p_desde: '2026-10-01', p_hasta: '2026-10-16' }));
-    expect(result[0].metrics.map(metric => metric.id)).toEqual(['repuestos.facturado', 'repuestos.unidades_netas']);
+    expect(result[0].metrics.map(metric => metric.id)).toEqual(['repuestos.facturado']);
     expect(result[0].metrics[0]).toMatchObject({ value: 123, unit: 'USD', scope: 'Repuestos' });
   });
 
@@ -30,6 +30,12 @@ describe('Panorama metric permissions and sources', () => {
     const result = await loadPanoramaData(['ventas_facturacion'], ['servicios.ventas'], '2026-10-16');
     expect(result[0].metrics).toEqual([]);
     expect(result[0].error).toMatch(/no devolvió facturación/);
+  });
+
+  it('uses the source-defined equivalent prior period for the sales comparison', async () => {
+    rpc.mockResolvedValue({ data: { resumen: { facturado: 150 }, comparacion: { facturado: 100, desde: '2026-09-01', hasta: '2026-09-16' } }, error: null });
+    const result = await loadPanoramaData(['ventas_facturacion'], ['repuestos.ventas'], '2026-10-16');
+    expect(result[0].metrics[0].comparison).toEqual({ value: 100, from: '2026-09-01', to: '2026-09-16' });
   });
 
   it('uses the valued stock source only with Analysis access', async () => {

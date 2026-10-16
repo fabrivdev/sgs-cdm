@@ -17,8 +17,8 @@
 }
 .campi-panorama-avatar .campi-sprite {
   transform: translateY(5px) scale(1.14);
-  -webkit-mask-image: linear-gradient(to bottom, #000 0%, #000 68%, transparent 96%);
-  mask-image: linear-gradient(to bottom, #000 0%, #000 68%, transparent 96%);
+  -webkit-mask-image: linear-gradient(to bottom, #000 0%, #000 67%, transparent 84%);
+  mask-image: linear-gradient(to bottom, #000 0%, #000 67%, transparent 84%);
 }
 .campi-panorama-avatar[data-paused="true"] { animation-play-state: paused; }
 @keyframes campi-panorama-breathe {

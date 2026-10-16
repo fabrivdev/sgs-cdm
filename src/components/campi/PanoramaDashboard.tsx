@@ -19,6 +19,7 @@ const today = () => {
 };
 const money = (value: number, unit: PanoramaMetric['unit']) => (unit === 'USD' ? 'USD ' : unit === 'PYG' ? '₲ ' : '') + numberFormat.format(value);
 const iconFor = (id: string) => id.startsWith('parque.') ? Tractor : id.includes('stock') ? Package : ChartNoAxesCombined;
+const shortDate = (value: string) => dateFormat.format(new Date(value + 'T12:00:00'));
 
 export function PanoramaDashboard({ userId, topics, available, hasAccess, onEdit }: {
   userId: string;
@@ -46,23 +47,29 @@ export function PanoramaDashboard({ userId, topics, available, hasAccess, onEdit
 
   const catalog = new Map(available.map(topic => [topic.id, topic]));
   const ordered = topics.flatMap(id => metrics.filter(metric => metric.topic === id));
-  const headline = topics.map(id => ordered.find(metric => metric.topic === id)).filter((item): item is PanoramaMetric => Boolean(item)).slice(0, 3);
-  const remaining = ordered.filter(metric => !headline.some(item => item.id === metric.id));
+  const headlineMetrics = ordered.slice(0, 3);
+  const headline = [
+    ...headlineMetrics.map(metric => ({ id: metric.topic, metric, topic: catalog.get(metric.topic) })),
+    ...topics.filter(id => !headlineMetrics.some(metric => metric.topic === id)).map(id => ({ id, metric: undefined, topic: catalog.get(id) })),
+  ].filter(item => item.topic).slice(0, 3);
   const insight = results.flatMap(result => result.insights ?? []).find(item => item.id === 'repuestos.stock_antiguo' && item.value > 0);
+  const remaining = ordered.filter(metric => !headline.some(item => item.metric?.id === metric.id) && !(metric.id === 'repuestos.valor_stock' && insight));
   const focus = topics.map(id => catalog.get(id)).filter((item): item is PanoramaTopic => Boolean(item));
   const moreRoutes = focus.filter(topic => !ordered.some(metric => metric.topic === topic.id)).map(topic => {
     const section = topic.sections.find(hasAccess);
     return section ? { id: topic.id, label: topic.label, route: SECTION_ROUTES.find(item => item.id === section)?.route } : null;
   }).filter((item): item is { id: PanoramaTopicId; label: string; route: string | undefined } => item !== null).slice(0, 4);
+  const followRoute = !insight ? moreRoutes.find(item => item.route) : undefined;
 
   return <PageShell className="panorama-dashboard max-w-[1440px] space-y-4">
     <PageHeader title="Panorama" actions={<div className="flex items-center gap-3"><span className="hidden items-center gap-1.5 text-[12px] text-muted-foreground sm:inline-flex"><CalendarDays className="h-3.5 w-3.5" />Datos al {dateFormat.format(new Date(cutoff + 'T12:00:00'))}</span><Button variant="outline" size="sm" onClick={onEdit}><Settings2 className="mr-2 h-4 w-4" />Editar prioridades</Button></div>} />
-    <Panel className="panorama-hero">
-      <div className="panorama-hero-avatar"><CampiPanoramaAvatar /></div>
+    <Panel className={`panorama-hero ${insight ? 'panorama-hero-attention' : ''}`}>
+      <div className="panorama-hero-avatar"><CampiPanoramaAvatar attention={Boolean(insight)} /></div>
       <div className="panorama-hero-message">
         <span className="panorama-hero-kicker"><Sparkles className="h-4 w-4" />Campi</span>
         <div className="panorama-speech">
-          <h2>{report.isLoading ? 'Estoy reuniendo tus datos.' : insight ? 'Encontré un grupo de repuestos que conviene revisar.' : metrics.length ? 'Ya está lista la lectura de tus temas.' : 'Estoy revisando los temas que elegiste.'}</h2>
+          <h2>{report.isLoading ? 'Estoy reuniendo tus datos.' : insight ? `${numberFormat.format(insight.count)} códigos de repuestos requieren atención.` : metrics.length ? 'Ya está lista la lectura de tus temas.' : 'Tus temas están listos para explorar.'}</h2>
+          {insight && <><p>Sin ventas en tres años y con última compra hace más de 1.000 días: {money(insight.value, insight.unit)}.</p><Link to={insight.route} className="panorama-hero-link">Ver el grupo en Análisis de repuestos <ArrowRight className="h-4 w-4" /></Link></>}
           {failed && <p>Una fuente no respondió por ahora.</p>}
         </div>
       </div>
@@ -77,37 +84,44 @@ export function PanoramaDashboard({ userId, topics, available, hasAccess, onEdit
     <section aria-labelledby="panorama-lectura-title" className="space-y-2">
       <h2 id="panorama-lectura-title" className="panorama-section-title">Lectura rápida</h2>
       <div className="panorama-kpi-grid">
-        {headline.map(metric => {
-          const Icon = iconFor(metric.id);
-          return <Link key={metric.id} to={metric.route} className="panorama-kpi" aria-label={'Abrir ' + metric.label}>
+        {headline.map(({ id, metric, topic }) => {
+          const section = topic?.sections.find(hasAccess);
+          const route = metric?.route ?? SECTION_ROUTES.find(item => item.id === section)?.route;
+          if (!route) return null;
+          const Icon = iconFor(metric?.id ?? id);
+          return <Link key={metric?.id ?? id} to={route} className="panorama-kpi" aria-label={'Abrir ' + (metric?.label ?? topic?.label)}>
             <span className="panorama-kpi-icon"><Icon className="h-5 w-5" /></span>
-            <span className="panorama-kpi-body"><span className="panorama-kpi-label">{metric.label}</span><strong>{money(metric.value, metric.unit)}</strong><small>{metric.scope} · {metric.period === 'stock' ? 'Stock actual' : metric.period}</small></span>
+            <span className="panorama-kpi-body"><span className="panorama-kpi-label">{metric?.label ?? topic?.label}</span>
+              {metric ? <>{!metric.comparison && !metric.breakdown && <strong>{money(metric.value, metric.unit)}</strong>}
+                {metric.comparison && <><span className="panorama-kpi-comparison"><span><b>Período anterior</b>{money(metric.comparison.value, metric.unit)}<small>{shortDate(metric.comparison.from)}–{shortDate(metric.comparison.to)}</small></span><span><b>Período actual</b>{money(metric.value, metric.unit)}<small>{shortDate(metric.period + '-01')}–{shortDate(metric.cutoff)}</small></span></span><span className="panorama-kpi-variance">Variación {money(metric.value - metric.comparison.value, metric.unit)}{metric.comparison.value !== 0 ? ` (${numberFormat.format((metric.value / metric.comparison.value - 1) * 100)}%)` : ''}</span></>}
+                {metric.breakdown && <><span className="panorama-kpi-breakdown">{metric.breakdown.map(part => <span key={part.label}><b>{part.label}</b>{numberFormat.format(part.value)}</span>)}</span><small>{metric.scope} · al {shortDate(metric.cutoff)}</small></>}
+                {!metric.comparison && !metric.breakdown && <small>{metric.scope} · {metric.period === 'stock' ? 'Stock actual' : metric.period}</small>}
+              </> : <span className="panorama-kpi-empty">Abrir {topic?.label.toLowerCase()}</span>}</span>
             <span className="panorama-kpi-action">Ver detalle <ArrowRight className="h-4 w-4" /></span>
           </Link>;
         })}
-        {report.isSuccess && !headline.length && <Panel className="col-span-full text-[13px] text-muted-foreground">No hay indicadores consolidados para los temas elegidos.</Panel>}
+        {report.isSuccess && !headline.length && <Button variant="outline" onClick={onEdit}>Elegir temas para Panorama</Button>}
       </div>
     </section>
-    {!report.isLoading && <section aria-labelledby="panorama-seguimiento-title" className="space-y-2">
-      <h2 id="panorama-seguimiento-title" className="panorama-section-title">En seguimiento</h2>
+    {!report.isLoading && (insight || followRoute || remaining.length > 0) && <section aria-labelledby="panorama-seguimiento-title" className="space-y-2">
+      <h2 id="panorama-seguimiento-title" className="panorama-section-title">{insight ? 'En seguimiento' : 'Para explorar'}</h2>
       <div className="panorama-follow-grid">
         <Panel className="panorama-insight">
           {insight ? <>
             <div className="panorama-insight-title"><span className="panorama-insight-icon"><Package className="h-5 w-5" /></span><h3>Antigüedad del stock de repuestos</h3></div>
-            <p>{insight.title}</p>
-            <div className="panorama-insight-numbers"><strong>{money(insight.value, insight.unit)}</strong><span>{numberFormat.format(insight.count)} códigos · {numberFormat.format(insight.value / insight.total * 100)}% del valor Kardex referencial</span></div>
+            <div className="panorama-insight-numbers"><strong>{numberFormat.format(insight.value / insight.total * 100)}%</strong><span>del valor Kardex referencial</span></div>
             <div className="panorama-insight-track" role="img" aria-label={numberFormat.format(insight.value / insight.total * 100) + ' por ciento del valor Kardex referencial'}><span style={{ width: Math.max(0, Math.min(100, insight.value / insight.total * 100)) + '%' }} /></div>
             <Link to={insight.route} className="panorama-text-link">Explorar en Análisis de repuestos <ArrowRight className="h-4 w-4" /></Link>
           </> : <>
-            <div className="panorama-insight-title"><span className="panorama-insight-icon"><ChartNoAxesCombined className="h-5 w-5" /></span><h3>Información disponible</h3></div>
-            <p>{failed ? 'Hay una fuente sin datos en este momento.' : 'Todavía no hay un hallazgo comparable confirmado para los temas priorizados.'}</p>
+            <div className="panorama-insight-title"><span className="panorama-insight-icon"><ChartNoAxesCombined className="h-5 w-5" /></span><h3>{followRoute?.label ?? 'Tus indicadores'}</h3></div>
+            {followRoute?.route && <Link to={followRoute.route} className="panorama-text-link">Abrir {followRoute.label.toLowerCase()} <ArrowRight className="h-4 w-4" /></Link>}
           </>}
         </Panel>
         <Panel className="panorama-continue">
           <h3>Seguí explorando</h3>
           <div className="panorama-continue-list">
             {remaining.slice(0, 3).map(metric => <Link key={metric.id} to={metric.route}><span>{metric.label}</span><strong>{money(metric.value, metric.unit)}</strong><ArrowRight className="h-4 w-4" /></Link>)}
-            {moreRoutes.map(item => item.route && <Link key={item.id} to={item.route}><span>{item.label}</span><ArrowRight className="h-4 w-4" /></Link>)}
+            {moreRoutes.filter(item => item.id !== followRoute?.id).map(item => item.route && <Link key={item.id} to={item.route}><span>{item.label}</span><ArrowRight className="h-4 w-4" /></Link>)}
             {!remaining.length && !moreRoutes.length && <span className="text-[13px] text-muted-foreground">Tus indicadores principales están arriba.</span>}
           </div>
         </Panel>
