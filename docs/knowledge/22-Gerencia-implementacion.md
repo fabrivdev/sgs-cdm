@@ -30,7 +30,7 @@ Reutilizar contratos fiables de los módulos, no copiar cálculos a un component
 
 No elevar límites de consulta como sustituto de optimización. No ejecutar cinco exports completos para producir tarjetas. Cualquier nueva RPC/migración debe revisarse y entregarse para aplicación manual del usuario, sin suponer que push actualiza la base.
 
-Punto de partida: [[SIG CDM/Generado/Codigo/src__pages__Dashboard_tsx|Dashboard.tsx]], [[SIG CDM/Generado/Pantallas/servicios-dashboard|Dashboard actual]], [[SIG CDM/Generado/Modulos/administracion|Accesos]] y [[SIG CDM/Generado/Modulos/datos|Datos]]. El Panorama inicial de Campi usa `/panorama`, restringida a Gerencia y Administración, para elegir y ordenar hasta tres intereses entre secciones ya autorizadas; no crea un permiso de sección ni publica indicadores. Ver [[36-Campi-bienvenida]]. Siguen pendientes las decisiones sobre datos, sucursales, alertas y fuente de cada KPI.
+Punto de partida: [[SIG CDM/Generado/Codigo/src__pages__Dashboard_tsx|Dashboard.tsx]], [[SIG CDM/Generado/Pantallas/servicios-dashboard|Dashboard actual]], [[SIG CDM/Generado/Modulos/administracion|Accesos]] y [[SIG CDM/Generado/Modulos/datos|Datos]]. Ruta/permiso gerencial nuevos quedan por decidir, no se crean en el inventario como si existieran.
 
 ## Pruebas de aceptación previstas
 

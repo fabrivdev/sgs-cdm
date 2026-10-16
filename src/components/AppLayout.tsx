@@ -268,15 +268,6 @@ export function AppLayout({ children, preview }: { children?: React.ReactNode; p
         </SidebarHeader>
 
         <SidebarContent className="gap-1 px-1 py-3">
-          {!preview && canSeeCampi && <SidebarGroup className="p-0">
-            <SidebarMenu className="px-2">
-              <SidebarMenuItem>
-                <SidebarMenuButton asChild isActive={location.pathname === '/panorama'} tooltip="Panorama" className="h-10 rounded-lg px-2 text-[13px] data-[active=true]:bg-primary/10 data-[active=true]:text-primary">
-                  <NavLink to="/panorama"><Sparkles className="h-[18px] w-[18px]" /><span className="sidebar-label-anim group-data-[collapsible=icon]:hidden">Panorama</span></NavLink>
-                </SidebarMenuButton>
-              </SidebarMenuItem>
-            </SidebarMenu>
-          </SidebarGroup>}
           <div className="px-4 pb-2 text-[10px] font-semibold uppercase tracking-[0.12em] text-muted-foreground group-data-[collapsible=icon]:hidden">
             Módulos
           </div>
@@ -353,10 +344,6 @@ export function AppLayout({ children, preview }: { children?: React.ReactNode; p
                 {!preview && user && canSeeCampi && <DropdownMenuItem className="hidden lg:flex [@media(pointer:coarse)]:hidden" onClick={() => window.dispatchEvent(new Event(OPEN_CAMPI_EVENT))}>
                   <Sparkles className="mr-2 h-4 w-4" />
                   Conocer a Campi
-                </DropdownMenuItem>}
-                {!preview && canSeeCampi && <DropdownMenuItem onClick={() => navigate('/panorama')}>
-                  <ChartNoAxesCombined className="mr-2 h-4 w-4" />
-                  Panorama
                 </DropdownMenuItem>}
                 <DropdownMenuItem onClick={preview ? undefined : signOut}>
                   <LogOut className="mr-2 h-4 w-4" />
