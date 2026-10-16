@@ -11,7 +11,7 @@ La integración está en `AppLayout` y se omite en su modo de vista previa. Solo
 - Entrada: anticipación, salto, aterrizaje, reverencia y saludo con poses prediseñadas.
 - Reposo: respiración ligera, parpadeo y curiosidad al acercar puntero o foco.
 - Saludo espontáneo: sonrisa y gesto de bienvenida. Sorpresa, guiño, enojo y tristeza quedan como repertorio para escenas posteriores, nunca como reacción al cierre.
-- Cierre: carrera lateral con alternancia de brazos y piernas. Después queda fuera de pantalla. Un único asomo breve por visita muestra solo cabeza y una mano; se puede tocar para reabrir. No hay asomos espontáneos con movimiento reducido.
+- Cierre: carrera lateral con alternancia de brazos y piernas. La secuencia conserva la pose de carrera hasta desaparecer y oculta inmediatamente la figura al quedar fuera, sin mostrar una pose quieta recortada ni un destello al volver al margen. Un único asomo breve por visita muestra solo cabeza y una mano; se puede tocar para reabrir. No hay asomos espontáneos con movimiento reducido.
 - Menús, modales, drawers y pestaña oculta suspenden temporizadores y visibilidad. El overlay solo recibe clics en Campi y su mensaje. Cerrar devuelve el foco al menú de cuenta; el personaje oculto no queda en la secuencia de tabulación.
 
 El aspecto 3D se logra con poses transparentes y CSS, sin modelo 3D. `CampiDesktopSlot` carga el componente solo en escritorio. Los PNG originales del paquete se conservan como fuente visual; la app solicita WebP comprimidos según el gesto para reducir transferencia. Las escenas con planta y maquinaria CLAAS/HORSCH siguen pendientes.

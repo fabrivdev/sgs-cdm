@@ -12,13 +12,13 @@
 .campi-layer button:focus-visible { outline: 2px solid hsl(var(--ring)); outline-offset: 3px; }
 .campi-layer[data-state="welcome"] .campi-character { animation: campi-enter .38s ease-out both; }
 .campi-layer[data-state="farewell"] .campi-character { animation: campi-leave .72s ease-in both; }
-.campi-layer[data-state="tucked"] .campi-character { animation: none; opacity: 0; pointer-events: none; }
+.campi-layer[data-state="tucked"] .campi-character { animation: none; visibility: hidden; opacity: 0; transition: none; pointer-events: none; }
 .campi-layer[data-state="peeking"] .campi-character { animation: none; opacity: 1; transition: none; }
 .campi-layer[data-paused="true"] *, .campi-layer[data-paused="true"] { animation-play-state: paused !important; }
 @keyframes campi-idle { 0%,100% { transform: translateY(0); } 50% { transform: translateY(-4px); } }
 @keyframes campi-enter { from { opacity: 0; transform: translateY(12px); } to { opacity: 1; transform: translateY(0); } }
 @keyframes campi-greet { 0%,100% { transform: rotate(0); } 25%,75% { transform: rotate(-5deg) translateY(-3px); } 50% { transform: rotate(5deg) translateY(-5px); } }
-@keyframes campi-leave { 0%,14% { transform: translateX(0); } 35% { transform: translateX(22px) translateY(-3px); } 60% { transform: translateX(62px); } 80% { transform: translateX(90px) translateY(-3px); } 100% { transform: translateX(112px); } }
+@keyframes campi-leave { 0%,42% { transform: translateX(0); opacity: 1; } 55% { transform: translateX(12px) translateY(-3px); opacity: 1; } 68% { transform: translateX(20px); opacity: 0; } 100% { transform: translateX(170px); opacity: 0; } }
 @media (prefers-reduced-motion: reduce) { .campi-layer *, .campi-layer { animation: none !important; transition: none !important; } }
 @media (max-width: 1023px), (pointer: coarse) { .campi-layer { display: none; } }
 

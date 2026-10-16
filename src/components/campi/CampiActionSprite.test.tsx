@@ -4,8 +4,11 @@ import { CampiActionSprite } from './CampiActionSprite';
 import { CAMPI_ACTIONS } from './campiActions';
 afterEach(() => { cleanup(); vi.useRealTimers(); });
 describe('Campi explicit action sequences', () => {
-  it('returns every action to neutral', () => {
-    for (const frames of Object.values(CAMPI_ACTIONS)) expect(frames.at(-1)).toMatchObject({body:'rest',face:'rest'});
+  it('returns stationary actions to neutral and keeps the exit running', () => {
+    for (const [action, frames] of Object.entries(CAMPI_ACTIONS)) {
+      if (action === 'run') expect(frames.at(-1)?.body).toBe('run2');
+      else expect(frames.at(-1)).toMatchObject({body:'rest',face:'rest'});
+    }
   });
   it('anticipates, jumps, lands and returns', () => {
     vi.useFakeTimers(); const {container}=render(<CampiActionSprite action="celebrate" active reduced={false}/>);
