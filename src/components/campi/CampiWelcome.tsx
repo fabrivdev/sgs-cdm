@@ -1,6 +1,5 @@
 import { useEffect, useReducer, useRef, useState } from 'react';
 import { X } from 'lucide-react';
-import { Button } from '@/components/ui/button';
 import { CampiMotionAssets, OPEN_CAMPI_EVENT, readCampiState, saveCampiState, transitionCampi } from './campiState';
 import './campi.css';
 import { CampiSprite } from './CampiSprite';
@@ -18,11 +17,10 @@ export function CampiWelcome({ userId, assets = {} }: { userId: string; assets?:
   const [blocked, setBlocked] = useState(false);
   const [curious, setCurious] = useState(false);
   const blockedRef = useRef(false);
-  const character = useRef<HTMLButtonElement>(null);
   const peeked = useRef(false);
   const video = useRef<HTMLVideoElement>(null);
   const active = desktop && visible && !blocked;
-  const expanded = ['welcome', 'idle', 'greeting'].includes(state);
+  const expanded = state === 'welcome' || state === 'idle';
   const asset = assets[state];
 
   useEffect(() => {
@@ -56,7 +54,7 @@ export function CampiWelcome({ userId, assets = {} }: { userId: string; assets?:
   useEffect(() => {
     if (!active || state === 'hidden') return;
     if (state === 'welcome') saveCampiState(userId);
-    const delays = { welcome: 1600, greeting: 1400, farewell: reduced ? 0 : 720, tucked: 90000, peeking: 2800 };
+    const delays = { welcome: 1600, farewell: reduced ? 0 : 720, tucked: 90000, peeking: 2800 };
     if (state === 'idle' || (state === 'tucked' && (reduced || peeked.current))) return;
     const event = state === 'tucked' ? 'peek' : state === 'peeking' ? 'rest' : 'settled';
     const timer = window.setTimeout(() => { if (event === 'peek') peeked.current = true; dispatch(event); }, delays[state]);
@@ -79,16 +77,14 @@ export function CampiWelcome({ userId, assets = {} }: { userId: string; assets?:
         <button className="campi-close" type="button" aria-label="Cerrar bienvenida de Campi" onClick={close}><X size={16} /></button>
         <span className="campi-eyebrow">Muy pronto</span>
         <h2 id="campi-heading">¡Hola! Soy Campi.</h2>
-        <p className="campi-reaction" aria-live="polite">{state === 'greeting' ? '¡Un gusto conocerte!' : 'Pronto voy a acompañarte en SIG CDM.'}</p>
-        <div className="campi-actions">
-          <Button size="sm" onClick={() => dispatch('greet')}>¡Hola, Campi!</Button>
-          <Button size="sm" variant="ghost" onClick={close}>Hasta pronto</Button>
-        </div>
+        <p>Voy a ayudarte a seguir tus áreas de SIG CDM, detectar cambios que merecen atención y abrir el detalle que respalda cada dato. Siempre con información verificada y según tus permisos.</p>
         <button type="button" className="campi-hide" onClick={() => { saveCampiState(userId, true); dispatch('hide'); document.querySelector<HTMLButtonElement>('[aria-label="Abrir menú de cuenta"]')?.focus(); }}>Ocultar a Campi</button>
       </section>}
-      <button ref={character} className="campi-character" tabIndex={state === 'tucked' || state === 'farewell' ? -1 : 0} onPointerEnter={() => setCurious(true)} onPointerLeave={() => setCurious(false)} onFocus={() => setCurious(true)} onBlur={() => setCurious(false)} type="button" aria-label={expanded ? 'Saludar a Campi' : 'Abrir bienvenida de Campi'} aria-expanded={expanded} aria-hidden={state === 'tucked' || state === 'farewell'} onClick={() => dispatch(expanded ? 'greet' : 'open')}>
-        {atEdge ? <CampiPeek /> : asset && !reduced ? <video ref={video} key={asset.src} src={asset.src} poster={asset.poster} muted playsInline loop={state === 'idle'} aria-hidden="true" /> : <>{asset ? <img src={asset.poster} alt="" draggable={false} /> : <CampiSprite state={state} active={active} reduced={reduced} curious={curious} action={state === 'welcome' ? 'intro' : state === 'farewell' ? 'run' : 'neutral'} />}</>}
-      </button>
+      {expanded ? <div className="campi-character" aria-hidden="true" onPointerEnter={() => setCurious(true)} onPointerLeave={() => setCurious(false)}>
+        {asset && !reduced ? <video ref={video} key={asset.src} src={asset.src} poster={asset.poster} muted playsInline loop={state === 'idle'} /> : asset ? <img src={asset.poster} alt="" draggable={false} /> : <CampiSprite state={state} active={active} reduced={reduced} curious={curious} action={state === 'welcome' ? 'intro' : 'neutral'} />}
+      </div> : <button className="campi-character" tabIndex={state === 'tucked' || state === 'farewell' ? -1 : 0} onPointerEnter={() => setCurious(true)} onPointerLeave={() => setCurious(false)} onFocus={() => setCurious(true)} onBlur={() => setCurious(false)} type="button" aria-label="Abrir bienvenida de Campi" aria-hidden={state === 'tucked' || state === 'farewell'} onClick={() => dispatch('open')}>
+        {atEdge ? <CampiPeek /> : asset && !reduced ? <video ref={video} key={asset.src} src={asset.src} poster={asset.poster} muted playsInline /> : asset ? <img src={asset.poster} alt="" draggable={false} /> : <CampiSprite state={state} active={active} reduced={reduced} curious={curious} action={state === 'farewell' ? 'run' : 'neutral'} />}
+      </button>}
     </aside>
   );
 }

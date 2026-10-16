@@ -1,13 +1,12 @@
-export type CampiState = 'welcome' | 'greeting' | 'idle' | 'farewell' | 'tucked' | 'peeking' | 'hidden';
+export type CampiState = 'welcome' | 'idle' | 'farewell' | 'tucked' | 'peeking' | 'hidden';
 export const OPEN_CAMPI_EVENT = 'sig-cdm:open-campi';
-export type CampiEvent = 'settled' | 'greet' | 'close' | 'hide' | 'open' | 'peek' | 'rest';
+export type CampiEvent = 'settled' | 'close' | 'hide' | 'open' | 'peek' | 'rest';
 export function transitionCampi(state: CampiState, event: CampiEvent): CampiState {
   if (event === 'hide') return 'hidden';
   if (event === 'open') return 'welcome';
   if (event === 'close') return 'farewell';
   if (state === 'hidden') return state;
-  if (event === 'greet' && ['welcome', 'idle'].includes(state)) return 'greeting';
-  if (event === 'settled') return state === 'farewell' ? 'tucked' : ['welcome', 'greeting'].includes(state) ? 'idle' : state;
+  if (event === 'settled') return state === 'farewell' ? 'tucked' : state === 'welcome' ? 'idle' : state;
   if (event === 'peek' && state === 'tucked') return 'peeking';
   if (event === 'rest' && state === 'peeking') return 'tucked';
   return state;

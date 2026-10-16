@@ -4,8 +4,8 @@ import { CampiSprite } from './CampiSprite';
 beforeEach(() => vi.useFakeTimers());
 afterEach(() => { cleanup(); vi.useRealTimers(); });
 describe('Campi authored gestures', () => {
-  it('changes actual hand frames for a greeting then returns to rest', () => {
-    const { container } = render(<CampiSprite state="greeting" active reduced={false} />);
+  it('changes hand frames for its own welcome then returns to rest', () => {
+    const { container } = render(<CampiSprite state="welcome" active reduced={false} />);
     const sprite = container.firstElementChild!;
     expect(sprite).toHaveAttribute('data-pose', 'rest');
     act(() => vi.advanceTimersByTime(100));
@@ -23,18 +23,16 @@ describe('Campi authored gestures', () => {
     expect(container.firstElementChild).toHaveAttribute('data-pose', 'rest');
   });
   it.each([{active:false,reduced:false}, {active:true,reduced:true}])('does not animate when suspended: %j', ({active,reduced}) => {
-    const { container } = render(<CampiSprite state="greeting" active={active} reduced={reduced} />);
+    const { container } = render(<CampiSprite state="welcome" active={active} reduced={reduced} />);
     act(() => vi.advanceTimersByTime(10000));
     expect(container.firstElementChild).toHaveAttribute('data-pose', 'rest');
     expect(vi.getTimerCount()).toBe(0);
   });
-  it('shows surprise, wink and smile after a click gesture', () => {
-    const { container } = render(<CampiSprite state="greeting" active reduced={false} />);
-    expect(container.firstElementChild).toHaveAttribute('data-face', 'surprised');
-    act(() => vi.advanceTimersByTime(400));
-    expect(container.firstElementChild).toHaveAttribute('data-face', 'wink');
-    act(() => vi.advanceTimersByTime(500));
+  it('smiles during the automatic welcome and settles naturally', () => {
+    const { container } = render(<CampiSprite state="welcome" active reduced={false} />);
     expect(container.firstElementChild).toHaveAttribute('data-face', 'smile');
+    act(() => vi.advanceTimersByTime(1300));
+    expect(container.firstElementChild).toHaveAttribute('data-face', 'rest');
   });
   it('reacts with curiosity without moving the body', () => {
     const { container, rerender } = render(<CampiSprite state="idle" active reduced={false} curious />);

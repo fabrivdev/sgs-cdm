@@ -6,14 +6,11 @@
 .campi-eyebrow { color: hsl(var(--primary)); font-size: 10px; font-weight: 650; letter-spacing: .08em; text-transform: uppercase; }
 .campi-close { position: absolute; top: 10px; right: 10px; padding: 7px; border-radius: 8px; }
 .campi-close:hover { background: hsl(var(--muted)); }
-.campi-reaction { min-height: 20px; margin-top: 8px; }
-.campi-actions { display: flex; gap: 6px; margin-top: 12px; }
 .campi-hide { color: hsl(var(--muted-foreground)); font-size: 11px; margin-top: 12px; text-decoration: underline; text-underline-offset: 3px; }
 .campi-character { pointer-events: auto; display: block; width: 135px; height: 170px; margin-left: auto; border-radius: 22px; overflow: hidden; transform-origin: center bottom; animation: campi-idle 5s ease-in-out infinite; transition: transform .45s ease, opacity .3s; }
 .campi-character img, .campi-character video { width: 100%; height: 100%; object-fit: contain; }
 .campi-layer button:focus-visible { outline: 2px solid hsl(var(--ring)); outline-offset: 3px; }
 .campi-layer[data-state="welcome"] .campi-character { animation: campi-enter .38s ease-out both; }
-.campi-layer[data-state="greeting"] .campi-character { animation: none; }
 .campi-layer[data-state="farewell"] .campi-character { animation: campi-leave .72s ease-in both; }
 .campi-layer[data-state="tucked"] .campi-character { animation: none; opacity: 0; pointer-events: none; }
 .campi-layer[data-state="peeking"] .campi-character { animation: none; opacity: 1; transition: none; }

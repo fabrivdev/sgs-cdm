@@ -11,17 +11,18 @@ beforeEach(() => {
 });
 afterEach(() => { cleanup(); vi.useRealTimers(); vi.unstubAllGlobals(); });
 describe('Campi introduction', () => {
-  it('shows a short scripted desktop welcome with no chat input', () => {
+  it('introduces the future help without asking for a scripted response', () => {
     render(<CampiWelcome userId="a" />);
     expect(screen.getByText('¡Hola! Soy Campi.')).toBeInTheDocument();
+    expect(screen.getByText(/detectar cambios que merecen atención y abrir el detalle/)).toBeInTheDocument();
     expect(screen.queryByRole('textbox')).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: '¡Hola, Campi!' })).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Hasta pronto' })).not.toBeInTheDocument();
     expect(localStorage.getItem(campiStorageKey('a'))).toBe('seen');
-    fireEvent.click(screen.getByRole('button', { name: '¡Hola, Campi!' }));
-    expect(screen.getByText('¡Un gusto conocerte!')).toBeInTheDocument();
   });
   it('closes with Escape and can reopen from the edge', () => {
     render(<><button aria-label="Abrir menú de cuenta">Cuenta</button><CampiWelcome userId="a" /></>);
-    fireEvent.keyDown(screen.getByRole('button', { name: '¡Hola, Campi!' }), { key: 'Escape' });
+    fireEvent.keyDown(screen.getByRole('button', { name: 'Cerrar bienvenida de Campi' }), { key: 'Escape' });
     expect(screen.getByRole('button', { name: 'Abrir menú de cuenta' })).toHaveFocus();
     act(() => vi.advanceTimersByTime(720));
     expect(screen.queryByText('¡Hola! Soy Campi.')).not.toBeInTheDocument();
@@ -31,7 +32,7 @@ describe('Campi introduction', () => {
     expect([...document.querySelectorAll<HTMLImageElement>('.campi-peek img')].map(image => image.src)).toEqual(expect.arrayContaining([expect.stringContaining('campi-curious.webp'), expect.stringContaining('campi-run.webp')]));
     fireEvent.click(trigger);
     expect(screen.getByText('¡Hola! Soy Campi.')).toBeInTheDocument();
-    fireEvent.keyDown(trigger, { key: 'Escape' });
+    fireEvent.keyDown(screen.getByRole('button', { name: 'Cerrar bienvenida de Campi' }), { key: 'Escape' });
     act(() => vi.advanceTimersByTime(720));
     expect(screen.queryByText('¡Hola! Soy Campi.')).not.toBeInTheDocument();
   });
@@ -54,7 +55,7 @@ describe('Campi introduction', () => {
   it('shows a curious face on pointer hover and restores it on leave', () => {
     render(<CampiWelcome userId="a" />);
     act(() => vi.advanceTimersByTime(1600));
-    const character = screen.getByRole('button', { name: 'Saludar a Campi' });
+    const character = document.querySelector('.campi-character')!;
     fireEvent.pointerEnter(character);
     expect(document.querySelector('.campi-sprite')).toHaveAttribute('data-face', 'curious');
     fireEvent.pointerLeave(character);
