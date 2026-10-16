@@ -9,7 +9,7 @@ La integración está en `AppLayout` y se omite en su modo de vista previa. Solo
 ## Gestos e interacción
 
 - Entrada: anticipación, salto, aterrizaje, reverencia y saludo con poses prediseñadas.
-- Reposo: respiración ligera, parpadeo y curiosidad al acercar puntero o foco.
+- Reposo: respiración ligera, parpadeo, curiosidad al acercar el puntero y gestos amables espontáneos. Al hacer clic o activar el personaje con teclado, Campi responde con saludo, pasos o una celebración breve, incluso durante la entrada. No inicia una consulta ni inventa datos.
 - Saludo espontáneo: sonrisa y gesto de bienvenida. Sorpresa, guiño, enojo y tristeza quedan como repertorio para escenas posteriores, nunca como reacción al cierre.
 - Cierre: la X reproduce la carrera lateral con alternancia de brazos y piernas. La secuencia conserva la pose de carrera hasta desaparecer, sin mostrar una pose quieta recortada ni un destello al volver al margen. No hay asomos automáticos ni un segundo control de ocultación.
 - Menús, modales, drawers y pestaña oculta suspenden temporizadores y visibilidad. El overlay solo recibe clics en el mensaje y en el personaje mientras está presente. Cerrar devuelve el foco al menú de cuenta; el personaje cerrado no queda en la secuencia de tabulación.

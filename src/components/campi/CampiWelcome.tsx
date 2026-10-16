@@ -1,8 +1,9 @@
-import { useEffect, useReducer, useRef, useState } from 'react';
+import { useCallback, useEffect, useReducer, useRef, useState } from 'react';
 import { X } from 'lucide-react';
 import { CampiMotionAssets, OPEN_CAMPI_EVENT, readCampiState, saveCampiState, transitionCampi } from './campiState';
 import './campi.css';
 import { CampiSprite } from './CampiSprite';
+import type { CampiAction } from './campiActions';
 
 const DESKTOP = '(min-width: 1024px) and (pointer: fine)';
 const REDUCED = '(prefers-reduced-motion: reduce)';
@@ -17,11 +18,19 @@ export function CampiWelcome({ userId, assets = {} }: { userId: string; assets?:
   const [visible, setVisible] = useState(() => !document.hidden);
   const [blocked, setBlocked] = useState(isBlocked);
   const [curious, setCurious] = useState(false);
+  const [idleAction, setIdleAction] = useState<CampiAction>('neutral');
+  const gestureTimeout = useRef<number | undefined>(undefined);
+  const clickGestureIndex = useRef(0);
   const blockedRef = useRef(blocked);
   const video = useRef<HTMLVideoElement>(null);
   const active = desktop && visible && !blocked;
   const expanded = state === 'welcome' || state === 'idle';
   const asset = assets[state];
+  const playGesture = useCallback((next: CampiAction) => {
+    window.clearTimeout(gestureTimeout.current);
+    setIdleAction(next);
+    gestureTimeout.current = window.setTimeout(() => setIdleAction('neutral'), 1200);
+  }, []);
 
   useEffect(() => {
     const media = window.matchMedia(DESKTOP);
@@ -67,6 +76,25 @@ export function CampiWelcome({ userId, assets = {} }: { userId: string; assets?:
     else void element.play().catch(() => { /* The poster remains visible if playback is restricted. */ });
   }, [active, reduced, asset]);
 
+  useEffect(() => {
+    if (!active || reduced) setIdleAction('neutral');
+  }, [active, reduced]);
+
+  useEffect(() => {
+    if (!active || reduced || state !== 'idle') return;
+    let nextGesture = 0;
+    const gesture = () => {
+      playGesture(nextGesture++ % 2 === 0 ? 'approve' : 'step');
+    };
+    const first = window.setTimeout(gesture, 2600);
+    const interval = window.setInterval(gesture, 12500);
+    return () => {
+      window.clearTimeout(first);
+      window.clearInterval(interval);
+      window.clearTimeout(gestureTimeout.current);
+    };
+  }, [active, reduced, state, playGesture]);
+
   if (!desktop || state === 'hidden') return null;
   const close = () => { dispatch('close'); document.querySelector<HTMLButtonElement>('[aria-label="Abrir menú de cuenta"]')?.focus(); };
   return (
@@ -77,9 +105,11 @@ export function CampiWelcome({ userId, assets = {} }: { userId: string; assets?:
         <h2 id="campi-heading">¡Hola! Soy Campi.</h2>
         <p>Voy a ayudarte a seguir tus áreas de SIG CDM, detectar cambios que merecen atención y abrir el detalle que respalda cada dato. Siempre con información verificada y según tus permisos.</p>
       </section>}
-      <div className="campi-character" aria-hidden="true" onPointerEnter={() => setCurious(true)} onPointerLeave={() => setCurious(false)}>
-        {asset && !reduced ? <video ref={video} key={asset.src} src={asset.src} poster={asset.poster} muted playsInline loop={state === 'idle'} /> : asset ? <img src={asset.poster} alt="" draggable={false} /> : <CampiSprite state={state} active={active} reduced={reduced} curious={curious} action={state === 'welcome' ? 'intro' : state === 'farewell' ? 'run' : 'neutral'} />}
-      </div>
+      <button type="button" className="campi-character" aria-label="Saludar a Campi" disabled={!expanded}
+        onClick={() => { if (expanded && active && !reduced) playGesture((['approve', 'step', 'celebrate'] as const)[clickGestureIndex.current++ % 3]); }}
+        onPointerEnter={() => setCurious(true)} onPointerLeave={() => setCurious(false)}>
+        {asset && !reduced ? <video ref={video} key={asset.src} src={asset.src} poster={asset.poster} muted playsInline loop={state === 'idle'} /> : asset ? <img src={asset.poster} alt="" draggable={false} /> : <CampiSprite state={state} active={active} reduced={reduced} curious={curious} action={state === 'farewell' ? 'run' : idleAction !== 'neutral' ? idleAction : state === 'welcome' ? 'intro' : 'neutral'} />}
+      </button>
     </aside>
   );
 }
