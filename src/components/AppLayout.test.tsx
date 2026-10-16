@@ -33,8 +33,9 @@ function setup(path = "/parque-ventas") {
 }
 
 describe("shared mobile header", () => {
-  it("shows Campi and its account action only to Gerencia", async () => {
+  it("shows Campi and its account action only to Gerencia or Administración", async () => {
     auth.user = { id: "user-1" };
+    auth.isAdmin = false;
     setup();
     expect(screen.queryByTestId("campi-slot")).not.toBeInTheDocument();
     fireEvent.keyDown(screen.getByRole("button", { name: "Abrir menú de cuenta" }), { key: "Enter" });
@@ -43,6 +44,14 @@ describe("shared mobile header", () => {
     cleanup();
 
     auth.isGerencia = true;
+    setup();
+    expect(screen.getByTestId("campi-slot")).toHaveTextContent("user-1");
+    fireEvent.keyDown(screen.getByRole("button", { name: "Abrir menú de cuenta" }), { key: "Enter" });
+    expect(await screen.findByText("Conocer a Campi")).toBeInTheDocument();
+    cleanup();
+
+    auth.isGerencia = false;
+    auth.isAdmin = true;
     setup();
     expect(screen.getByTestId("campi-slot")).toHaveTextContent("user-1");
     fireEvent.keyDown(screen.getByRole("button", { name: "Abrir menú de cuenta" }), { key: "Enter" });
