@@ -60,8 +60,6 @@ import { AIAssistant } from "@/components/assistant/AIAssistant";
 import { nivelLabel } from "@/lib/constants";
 import { APP_NAME, APP_SHORT_NAME, AppLogo } from "@/components/AppBrand";
 import { HelpDrawer } from "@/components/layout/HelpDrawer";
-import { CampiDesktopSlot } from "@/components/campi/CampiDesktopSlot";
-import { OPEN_CAMPI_EVENT } from "@/components/campi/campiState";
 import type { SectionKey } from "@/lib/permissions";
 
 type NavItem = { to: string; label: string; icon: typeof ListChecks; section: SectionKey; end?: boolean; managementOnly?: boolean; adminOnly?: boolean };
@@ -350,10 +348,6 @@ export function AppLayout({ children, preview }: { children?: React.ReactNode; p
                     Administración
                   </DropdownMenuItem>
                 )}
-                {!preview && user && canSeeCampi && <DropdownMenuItem className="hidden lg:flex [@media(pointer:coarse)]:hidden" onClick={() => window.dispatchEvent(new Event(OPEN_CAMPI_EVENT))}>
-                  <Sparkles className="mr-2 h-4 w-4" />
-                  Conocer a Campi
-                </DropdownMenuItem>}
                 {!preview && canSeeCampi && <DropdownMenuItem onClick={() => navigate('/panorama')}>
                   <ChartNoAxesCombined className="mr-2 h-4 w-4" />
                   Panorama
@@ -371,7 +365,6 @@ export function AppLayout({ children, preview }: { children?: React.ReactNode; p
           <div key={location.pathname} className="min-w-0 app-page-enter">{children ?? <Outlet />}</div>
         </main>
 
-        {!preview && user && canSeeCampi && <CampiDesktopSlot userId={user.id} />}
         {AI_ASSISTANT_ENABLED && <AIAssistant />}
         <HelpDrawer open={helpOpen} onOpenChange={setHelpOpen} />
 
