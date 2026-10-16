@@ -39,6 +39,12 @@ describe('Campi introduction', () => {
   it('hides persistently for that user and is recoverable from the account menu event', () => {
     const view = render(<CampiWelcome userId="a" />);
     fireEvent.click(screen.getByText('Ocultar a Campi'));
+    expect(screen.getByRole('complementary')).toHaveAttribute('data-state', 'hiding');
+    expect(document.querySelector('.campi-sprite')).toHaveAttribute('data-action', 'run');
+    expect(localStorage.getItem(campiStorageKey('a'))).toBe('hidden');
+    act(() => vi.advanceTimersByTime(720));
+    expect(screen.queryByRole('complementary')).not.toBeInTheDocument();
+    act(() => vi.advanceTimersByTime(180000));
     expect(screen.queryByRole('complementary')).not.toBeInTheDocument();
     view.unmount();
     render(<CampiWelcome userId="a" />);
@@ -99,5 +105,7 @@ describe('Campi introduction', () => {
     expect(transitionCampi('tucked', 'peek')).toBe('peeking');
     expect(transitionCampi('peeking', 'rest')).toBe('tucked');
     expect(transitionCampi('hidden', 'peek')).toBe('hidden');
+    expect(transitionCampi('hiding', 'settled')).toBe('hidden');
+    expect(transitionCampi('hidden', 'hide')).toBe('hidden');
   });
 });

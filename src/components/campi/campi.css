@@ -11,7 +11,7 @@
 .campi-character img, .campi-character video { width: 100%; height: 100%; object-fit: contain; }
 .campi-layer button:focus-visible { outline: 2px solid hsl(var(--ring)); outline-offset: 3px; }
 .campi-layer[data-state="welcome"] .campi-character { animation: campi-enter .38s ease-out both; }
-.campi-layer[data-state="farewell"] .campi-character { animation: campi-leave .72s ease-in both; }
+.campi-layer[data-state="farewell"] .campi-character, .campi-layer[data-state="hiding"] .campi-character { animation: campi-leave .72s ease-in both; }
 .campi-layer[data-state="tucked"] .campi-character { animation: none; visibility: hidden; opacity: 0; transition: none; pointer-events: none; }
 .campi-layer[data-state="peeking"] .campi-character { animation: none; opacity: 1; transition: none; }
 .campi-layer[data-paused="true"] *, .campi-layer[data-paused="true"] { animation-play-state: paused !important; }
