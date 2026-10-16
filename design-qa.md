@@ -442,3 +442,29 @@ Validación productiva posterior, 15/10: migración 20261015190000 aplicada con 
 
 
 15/10 — Verificación posterior a activación SQL: vista previa actual con fabrizio.vega. Se verifican ambos indicadores por sucursal/resumen, Lila 519/USD228.538,35 sin etiquetas duplicadas, panel de cuatro filtros y columnas 2026/2025/2024. Revisión real escritorio y teléfonos 320/390; encabezados de indicadores móviles corregidos (sin flechas, orden conservado en menú) y comprobados localmente a 320. No se pulsa Publish. Comparación SQL independiente: 40 grupos, cero diferencias en color/días; baseline monetario y promedios preservados.
+
+# Panorama de Campi — revisión visual local
+
+**Fuente visual:** C:\Users\Usuario\Downloads\Imagen de ChatGPT 16 oct 2026, 14_00_54.jpg (1536 × 864 px) y C:\Users\Usuario\Downloads\Imagen de ChatGPT 16 oct 2026, 14_01_47.jpg (estados de Campi). Las cifras de esas imágenes son ilustrativas.
+
+**Implementación:** output/campi-panorama-qa.png (1521 × 722 px), Chrome autenticado, ruta /panorama, usuario Administración, tema claro, escritorio. **Comparación conjunta:** output/campi-panorama-comparison.png. Ambas vistas se normalizaron visualmente a 800 × 450 px para comparar composición; el producto conserva su propia navegación lateral y no copia la barra de navegación ficticia del ejemplo.
+
+**Comparación de vista completa:** el encabezado ahora ubica a Campi, su mensaje y el enfoque en una sola banda; debajo se ven tres indicadores y una zona de seguimiento con acceso al detalle. La versión anterior mostraba una tarjeta por tema y no tenía esta jerarquía.
+
+**Regiones enfocadas:** encabezado (escala y recorte de Campi, globo y lista), indicadores (lectura y separación) y seguimiento (proporción valorizada y vínculo). Se revisaron en la captura a resolución original después de la comparación conjunta.
+
+**Tipografía y texto:** jerarquía legible y títulos sin subtítulos explicativos. El mensaje de Campi describe una condición comprobable del semáforo. No se muestran variaciones o mejoras ficticias.
+
+**Espaciado y color:** se mantienen bordes, radios, espacios y verde del producto. La distribución sigue la referencia sin duplicar su navegación.
+
+**Imagen:** se conservan los recursos originales animados de Campi; la cabeza y los brazos se ven completos y el cuerpo termina a media altura dentro del encabezado. No se observan halos en el fondo claro revisado.
+
+**Diferencias deliberadas:** no hay campo de preguntas porque aún no existe un servicio de respuestas verificables; las rutas de exploración sí funcionan. Tampoco hay minigráficos de tendencia o estados de ánimo basados en cambios porque todavía no existe una comparación de períodos validada en servidor.
+
+**Historial de comparación:** la primera captura reveló a Campi de cuerpo entero, demasiado espacio vacío en el encabezado y un mensaje genérico. Se ajustó el recorte a medio cuerpo, se convirtió el mensaje en un globo con el hallazgo real y se retiró la comparación no respaldada. La captura final es output/campi-panorama-qa.png.
+
+**Interacciones comprobadas:** clic sobre Campi, apertura de prioridades y restauración del panel tras recarga. Los enlaces y el indicador de stock se comprobaron en el árbol accesible de Chrome. Pruebas específicas, TypeScript, lint y build pasaron.
+
+**Pendiente funcional:** cálculo en servidor para comparar cortes y última visita antes de asignar una emoción de mejora, riesgo o ausencia de datos. No se aplicó la migración de visitas ni se publicó en main.
+
+final result: passed

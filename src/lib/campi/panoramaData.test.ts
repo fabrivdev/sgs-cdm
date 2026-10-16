@@ -33,10 +33,12 @@ describe('Panorama metric permissions and sources', () => {
   });
 
   it('uses the valued stock source only with Analysis access', async () => {
-    semaphore.mockResolvedValue({ valor_kardex_usd: 4000, fecha_analisis: '2026-10-16', version: 'v1' });
+    semaphore.mockResolvedValue({ valor_kardex_usd: 4000, fecha_analisis: '2026-10-16', version: 'v1',
+      por_color: [{ color: 'ROJO', lineas: 10, valor_kardex_usd: 1000 }] });
     expect(await loadPanoramaData(['repuestos_stock'], ['repuestos.stock'], '2026-10-16')).toEqual([]);
     const result = await loadPanoramaData(['repuestos_stock'], ['repuestos.analisis'], '2026-10-16');
     expect(semaphore).toHaveBeenCalledOnce();
     expect(result[0].metrics[0]).toMatchObject({ id: 'repuestos.valor_stock', value: 4000, unit: 'USD' });
+    expect(result[0].insights).toEqual([expect.objectContaining({ id: 'repuestos.stock_antiguo', value: 1000, total: 4000, count: 10 })]);
   });
 });

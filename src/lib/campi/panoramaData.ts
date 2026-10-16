@@ -18,12 +18,24 @@ export type PanoramaMetric = {
   route: string;
 };
 
-export type PanoramaSourceResult = { section: SectionKey; metrics: PanoramaMetric[]; error?: string };
+export type PanoramaInsight = {
+  id: string;
+  topic: PanoramaTopicId;
+  title: string;
+  value: number;
+  total: number;
+  count: number;
+  unit: 'USD';
+  cutoff: string;
+  route: string;
+};
+
+export type PanoramaSourceResult = { section: SectionKey; metrics: PanoramaMetric[]; insights?: PanoramaInsight[]; error?: string };
 
 type Source = {
   section: SectionKey;
   topics: readonly PanoramaTopicId[];
-  load: (today: string) => Promise<PanoramaMetric[]>;
+  load: (today: string) => Promise<{ metrics: PanoramaMetric[]; insights?: PanoramaInsight[] }>;
 };
 
 const number = (value: unknown) => typeof value === 'number' && Number.isFinite(value) ? value : null;
@@ -48,10 +60,10 @@ const SOURCES: readonly Source[] = [
       const billed = number(data.resumen?.facturado);
       const units = number(data.resumen?.unidades_netas);
       if (billed === null) throw new Error('La fuente de Repuestos no devolvió facturación.');
-      return [
+      return { metrics: [
         { id: 'repuestos.facturado', topic: 'ventas_facturacion', label: 'Facturación de repuestos', value: billed, unit: 'USD', section: 'repuestos.ventas', scope: 'Repuestos', period: period(today), cutoff: today, version: 'ventas_repuestos_panorama_v2', route: '/repuestos/ventas' },
         ...(units === null ? [] : [{ id: 'repuestos.unidades_netas', topic: 'repuestos_demanda' as const, label: 'Unidades netas vendidas', value: units, unit: 'unidades' as const, section: 'repuestos.ventas' as const, scope: 'Repuestos', period: period(today), cutoff: today, version: 'ventas_repuestos_panorama_v2', route: '/repuestos/ventas' }]),
-      ];
+      ] };
     },
   },
   {
@@ -63,7 +75,7 @@ const SOURCES: readonly Source[] = [
       }) as { resumen?: { total?: unknown } };
       const total = number(data.resumen?.total);
       if (total === null) throw new Error('La fuente de Servicios no devolvió facturación.');
-      return [{ id: 'servicios.facturado', topic: 'ventas_facturacion', label: 'Facturación de servicios', value: total, unit: 'USD', section: 'servicios.ventas', scope: 'Servicios', period: period(today), cutoff: today, version: 'ventas_servicios_panorama_v2', route: '/servicios/ventas' }];
+      return { metrics: [{ id: 'servicios.facturado', topic: 'ventas_facturacion', label: 'Facturación de servicios', value: total, unit: 'USD', section: 'servicios.ventas', scope: 'Servicios', period: period(today), cutoff: today, version: 'ventas_servicios_panorama_v2', route: '/servicios/ventas' }] };
     },
   },
   {
@@ -72,7 +84,12 @@ const SOURCES: readonly Source[] = [
       const data = await fetchSemaforoHistorico({ busqueda: '', marca: '', color: '', sucursal: '' }, 0, 1);
       const value = number(data.valor_kardex_usd);
       if (value === null) throw new Error('El inventario no tiene valor USD consolidado.');
-      return [{ id: 'repuestos.valor_stock', topic: 'repuestos_stock', label: 'Valor Kardex referencial', value, unit: 'USD', section: 'repuestos.analisis', scope: 'Repuestos', period: 'stock', cutoff: data.fecha_analisis, version: 'repuestos_analisis_valorizado:ultima_compra_v1', route: '/repuestos/analisis' }];
+      const red = data.por_color?.find(row => row.color === 'ROJO');
+      const redValue = number(red?.valor_kardex_usd);
+      return {
+        metrics: [{ id: 'repuestos.valor_stock', topic: 'repuestos_stock', label: 'Valor Kardex referencial', value, unit: 'USD', section: 'repuestos.analisis', scope: 'Repuestos', period: 'stock', cutoff: data.fecha_analisis, version: 'repuestos_analisis_valorizado:ultima_compra_v1', route: '/repuestos/analisis' }],
+        insights: red && redValue !== null && value > 0 ? [{ id: 'repuestos.stock_antiguo', topic: 'repuestos_stock', title: 'Stock sin ventas en tres años y última compra hace más de 1.000 días', value: redValue, total: value, count: red.lineas, unit: 'USD', cutoff: data.fecha_analisis, route: '/repuestos/analisis' }] : [],
+      };
     },
   },
   {
@@ -80,7 +97,7 @@ const SOURCES: readonly Source[] = [
     load: async today => {
       const data = parseProjectedMachineStock(await rpc('parque_stock_proyectado_v1', { p_corte: today }));
       const total = projectedStockTotals(data.filas);
-      return [{ id: 'parque.stock_proyectado', topic: 'maquinas_proyeccion', label: 'Stock proyectado', value: total.stockProyectado, unit: 'unidades', section: 'parque.stock_proyectado', scope: 'Máquinas nuevas desde 31/08/2026', period: data.fecha_corte, cutoff: data.fecha_corte, version: 'parque_stock_proyectado_v1', route: '/parque-stock-proyectado' }];
+      return { metrics: [{ id: 'parque.stock_proyectado', topic: 'maquinas_proyeccion', label: 'Stock proyectado', value: total.stockProyectado, unit: 'unidades', section: 'parque.stock_proyectado', scope: 'Máquinas nuevas desde 31/08/2026', period: data.fecha_corte, cutoff: data.fecha_corte, version: 'parque_stock_proyectado_v1', route: '/parque-stock-proyectado' }] };
     },
   },
 ];
@@ -94,8 +111,10 @@ export async function loadPanoramaData(topics: readonly PanoramaTopicId[], grant
   const sources = SOURCES.filter(source => granted.has(source.section) && source.topics.some(topic => topics.includes(topic)));
   return Promise.all(sources.map(async source => {
     try {
-      const metrics = (await source.load(today)).filter(metric => topics.includes(metric.topic));
-      return { section: source.section, metrics };
+      const loaded = await source.load(today);
+      const metrics = loaded.metrics.filter(metric => topics.includes(metric.topic));
+      const insights = loaded.insights?.filter(insight => topics.includes(insight.topic));
+      return { section: source.section, metrics, insights };
     } catch (error) {
       return { section: source.section, metrics: [], error: error instanceof Error ? error.message : 'No se pudo consultar la fuente.' };
     }
