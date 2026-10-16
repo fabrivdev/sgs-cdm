@@ -38,4 +38,24 @@ Después de guardar prioridades, se abre un panel con tarjetas en el orden elegi
 
 La migración `20261016190000_campi_panorama_visits.sql` crea un historial propio por usuario, protegido por RLS para Gerencia y Administración. Se registra una visita solo si el panel obtuvo métricas sin errores y se conserva una sesión de navegador para que recargar no cambie la base de comparación. Se comparan únicamente indicador, unidad, sección, alcance, período y versión de definición iguales; falta de dato, período nuevo o fuente fallida no equivalen a cero. Los datos de visita guardan agregados mostrados, no filas comerciales ni clientes. Estos agregados son enviados por el cliente después de consultar RPC protegidas; antes de usar cambios para alertas o afirmaciones de mejora, los cálculos y el registro deberán trasladarse a una fuente calculada por el servidor. La migración está preparada en la rama y **no está ejecutada** en la base; hasta aplicarla, el panel muestra datos actuales sin comparación entre visitas. No se ha comprobado esta etapa en producción ni se ha integrado en `main`.
 
+Cobertura actual del catálogo de trece temas:
+
+| Tema | Fuente/alcance del primer indicador | Estado |
+| --- | --- | --- |
+| Evolución de ventas y facturación | RPC de Ventas de Repuestos y Servicios, cada área por separado, USD | Operativo; falta Máquinas |
+| Demanda de repuestos | Unidades netas de Ventas de Repuestos | Operativo |
+| Stock y antigüedad de repuestos | Valor Kardex referencial del Análisis valorizado | Valor operativo; falta indicador propio de antigüedad |
+| Cobertura futura de máquinas | Stock proyectado de máquinas nuevas desde 31/08/2026 | Operativo |
+| Pedidos de máquinas por cumplir | Operaciones y unidades comerciales | Definir pendientes y corte sin mezclar NP/facturas |
+| Órdenes de servicio pendientes | OS importadas y estado operativo | Definir vencimiento y fuente completa |
+| Disponibilidad de máquinas | Stock físico y asignaciones | Conciliar unidades repetidas y reservas |
+| Trabajo realizado en servicios | Trabajos y jornadas | Definir período, cierre y conteo |
+| Agenda y capacidad de servicio | Planificador, Calendario y Flota | Definir capacidad y vencimientos |
+| Importaciones y arribos de máquinas | Unidades de importación y despacho | Definir estado y ETA sin doble conteo |
+| Parque instalado y clientes | Parque y Clientes | Definir máquinas activas y propietario |
+| Reposición y compras de repuestos | Compras y Sugerencias | Definir pedido pendiente frente a sugerencia |
+| Comisiones del servicio | Jornadas y liquidaciones | Reservado a Administración; definir monto devengado/pagado |
+
+Los nueve temas pendientes siguen siendo destinos autorizados sin cifra inventada. Antes de convertirlos en indicadores hay que fijar grano, unidad, corte, exclusiones, estado sin datos, permiso de lectura y destino de detalle; no interpretar una fila de tabla como KPI de negocio.
+
 Fuente: `src/pages/CampiPanorama.tsx`, `src/lib/campi/panoramaPreferences.ts`, `src/components/campi/CampiPanoramaAvatar.tsx`, `src/components/campi/CampiWelcome.tsx`, `src/App.tsx` y `src/components/AppLayout.tsx`. Las 24 pruebas específicas de estos cambios, TypeScript, lint y build pasaron en la rama; se comprobaron clic y teclado en Chrome local autenticado. No hay migración SQL para esta etapa ni validación de producción.
