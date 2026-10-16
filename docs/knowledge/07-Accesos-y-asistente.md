@@ -54,3 +54,7 @@ Las altas de operativos/usuarios y la edición de credenciales usan `ResponsiveD
 Análisis usa `repuestos.analisis` en registro de rutas, menú y ruta protegida. La migración `20261015150000_parts_analysis_section_access.sql` registra la sección activa en `app_secciones` para la asignación existente de Administración y exige módulo Repuestos más la sección en ambos RPC del semáforo. No copia permisos de Stock ni asigna usuarios automáticamente; superadmin conserva su acceso global. Repetir el SQL no restaura permisos revocados. Las pruebas SQL verifican denegación sin sección, acceso concedido y revocación; no se alteran cálculos ni diseño.
 
 Migración ejecutada en Lovable Cloud el 15/10: consulta final exitosa. Pruebas locales: 19 correctas y build completo. La publicación pública del frontend continúa a cargo del usuario.
+
+## Campi: bienvenida local
+
+Ver [[36-Campi-bienvenida]]. La introducción de Campi usa una capa de presentación de escritorio para usuarios autenticados y no reactiva el asistente IA ni cambia acceso a datos. Persistencia de visibilidad por usuario/navegador, sin sincronización remota. Rama local de revisión; no publicación acreditada.

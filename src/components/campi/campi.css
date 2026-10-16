@@ -1,0 +1,49 @@
+/* Presentation-only shell. The transparent still is provisional artwork, not a rigged 3D model. */
+.campi-layer { position: fixed; bottom: 14px; right: 16px; width: 320px; z-index: 35; pointer-events: none; }
+.campi-message { pointer-events: auto; border: 1px solid hsl(var(--border)); border-radius: 18px; padding: 20px; background: hsl(var(--card)); color: hsl(var(--card-foreground)); box-shadow: 0 8px 32px #00000012; margin-bottom: 6px; animation: campi-enter .35s ease-out both; }
+.campi-message h2 { font-size: 20px; font-weight: 650; margin: 8px 0; }
+.campi-message p { font-size: 13px; line-height: 1.55; color: hsl(var(--muted-foreground)); }
+.campi-eyebrow { color: hsl(var(--primary)); font-size: 10px; font-weight: 650; letter-spacing: .08em; text-transform: uppercase; }
+.campi-close { position: absolute; top: 10px; right: 10px; padding: 7px; border-radius: 8px; }
+.campi-close:hover { background: hsl(var(--muted)); }
+.campi-reaction { min-height: 20px; margin-top: 8px; }
+.campi-actions { display: flex; gap: 6px; margin-top: 12px; }
+.campi-hide { color: hsl(var(--muted-foreground)); font-size: 11px; margin-top: 12px; text-decoration: underline; text-underline-offset: 3px; }
+.campi-character { pointer-events: auto; display: block; width: 135px; height: 170px; margin-left: auto; border-radius: 22px; overflow: hidden; transform-origin: center bottom; animation: campi-idle 5s ease-in-out infinite; transition: transform .45s ease, opacity .3s; }
+.campi-character img, .campi-character video { width: 100%; height: 100%; object-fit: contain; }
+.campi-layer button:focus-visible { outline: 2px solid hsl(var(--ring)); outline-offset: 3px; }
+.campi-layer[data-state="welcome"] .campi-character { animation: campi-enter .38s ease-out both; }
+.campi-layer[data-state="greeting"] .campi-character { animation: none; }
+.campi-layer[data-state="farewell"] .campi-character { animation: campi-leave .72s ease-in both; }
+.campi-layer[data-state="tucked"] .campi-character { animation: none; opacity: 0; pointer-events: none; }
+.campi-layer[data-state="peeking"] .campi-character { animation: none; opacity: 1; transition: none; }
+.campi-layer[data-paused="true"] *, .campi-layer[data-paused="true"] { animation-play-state: paused !important; }
+@keyframes campi-idle { 0%,100% { transform: translateY(0); } 50% { transform: translateY(-4px); } }
+@keyframes campi-enter { from { opacity: 0; transform: translateY(12px); } to { opacity: 1; transform: translateY(0); } }
+@keyframes campi-greet { 0%,100% { transform: rotate(0); } 25%,75% { transform: rotate(-5deg) translateY(-3px); } 50% { transform: rotate(5deg) translateY(-5px); } }
+@keyframes campi-leave { 0%,14% { transform: translateX(0); } 35% { transform: translateX(22px) translateY(-3px); } 60% { transform: translateX(62px); } 80% { transform: translateX(90px) translateY(-3px); } 100% { transform: translateX(112px); } }
+@media (prefers-reduced-motion: reduce) { .campi-layer *, .campi-layer { animation: none !important; transition: none !important; } }
+@media (max-width: 1023px), (pointer: coarse) { .campi-layer { display: none; } }
+
+.campi-sprite { display: block; position: relative; width: 100%; height: 100%; }
+.campi-sprite .campi-frame { position: absolute; inset: 0; opacity: 0; }
+.campi-sprite .campi-frame.is-current { opacity: 1; }
+
+/* Blink replaces only the visor eye area: keep the body perfectly still. */
+.campi-face { clip-path: inset(15% 34% 72% 35% round 18%); }
+
+/* Authored anticipation, flight and settling. No 3D rig is implied. */
+.campi-action { transform-origin: 50% 96%; transition: transform 180ms ease-in-out; }
+.campi-action[data-motion="anticipate"] { transform: scaleY(.92) scaleX(1.04); }
+.campi-action[data-motion="air"] { transform: translateY(-24px) rotate(-3deg); }
+.campi-action[data-motion="land"] { transform: scaleY(.94) scaleX(1.03); }
+.campi-action[data-motion="bow"] { transform: translateY(7px) scaleY(.91) rotate(7deg); }
+.campi-action[data-motion="step-left"] { transform: translateX(-8px) rotate(-3deg); }
+.campi-action[data-motion="step-right"] { transform: translateX(8px) rotate(3deg); }
+@media (prefers-reduced-motion: reduce) { .campi-action { transition: none; transform: none !important; } }
+
+/* Two clipped copies of the approved artwork: a head and exactly one hand. */
+.campi-peek { display: block; position: relative; width: 100%; height: 100%; }
+.campi-peek img { position: absolute; top: 0; width: 135px; height: 170px; object-fit: contain; max-width: none; }
+.campi-peek-head { right: -45px; clip-path: inset(0 12% 65% 15%); transform: rotate(20deg); transform-origin: 62% 20%; }
+.campi-peek img.campi-peek-hand { right: -15px; top: -15px; clip-path: inset(39% 5% 50% 80%); }
