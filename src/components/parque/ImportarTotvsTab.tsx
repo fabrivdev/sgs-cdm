@@ -922,6 +922,7 @@ export function ImportarTotvsTab({ onChanged }: { onChanged: () => void }) {
       }
 
       if (kardexRows.length > 0) {
+        activeImportStage = "kardex.persist";
         const cargaId = crypto.randomUUID();
         for (let i = 0; i < kardexRows.length; i += 500) {
           const { data, error } = await (supabase as unknown as KardexRpcClient).rpc("totvs_importar_kardex_lote_v1", {
@@ -931,9 +932,6 @@ export function ImportarTotvsTab({ onChanged }: { onChanged: () => void }) {
           if (error) {
             if (error.code === "PGRST202" || error.code === "42883") {
               throw new Error("Falta aplicar la migraci\u00f3n local de Kardex antes de confirmar esta fuente.");
-            }
-            if (error.code === "23505") {
-              throw new Error("El Kardex contiene claves TABLA + RECNO ya cargadas con otra versi\u00f3n. No se sobrescribi\u00f3 ning\u00fan movimiento; revis\u00e1 la fuente y su trazabilidad.");
             }
             throw error;
           }
