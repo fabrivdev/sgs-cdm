@@ -31,6 +31,7 @@ const RepuestosSugerencias = lazy(() => import("./pages/RepuestosSugerencias"));
 const Admin = lazy(() => import("./pages/Admin"));
 const NotFound = lazy(() => import("./pages/NotFound"));
 const SinAcceso = lazy(() => import("./pages/SinAcceso"));
+const CampiPanorama = lazy(() => import("./pages/CampiPanorama"));
 
 const queryClient = new QueryClient();
 
@@ -195,6 +196,7 @@ const App = () => (
                   }
                 />
                 <Route path="/sin-acceso" element={<SinAcceso />} />
+                <Route path="/panorama" element={<ProtectedRoute requireRoles={["admin", "gerencia"]}><CampiPanorama /></ProtectedRoute>} />
               </Route>
               <Route path="*" element={<NotFound />} />
             </Routes>
