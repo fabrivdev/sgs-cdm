@@ -3,6 +3,7 @@ import { Activity, ArrowDown, ArrowUp, BarChart3, Boxes, CalendarDays, Check, Cl
 import { Button } from '@/components/ui/button';
 import { PageHeader, PageShell, Panel } from '@/components/layout/AppPrimitives';
 import { CampiPanoramaAvatar, type CampiPanoramaReaction } from '@/components/campi/CampiPanoramaAvatar';
+import { PanoramaDashboard } from '@/components/campi/PanoramaDashboard';
 import { useAuth } from '@/hooks/useAuth';
 import { cn } from '@/lib/utils';
 import {
@@ -45,6 +46,7 @@ export default function CampiPanorama() {
     [hasModuloAccess, hasSectionAccess, isAdmin],
   );
   const [saved, setSaved] = useState<PanoramaTopicId[] | null>(() => readPanoramaPreferences(userId));
+  const [editing, setEditing] = useState(() => readPanoramaPreferences(userId) === null);
   const [draft, setDraft] = useState<PanoramaTopicId[]>(() => reconcilePanoramaOrder(readPanoramaPreferences(userId), available));
   const [dragged, setDragged] = useState<PanoramaTopicId | null>(null);
   const [reaction, setReaction] = useState<CampiPanoramaReaction | null>(null);
@@ -77,7 +79,11 @@ export default function CampiPanorama() {
     savePanoramaPreferences(userId, selected);
     setSaved(selected);
     react('save');
+    setEditing(false);
   };
+
+  if (!editing && persisted.length) return <PanoramaDashboard userId={userId} topics={persisted} available={available}
+    hasAccess={section => hasModuloAccess(section.split('.')[0]) && hasSectionAccess(section)} onEdit={() => setEditing(true)} />;
 
   return <PageShell className="max-w-[1440px] space-y-4">
     <PageHeader title="Panorama" />

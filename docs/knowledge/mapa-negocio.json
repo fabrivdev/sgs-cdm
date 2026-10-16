@@ -672,6 +672,16 @@
   ],
   "rules": [
     {
+      "id": "panorama-permisos-y-comparacion",
+      "title": "Panorama por permisos y visitas comparables",
+      "module": "asistente",
+      "description": "Los temas ordenan solo indicadores autorizados por módulo y sección. Una tarjeta con varias fuentes mantiene importes separados por área y enlaza cada cifra a su detalle. La visita anterior se compara solo con la misma métrica, unidad, sección, alcance, período y definición; un dato faltante o un corte no comparable no es cero ni mejora.",
+      "check": "Probar revocación de módulo/sección, fuente fallida, primer ingreso, recarga en la misma sesión, cambio de mes, moneda y fila histórica propia por RLS. No convertir el snapshot enviado por el cliente en alerta o síntesis causal hasta calcularlo en servidor.",
+      "entities": ["usuario", "permiso"],
+      "sources": ["src/lib/campi/panoramaPreferences.ts", "src/lib/campi/panoramaData.ts", "src/lib/campi/panoramaVisits.ts", "supabase/migrations/20261016190000_campi_panorama_visits.sql", "docs/knowledge/36-Campi-bienvenida.md"],
+      "evidence": "Rama feat/campi-panorama; SQL probado en PostgreSQL aislado y pantalla local, sin despliegue ni ejecución remota de la migración"
+    },
+    {
       "id": "mora-cxc-fuente",
       "title": "Mora sobre saldo NF vencido, sin doble compensación",
       "module": "ventas",
@@ -1692,6 +1702,16 @@
   ],
   "flows": [
     {
+      "id": "configurar-y-leer-panorama",
+      "title": "Priorizar temas y leer Panorama",
+      "module": "asistente",
+      "description": "El usuario autorizado ordena temas específicos y abre un panel variable sin cifras ficticias.",
+      "steps": ["Filtrar el catálogo por rol, módulo y sección.", "Guardar el orden elegido por usuario y navegador.", "Consultar solo las fuentes autorizadas para las tarjetas elegidas.", "Comparar únicamente métricas compatibles con una visita anterior visible y abrir cada detalle autorizado."],
+      "entities": ["usuario", "permiso"],
+      "rules": ["panorama-permisos-y-comparacion"],
+      "sources": ["src/pages/CampiPanorama.tsx", "src/components/campi/PanoramaDashboard.tsx", "src/lib/campi/panoramaData.ts", "src/lib/campi/panoramaVisits.ts"]
+    },
+    {
       "id": "planificar-trabajo",
       "title": "De trabajo a intervención programada",
       "module": "servicios",
@@ -2329,6 +2349,14 @@
     }
   ],
   "screens": [
+    {
+      "id": "asistente.panorama",
+      "title": "Panorama de Campi",
+      "module": "asistente",
+      "description": "Selector de prioridades y panel variable en la rama de desarrollo. El historial entre visitas exige la migración pendiente; no afirmar métricas de los temas aún sin fuente consolidada.",
+      "sources": ["src/pages/CampiPanorama.tsx", "src/components/campi/PanoramaDashboard.tsx", "docs/knowledge/36-Campi-bienvenida.md"],
+      "flows": ["configurar-y-leer-panorama"]
+    },
     {
       "id": "servicios.planificador",
       "title": "Planificador",
