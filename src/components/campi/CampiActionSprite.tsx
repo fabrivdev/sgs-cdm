@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import { CAMPI_ACTIONS, type CampiAction } from './campiActions';
 
-const actionAssets = { rest: '/campi/campi-rest.webp', celebrate: '/campi/campi-celebrate.webp', flight: '/campi/campi-flight.webp', run: '/campi/campi-run.webp', run2: '/campi/campi-run2.webp', wave: '/campi/campi-wave.webp', wave2: '/campi/campi-wave2.webp', angry: '/campi/campi-angry.webp', sad: '/campi/campi-sad.webp', smile: '/campi/campi-smile.webp' };
+const actionAssets = { rest: '/campi/campi-rest.webp', celebrate: '/campi/campi-celebrate.webp', flight: '/campi/campi-flight.webp', run: '/campi/campi-run.webp', run2: '/campi/campi-run2.webp', wave: '/campi/campi-wave.webp', wave2: '/campi/campi-wave2.webp', angry: '/campi/campi-angry.webp', sad: '/campi/campi-sad.webp', smile: '/campi/campi-smile.webp', wink: '/campi/campi-wink.webp', curious: '/campi/campi-curious.webp' };
 
 /** Optional action layer: assets are requested only for the current action. */
 export function CampiActionSprite({ action, active, reduced }: { action: CampiAction; active: boolean; reduced: boolean }) {

@@ -66,6 +66,25 @@ describe('Campi introduction', () => {
     fireEvent.pointerLeave(character);
     expect(document.querySelector('.campi-sprite')).toHaveAttribute('data-face', 'rest');
   });
+  it('keeps the presentation lively after its initial entrance', () => {
+    render(<CampiWelcome userId="a" />);
+    expect(document.querySelector('.campi-sprite')).toHaveAttribute('data-action', 'intro');
+    act(() => vi.advanceTimersByTime(1600));
+    expect(document.querySelector('.campi-sprite')).toHaveAttribute('data-pose', 'rest');
+    act(() => vi.advanceTimersByTime(2600));
+    expect(document.querySelector('.campi-sprite')).toHaveAttribute('data-action', 'approve');
+    act(() => vi.advanceTimersByTime(1200));
+    expect(document.querySelector('.campi-sprite')).toHaveAttribute('data-pose', 'rest');
+  });
+  it('responds to clicking Campi with friendly gestures', () => {
+    render(<CampiWelcome userId="a" />);
+    act(() => vi.advanceTimersByTime(1600));
+    fireEvent.click(screen.getByRole('button', { name: 'Saludar a Campi' }));
+    expect(document.querySelector('.campi-sprite')).toHaveAttribute('data-action', 'approve');
+    act(() => vi.advanceTimersByTime(1200));
+    fireEvent.click(screen.getByRole('button', { name: 'Saludar a Campi' }));
+    expect(document.querySelector('.campi-sprite')).toHaveAttribute('data-action', 'step');
+  });
   it('does not render or mark seen on mobile', () => {
     desktop = false;
     render(<CampiWelcome userId="a" />);

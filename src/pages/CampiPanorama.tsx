@@ -1,8 +1,8 @@
 import { useMemo, useState } from 'react';
-import { Activity, ArrowDown, ArrowUp, BarChart3, Boxes, CalendarDays, Check, ClipboardList, GripVertical, HandCoins, Package, Plus, Search, Ship, ShoppingCart, Tractor, Truck, Wrench, X } from 'lucide-react';
+import { Activity, ArrowDown, ArrowUp, BarChart3, Boxes, CalendarDays, Check, ClipboardList, GripVertical, HandCoins, Package, Plus, Ship, ShoppingCart, Tractor, Truck, Wrench, X } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { PageHeader, PageShell, Panel } from '@/components/layout/AppPrimitives';
-import { CampiPanoramaAvatar } from '@/components/campi/CampiPanoramaAvatar';
+import { CampiPanoramaAvatar, type CampiPanoramaReaction } from '@/components/campi/CampiPanoramaAvatar';
 import { useAuth } from '@/hooks/useAuth';
 import { cn } from '@/lib/utils';
 import {
@@ -37,8 +37,6 @@ const groupTone: Record<PanoramaTopicGroup, string> = {
   Operación: 'bg-violet-50 text-violet-700',
   Abastecimiento: 'bg-orange-50 text-orange-700',
 };
-const normalize = (value: string) => value.normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLocaleLowerCase('es');
-
 export default function CampiPanorama() {
   const { user, isAdmin, hasModuloAccess, hasSectionAccess } = useAuth();
   const userId = user?.id ?? '';
@@ -48,30 +46,37 @@ export default function CampiPanorama() {
   );
   const [saved, setSaved] = useState<PanoramaTopicId[] | null>(() => readPanoramaPreferences(userId));
   const [draft, setDraft] = useState<PanoramaTopicId[]>(() => reconcilePanoramaOrder(readPanoramaPreferences(userId), available));
-  const [search, setSearch] = useState('');
   const [dragged, setDragged] = useState<PanoramaTopicId | null>(null);
+  const [reaction, setReaction] = useState<CampiPanoramaReaction | null>(null);
   const selected = reconcilePanoramaOrder(draft, available);
   const persisted = reconcilePanoramaOrder(saved, available);
   const changed = saved === null || selected.join('|') !== persisted.join('|');
   const topicById = new Map(available.map(topic => [topic.id, topic]));
-  const query = normalize(search.trim());
   const unselected = available.filter(topic => !selected.includes(topic.id));
-  const visible = unselected.filter(topic => !query || normalize(`${topic.label} ${topic.group}`).includes(query));
+  const react = (kind: CampiPanoramaReaction['kind']) => setReaction(current => ({ kind, token: (current?.token ?? 0) + 1 }));
 
-  const add = (id: PanoramaTopicId) => setDraft(current => {
-    const permitted = reconcilePanoramaOrder(current, available);
-    return permitted.includes(id) ? permitted : [...permitted, id];
-  });
-  const remove = (id: PanoramaTopicId) => setDraft(current => reconcilePanoramaOrder(current, available).filter(item => item !== id));
+  const add = (id: PanoramaTopicId) => {
+    setDraft(current => {
+      const permitted = reconcilePanoramaOrder(current, available);
+      return permitted.includes(id) ? permitted : [...permitted, id];
+    });
+    react('select');
+  };
+  const remove = (id: PanoramaTopicId) => {
+    setDraft(current => reconcilePanoramaOrder(current, available).filter(item => item !== id));
+    react('remove');
+  };
   const move = (from: number, to: number) => {
     if (from === to || to < 0 || to >= selected.length) return;
     const next = [...selected];
     next.splice(to, 0, next.splice(from, 1)[0]);
     setDraft(next);
+    react('reorder');
   };
   const save = () => {
     savePanoramaPreferences(userId, selected);
     setSaved(selected);
+    react('save');
   };
 
   return <PageShell className="max-w-[1440px] space-y-4">
@@ -81,7 +86,7 @@ export default function CampiPanorama() {
         <h2 className="text-[25px] font-semibold tracking-tight">Hola, soy Campi</h2>
         <p className="max-w-lg text-[15px] leading-6 text-foreground/85">Te ayudaré a ver qué cambió y qué necesita atención, con información verificada.</p>
       </div>
-      <div className="absolute bottom-0 right-[190px] z-20 hidden h-[200px] w-[200px] lg:block"><CampiPanoramaAvatar /></div>
+      <div className="absolute bottom-0 right-[190px] z-20 hidden h-[200px] w-[200px] lg:block"><CampiPanoramaAvatar reaction={reaction} /></div>
       <div className="absolute right-5 top-1/2 z-10 hidden w-[165px] -translate-y-1/2 rounded-xl border bg-card px-3.5 py-3 text-[13px] font-semibold shadow-sm before:absolute before:-left-[7px] before:top-[calc(50%-7px)] before:h-3.5 before:w-3.5 before:rotate-45 before:border-b before:border-l before:bg-card lg:block">Tus temas, en el orden que prefieras.</div>
     </Panel>
     <div className="grid items-start gap-4 lg:grid-cols-[minmax(0,1.55fr)_minmax(360px,0.85fr)]">
@@ -90,15 +95,9 @@ export default function CampiPanorama() {
           <h2 className="text-[15px] font-semibold">Temas de interés</h2>
           <span className="text-[12px] tabular-nums text-muted-foreground">{available.length} disponibles</span>
         </div>
-        <label className="flex h-9 items-center gap-2 rounded-lg border bg-background px-3">
-          <Search className="h-4 w-4 shrink-0 text-muted-foreground" />
-          <span className="sr-only">Buscar tema</span>
-          <input type="search" value={search} onChange={event => setSearch(event.target.value)} placeholder="Buscar tema"
-            className="h-full w-full bg-transparent text-[13px] outline-none placeholder:text-muted-foreground" />
-        </label>
         <div className="max-h-[430px] space-y-3 overflow-y-auto pr-1" aria-label="Temas disponibles">
           {GROUPS.map(group => {
-            const topics = visible.filter(topic => topic.group === group);
+            const topics = unselected.filter(topic => topic.group === group);
             if (!topics.length) return null;
             return <section key={group} aria-label={group} className="space-y-1.5">
               <h3 className="px-1 text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">{group}</h3>
@@ -113,7 +112,7 @@ export default function CampiPanorama() {
               })}
             </section>;
           })}
-          {!visible.length && <div className="px-2 py-6 text-center text-[13px] text-muted-foreground">{unselected.length ? 'No hay temas para esa búsqueda.' : 'Todos los temas están priorizados.'}</div>}
+          {!unselected.length && <div className="px-2 py-6 text-center text-[13px] text-muted-foreground">Todos los temas están priorizados.</div>}
         </div>
       </Panel>
       <Panel className="space-y-3 lg:sticky lg:top-3">

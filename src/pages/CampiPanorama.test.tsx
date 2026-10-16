@@ -12,7 +12,7 @@ vi.mock('@/hooks/useAuth', () => ({
     hasSectionAccess: (section: string) => allowed.has(section),
   }),
 }));
-vi.mock('@/components/campi/CampiPanoramaAvatar', () => ({ CampiPanoramaAvatar: () => <div role="img" aria-label="Campi animado" /> }));
+vi.mock('@/components/campi/CampiPanoramaAvatar', () => ({ CampiPanoramaAvatar: ({ reaction }: { reaction?: { kind: string } }) => <div role="img" aria-label="Campi animado" data-reaction={reaction?.kind ?? 'none'} /> }));
 
 beforeEach(() => { localStorage.clear(); allowed.clear(); baseline.forEach(id => allowed.add(id)); });
 afterEach(cleanup);
@@ -36,15 +36,15 @@ describe('Campi Panorama configuration', () => {
     expect(screen.getByText('4 priorizados')).toBeInTheDocument();
   });
 
-  it('shows each topic once, searches, and lets users remove it from the ordered list', () => {
+  it('shows each topic once and reacts when adding or removing it', () => {
     render(<CampiPanorama />);
-    fireEvent.change(screen.getByRole('searchbox', { name: 'Buscar tema' }), { target: { value: 'maquinas' } });
+    expect(screen.queryByRole('searchbox')).not.toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Disponibilidad de máquinas' })).toBeInTheDocument();
-    expect(screen.queryByRole('button', { name: 'Evolución de ventas y facturación' })).not.toBeInTheDocument();
-    fireEvent.change(screen.getByRole('searchbox', { name: 'Buscar tema' }), { target: { value: '' } });
     fireEvent.click(screen.getByRole('button', { name: 'Disponibilidad de máquinas' }));
+    expect(screen.getByRole('img', { name: 'Campi animado' })).toHaveAttribute('data-reaction', 'select');
     expect(screen.queryByRole('button', { name: 'Disponibilidad de máquinas' })).not.toBeInTheDocument();
     fireEvent.click(screen.getByRole('button', { name: 'Quitar Disponibilidad de máquinas' }));
+    expect(screen.getByRole('img', { name: 'Campi animado' })).toHaveAttribute('data-reaction', 'remove');
     expect(screen.getByRole('button', { name: 'Disponibilidad de máquinas' })).toBeInTheDocument();
   });
 
@@ -67,7 +67,9 @@ describe('Campi Panorama configuration', () => {
     fireEvent.dragStart(first!, { dataTransfer: { effectAllowed: 'move' } });
     fireEvent.dragOver(second!);
     fireEvent.drop(second!);
+    expect(screen.getByRole('img', { name: 'Campi animado' })).toHaveAttribute('data-reaction', 'reorder');
     fireEvent.click(screen.getByRole('button', { name: 'Guardar orden' }));
+    expect(screen.getByRole('img', { name: 'Campi animado' })).toHaveAttribute('data-reaction', 'save');
     expect(localStorage.getItem(panoramaStorageKey('manager-a'))).toBe('["maquinas_pedidos","ventas_facturacion"]');
   });
 });

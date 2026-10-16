@@ -1,9 +1,15 @@
 .campi-panorama-avatar {
+  display: block;
   width: 100%;
   height: 100%;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  cursor: pointer;
   transform-origin: center bottom;
   animation: campi-panorama-breathe 3.6s ease-in-out infinite;
 }
+.campi-panorama-avatar:focus-visible { outline: 2px solid hsl(var(--ring)); outline-offset: 3px; }
 .campi-panorama-avatar .campi-frame {
   width: 100%;
   height: 100%;

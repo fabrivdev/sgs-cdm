@@ -1,15 +1,32 @@
-import { useEffect, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { CampiSprite } from './CampiSprite';
+import type { CampiAction } from './campiActions';
 import './campi.css';
 import './campi-panorama.css';
 
 const REDUCED = '(prefers-reduced-motion: reduce)';
+export type CampiPanoramaReaction = { kind: 'select' | 'reorder' | 'remove' | 'save'; token: number };
+const REACTION_ACTION: Record<CampiPanoramaReaction['kind'], CampiAction> = {
+  select: 'celebrate',
+  reorder: 'step',
+  remove: 'consider',
+  save: 'approve',
+};
 
-export function CampiPanoramaAvatar() {
+export function CampiPanoramaAvatar({ reaction }: { reaction?: CampiPanoramaReaction | null }) {
   const [state, setState] = useState<'welcome' | 'idle'>('welcome');
   const [visible, setVisible] = useState(() => !document.hidden);
   const [reduced, setReduced] = useState(() => window.matchMedia(REDUCED).matches);
   const [curious, setCurious] = useState(false);
+  const [action, setAction] = useState<CampiAction>('neutral');
+  const actionTimeout = useRef<number | undefined>(undefined);
+  const interactionIndex = useRef(0);
+
+  const play = useCallback((next: CampiAction) => {
+    window.clearTimeout(actionTimeout.current);
+    setAction(next);
+    actionTimeout.current = window.setTimeout(() => setAction('neutral'), 1300);
+  }, []);
 
   useEffect(() => {
     let settle = window.setTimeout(() => setState('idle'), 1600);
@@ -28,12 +45,24 @@ export function CampiPanoramaAvatar() {
       window.clearInterval(gesture);
       document.removeEventListener('visibilitychange', onVisibility);
       media.removeEventListener('change', onMotion);
+      window.clearTimeout(actionTimeout.current);
     };
   }, []);
 
-  return <div className="campi-panorama-avatar" data-paused={!visible || reduced}
+  useEffect(() => {
+    if (reduced) { window.clearTimeout(actionTimeout.current); setAction('neutral'); return; }
+    if (reaction) play(REACTION_ACTION[reaction.kind]);
+  }, [reaction, reduced, play]);
+
+  const interact = () => {
+    if (!visible || reduced) return;
+    const gestures: CampiAction[] = ['approve', 'step', 'celebrate'];
+    play(gestures[interactionIndex.current++ % gestures.length]);
+  };
+
+  return <button type="button" className="campi-panorama-avatar" data-paused={!visible || reduced}
     onPointerEnter={() => setCurious(true)} onPointerLeave={() => setCurious(false)}
-    aria-label="Campi" role="img">
-    <CampiSprite state={state} active={visible} reduced={reduced} curious={curious} />
-  </div>;
+    onClick={interact} aria-label="Saludar a Campi">
+    <CampiSprite state={state} active={visible} reduced={reduced} curious={curious} action={action} />
+  </button>;
 }
