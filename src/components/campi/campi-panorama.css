@@ -9,7 +9,11 @@
   height: 100%;
   object-fit: contain;
 }
-.campi-panorama-avatar .campi-sprite { transform: translateY(4px) scale(1.12); }
+.campi-panorama-avatar .campi-sprite {
+  transform: translateY(5px) scale(1.14);
+  -webkit-mask-image: linear-gradient(to bottom, #000 0%, #000 68%, transparent 96%);
+  mask-image: linear-gradient(to bottom, #000 0%, #000 68%, transparent 96%);
+}
 .campi-panorama-avatar[data-paused="true"] { animation-play-state: paused; }
 @keyframes campi-panorama-breathe {
   0%, 100% { transform: translateY(0) scale(1); }

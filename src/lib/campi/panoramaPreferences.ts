@@ -1,60 +1,45 @@
-import { SECTION_ROUTES, type SectionKey } from '@/lib/permissions';
+import type { SectionKey } from '@/lib/permissions';
 
-export type PanoramaTopicId = Exclude<SectionKey, `admin.${string}`>;
-export type PanoramaTopicGroup = 'Ventas' | 'Servicios' | 'Parque' | 'Repuestos';
+export type PanoramaTopicGroup = 'Resultados' | 'Compromisos' | 'Disponibilidad' | 'Operación' | 'Abastecimiento';
 
-export interface PanoramaTopic {
-  id: PanoramaTopicId;
-  label: string;
-  group: PanoramaTopicGroup;
-  module: string;
-  path: string;
-  adminOnly?: boolean;
-}
+const TOPICS = [
+  { id: 'ventas_facturacion', label: 'Evolución de ventas y facturación', group: 'Resultados', sections: ['servicios.ventas', 'parque.ventas', 'repuestos.ventas'] },
+  { id: 'repuestos_demanda', label: 'Demanda de repuestos', group: 'Resultados', sections: ['repuestos.ventas', 'repuestos.analisis'] },
+  { id: 'maquinas_pedidos', label: 'Pedidos de máquinas por cumplir', group: 'Compromisos', sections: ['parque.operaciones'] },
+  { id: 'servicios_pendientes', label: 'Órdenes de servicio pendientes', group: 'Compromisos', sections: ['servicios.ordenes'] },
+  { id: 'maquinas_stock', label: 'Disponibilidad de máquinas', group: 'Disponibilidad', sections: ['parque.stock'] },
+  { id: 'repuestos_stock', label: 'Stock y antigüedad de repuestos', group: 'Disponibilidad', sections: ['repuestos.stock', 'repuestos.analisis'] },
+  { id: 'maquinas_proyeccion', label: 'Cobertura futura de máquinas', group: 'Disponibilidad', sections: ['parque.stock_proyectado'] },
+  { id: 'servicios_trabajo', label: 'Trabajo realizado en servicios', group: 'Operación', sections: ['servicios.trabajos'] },
+  { id: 'servicios_agenda', label: 'Agenda y capacidad de servicio', group: 'Operación', sections: ['servicios.planificador', 'servicios.calendario', 'servicios.flota'] },
+  { id: 'maquinas_importacion', label: 'Importaciones y arribos de máquinas', group: 'Operación', sections: ['parque.importaciones'] },
+  { id: 'maquinas_parque', label: 'Parque instalado y clientes', group: 'Operación', sections: ['parque.maquinas', 'parque.clientes'] },
+  { id: 'repuestos_reposicion', label: 'Reposición y compras de repuestos', group: 'Abastecimiento', sections: ['repuestos.compras', 'repuestos.sugerencias'] },
+  { id: 'servicios_comisiones', label: 'Comisiones del servicio', group: 'Resultados', sections: ['servicios.comisiones'], adminOnly: true },
+] as const satisfies readonly { id: string; label: string; group: PanoramaTopicGroup; sections: readonly SectionKey[]; adminOnly?: boolean }[];
 
-export const MAX_PANORAMA_PRIORITIES = 3;
+export type PanoramaTopicId = (typeof TOPICS)[number]['id'];
+export type PanoramaTopic = (typeof TOPICS)[number];
+export const PANORAMA_TOPICS: readonly PanoramaTopic[] = TOPICS;
 
-const TOPIC_LABELS: Record<PanoramaTopicId, { label: string; group: PanoramaTopicGroup; adminOnly?: boolean }> = {
-  'servicios.ventas': { label: 'Ventas de servicios', group: 'Ventas' },
-  'servicios.planificador': { label: 'Planificación de servicios', group: 'Servicios' },
-  'servicios.trabajos': { label: 'Trabajos de servicios', group: 'Servicios' },
-  'servicios.calendario': { label: 'Calendario de servicios', group: 'Servicios' },
-  'servicios.ordenes': { label: 'Órdenes de servicio', group: 'Servicios' },
-  'servicios.flota': { label: 'Flota de servicios', group: 'Servicios' },
-  'servicios.comisiones': { label: 'Comisiones de servicios', group: 'Servicios', adminOnly: true },
-  'parque.ventas': { label: 'Ventas de máquinas', group: 'Ventas' },
-  'parque.clientes': { label: 'Clientes de máquinas', group: 'Parque' },
-  'parque.maquinas': { label: 'Parque de máquinas', group: 'Parque' },
-  'parque.stock': { label: 'Stock de máquinas', group: 'Parque' },
-  'parque.stock_proyectado': { label: 'Stock proyectado', group: 'Parque' },
-  'parque.operaciones': { label: 'Pedidos y operaciones', group: 'Parque' },
-  'parque.importaciones': { label: 'Importaciones de máquinas', group: 'Parque' },
-  'repuestos.ventas': { label: 'Ventas de repuestos', group: 'Ventas' },
-  'repuestos.stock': { label: 'Stock de repuestos', group: 'Repuestos' },
-  'repuestos.analisis': { label: 'Análisis de repuestos', group: 'Repuestos' },
-  'repuestos.compras': { label: 'Compras de repuestos', group: 'Repuestos' },
-  'repuestos.sugerencias': { label: 'Sugerencias de compra', group: 'Repuestos' },
-};
-
-export const PANORAMA_TOPICS: readonly PanoramaTopic[] = SECTION_ROUTES
-  .filter((section): section is typeof section & { id: PanoramaTopicId } => !section.id.startsWith('admin.'))
-  .map(section => ({ ...TOPIC_LABELS[section.id], id: section.id, module: section.module, path: section.route }));
-
-export const panoramaStorageKey = (userId: string) => `sig-cdm:panorama:v3:${userId}`;
+export const panoramaStorageKey = (userId: string) => `sig-cdm:panorama:v4:${userId}`;
 
 export function availablePanoramaTopics(
   hasModule: (module: string) => boolean,
   hasSection: (section: string) => boolean,
   isAdmin: boolean,
 ) {
-  return PANORAMA_TOPICS.filter(topic => hasModule(topic.module) && hasSection(topic.id) && (!topic.adminOnly || isAdmin));
+  return PANORAMA_TOPICS.filter(topic => {
+    if ('adminOnly' in topic && topic.adminOnly && !isAdmin) return false;
+    return topic.sections.some(section => hasModule(section.split('.')[0]) && hasSection(section));
+  });
 }
 
 export function reconcilePanoramaOrder(saved: readonly string[] | null, available: readonly PanoramaTopic[]) {
-  const permitted = new Set(available.map(topic => topic.id));
+  const permitted = new Set<string>(available.map(topic => topic.id));
   return (saved ?? []).filter((id, index, all): id is PanoramaTopicId =>
-    permitted.has(id as PanoramaTopicId) && all.indexOf(id) === index,
-  ).slice(0, MAX_PANORAMA_PRIORITIES);
+    permitted.has(id) && all.indexOf(id) === index,
+  );
 }
 
 export function readPanoramaPreferences(userId: string): PanoramaTopicId[] | null {
@@ -69,6 +54,6 @@ export function readPanoramaPreferences(userId: string): PanoramaTopicId[] | nul
 
 export function savePanoramaPreferences(userId: string, topics: readonly PanoramaTopicId[]) {
   if (!userId) return;
-  try { localStorage.setItem(panoramaStorageKey(userId), JSON.stringify(topics.slice(0, MAX_PANORAMA_PRIORITIES))); }
+  try { localStorage.setItem(panoramaStorageKey(userId), JSON.stringify(topics)); }
   catch { /* The page remains usable when browser storage is unavailable. */ }
 }

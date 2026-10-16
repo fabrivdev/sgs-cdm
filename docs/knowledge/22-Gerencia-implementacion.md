@@ -30,7 +30,7 @@ Reutilizar contratos fiables de los módulos, no copiar cálculos a un component
 
 No elevar límites de consulta como sustituto de optimización. No ejecutar cinco exports completos para producir tarjetas. Cualquier nueva RPC/migración debe revisarse y entregarse para aplicación manual del usuario, sin suponer que push actualiza la base.
 
-Punto de partida: [[SIG CDM/Generado/Codigo/src__pages__Dashboard_tsx|Dashboard.tsx]], [[SIG CDM/Generado/Pantallas/servicios-dashboard|Dashboard actual]], [[SIG CDM/Generado/Modulos/administracion|Accesos]] y [[SIG CDM/Generado/Modulos/datos|Datos]]. El prototipo de Panorama está solo en `feat/campi-panorama`; `main` conserva la bienvenida «Muy pronto». La rama explora una configuración de hasta tres intereses entre 19 secciones de negocio autorizadas, sin indicadores publicados ni permiso adicional. Ver [[36-Campi-bienvenida]]. Siguen pendientes las decisiones sobre datos, sucursales, alertas y fuente de cada KPI.
+Punto de partida: [[SIG CDM/Generado/Codigo/src__pages__Dashboard_tsx|Dashboard.tsx]], [[SIG CDM/Generado/Pantallas/servicios-dashboard|Dashboard actual]], [[SIG CDM/Generado/Modulos/administracion|Accesos]] y [[SIG CDM/Generado/Modulos/datos|Datos]]. El prototipo de Panorama está solo en `feat/campi-panorama`; `main` conserva la bienvenida «Muy pronto». La rama explora trece temas concretos vinculados a secciones autorizadas, con selección y orden sin límite de tres, sin indicadores publicados ni permiso adicional. Ver [[36-Campi-bienvenida]]. Siguen pendientes las decisiones sobre datos, sucursales, alertas y fuente de cada KPI.
 
 ## Pruebas de aceptación previstas
 
