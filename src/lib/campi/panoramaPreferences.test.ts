@@ -1,6 +1,8 @@
 import { beforeEach, describe, expect, it } from 'vitest';
+import { SECTION_ROUTES } from '@/lib/permissions';
 import {
-  availablePanoramaAreas,
+  availablePanoramaTopics,
+  PANORAMA_TOPICS,
   panoramaStorageKey,
   readPanoramaPreferences,
   reconcilePanoramaOrder,
@@ -9,32 +11,39 @@ import {
 
 beforeEach(() => localStorage.clear());
 
-describe('Campi Panorama preferences', () => {
-  it('offers only routes covered by current section permissions', () => {
-    const areas = availablePanoramaAreas(section => ['parque.ventas', 'repuestos.analisis'].includes(section));
-    expect(areas.map(area => area.id)).toEqual(['ventas', 'repuestos']);
-    expect(areas[0].routes.map(route => route.path)).toEqual(['/parque-ventas']);
-    expect(areas[1].routes.map(route => route.path)).toEqual(['/repuestos/analisis']);
+describe('Campi Panorama topics', () => {
+  it('covers every business section and uses its actual route', () => {
+    expect(PANORAMA_TOPICS).toHaveLength(19);
+    expect(PANORAMA_TOPICS.map(topic => topic.id)).toEqual(SECTION_ROUTES.filter(route => !route.id.startsWith('admin.')).map(route => route.id));
+    for (const topic of PANORAMA_TOPICS) {
+      expect(topic.path).toBe(SECTION_ROUTES.find(route => route.id === topic.id)?.route);
+    }
   });
 
-  it('removes revoked priorities without adding other topics on behalf of the user', () => {
-    const areas = availablePanoramaAreas(section => ['servicios.trabajos', 'parque.importaciones'].includes(section));
-    expect(reconcilePanoramaOrder(['ventas', 'servicios'], areas)).toEqual(['servicios']);
+  it('requires both module and section access and keeps commissions admin-only', () => {
+    const allowed = availablePanoramaTopics(module => module === 'servicios', section =>
+      ['servicios.ventas', 'servicios.comisiones'].includes(section), false);
+    expect(allowed.map(topic => topic.id)).toEqual(['servicios.ventas']);
+    expect(availablePanoramaTopics(() => false, () => true, true)).toEqual([]);
+    expect(availablePanoramaTopics(() => true, () => true, true).some(topic => topic.id === 'servicios.comisiones')).toBe(true);
   });
 
-  it('limits saved priorities to three and migrates the older local order', () => {
-    savePanoramaPreferences('a', ['ventas', 'repuestos', 'parque', 'servicios']);
-    expect(readPanoramaPreferences('a')).toEqual(['ventas', 'repuestos', 'parque']);
-    localStorage.setItem('sig-cdm:panorama:v1:b', '["servicios","parque","ventas","repuestos"]');
-    expect(readPanoramaPreferences('b')).toEqual(['servicios', 'parque', 'ventas', 'repuestos']);
-    expect(reconcilePanoramaOrder(readPanoramaPreferences('b'), availablePanoramaAreas(() => true))).toHaveLength(3);
+  it('removes revoked topics, duplicates and any choice beyond three', () => {
+    const available = availablePanoramaTopics(() => true, () => true, true);
+    expect(reconcilePanoramaOrder([
+      'servicios.ventas', 'repuestos.analisis', 'servicios.ventas', 'parque.stock', 'parque.ventas',
+    ], available)).toEqual(['servicios.ventas', 'repuestos.analisis', 'parque.stock']);
+    expect(reconcilePanoramaOrder(['parque.stock', 'repuestos.analisis'], available.filter(topic => topic.id !== 'parque.stock')))
+      .toEqual(['repuestos.analisis']);
   });
 
-  it('keeps the order independent for each user in this browser', () => {
-    savePanoramaPreferences('a', ['repuestos', 'ventas']);
-    savePanoramaPreferences('b', ['servicios']);
-    expect(readPanoramaPreferences('a')).toEqual(['repuestos', 'ventas']);
-    expect(readPanoramaPreferences('b')).toEqual(['servicios']);
+  it('persists choices per user and ignores the obsolete five-area preference', () => {
+    localStorage.setItem('sig-cdm:panorama:v2:a', '["ventas","repuestos","parque"]');
+    expect(readPanoramaPreferences('a')).toBeNull();
+    savePanoramaPreferences('a', ['servicios.ventas', 'parque.stock']);
+    savePanoramaPreferences('b', ['repuestos.analisis']);
+    expect(readPanoramaPreferences('a')).toEqual(['servicios.ventas', 'parque.stock']);
+    expect(readPanoramaPreferences('b')).toEqual(['repuestos.analisis']);
     expect(localStorage.getItem(panoramaStorageKey('a'))).not.toBe(localStorage.getItem(panoramaStorageKey('b')));
   });
 });

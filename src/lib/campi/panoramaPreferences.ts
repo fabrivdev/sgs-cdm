@@ -1,67 +1,74 @@
-export type PanoramaAreaId = 'ventas' | 'repuestos' | 'parque' | 'servicios' | 'importaciones';
+import { SECTION_ROUTES, type SectionKey } from '@/lib/permissions';
 
-export interface PanoramaArea {
-  id: PanoramaAreaId;
+export type PanoramaTopicId = Exclude<SectionKey, `admin.${string}`>;
+export type PanoramaTopicGroup = 'Ventas' | 'Servicios' | 'Parque' | 'Repuestos';
+
+export interface PanoramaTopic {
+  id: PanoramaTopicId;
   label: string;
-  routes: readonly { section: string; path: string; label: string }[];
+  group: PanoramaTopicGroup;
+  module: string;
+  path: string;
+  adminOnly?: boolean;
 }
 
 export const MAX_PANORAMA_PRIORITIES = 3;
 
-export const PANORAMA_AREAS: readonly PanoramaArea[] = [
-  { id: 'ventas', label: 'Ventas y facturación', routes: [
-    { section: 'servicios.ventas', path: '/servicios/ventas', label: 'Servicios' },
-    { section: 'parque.ventas', path: '/parque-ventas', label: 'Máquinas' },
-    { section: 'repuestos.ventas', path: '/repuestos/ventas', label: 'Repuestos' },
-  ] },
-  { id: 'repuestos', label: 'Stock de repuestos', routes: [
-    { section: 'repuestos.analisis', path: '/repuestos/analisis', label: 'Análisis' },
-    { section: 'repuestos.stock', path: '/repuestos', label: 'Catálogo y stock' },
-    { section: 'repuestos.sugerencias', path: '/repuestos/sugerencias', label: 'Sugerencia de compra' },
-  ] },
-  { id: 'parque', label: 'Parque y disponibilidad', routes: [
-    { section: 'parque.stock', path: '/parque-stock', label: 'Stock' },
-    { section: 'parque.maquinas', path: '/parque-maquinas', label: 'Máquinas' },
-    { section: 'parque.operaciones', path: '/parque-operaciones', label: 'Operaciones' },
-  ] },
-  { id: 'servicios', label: 'Órdenes y trabajos', routes: [
-    { section: 'servicios.ordenes', path: '/servicios/ordenes', label: 'Órdenes de servicio' },
-    { section: 'servicios.trabajos', path: '/trabajos', label: 'Trabajos' },
-  ] },
-  { id: 'importaciones', label: 'Importaciones', routes: [
-    { section: 'parque.importaciones', path: '/parque-importaciones', label: 'Importaciones' },
-  ] },
-];
+const TOPIC_LABELS: Record<PanoramaTopicId, { label: string; group: PanoramaTopicGroup; adminOnly?: boolean }> = {
+  'servicios.ventas': { label: 'Ventas de servicios', group: 'Ventas' },
+  'servicios.planificador': { label: 'Planificación de servicios', group: 'Servicios' },
+  'servicios.trabajos': { label: 'Trabajos de servicios', group: 'Servicios' },
+  'servicios.calendario': { label: 'Calendario de servicios', group: 'Servicios' },
+  'servicios.ordenes': { label: 'Órdenes de servicio', group: 'Servicios' },
+  'servicios.flota': { label: 'Flota de servicios', group: 'Servicios' },
+  'servicios.comisiones': { label: 'Comisiones de servicios', group: 'Servicios', adminOnly: true },
+  'parque.ventas': { label: 'Ventas de máquinas', group: 'Ventas' },
+  'parque.clientes': { label: 'Clientes de máquinas', group: 'Parque' },
+  'parque.maquinas': { label: 'Parque de máquinas', group: 'Parque' },
+  'parque.stock': { label: 'Stock de máquinas', group: 'Parque' },
+  'parque.stock_proyectado': { label: 'Stock proyectado', group: 'Parque' },
+  'parque.operaciones': { label: 'Pedidos y operaciones', group: 'Parque' },
+  'parque.importaciones': { label: 'Importaciones de máquinas', group: 'Parque' },
+  'repuestos.ventas': { label: 'Ventas de repuestos', group: 'Ventas' },
+  'repuestos.stock': { label: 'Stock de repuestos', group: 'Repuestos' },
+  'repuestos.analisis': { label: 'Análisis de repuestos', group: 'Repuestos' },
+  'repuestos.compras': { label: 'Compras de repuestos', group: 'Repuestos' },
+  'repuestos.sugerencias': { label: 'Sugerencias de compra', group: 'Repuestos' },
+};
 
-export const panoramaStorageKey = (userId: string) => `sig-cdm:panorama:v2:${userId}`;
-const legacyStorageKey = (userId: string) => `sig-cdm:panorama:v1:${userId}`;
+export const PANORAMA_TOPICS: readonly PanoramaTopic[] = SECTION_ROUTES
+  .filter((section): section is typeof section & { id: PanoramaTopicId } => !section.id.startsWith('admin.'))
+  .map(section => ({ ...TOPIC_LABELS[section.id], id: section.id, module: section.module, path: section.route }));
 
-export function availablePanoramaAreas(hasSection: (section: string) => boolean) {
-  return PANORAMA_AREAS.map(area => ({
-    ...area,
-    routes: area.routes.filter(route => hasSection(route.section)),
-  })).filter(area => area.routes.length > 0);
+export const panoramaStorageKey = (userId: string) => `sig-cdm:panorama:v3:${userId}`;
+
+export function availablePanoramaTopics(
+  hasModule: (module: string) => boolean,
+  hasSection: (section: string) => boolean,
+  isAdmin: boolean,
+) {
+  return PANORAMA_TOPICS.filter(topic => hasModule(topic.module) && hasSection(topic.id) && (!topic.adminOnly || isAdmin));
 }
 
-export function reconcilePanoramaOrder(saved: readonly string[] | null, available: readonly PanoramaArea[]) {
-  const permitted = new Set(available.map(area => area.id));
-  return (saved ?? []).filter((id, index, all): id is PanoramaAreaId =>
-    permitted.has(id as PanoramaAreaId) && all.indexOf(id) === index,
+export function reconcilePanoramaOrder(saved: readonly string[] | null, available: readonly PanoramaTopic[]) {
+  const permitted = new Set(available.map(topic => topic.id));
+  return (saved ?? []).filter((id, index, all): id is PanoramaTopicId =>
+    permitted.has(id as PanoramaTopicId) && all.indexOf(id) === index,
   ).slice(0, MAX_PANORAMA_PRIORITIES);
 }
 
-export function readPanoramaPreferences(userId: string): PanoramaAreaId[] | null {
+export function readPanoramaPreferences(userId: string): PanoramaTopicId[] | null {
   if (!userId) return null;
   try {
-    const raw = localStorage.getItem(panoramaStorageKey(userId)) ?? localStorage.getItem(legacyStorageKey(userId));
+    const raw = localStorage.getItem(panoramaStorageKey(userId));
     if (!raw) return null;
     const parsed: unknown = JSON.parse(raw);
-    return Array.isArray(parsed) && parsed.every(item => typeof item === 'string') ? parsed as PanoramaAreaId[] : null;
+    return Array.isArray(parsed) && parsed.every(item => typeof item === 'string') ? parsed as PanoramaTopicId[] : null;
   } catch { return null; }
 }
 
-export function savePanoramaPreferences(userId: string, areas: readonly PanoramaAreaId[]) {
+export function savePanoramaPreferences(userId: string, topics: readonly PanoramaTopicId[]) {
   if (!userId) return;
-  try { localStorage.setItem(panoramaStorageKey(userId), JSON.stringify(areas.slice(0, MAX_PANORAMA_PRIORITIES))); }
+  try { localStorage.setItem(panoramaStorageKey(userId), JSON.stringify(topics.slice(0, MAX_PANORAMA_PRIORITIES))); }
   catch { /* The page remains usable when browser storage is unavailable. */ }
 }
