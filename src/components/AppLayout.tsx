@@ -188,7 +188,7 @@ function ModuloNavGroup({
 }
 
 export function AppLayout({ children, preview }: { children?: React.ReactNode; preview?: { modulo: string; profileName: string; levelLabel: string } }) {
-  const { user, profile, isAdmin, hasModuloAccess, hasSectionAccess, can, signOut, roles, moduloAccess } = useAuth();
+  const { user, profile, isAdmin, isGerencia, hasModuloAccess, hasSectionAccess, can, signOut, roles, moduloAccess } = useAuth();
   const unseen = useUnseen();
   const location = useLocation();
   const navigate = useNavigate();
@@ -340,7 +340,7 @@ export function AppLayout({ children, preview }: { children?: React.ReactNode; p
                     Administración
                   </DropdownMenuItem>
                 )}
-                {!preview && user && <DropdownMenuItem className="hidden lg:flex [@media(pointer:coarse)]:hidden" onClick={() => window.dispatchEvent(new Event(OPEN_CAMPI_EVENT))}>
+                {!preview && user && isGerencia && <DropdownMenuItem className="hidden lg:flex [@media(pointer:coarse)]:hidden" onClick={() => window.dispatchEvent(new Event(OPEN_CAMPI_EVENT))}>
                   <Sparkles className="mr-2 h-4 w-4" />
                   Conocer a Campi
                 </DropdownMenuItem>}
@@ -357,7 +357,7 @@ export function AppLayout({ children, preview }: { children?: React.ReactNode; p
           <div key={location.pathname} className="min-w-0 app-page-enter">{children ?? <Outlet />}</div>
         </main>
 
-        {!preview && user && <CampiDesktopSlot userId={user.id} />}
+        {!preview && user && isGerencia && <CampiDesktopSlot userId={user.id} />}
         {AI_ASSISTANT_ENABLED && <AIAssistant />}
         <HelpDrawer open={helpOpen} onOpenChange={setHelpOpen} />
 

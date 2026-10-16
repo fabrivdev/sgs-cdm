@@ -4,7 +4,7 @@ import { MemoryRouter, useLocation } from "react-router-dom";
 import { AppLayout } from "./AppLayout";
 
 const { auth } = vi.hoisted(() => ({ auth: {
-  user: null, profile: { nombre: "Usuario Demo", sucursal: "Santa Rita" }, isAdmin: true,
+  user: null as { id: string } | null, profile: { nombre: "Usuario Demo", sucursal: "Santa Rita" }, isAdmin: true, isGerencia: false,
   roles: ["admin"], moduloAccess: ["parque", "servicios", "repuestos"],
   can: vi.fn(() => true), hasModuloAccess: vi.fn((_module: string) => true),
   hasSectionAccess: vi.fn((_section: string) => true), signOut: vi.fn(),
@@ -13,6 +13,7 @@ vi.mock("@/hooks/useAuth", () => ({ useAuth: () => auth }));
 vi.mock("@/hooks/useUnseen", () => ({ useUnseen: () => 12 }));
 vi.mock("@/hooks/use-mobile", () => ({ useIsMobile: () => true }));
 vi.mock("@/components/assistant/AIAssistant", () => ({ AIAssistant: () => null }));
+vi.mock("@/components/campi/CampiDesktopSlot", () => ({ CampiDesktopSlot: ({ userId }: { userId: string }) => <div data-testid="campi-slot">{userId}</div> }));
 vi.mock("@/components/parque/MachineSaleNotificationDialog", () => ({ MachineSaleNotificationDialog: () => null }));
 vi.mock("@/components/parque/MachineStockReturnNotificationDialog", () => ({ MachineStockReturnNotificationDialog: () => null }));
 vi.mock("@/integrations/supabase/client", () => ({ supabase: {} }));
@@ -20,6 +21,8 @@ vi.mock("@/integrations/supabase/client", () => ({ supabase: {} }));
 beforeEach(() => {
   vi.stubGlobal("ResizeObserver", class { observe() {} unobserve() {} disconnect() {} });
   auth.isAdmin = true;
+  auth.isGerencia = false;
+  auth.user = null;
   auth.hasModuloAccess.mockReturnValue(true);
   auth.hasSectionAccess.mockReturnValue(true);
 });
@@ -30,6 +33,21 @@ function setup(path = "/parque-ventas") {
 }
 
 describe("shared mobile header", () => {
+  it("shows Campi and its account action only to Gerencia", async () => {
+    auth.user = { id: "user-1" };
+    setup();
+    expect(screen.queryByTestId("campi-slot")).not.toBeInTheDocument();
+    fireEvent.keyDown(screen.getByRole("button", { name: "Abrir menú de cuenta" }), { key: "Enter" });
+    await screen.findByRole("menuitem", { name: "Cerrar sesión" });
+    expect(screen.queryByText("Conocer a Campi")).not.toBeInTheDocument();
+    cleanup();
+
+    auth.isGerencia = true;
+    setup();
+    expect(screen.getByTestId("campi-slot")).toHaveTextContent("user-1");
+    fireEvent.keyDown(screen.getByRole("button", { name: "Abrir menú de cuenta" }), { key: "Enter" });
+    expect(await screen.findByText("Conocer a Campi")).toBeInTheDocument();
+  });
   it.each(["/parque-ventas", "/servicios/ventas", "/repuestos/ventas", "/parque-stock"])("groups the logo and name on %s with named icon controls", path => {
     setup(path);
     const header = within(screen.getByRole("banner"));
