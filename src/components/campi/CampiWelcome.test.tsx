@@ -18,30 +18,29 @@ describe('Campi introduction', () => {
     expect(screen.queryByRole('textbox')).not.toBeInTheDocument();
     expect(screen.queryByRole('button', { name: '¡Hola, Campi!' })).not.toBeInTheDocument();
     expect(screen.queryByRole('button', { name: 'Hasta pronto' })).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Ocultar a Campi' })).not.toBeInTheDocument();
     expect(localStorage.getItem(campiStorageKey('a'))).toBe('seen');
   });
-  it('closes with Escape and can reopen from the edge', () => {
+  it('closes with Escape, stays gone, and reopens only from the account menu', () => {
     render(<><button aria-label="Abrir menú de cuenta">Cuenta</button><CampiWelcome userId="a" /></>);
     fireEvent.keyDown(screen.getByRole('button', { name: 'Cerrar bienvenida de Campi' }), { key: 'Escape' });
     expect(screen.getByRole('button', { name: 'Abrir menú de cuenta' })).toHaveFocus();
     act(() => vi.advanceTimersByTime(720));
-    expect(screen.queryByText('¡Hola! Soy Campi.')).not.toBeInTheDocument();
-    act(() => vi.advanceTimersByTime(90000));
-    const trigger = screen.getByRole('button', { name: 'Abrir bienvenida de Campi' });
-    expect(document.querySelectorAll('.campi-peek img')).toHaveLength(2);
-    expect([...document.querySelectorAll<HTMLImageElement>('.campi-peek img')].map(image => image.src)).toEqual(expect.arrayContaining([expect.stringContaining('campi-curious.webp'), expect.stringContaining('campi-run.webp')]));
-    fireEvent.click(trigger);
+    expect(screen.queryByRole('complementary')).not.toBeInTheDocument();
+    act(() => vi.advanceTimersByTime(180000));
+    expect(screen.queryByRole('complementary')).not.toBeInTheDocument();
+    act(() => window.dispatchEvent(new Event(OPEN_CAMPI_EVENT)));
     expect(screen.getByText('¡Hola! Soy Campi.')).toBeInTheDocument();
     fireEvent.keyDown(screen.getByRole('button', { name: 'Cerrar bienvenida de Campi' }), { key: 'Escape' });
     act(() => vi.advanceTimersByTime(720));
-    expect(screen.queryByText('¡Hola! Soy Campi.')).not.toBeInTheDocument();
+    expect(screen.queryByRole('complementary')).not.toBeInTheDocument();
   });
-  it('hides persistently for that user and is recoverable from the account menu event', () => {
+  it('keeps the closed welcome dismissed after reload and recovers from the account menu', () => {
     const view = render(<CampiWelcome userId="a" />);
-    fireEvent.click(screen.getByText('Ocultar a Campi'));
-    expect(screen.getByRole('complementary')).toHaveAttribute('data-state', 'hiding');
+    fireEvent.click(screen.getByRole('button', { name: 'Cerrar bienvenida de Campi' }));
+    expect(screen.getByRole('complementary')).toHaveAttribute('data-state', 'farewell');
     expect(document.querySelector('.campi-sprite')).toHaveAttribute('data-action', 'run');
-    expect(localStorage.getItem(campiStorageKey('a'))).toBe('hidden');
+    expect(localStorage.getItem(campiStorageKey('a'))).toBe('seen');
     act(() => vi.advanceTimersByTime(720));
     expect(screen.queryByRole('complementary')).not.toBeInTheDocument();
     act(() => vi.advanceTimersByTime(180000));
@@ -53,9 +52,9 @@ describe('Campi introduction', () => {
     expect(screen.getByText('¡Hola! Soy Campi.')).toBeInTheDocument();
     expect(localStorage.getItem(campiStorageKey('b'))).toBeNull();
   });
-  it('returns focus to the account control when hidden', () => {
+  it('returns focus to the account control when closed', () => {
     render(<><button aria-label="Abrir menú de cuenta">Cuenta</button><CampiWelcome userId="a" /></>);
-    fireEvent.click(screen.getByText('Ocultar a Campi'));
+    fireEvent.click(screen.getByRole('button', { name: 'Cerrar bienvenida de Campi' }));
     expect(screen.getByRole('button', { name: 'Abrir menú de cuenta' })).toHaveFocus();
   });
   it('shows a curious face on pointer hover and restores it on leave', () => {
@@ -73,22 +72,24 @@ describe('Campi introduction', () => {
     expect(screen.queryByRole('complementary')).not.toBeInTheDocument();
     expect(localStorage.getItem(campiStorageKey('a'))).toBeNull();
   });
-  it('does not peek when reduced motion is requested', () => {
-    reduced = true; localStorage.setItem(campiStorageKey('a'), 'seen');
+  it('respects reduced motion and finishes closing without a peek', () => {
+    reduced = true;
     render(<CampiWelcome userId="a" />);
+    fireEvent.click(screen.getByRole('button', { name: 'Cerrar bienvenida de Campi' }));
+    act(() => vi.advanceTimersByTime(0));
     act(() => vi.advanceTimersByTime(180000));
-    expect(screen.getByRole('complementary')).toHaveAttribute('data-state', 'tucked');
+    expect(screen.queryByRole('complementary')).not.toBeInTheDocument();
   });
-  it('peeks with only a head and one hand, once per visit', () => {
+  it('shows the automatic welcome only once per user and browser', () => {
     localStorage.setItem(campiStorageKey('a'), 'seen');
     render(<CampiWelcome userId="a" />);
-    act(() => vi.advanceTimersByTime(90000));
-    expect(screen.getByRole('complementary')).toHaveAttribute('data-state', 'peeking');
-    expect(document.querySelectorAll('.campi-peek img')).toHaveLength(2);
-    act(() => vi.advanceTimersByTime(2800));
-    expect(screen.getByRole('complementary')).toHaveAttribute('data-state', 'tucked');
-    act(() => vi.advanceTimersByTime(180000));
-    expect(screen.getByRole('complementary')).toHaveAttribute('data-state', 'tucked');
+    expect(screen.queryByRole('complementary')).not.toBeInTheDocument();
+    localStorage.setItem(campiStorageKey('old'), 'hidden');
+    render(<CampiWelcome userId="old" />);
+    expect(screen.queryByRole('complementary')).not.toBeInTheDocument();
+    render(<CampiWelcome userId="b" />);
+    expect(screen.getByText('¡Hola! Soy Campi.')).toBeInTheDocument();
+    expect(localStorage.getItem(campiStorageKey('b'))).toBe('seen');
   });
   it('yields visibility and timers while a dialog is present', async () => {
     render(<CampiWelcome userId="a" />);
@@ -100,12 +101,16 @@ describe('Campi introduction', () => {
     await act(async () => modal.remove());
     expect(screen.getByRole('complementary')).toHaveStyle({ visibility: 'visible' });
   });
+  it('does not count a welcome hidden behind an existing dialog as seen', async () => {
+    const modal = document.createElement('div'); modal.setAttribute('aria-modal', 'true');
+    document.body.appendChild(modal);
+    render(<CampiWelcome userId="a" />);
+    expect(localStorage.getItem(campiStorageKey('a'))).toBeNull();
+    await act(async () => modal.remove());
+    expect(localStorage.getItem(campiStorageKey('a'))).toBe('seen');
+  });
   it('has predictable finite transitions and never revives hidden on a timer', () => {
-    expect(transitionCampi('farewell', 'settled')).toBe('tucked');
-    expect(transitionCampi('tucked', 'peek')).toBe('peeking');
-    expect(transitionCampi('peeking', 'rest')).toBe('tucked');
-    expect(transitionCampi('hidden', 'peek')).toBe('hidden');
-    expect(transitionCampi('hiding', 'settled')).toBe('hidden');
-    expect(transitionCampi('hidden', 'hide')).toBe('hidden');
+    expect(transitionCampi('farewell', 'settled')).toBe('hidden');
+    expect(transitionCampi('hidden', 'close')).toBe('hidden');
   });
 });

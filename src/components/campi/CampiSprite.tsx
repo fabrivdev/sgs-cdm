@@ -37,7 +37,7 @@ export function CampiSprite({ state, active, reduced, curious = false, action = 
   }, [state, active, reduced, action]);
 
   if (action !== 'neutral') return <CampiActionSprite action={action} active={active} reduced={reduced} />;
-  const visibleFace = state === 'peeking' && active ? 'curious' : curious && active && (state === 'idle' || state === 'tucked' || state === 'peeking') ? 'curious' : face;
+  const visibleFace = curious && active && state === 'idle' ? 'curious' : face;
   return <span className="campi-sprite" data-pose={pose} data-face={visibleFace} aria-hidden="true">
     <img src={ASSETS[pose]} alt="" draggable={false} data-frame={pose} className="campi-frame is-current" />
     {visibleFace !== 'rest' && <img src={ASSETS[visibleFace]} alt="" draggable={false} data-frame={visibleFace} className="campi-frame campi-face is-current" />}
