@@ -8,7 +8,7 @@ import type { PanoramaStory, StoryDatum, StoryUnit } from '@/lib/campi/panoramaS
 
 const numbers = new Intl.NumberFormat('es-PY', { maximumFractionDigits: 2 });
 const compact = new Intl.NumberFormat('es-PY', { notation: 'compact', maximumFractionDigits: 1 });
-const storyValue = (value: number | null, unit: StoryUnit) => value === null || !Number.isFinite(value) ? '—' : `${unit === 'USD' ? '$ ' : unit === 'PYG' ? '₲ ' : ''}${numbers.format(value)}${unit === 'percent' ? '%' : ''}`;
+const storyValue = (value: number | null, unit: StoryUnit) => value === null || !Number.isFinite(value) ? '—' : `${unit === 'USD' ? '$ ' : unit === 'PYG' ? '₲ ' : ''}${numbers.format(value)}${unit === 'percent' ? '%' : unit === 'days' ? ' días' : ''}`;
 const dateLabel = (value: string) => new Intl.DateTimeFormat('es-PY').format(new Date(`${value}T12:00:00`));
 
 function Datum({ datum, primary = false }: { datum: StoryDatum; primary?: boolean }) {
@@ -90,7 +90,7 @@ export function StoryPanel({ story, index, onRetry, retrying, visitChange = null
         </>}</dl>
         {percentage && <div className="story-percentage" data-kind={percentage.kind} data-direction={percentage.value < 0 ? 'down' : 'up'}><strong>{percentage.kind === 'variation' && percentage.value > 0 ? '+' : ''}{numbers.format(percentage.value)}%</strong><span>{percentage.kind === 'variation' ? 'Variación' : percentage.label}</span></div>}
       </div>
-      {story.id === 'maquinas_proyeccion' && story.primary?.value === 0 && story.supporting.length ? <ProjectionComponents story={story} /> : story.primary?.comparison && story.primary.value !== null && Number.isFinite(story.primary.value) && Number.isFinite(story.primary.comparison.value) && story.primary.value >= 0 && story.primary.comparison.value >= 0 ? <StoryComparisonChart current={story.primary.value} previous={story.primary.comparison.value} label={story.primary.label} unit={story.primary.unit} /> : story.chart && story.chart.rows.length > 0 ? <StoryChart chart={story.chart} mini /> : <p className="story-no-chart">{story.message}</p>}
+      {story.id === 'maquinas_proyeccion' && ['Stock calculado', 'Compras pendientes', 'Ventas pendientes'].every(label => story.supporting.some(item => item.label === label)) ? <ProjectionComponents story={story} /> : story.primary?.comparison && story.primary.value !== null && Number.isFinite(story.primary.value) && Number.isFinite(story.primary.comparison.value) && story.primary.value >= 0 && story.primary.comparison.value >= 0 ? <StoryComparisonChart current={story.primary.value} previous={story.primary.comparison.value} label={story.primary.label} unit={story.primary.unit} /> : story.chart && story.chart.rows.length > 0 ? <StoryChart chart={story.chart} mini /> : <p className="story-no-chart">{story.message}</p>}
       <Dialog><DialogTrigger asChild><Button variant="outline" className="story-detail-trigger" aria-label={`Ver detalle de ${story.title}`}>Ver detalle <ArrowRight className="ml-2 h-4 w-4" /></Button></DialogTrigger>
         <DialogContent className="panorama-story-dialog"><DialogHeader><DialogTitle>{story.question}</DialogTitle><DialogDescription>{story.scope} · {story.periodLabel}{story.cutoff && ` · Corte: ${dateLabel(story.cutoff)}`}</DialogDescription></DialogHeader>
           <p className="story-conclusion">{story.message}</p>

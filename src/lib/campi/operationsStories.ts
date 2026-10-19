@@ -11,7 +11,7 @@ const day = (v: unknown): string | null => {
   return Number.isFinite(stamp) && new Date(stamp).toISOString().slice(0, 10) === v ? v : null;
 };
 const definitions: Partial<Record<StoryTopicId, { title: string; question: string; section: SectionKey; route: string; source: string }>> = {
-  repuestos_sucursales: { title: 'Repuestos por sucursal', question: '¿Dónde está distribuido el stock?', section: 'repuestos.analisis', route: '/repuestos/analisis', source: 'repuestos_analisis_valorizado · sucursales' },
+  repuestos_sucursales: { title: 'Antigüedad de repuestos por sucursal', question: '¿Cuánto tiempo hace desde la última compra por sucursal?', section: 'repuestos.analisis', route: '/repuestos/analisis', source: 'repuestos_analisis_valorizado · sucursales' },
   repuestos_stock: { title: 'Situación del stock de repuestos', question: '¿Qué stock necesita atención?', section: 'repuestos.analisis', route: '/repuestos/analisis', source: 'repuestos_analisis_valorizado · semáforo histórico' },
   maquinas_pedidos: { title: 'Pedidos de máquinas pendientes', question: '¿Qué unidades de pedidos siguen sin facturar?', section: 'parque.operaciones', route: '/parque-operaciones', source: 'maquinaria_pedidos_lineas_estado_actual + maquinaria_unidades_facturadas_confirmadas' },
   maquinas_stock: { title: 'Stock físico de máquinas', question: '¿Qué existencias informa la última foto?', section: 'parque.stock', route: '/parque-stock', source: 'parque_stock_maquinas · saldo_actual' },
@@ -33,16 +33,18 @@ function parts(id: StoryTopicId, data: SemaforoResultado): PanoramaStory {
   story.primary = { label: 'Valor Kardex referencial', value, unit: 'USD' };
   story.supporting = [{ label: 'Códigos con stock', value: total, unit: 'count' }, { label: 'Ubicaciones sin valor', value: number(data.ubicaciones_sin_valor), unit: 'count' }];
   if (id === 'repuestos_sucursales') {
-    const leading = data.sucursales.filter(r => number(r.valor_kardex_usd) !== null).sort((a, b) => b.valor_kardex_usd! - a.valor_kardex_usd!)[0];
-    story.primary = { label: leading ? `Mayor valor · ${leading.nombre}` : 'Mayor valor por sucursal', value: number(leading?.valor_kardex_usd), unit: 'USD' };
-    story.supporting.push({ label: 'Valor Kardex total', value, unit: 'USD' });
-    story.message = total ? leading ? `${leading.nombre} concentra el mayor valor Kardex registrado por sucursal.` : 'No se informó valor Kardex por sucursal.' : 'Sin productos dentro del universo del análisis.';
-    story.chart = { kind: 'bars', title: 'Valor Kardex por sucursal', unit: 'USD', rows: data.sucursales.flatMap(r => number(r.valor_kardex_usd) === null ? [] : [{ label: r.nombre, value: r.valor_kardex_usd! }]) };
-    story.breakdown = data.sucursales.flatMap(r => [
-      ...(number(r.valor_kardex_usd) === null ? [] : [{ label: r.nombre, value: r.valor_kardex_usd!, unit: 'USD' as const }]),
-      { label: `${r.nombre} · unidades`, value: required(r.unidades), unit: 'count' as const, note: number(r.valor_kardex_usd) === null ? 'Valor Kardex no disponible' : undefined },
-    ]);
-    story.details.push('Los códigos presentes en varias sucursales no son sumables como códigos únicos. Las ventas históricas del semáforo son globales, no ventas locales.');
+    const branches = data.sucursales.map(r => ({ name: r.nombre, days: number(r.dias_compra_promedio), dated: number(r.valor_compra_con_fecha_usd), positive: number(r.valor_positivo_usd) }));
+    if (branches.some(r => r.dated === null || r.positive === null || r.dated < 0 || r.positive < 0 || r.dated > r.positive || (r.days === null) !== (r.dated === 0))) throw new Error('Cobertura de compras por sucursal incompleta.');
+    const measured = branches.filter(r => r.days !== null && r.dated! > 0);
+    const dated = branches.reduce((sum, r) => sum + r.dated!, 0);
+    const positive = branches.reduce((sum, r) => sum + r.positive!, 0);
+    const average = dated > 0 ? measured.reduce((sum, r) => sum + r.days! * r.dated!, 0) / dated : null;
+    story.primary = { label: 'Días desde última compra', value: average, unit: 'days' };
+    story.supporting = [{ label: 'Valor con compra fechada', value: dated, unit: 'USD' }, { label: 'Cobertura del valor positivo', value: positive > 0 ? dated / positive * 100 : null, unit: 'percent' }];
+    story.message = average === null ? 'No hay valor positivo con última compra comprobada para calcular la antigüedad.' : 'Antigüedad de la última compra por sucursal, ponderada por valor USD positivo con fecha.';
+    story.chart = { kind: 'bars', title: 'Días desde última compra por sucursal', unit: 'days', rows: measured.map(r => ({ label: r.name, value: r.days! })) };
+    story.breakdown = measured.map(r => ({ label: r.name, value: r.days!, unit: 'days', note: `Cobertura: ${new Intl.NumberFormat('es-PY', { maximumFractionDigits: 1 }).format(r.dated! / r.positive! * 100)}% del valor positivo.` }));
+    story.details.push('Cada promedio usa el valor USD positivo de esa sucursal con fecha de compra comprobada. El promedio general pondera las sucursales por ese mismo valor; sin fecha o sin valor positivo quedan fuera.', 'Los códigos presentes en varias sucursales no son sumables como códigos únicos. Las ventas históricas del semáforo son globales, no ventas locales.');
   } else {
     story.message = total ? 'Semáforo de ventas de tres años calendario y última compra comprobada.' : 'Sin productos dentro del universo del análisis.';
     story.chart = { kind: 'bars', title: 'Valor Kardex por semáforo', unit: 'USD', rows: data.por_color.flatMap(r => number(r.valor_kardex_usd) === null ? [] : [{ label: SEMAFORO_COLORES.find(c => c.id === r.color)?.label ?? r.color, value: r.valor_kardex_usd! }]) };
@@ -52,7 +54,6 @@ function parts(id: StoryTopicId, data: SemaforoResultado): PanoramaStory {
     });
     const red = data.por_color.find(r => r.color === 'ROJO');
     story.supporting.push({ label: 'Rojo · valor Kardex', value: number(red?.valor_kardex_usd), unit: 'USD', note: 'Sin ventas en tres años; última compra hace más de 1.000 días.' });
-    story.attention = (number(red?.lineas) ?? 0) > 0;
     story.details.push('Sin equivalencia no significa sin movimiento. Sin datos significa sin ventas trianuales y sin compra comprobada.', 'Rotación no disponible: el RPC declara SIN_BASE_COMPARABLE; no se deriva una tasa de los colores.');
   }
   return story;
@@ -70,14 +71,12 @@ async function projected(asOf: string) {
   story.cutoff = asOf; story.periodLabel = `Corte ${asOf}`;
   story.scope = `Máquinas nuevas · apertura ${raw.disponible_desde}`;
   story.status = rows.length ? 'ready' : 'empty';
-  const negativeModels = rows.filter(r => r.value < 0).length;
-  story.message = negativeModels ? `${negativeModels} modelos tienen saldo proyectado negativo; revisá sus componentes en el detalle.` : 'No hay modelos con saldo proyectado negativo.';
-  story.primary = { label: 'Modelos con saldo negativo', value: negativeModels, unit: 'count' };
-  story.supporting = [{ label: 'Stock calculado', value: sum('stock'), unit: 'count' }, { label: 'Compras pendientes', value: sum('compras'), unit: 'count' }, { label: 'Ventas pendientes', value: sum('ventas'), unit: 'count' }, { label: 'Saldo proyectado total', value: sum('value'), unit: 'count', note: 'Suma algebraica de todos los modelos; puede ocultar saldos negativos individuales.' }];
-  story.chart = { kind: 'bars', title: 'Saldo proyectado por modelo', rows: [...rows].sort((a,b) => a.value-b.value).slice(0, 10).map(({ label, value }) => ({ label, value })), unit: 'count' };
+  story.message = 'Saldo calculado de máquinas nuevas después de sumar compras pendientes y restar ventas pendientes.';
+  story.primary = { label: 'Saldo proyectado', value: sum('value'), unit: 'count' };
+  story.supporting = [{ label: 'Stock calculado', value: sum('stock'), unit: 'count' }, { label: 'Compras pendientes', value: sum('compras'), unit: 'count' }, { label: 'Ventas pendientes', value: sum('ventas'), unit: 'count' }];
+  story.chart = { kind: 'bars', title: 'Saldo proyectado por modelo', rows: [...rows].sort((a,b) => b.value-a.value).slice(0, 10).map(({ label, value }) => ({ label, value })), unit: 'count' };
   story.breakdown = rows.map(r => ({ label: r.label, value: r.value, unit: 'count', note: `Stock ${r.stock} + compras ${r.compras} − ventas ${r.ventas}` }));
-  story.details = ['Saldo calculado desde la apertura, distinto de la foto física del Stock.', 'Los arribos se reconocen por ATA real; ETA y entrega física no sustituyen facturación.', 'El gráfico muestra hasta 10 modelos de menor saldo; el detalle incluye todos.'];
-  story.attention = rows.some(r => r.value < 0);
+  story.details = ['Saldo calculado desde la apertura, distinto de la foto física del Stock. Es una suma algebraica entre modelos: no acredita que un modelo pueda cubrir la venta pendiente de otro.', 'Los arribos se reconocen por ATA real; ETA y entrega física no sustituyen facturación.', 'El gráfico muestra hasta 10 modelos con mayor saldo; el detalle incluye todos.'];
   return story;
 }
 
@@ -142,7 +141,6 @@ async function serviceOrders(asOf: string) {
   story.chart = { kind: 'bars', title: `Antigüedad de abiertas al ${asOf}`, rows, unit: 'count' };
   story.breakdown = rows.map(r => ({...r, unit: 'count'}));
   story.details = [`Antigüedad calculada al ${asOf}; el corte de actualización de la fuente no está informado.`, 'Solo estados que contienen Abierta se incluyen; canceladas, anuladas y estados desconocidos no se presumen pendientes.', 'La fecha y situación de facturación no deciden si una OS está abierta. Estas consultas independientes no son una foto transaccional.'];
-  story.attention = older > 0;
   return story;
 }
 

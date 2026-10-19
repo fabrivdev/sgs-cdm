@@ -8,8 +8,12 @@ function response(name: string, args: Record<string, string>) {
   const year = args.p_desde.slice(0, 4);
   const start = Number(args.p_desde.slice(5, 7)), end = Number(args.p_hasta.slice(5, 7));
   const value = year === '2025' ? 50 : name === parts ? 100 : name.includes('servicios') ? -20 : 200;
-  const periodos = Array.from({ length: end - start + 1 }, (_, i) => ({ periodo: `${year}-${String(start + i).padStart(2, '0')}-01`, [amount]: value, clientes: 3 }));
-  return { data: { resumen: { [amount]: value * periodos.length, clientes: 7 }, periodos }, error: null };
+  const credit = value < 0 ? 20 : name === parts ? 20 : 0;
+  const gross = value + credit;
+  const components = name === parts ? { ventas: gross, notas_credito: -credit } : { venta_bruta: gross, notas_credito_monto: credit };
+  const periodos = Array.from({ length: end - start + 1 }, (_, i) => ({ periodo: `${year}-${String(start + i).padStart(2, '0')}-01`, [amount]: value, ...components }));
+  const summaryComponents = Object.fromEntries(Object.entries(components).map(([key, item]) => [key, item * periodos.length]));
+  return { data: { resumen: { [amount]: value * periodos.length, ...summaryComponents, ...(name.includes('servicios') ? { nc_sign_conflicts: 0 } : {}) }, periodos }, error: null } as { data: { resumen: Record<string, number>; periodos: Array<Record<string, number | string>> }; error: null };
 }
 beforeEach(() => { rpc.mockReset(); rpc.mockImplementation(async (name, args) => response(name, args)); });
 describe('sales story source contracts', () => {
@@ -19,22 +23,25 @@ describe('sales story source contracts', () => {
     const [story] = await loadSalesStories(['ventas_facturacion', 'repuestos_clientes'], ['servicios.ventas'], '2026-10-16');
     expect(rpc).toHaveBeenCalledTimes(2);
     expect(story.sections).toEqual(['servicios.ventas']);
-    expect(story.primary?.value).toBe(-20);
+    expect(story.primary?.value).toBe(0);
   });
-  it('sums authorized net billing and reuses periods with no duplicated client calls', async () => {
+  it('sums authorized gross sales, keeps credit notes separate, and reuses parts sales', async () => {
     const [billing, clients] = await loadSalesStories(['ventas_facturacion', 'repuestos_clientes'], ['repuestos.ventas', 'servicios.ventas', 'parque.ventas'], '2026-10-16');
-    expect(rpc).toHaveBeenCalledTimes(6);
-    expect(billing.primary).toMatchObject({ value: 280, unit: 'USD', comparison: { value: 150 } });
+    expect(rpc).toHaveBeenCalledTimes(9);
+    expect(billing.primary).toMatchObject({ value: 320, unit: 'USD', comparison: { value: 170 } });
+    expect(billing.supporting[0].value).toBe(-40);
     expect(billing.supporting[1].value).toBe(280);
-    expect(billing.supporting[2].value).toBe(2800);
-    expect(billing.chart?.rows).toHaveLength(10);
+    expect(billing.supporting[3].value).toBe(3200);
+    expect(billing.chart?.rows).toHaveLength(3);
     expect(billing.cutoff).toBeNull();
-    expect(clients.primary?.value).toBe(3);
-    expect(clients.supporting[2].value).toBe(7); // DISTINCT over YTD, never 3 * 10.
-    expect(clients.details.join(' ')).toContain('No equivale a compradores positivos');
+    expect(clients.primary?.value).toBe(120);
+    expect(clients.supporting.find(item => item.label === 'Ventas acumuladas')?.value).toBe(1200);
+    expect(clients.supporting.find(item => item.label === 'Notas de crédito del mes')?.value).toBe(-20);
+    expect(clients.supporting.find(item => item.label === 'Facturación neta de repuestos')?.value).toBe(100);
+    expect(clients.details.join(' ')).toContain('compradores efectivos');
     expect(rpc).toHaveBeenCalledWith(parts, expect.objectContaining({ p_desde: '2025-01-01', p_hasta: '2025-10-16', p_agrupacion: 'mes' }));
   });
-  it('invalidates consolidated totals on any source failure but keeps independent clients', async () => {
+  it('invalidates consolidated totals on any source failure but keeps independent repuestos composition', async () => {
     rpc.mockImplementation(async (name, args) => name.includes('servicios') ? { data: null, error: { message: 'timeout' } } : response(name, args));
     const [billing, clients] = await loadSalesStories(['ventas_facturacion', 'repuestos_clientes'], ['repuestos.ventas', 'servicios.ventas'], '2026-10-16');
     expect(billing).toMatchObject({ status: 'error', primary: null, chart: null, breakdown: [] });
@@ -51,12 +58,14 @@ describe('sales story source contracts', () => {
     rpc.mockImplementation(async (name, args) => {
       const result = response(name, args);
       result.data.resumen.facturado = 0;
-      result.data.periodos.forEach(row => { row.facturado = 0; });
+      result.data.resumen.ventas = 0;
+      result.data.resumen.notas_credito = 0;
+      result.data.periodos.forEach(row => { row.facturado = 0; row.ventas = 0; row.notas_credito = 0; });
       return result;
     });
     const [story] = await loadSalesStories(['ventas_facturacion'], ['repuestos.ventas'], '2026-10-16');
     expect(story.primary?.value).toBe(0);
-    expect(story.supporting[0].value).toBeNull();
+    expect(story.supporting[2].value).toBeNull();
     expect(salesChange(10, 0)).toBeNull();
     expect(salesChange(0, -10)).toBe(100);
   });
@@ -97,21 +106,51 @@ describe('sales story source contracts', () => {
     }
   });
   it('uses zero for absent machine groups only after reconciling a complete sparse aggregate', async () => {
-    rpc.mockImplementation(async () => ({ data: { resumen: { total: 0 }, periodos: [] }, error: null }));
+    rpc.mockImplementation(async () => ({ data: { resumen: { total: 0, venta_bruta: 0, notas_credito_monto: 0 }, periodos: [] }, error: null }));
     const [story] = await loadSalesStories(['ventas_facturacion'], ['parque.ventas'], '2026-10-16');
     expect(story.status).toBe('ready');
     expect(story.primary?.value).toBe(0);
-    expect(story.chart?.rows).toHaveLength(10);
+    expect(story.chart?.rows).toHaveLength(1);
   });
-  it('rejects unavailable or negative client counts independently of known money', async () => {
+  it('rejects unbalanced sales and credit notes independently of known net billing', async () => {
     rpc.mockImplementation(async (name, args) => {
       const result = response(name, args);
-      result.data.resumen.clientes = -1;
+      result.data.resumen.ventas = 999;
       return result;
     });
     const [billing, clients] = await loadSalesStories(['ventas_facturacion', 'repuestos_clientes'], ['repuestos.ventas'], '2026-10-16');
-    expect(billing.status).toBe('ready');
+    expect(billing.status).toBe('error');
     expect(clients).toMatchObject({ status: 'error', primary: null });
+  });
+  it('does not let a machine credit note erase positive sales in the headline', async () => {
+    rpc.mockImplementation(async (name, args) => {
+      const result = response(name, args);
+      if (args.p_desde.startsWith('2026-') && args.p_hasta.startsWith('2026-10')) {
+        const net = name === parts ? 110483.09 : name.includes('servicios') ? 32264.06 : -140000.30;
+        const gross = name === parts ? 182886.19 : name.includes('servicios') ? 32264.06 : 0;
+        const credit = gross - net;
+        const october = result.data.periodos.find(row => row.periodo === '2026-10-01')!;
+        for (const [field, value] of Object.entries({ [parts === name ? 'facturado' : 'total']: net, [parts === name ? 'ventas' : 'venta_bruta']: gross, [parts === name ? 'notas_credito' : 'notas_credito_monto']: parts === name ? -credit : credit })) {
+          result.data.resumen[field] += value - Number(october[field]);
+          october[field] = value;
+        }
+      }
+      return result;
+    });
+    const [billing] = await loadSalesStories(['ventas_facturacion'], ['repuestos.ventas', 'servicios.ventas', 'parque.ventas'], '2026-10-16');
+    expect(billing.status).toBe('ready');
+    expect(billing.primary?.value).toBeCloseTo(215150.25, 2);
+    expect(billing.supporting[0].value).toBeCloseTo(-212403.40, 2);
+    expect(billing.supporting[1].value).toBeCloseTo(2746.85, 2);
+  });
+  it('refuses gross service sales when credit-note signs contradict their document type', async () => {
+    rpc.mockImplementation(async (name, args) => {
+      const result = response(name, args);
+      if (name.includes('servicios')) result.data.resumen.nc_sign_conflicts = 1;
+      return result;
+    });
+    const [billing] = await loadSalesStories(['ventas_facturacion'], ['servicios.ventas'], '2026-10-16');
+    expect(billing).toMatchObject({ status: 'error', primary: null });
   });
 
 });

@@ -8,7 +8,7 @@ import { storyVisitComparison, type StoryVisitSnapshot } from '@/lib/campi/panor
 import type { PanoramaStory } from '@/lib/campi/panoramaStoryTypes';
 import { CampiPanoramaAvatar } from './CampiPanoramaAvatar';
 
-const valueLabel = (value: number, unit: string) => `${unit === 'USD' ? 'USD ' : unit === 'PYG' ? '₲ ' : ''}${new Intl.NumberFormat('es-PY', { maximumFractionDigits: 2 }).format(value)}${unit === 'percent' ? '%' : ''}`;
+const valueLabel = (value: number, unit: string) => `${unit === 'USD' ? 'USD ' : unit === 'PYG' ? '₲ ' : ''}${new Intl.NumberFormat('es-PY', { maximumFractionDigits: 2 }).format(value)}${unit === 'percent' ? '%' : unit === 'days' ? ' días' : ''}`;
 const signedValue = (value: number, unit: string) => `${value > 0 ? '+' : value < 0 ? '−' : ''}${valueLabel(Math.abs(value), unit)}`;
 const visitDate = (at: string) => new Intl.DateTimeFormat('es-PY', { day: '2-digit', month: '2-digit', year: 'numeric' }).format(new Date(at));
 

@@ -46,7 +46,7 @@ describe('local visit reference', () => {
   });
   it('does not compare old primary definitions with the new branch and projection KPIs', () => {
     for (const id of ['repuestos_sucursales', 'maquinas_proyeccion'] as const) {
-      const unit = id === 'maquinas_proyeccion' ? 'count' as const : 'USD' as const;
+      const unit = id === 'maquinas_proyeccion' ? 'count' as const : 'days' as const;
       const current = { ...story, id, primary: { ...story.primary!, unit } };
       const legacy = { at: '2026-10-15T10:00:00Z', values: [{ id, value: 100, unit, fingerprint: JSON.stringify([['repuestos.ventas'], 'Repuestos', '2026-10:v1', 'ventas:v1']) }] };
       expect(storyVisitComparison(current, legacy)).toBeNull();

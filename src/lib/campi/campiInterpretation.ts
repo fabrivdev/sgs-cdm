@@ -4,7 +4,7 @@ import { storyVisitComparison, type StoryVisitSnapshot } from './panoramaStoryVi
 export type CampiFinding = { topic: StoryTopicId; kind: 'change' | 'attention' | 'neutral'; text: string; rank: number };
 const number = new Intl.NumberFormat('es-PY', { maximumFractionDigits: 1 });
 const valid = (n: number | null | undefined): n is number => typeof n === 'number' && Number.isFinite(n);
-const amount = (d: StoryDatum) => `${d.unit === 'USD' ? 'USD ' : d.unit === 'PYG' ? '₲ ' : ''}${number.format(d.value!)}${d.unit === 'percent' ? '%' : ''}`;
+const amount = (d: StoryDatum) => `${d.unit === 'USD' ? 'USD ' : d.unit === 'PYG' ? '₲ ' : ''}${number.format(d.value!)}${d.unit === 'percent' ? '%' : d.unit === 'days' ? ' días' : ''}`;
 const normalize = (text: string) => text.normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase().replace(/[¿?!.]/g, '').replace(/\s+/g, ' ').trim();
 
 /** Interprets already-authorized stories only. No network, model, causal inference or implicit deadlines. */
@@ -13,26 +13,15 @@ export function interpretCampi(stories: readonly PanoramaStory[]) {
   const findings: CampiFinding[] = usable.map(s => {
     const p = s.primary!;
     const finding = (kind: CampiFinding['kind'], text: string, rank: number): CampiFinding => ({ topic: s.id, kind, text, rank });
-    if (s.id === 'servicios_pendientes') {
-      const aged = s.supporting.find(d => d.label === 'Abiertas hace más de 30 días' && d.unit === 'count');
-      if (valid(aged?.value) && aged.value > 0 && p.unit === 'count' && aged.value <= p.value!) return finding('attention', `Conviene revisar ${number.format(aged.value)} de ${number.format(p.value!)} OS abiertas por su antigüedad de más de 30 días; esto no acredita vencimiento.`, 100);
-    }
-    if (s.id === 'maquinas_proyeccion') {
-      const negatives = s.breakdown.filter(d => d.unit === 'count' && valid(d.value) && d.value < 0);
-      if (negatives.length) return finding('attention', `La proyección tiene ${negatives.length} ${negatives.length === 1 ? 'modelo con saldo negativo' : 'modelos con saldo negativo'} después de sumar compras y restar ventas pendientes.`, 95);
-    }
-    if (s.id === 'repuestos_stock') {
-      const red = s.supporting.find(d => d.label === 'Rojo · valor Kardex' && d.unit === 'USD');
-      if (valid(red?.value) && red.value > 0) return finding('attention', `Repuestos tiene ${amount(red!)} de valor Kardex en rojo: sin ventas en tres años y última compra hace más de 1.000 días.`, 90);
-    }
-    // Positive sales movement is not a claim about profitability, demand or its cause.
+    // An age bucket, a static color and a negative projected model are not
+    // evidence of improvement, breach or a business alert.
     if (['ventas_facturacion', 'repuestos_clientes'].includes(s.id) && valid(p.comparison?.value) && p.comparison.value > 0) {
       const delta = (p.value! - p.comparison.value) / p.comparison.value * 100;
       if (delta !== 0) return finding('change', `${s.title}: ${p.label.toLowerCase()} ${delta > 0 ? 'subió' : 'bajó'} ${number.format(Math.abs(delta))}% frente a ${p.comparison.label.toLowerCase()} (${amount({ ...p, value: p.comparison.value })} → ${amount(p)}).`, 50 + Math.min(Math.abs(delta), 30));
     }
     return finding('neutral', `${s.title}: ${amount(p)} en ${p.label.toLowerCase()}, sin base suficiente para calificarlo como mejora o alerta.`, 0);
   });
-  // Severity precedes user preference; the chosen topic order breaks equal-rank ties.
+  // A comparable movement precedes a snapshot; chosen topic order breaks ties.
   const priority = new Map(stories.map((story, index) => [story.id, index]));
   const ordered = [...findings].sort((a, b) => b.rank - a.rank || (priority.get(a.topic) ?? Infinity) - (priority.get(b.topic) ?? Infinity));
   const selected = ordered.slice(0, 2);
@@ -51,7 +40,7 @@ export function answerCampi(question: string, stories: readonly PanoramaStory[],
   const interpretation = interpretCampi(stories);
   const q = normalize(question);
   const chosen = interpretation.suggestions.find(s => normalize(s.question) === q);
-  if (q === 'que limites tienen estos datos' && interpretation.findings.length) return 'Solo interpreto los temas seleccionados y autorizados que ya están cargados. Una cantidad pendiente no acredita demora; una subida no acredita su causa ni rentabilidad. Las fuentes sin corte informado no acreditan actualización en tiempo real.';
+  if (q === 'que limites tienen estos datos' && interpretation.findings.length) return 'Solo interpreto los temas seleccionados y autorizados que ya están cargados. Una cantidad pendiente o una OS antigua no acreditan demora; una subida no acredita su causa ni rentabilidad. El saldo proyectado no equivale al stock físico. Las fuentes sin corte informado no acreditan actualización en tiempo real.';
   if (q === 'que cambio desde mi ultima visita') {
     const changes = stories.flatMap(story => {
       const comparison = storyVisitComparison(story, previous);

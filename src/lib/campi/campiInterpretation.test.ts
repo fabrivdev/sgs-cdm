@@ -10,20 +10,20 @@ describe('deterministic Campi interpretation', () => {
     expect(result.findings.every(f => f.kind === 'neutral')).toBe(true);
     expect(result.attention).toBe(false);
   });
-  it('puts material alerts before observed sales movement regardless of topic order', () => {
+  it('describes comparable sales movement without promoting age buckets to alerts', () => {
     const a = interpretCampi([story(), orders, billing]);
     const b = interpretCampi([billing, story(), orders]);
-    expect(a.sentences).toEqual(b.sentences);
-    expect(a.sentences[0]).toContain('8 de 37');
-    expect(a.sentences[0]).toContain('no acredita vencimiento');
-    expect(a.sentences[1]).toContain('12%');
+    expect(a.sentences[0]).toContain('12%');
+    expect(b.sentences[0]).toContain('12%');
+    expect(a.attention).toBe(false);
     expect(a.findings.find(f => f.topic === 'ventas_facturacion')?.kind).toBe('change');
   });
-  it('uses the selected topic order for equal relevance and keeps two distinct alerts', () => {
-    const clients = { ...billing, id: 'repuestos_clientes' as const, title: 'Identidades' };
+  it('uses the selected topic order for equal comparable sales movements', () => {
+    const clients = { ...billing, id: 'repuestos_clientes' as const, title: 'Ventas de repuestos' };
     expect(interpretCampi([clients, billing]).suggestions.map(s => s.topic)).toEqual(['repuestos_clientes', 'ventas_facturacion']);
+    expect(interpretCampi([clients, billing]).findings.find(f => f.topic === 'repuestos_clientes')?.kind).toBe('change');
     const stock = story({ id: 'repuestos_stock', supporting: [{ label: 'Rojo · valor Kardex', value: 120, unit: 'USD' }] });
-    expect(interpretCampi([billing, stock, orders]).suggestions.map(s => s.topic)).toEqual(['servicios_pendientes', 'repuestos_stock']);
+    expect(interpretCampi([billing, stock, orders]).suggestions.map(s => s.topic)).toEqual(['ventas_facturacion', 'repuestos_stock']);
   });
   it('rejects absent, nonfinite or zero comparison bases', () => {
     for (const value of [0, -5, Infinity, NaN]) {
@@ -53,14 +53,16 @@ describe('deterministic Campi interpretation', () => {
     const q = interpretCampi([billing]).suggestions[0].question;
     expect(answerCampi(q, [orders])).toContain('No puedo responder');
   });
-  it('handles only evidenced negative projected models and stock classification', () => {
-    expect(interpretCampi([story({ id: 'maquinas_proyeccion', breakdown: [{ label: 'A', value: -2, unit: 'count' }] })]).attention).toBe(true);
-    expect(interpretCampi([story({ id: 'repuestos_stock', supporting: [{ label: 'Rojo · valor Kardex', value: 120, unit: 'USD' }] })]).sentences[0]).toContain('sin ventas en tres años');
+  it('keeps a negative model, red stock and old OS as context rather than unqualified alerts', () => {
+    const projection = story({ id: 'maquinas_proyeccion', breakdown: [{ label: 'A', value: -2, unit: 'count' }] });
+    const stock = story({ id: 'repuestos_stock', supporting: [{ label: 'Rojo · valor Kardex', value: 120, unit: 'USD' }] });
+    expect(interpretCampi([projection, stock, orders]).findings.every(f => f.kind === 'neutral')).toBe(true);
+    expect(interpretCampi([projection, stock, orders]).attention).toBe(false);
   });
   it('explains last-visit changes only with a matching saved scope', () => {
     const previous = { at: '2026-10-15T10:00:00Z', values: [{ id: 'ventas_facturacion' as const, value: 400000, unit: 'USD' as const, fingerprint: JSON.stringify([['parque.operaciones'], 'Otro alcance', 'Foto vigente', 'Fuente comprobada']) }] };
     expect(answerCampi('¿Qué cambió desde mi última visita?', [billing], previous)).toContain('No hay un cambio comparable');
-    const matching = { ...previous, values: [{ ...previous.values[0], fingerprint: JSON.stringify([['parque.operaciones'], 'Autorizado', 'Foto vigente', 'Fuente comprobada']) }] };
+    const matching = { ...previous, values: [{ ...previous.values[0], fingerprint: JSON.stringify([['parque.operaciones'], 'Autorizado', 'Foto vigente', 'Fuente comprobada', 'ventas-brutas-nc-separadas-v2']) }] };
     const comparable = story({ id: 'ventas_facturacion', primary: { label: 'Facturación', value: 448000, unit: 'USD' } });
     expect(answerCampi('¿Qué cambió desde mi última visita?', [comparable], matching)).toContain('400.000 → USD 448.000');
   });

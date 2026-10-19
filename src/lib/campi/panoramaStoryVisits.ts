@@ -4,7 +4,7 @@ export type StoryVisitSnapshot = { at: string; values: { id: StoryTopicId; value
 export type StoryVisitComparison = { before: number; current: number; change: number; at: string; unit: StoryUnit };
 const key = (userId: string) => `sig-cdm:panorama:alternativa:visita:v1:${userId}`;
 const sessionKey = (userId: string) => `sig-cdm:panorama:alternativa:base-sesion:v1:${userId}`;
-const definitionVersion: Partial<Record<StoryTopicId, string>> = { repuestos_sucursales: 'mayor-sucursal-v2', maquinas_proyeccion: 'modelos-negativos-v2' };
+const definitionVersion: Partial<Record<StoryTopicId, string>> = { ventas_facturacion: 'ventas-brutas-nc-separadas-v2', repuestos_clientes: 'composicion-repuestos-v2', repuestos_sucursales: 'antiguedad-ponderada-v3', maquinas_proyeccion: 'saldo-proyectado-v3' };
 const fingerprint = (story: PanoramaStory) => JSON.stringify([story.sections.slice().sort(), story.scope, story.visitKey ?? story.periodLabel, story.source, ...(definitionVersion[story.id] ? [definitionVersion[story.id]] : [])]);
 export function readStoryVisit(userId: string): StoryVisitSnapshot | null {
   if (!userId) return null;

@@ -48,18 +48,18 @@ describe('compact overview panel', () => {
     expect(screen.queryByText('Variación % sin base positiva')).not.toBeInTheDocument();
   });
   it('does not imply an earlier period for a snapshot without comparison', () => {
-    render(<MemoryRouter><StoryPanel story={{ ...story, id: 'maquinas_proyeccion', primary: { label: 'Modelos con saldo negativo', value: 2, unit: 'count' }, chart: null }} index={0} retrying={false} onRetry={vi.fn()} /></MemoryRouter>);
-    expect(screen.getByText('Modelos con saldo negativo')).toBeInTheDocument();
+    render(<MemoryRouter><StoryPanel story={{ ...story, id: 'maquinas_proyeccion', primary: { label: 'Saldo proyectado', value: 2, unit: 'count' }, chart: null }} index={0} retrying={false} onRetry={vi.fn()} /></MemoryRouter>);
+    expect(screen.getByText('Saldo proyectado')).toBeInTheDocument();
     expect(screen.queryByText('Sin base histórica comparable')).not.toBeInTheDocument();
     expect(screen.queryByText('Mismo tramo de 2025')).not.toBeInTheDocument();
   });
-  it('shows negative model balances with readable labels in the card', () => {
-    render(<MemoryRouter><StoryPanel story={{ ...story, id: 'maquinas_proyeccion', primary: { label: 'Modelos con saldo negativo', value: 2, unit: 'count' }, chart: { kind: 'bars', title: 'Saldo por modelo', unit: 'count', rows: [{ label: 'CLAAS Axion 870', value: -2 }] } }} index={0} retrying={false} onRetry={vi.fn()} /></MemoryRouter>);
+  it('shows a model chart only when projection components are unavailable', () => {
+    render(<MemoryRouter><StoryPanel story={{ ...story, id: 'maquinas_proyeccion', primary: { label: 'Saldo proyectado', value: 2, unit: 'count' }, chart: { kind: 'bars', title: 'Saldo por modelo', unit: 'count', rows: [{ label: 'CLAAS Axion 870', value: -2 }] } }} index={0} retrying={false} onRetry={vi.fn()} /></MemoryRouter>);
     expect(screen.getByRole('figure', { name: 'Saldo por modelo' })).toHaveTextContent('CLAAS Axion 870');
     expect(screen.getByRole('figure', { name: 'Saldo por modelo' })).toHaveTextContent('-2');
   });
-  it('shows projection components instead of a chart of zero balances', () => {
-    render(<MemoryRouter><StoryPanel story={{ ...story, id: 'maquinas_proyeccion', primary: { label: 'Modelos con saldo negativo', value: 0, unit: 'count' }, supporting: [{ label: 'Stock calculado', value: 13, unit: 'count' }, { label: 'Compras pendientes', value: 5, unit: 'count' }, { label: 'Ventas pendientes', value: 2, unit: 'count' }], chart: { kind: 'bars', title: 'Saldo por modelo', unit: 'count', rows: [{ label: 'Modelo A', value: 0 }] } }} index={0} retrying={false} onRetry={vi.fn()} /></MemoryRouter>);
+  it('shows projection components for any saldo, including nonzero', () => {
+    render(<MemoryRouter><StoryPanel story={{ ...story, id: 'maquinas_proyeccion', primary: { label: 'Saldo proyectado', value: 16, unit: 'count' }, supporting: [{ label: 'Stock calculado', value: 13, unit: 'count' }, { label: 'Compras pendientes', value: 5, unit: 'count' }, { label: 'Ventas pendientes', value: 2, unit: 'count' }], chart: { kind: 'bars', title: 'Saldo por modelo', unit: 'count', rows: [{ label: 'Modelo A', value: 16 }] } }} index={0} retrying={false} onRetry={vi.fn()} /></MemoryRouter>);
     expect(screen.getByLabelText('Componentes de la proyección')).toHaveTextContent('Stock calculado13');
     expect(screen.queryByRole('figure', { name: 'Saldo por modelo' })).not.toBeInTheDocument();
   });

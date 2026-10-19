@@ -8,10 +8,10 @@ export type PanoramaTopic = { id: StoryTopicId; label: string; group: PanoramaTo
 
 export const PANORAMA_TOPICS: readonly PanoramaTopic[] = [
   { id: 'ventas_facturacion', label: 'Cómo viene la facturación', group: 'Resultados', sections: ['servicios.ventas', 'parque.ventas', 'repuestos.ventas'] },
-  { id: 'repuestos_clientes', label: 'Identidades en documentos de repuestos', group: 'Resultados', sections: ['repuestos.ventas'] },
+  { id: 'repuestos_clientes', label: 'Ventas y notas de crédito de repuestos', group: 'Resultados', sections: ['repuestos.ventas'] },
   { id: 'maquinas_pedidos', label: 'Cuánto queda pendiente en pedidos de máquinas', group: 'Compromisos', sections: ['parque.operaciones'] },
   { id: 'servicios_pendientes', label: 'Qué órdenes de servicio siguen abiertas', group: 'Compromisos', sections: ['servicios.ordenes'] },
-  { id: 'repuestos_sucursales', label: 'Cómo se distribuyen los repuestos por sucursal', group: 'Disponibilidad', sections: ['repuestos.analisis'] },
+  { id: 'repuestos_sucursales', label: 'Antigüedad del stock de repuestos por sucursal', group: 'Disponibilidad', sections: ['repuestos.analisis'] },
   { id: 'repuestos_stock', label: 'Qué parte del stock necesita revisión', group: 'Disponibilidad', sections: ['repuestos.analisis'] },
   { id: 'maquinas_stock', label: 'Qué máquinas hay en stock', group: 'Disponibilidad', sections: ['parque.stock'] },
   { id: 'maquinas_proyeccion', label: 'Cómo cambia la disponibilidad de máquinas', group: 'Disponibilidad', sections: ['parque.stock_proyectado'] },

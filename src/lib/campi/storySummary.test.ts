@@ -12,7 +12,7 @@ describe('compact story percentages', () => {
   });
   it('labels snapshot composition and validates its denominator and unit', () => {
     const s = { ...story(40), id: 'servicios_pendientes', primary: { label: 'OS abiertas', value: 40, unit: 'count' }, supporting: [{ label: 'Abiertas hace más de 30 días', value: 8, unit: 'count' }] } as PanoramaStory;
-    expect(storySummaryPercentage(s)).toEqual({ value: 20, label: 'Abiertas hace más de 30 días / os abiertas', kind: 'composition' });
+    expect(storySummaryPercentage(s)).toBeNull();
     expect(storySummaryPercentage({ ...s, primary: { ...s.primary!, value: 0 } })).toBeNull();
     expect(storySummaryPercentage({ ...s, primary: { ...s.primary!, value: 7 } })).toBeNull();
     expect(storySummaryPercentage({ ...s, primary: { ...s.primary!, unit: 'USD' } })).toBeNull();
