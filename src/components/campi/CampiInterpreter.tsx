@@ -28,7 +28,7 @@ export function CampiInterpreter({ stories, loading, previous = null }: { storie
       return comparison?.change ? [{ story, comparison }] : [];
     })[0];
   const lead = attention ?? result.findings.find(f => f.kind === 'change') ?? result.findings[0];
-  const leadStory = stories.find(story => story.id === lead?.topic);
+  const leadStory = attentionStory ?? visit?.story ?? stories.find(story => story.id === lead?.topic);
   const tone = loading || !lead ? 'unknown' : attention ? 'attention' : visit || lead.kind === 'change' ? 'change' : 'serene';
   const headline = loading ? 'Estoy revisando tus temas.'
     : attention ? attention.text

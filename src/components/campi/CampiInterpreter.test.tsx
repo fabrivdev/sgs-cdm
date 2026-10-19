@@ -38,13 +38,17 @@ describe('Campi questions', () => {
     expect(screen.getByRole('heading', { name: /Facturación: USD 448.000/ })).toBeInTheDocument();
     expect(screen.queryByText(/subió/)).not.toBeInTheDocument();
   });
-  it('prioritizes an identified alert, changes the hero mood, and keeps a comparable visit visible', () => {
+  it('keeps a red stock share neutral and aligns the visit headline, scope and action', () => {
     const stock: PanoramaStory = { ...billing, id: 'repuestos_stock', title: 'Situación del stock', sections: ['repuestos.analisis'], primary: { label: 'Valor Kardex', value: 220, unit: 'USD' }, supporting: [{ label: 'Rojo · valor Kardex', value: 70, unit: 'USD' }] };
-    render(<CampiInterpreter stories={[billing, stock]} loading={false} previous={{ at: '2026-10-15T10:00:00Z', values: [{ id: 'ventas_facturacion', value: 400000, unit: 'USD', fingerprint: JSON.stringify([['repuestos.ventas'], 'Repuestos', 'Octubre', 'Prueba']) }] }} />);
-    expect(screen.getByRole('heading', { name: /USD 70 de valor Kardex en rojo/ })).toBeInTheDocument();
-    expect(screen.getByText('Mascota')).toHaveAttribute('data-mood', 'attention');
+    const parts: PanoramaStory = { ...billing, id: 'repuestos_clientes', title: 'Ventas de repuestos', primary: { ...billing.primary!, value: 420000 } };
+    render(<CampiInterpreter stories={[parts, billing, stock]} loading={false} previous={{ at: '2026-10-15T10:00:00Z', values: [{ id: 'ventas_facturacion', value: 400000, unit: 'USD', fingerprint: JSON.stringify([['repuestos.ventas'], 'Repuestos', 'Octubre', 'Prueba', 'ventas-brutas-nc-separadas-v2']) }] }} />);
+    expect(screen.getByRole('heading', { name: /Facturación: \+USD 48.000 desde tu última visita/ })).toBeInTheDocument();
+    expect(screen.getByText('Mascota')).toHaveAttribute('data-mood', 'change');
     expect(screen.getByLabelText(/Comparación de Facturación desde tu última visita/)).toHaveTextContent('USD 400.000 → USD 448.000');
-    expect(screen.getByLabelText(/Comparación de Facturación desde tu última visita/)).toHaveTextContent('Cambio +USD 48.000');
+    expect(screen.getByText('Repuestos · Octubre')).toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: 'Ver datos de facturación' }));
+    expect(screen.getByRole('dialog')).toHaveTextContent('Fuente: Prueba');
+    fireEvent.keyDown(screen.getByRole('dialog'), { key: 'Escape' });
     fireEvent.click(screen.getByRole('button', { name: '¿Qué cambió desde mi última visita?' }));
     expect(screen.getByRole('dialog')).toHaveTextContent('USD 400.000 → USD 448.000');
   });

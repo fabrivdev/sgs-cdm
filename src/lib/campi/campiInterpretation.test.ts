@@ -18,12 +18,19 @@ describe('deterministic Campi interpretation', () => {
     expect(a.attention).toBe(false);
     expect(a.findings.find(f => f.topic === 'ventas_facturacion')?.kind).toBe('change');
   });
-  it('uses the selected topic order for equal comparable sales movements', () => {
-    const clients = { ...billing, id: 'repuestos_clientes' as const, title: 'Ventas de repuestos' };
+  it('uses the selected topic order instead of the largest percentage', () => {
+    const clients = { ...billing, id: 'repuestos_clientes' as const, title: 'Ventas de repuestos', primary: { ...billing.primary!, value: 408000 } };
     expect(interpretCampi([clients, billing]).suggestions.map(s => s.topic)).toEqual(['repuestos_clientes', 'ventas_facturacion']);
     expect(interpretCampi([clients, billing]).findings.find(f => f.topic === 'repuestos_clientes')?.kind).toBe('change');
     const stock = story({ id: 'repuestos_stock', supporting: [{ label: 'Rojo · valor Kardex', value: 120, unit: 'USD' }] });
     expect(interpretCampi([billing, stock, orders]).suggestions.map(s => s.topic)).toEqual(['ventas_facturacion', 'repuestos_stock']);
+  });
+  it('names the largest arithmetic area difference only when the area totals reconcile', () => {
+    const input = story({ id: 'ventas_facturacion', title: 'Facturación', primary: { label: 'Ventas antes de NC del mes', value: 215150.25, unit: 'USD', comparison: { value: 793694.64, label: 'Mismo tramo de 2025' } }, chart: { kind: 'bars', title: 'Ventas por área', unit: 'USD', rows: [{ label: 'Repuestos', value: 182886.19, previous: 398983.19 }, { label: 'Servicios', value: 32264.06, previous: 5211.45 }, { label: 'Máquinas', value: 0, previous: 389500 }] } });
+    const text = interpretCampi([input]).sentences[0];
+    expect(text).toContain('Mayor diferencia entre áreas: Máquinas (USD 389.500 → USD 0)');
+    expect(text).toContain('NC');
+    expect(interpretCampi([{ ...input, chart: { ...input.chart!, rows: [{ label: 'Máquinas', value: 0, previous: 389500 }] } }]).sentences[0]).not.toContain('Mayor diferencia');
   });
   it('rejects absent, nonfinite or zero comparison bases', () => {
     for (const value of [0, -5, Infinity, NaN]) {
@@ -48,6 +55,7 @@ describe('deterministic Campi interpretation', () => {
     expect(answerCampi('¿Qué pedidos están vencidos?', [story()])).toContain('No puedo responder');
     expect(answerCampi('¿Qué mejoró?', [billing])).toContain('No puedo determinar una mejora');
     expect(answerCampi('¿Qué cambió?', [billing])).toContain('subió 12%');
+    expect(answerCampi('¿Qué merece atención?', [billing])).toContain('fecha comprometida');
   });
   it('removes answers when the associated authorized story disappears', () => {
     const q = interpretCampi([billing]).suggestions[0].question;
