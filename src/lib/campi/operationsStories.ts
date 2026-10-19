@@ -33,7 +33,10 @@ function parts(id: StoryTopicId, data: SemaforoResultado): PanoramaStory {
   story.primary = { label: 'Valor Kardex referencial', value, unit: 'USD' };
   story.supporting = [{ label: 'Códigos con stock', value: total, unit: 'count' }, { label: 'Ubicaciones sin valor', value: number(data.ubicaciones_sin_valor), unit: 'count' }];
   if (id === 'repuestos_sucursales') {
-    story.message = total ? 'Distribución de existencias y valor por sucursal.' : 'Sin productos dentro del universo del análisis.';
+    const leading = data.sucursales.filter(r => number(r.valor_kardex_usd) !== null).sort((a, b) => b.valor_kardex_usd! - a.valor_kardex_usd!)[0];
+    story.primary = { label: leading ? `Mayor valor · ${leading.nombre}` : 'Mayor valor por sucursal', value: number(leading?.valor_kardex_usd), unit: 'USD' };
+    story.supporting.push({ label: 'Valor Kardex total', value, unit: 'USD' });
+    story.message = total ? leading ? `${leading.nombre} concentra el mayor valor Kardex registrado por sucursal.` : 'No se informó valor Kardex por sucursal.' : 'Sin productos dentro del universo del análisis.';
     story.chart = { kind: 'bars', title: 'Valor Kardex por sucursal', unit: 'USD', rows: data.sucursales.flatMap(r => number(r.valor_kardex_usd) === null ? [] : [{ label: r.nombre, value: r.valor_kardex_usd! }]) };
     story.breakdown = data.sucursales.flatMap(r => [
       ...(number(r.valor_kardex_usd) === null ? [] : [{ label: r.nombre, value: r.valor_kardex_usd!, unit: 'USD' as const }]),
@@ -67,9 +70,10 @@ async function projected(asOf: string) {
   story.cutoff = asOf; story.periodLabel = `Corte ${asOf}`;
   story.scope = `Máquinas nuevas · apertura ${raw.disponible_desde}`;
   story.status = rows.length ? 'ready' : 'empty';
-  story.message = 'Stock + compras pendientes − ventas pendientes, por modelo.';
-  story.primary = { label: 'Stock proyectado', value: sum('value'), unit: 'count' };
-  story.supporting = [{ label: 'Stock calculado', value: sum('stock'), unit: 'count' }, { label: 'Compras pendientes', value: sum('compras'), unit: 'count' }, { label: 'Ventas pendientes', value: sum('ventas'), unit: 'count' }];
+  const negativeModels = rows.filter(r => r.value < 0).length;
+  story.message = negativeModels ? `${negativeModels} modelos tienen saldo proyectado negativo; revisá sus componentes en el detalle.` : 'No hay modelos con saldo proyectado negativo.';
+  story.primary = { label: 'Modelos con saldo negativo', value: negativeModels, unit: 'count' };
+  story.supporting = [{ label: 'Stock calculado', value: sum('stock'), unit: 'count' }, { label: 'Compras pendientes', value: sum('compras'), unit: 'count' }, { label: 'Ventas pendientes', value: sum('ventas'), unit: 'count' }, { label: 'Saldo proyectado total', value: sum('value'), unit: 'count', note: 'Suma algebraica de todos los modelos; puede ocultar saldos negativos individuales.' }];
   story.chart = { kind: 'bars', title: 'Saldo proyectado por modelo', rows: [...rows].sort((a,b) => a.value-b.value).slice(0, 10).map(({ label, value }) => ({ label, value })), unit: 'count' };
   story.breakdown = rows.map(r => ({ label: r.label, value: r.value, unit: 'count', note: `Stock ${r.stock} + compras ${r.compras} − ventas ${r.ventas}` }));
   story.details = ['Saldo calculado desde la apertura, distinto de la foto física del Stock.', 'Los arribos se reconocen por ATA real; ETA y entrega física no sustituyen facturación.', 'El gráfico muestra hasta 10 modelos de menor saldo; el detalle incluye todos.'];

@@ -19,8 +19,17 @@ describe('operations stories', () => {
     expect(stories[0].supporting[0].value).toBe(12000);
     expect(stories.every(s => s.cutoff === null)).toBe(true);
     expect(stories[0].chart?.rows.map(r => r.value)).toEqual([110,-10]);
+    expect(stories[1].primary).toMatchObject({ label: 'Mayor valor · Santa Rita', value: 100, unit: 'USD' });
+    expect(stories[1].supporting.find(r => r.label === 'Valor Kardex total')?.value).toBe(100);
     expect(stories[1].breakdown.find(r => r.label === 'Katuete · unidades')?.note).toContain('no disponible');
     expect(stories[0].details.join(' ')).toContain('Sin equivalencia no significa sin movimiento');
+  });
+  it('highlights the leading branch instead of repeating the overall Kardex value', async () => {
+    const data = partData();
+    mocks.parts.mockResolvedValue({ ...data, sucursales: [{ nombre: 'Santa Rita', unidades: 40, valor_kardex_usd: 60 }, { nombre: 'Katuete', unidades: 2, valor_kardex_usd: 40 }] });
+    const story = (await loadOperationsStories(['repuestos_sucursales'], ['repuestos.analisis'], asOf))[0];
+    expect(story.primary?.value).toBe(60);
+    expect(story.supporting.find(r => r.label === 'Valor Kardex total')?.value).toBe(100);
   });
   it('preserves missing Kardex value and propagates shared errors', async () => {
     mocks.parts.mockResolvedValue({ ...partData(), valor_kardex_usd: null });
@@ -34,7 +43,9 @@ describe('operations stories', () => {
     const data = { fecha_corte: asOf, disponible_desde: '2026-08-31', solo_nuevas: true, filas: [{ marca: 'A', modelo: 'M', stock: 1, pedidos_compra: 0, ventas_pendientes: 3, stock_proyectado: -2 }] };
     mocks.rpc.mockResolvedValue({ data, error: null });
     const story = (await loadOperationsStories(['maquinas_proyeccion'], ['parque.stock_proyectado'], asOf))[0];
-    expect(story.primary?.value).toBe(-2); expect(story.attention).toBe(true); expect(story.cutoff).toBe(asOf);
+    expect(story.primary).toMatchObject({ label: 'Modelos con saldo negativo', value: 1 });
+    expect(story.supporting.find(r => r.label === 'Saldo proyectado total')?.value).toBe(-2);
+    expect(story.attention).toBe(true); expect(story.cutoff).toBe(asOf);
     mocks.rpc.mockResolvedValue({ data: { ...data, filas: [{ ...data.filas[0], stock: null }] }, error: null });
     expect((await loadOperationsStories(['maquinas_proyeccion'], ['parque.stock_proyectado'], asOf))[0].status).toBe('error');
   });

@@ -22,6 +22,10 @@ function Datum({ datum, primary = false }: { datum: StoryDatum; primary?: boolea
 function StoryChart({ chart, mini = false }: { mini?: boolean; chart: NonNullable<PanoramaStory['chart']> }) {
   const comparison = chart.rows.some(row => row.previous !== undefined);
   const shownRows = mini && chart.kind === 'bars' ? chart.rows.slice(0, 4) : chart.rows;
+  if (mini && chart.rows.some(row => row.value < 0)) return <figure className="story-chart story-chart-mini story-negative-list" aria-label={chart.title}>
+    <figcaption className="sr-only">{chart.title}</figcaption>
+    <ul>{chart.rows.slice(0, 2).map((row, index) => <li key={`${row.label}-${index}`}><span title={row.label}>{row.label}</span><strong>{storyValue(row.value, chart.unit)}</strong></li>)}</ul>
+  </figure>;
   const common = { data: shownRows, margin: { top: 4, right: mini && chart.kind === 'bars' ? 26 : 8, bottom: 0, left: 0 } };
   const tooltip = <Tooltip formatter={(value: number) => storyValue(value, chart.unit)} contentStyle={{ borderRadius: 8, fontSize: 12, background: 'hsl(var(--card))', color: 'hsl(var(--foreground))', borderColor: 'hsl(var(--border))' }} />;
   return <figure className={mini ? "story-chart story-chart-mini" : "story-chart"} aria-label={chart.title}>
@@ -50,17 +54,31 @@ function StoryChart({ chart, mini = false }: { mini?: boolean; chart: NonNullabl
   </figure>;
 }
 
+function StoryComparisonChart({ current, previous, label, unit }: { current: number; previous: number; label: string; unit: StoryUnit }) {
+  const maximum = Math.max(current, previous, 1);
+  return <figure className="story-chart story-chart-mini story-comparison-chart" aria-label={`Comparación de ${label}`}>
+    <figcaption className="sr-only">Anterior: {storyValue(previous, unit)}; actual: {storyValue(current, unit)}</figcaption>
+    <div className="story-comparison-columns" aria-hidden="true">
+      <div><span className="story-comparison-bar story-comparison-bar--previous" style={{ height: `${Math.max(previous / maximum * 80, 2)}px` }} /><small>Anterior</small></div>
+      <div><span className="story-comparison-bar story-comparison-bar--current" style={{ height: `${Math.max(current / maximum * 80, 2)}px` }} /><small>Actual</small></div>
+    </div>
+  </figure>;
+}
+
 export function StoryPanel({ story, index, onRetry, retrying, visitChange = null }: { story: PanoramaStory; index: number; onRetry: () => void; retrying: boolean; visitChange?: number | null }) {
   const titleId = `story-${story.id}`;
   const percentage = storySummaryPercentage(story);
   return <article className="panorama-story" aria-labelledby={titleId} data-story={story.id}>
-    <header className="story-header"><span className="story-index">{String(index + 1).padStart(2, '0')}</span><div className="story-heading-text"><h2 id={titleId}>{story.title}</h2>{story.primary && <p>{story.primary.label}</p>}</div><span className="story-period">{story.periodLabel}</span></header>
+    <header className="story-header"><span className="story-index">{String(index + 1).padStart(2, '0')}</span><div className="story-heading-text"><h2 id={titleId}>{story.title}</h2></div><span className="story-period">{story.periodLabel}</span></header>
     {story.status === 'error' ? <div role="alert"><p className="story-error">{story.message}</p><Button variant="outline" disabled={retrying} onClick={onRetry}><RefreshCw className="mr-2 h-4 w-4" />{retrying ? 'Consultando…' : 'Reintentar fuente'}</Button></div> : <>
       <div className="story-summary-metric">
-        <dl>{story.primary && <div className="story-datum story-datum-primary"><dt className="sr-only">{story.primary.label}</dt><dd data-long={storyValue(story.primary.value, story.primary.unit).length > 12}>{storyValue(story.primary.value, story.primary.unit)}</dd></div>}</dl>
-        {percentage ? <div className="story-percentage" data-kind={percentage.kind} data-direction={percentage.value < 0 ? 'down' : 'up'}><strong>{percentage.kind === 'variation' && percentage.value > 0 ? '+' : ''}{numbers.format(percentage.value)}%</strong><span>{percentage.label}</span></div> : <span className="story-no-comparison">{story.primary?.comparison ? 'Variación % sin base positiva' : 'Sin base histórica comparable'}</span>}
+        <dl>{story.primary && <>
+          <div className="story-datum story-datum-primary"><dt>{story.primary.label}</dt><dd data-long={storyValue(story.primary.value, story.primary.unit).length > 12}>{storyValue(story.primary.value, story.primary.unit)}</dd></div>
+          {story.primary.comparison && <div className="story-datum story-datum-previous"><dt>{story.primary.comparison.label}</dt><dd>{storyValue(story.primary.comparison.value, story.primary.unit)}</dd></div>}
+        </>}</dl>
+        {percentage && <div className="story-percentage" data-kind={percentage.kind} data-direction={percentage.value < 0 ? 'down' : 'up'}><strong>{percentage.kind === 'variation' && percentage.value > 0 ? '+' : ''}{numbers.format(percentage.value)}%</strong><span>{percentage.kind === 'variation' ? 'Variación' : percentage.label}</span></div>}
       </div>
-      {story.chart && story.chart.rows.length > 0 ? <StoryChart chart={story.chart} mini /> : <p className="story-no-chart">{story.message}</p>}
+      {story.primary?.comparison && story.primary.value !== null && Number.isFinite(story.primary.value) && Number.isFinite(story.primary.comparison.value) && story.primary.value >= 0 && story.primary.comparison.value >= 0 ? <StoryComparisonChart current={story.primary.value} previous={story.primary.comparison.value} label={story.primary.label} unit={story.primary.unit} /> : story.chart && story.chart.rows.length > 0 ? <StoryChart chart={story.chart} mini /> : <p className="story-no-chart">{story.message}</p>}
       <Dialog><DialogTrigger asChild><Button variant="outline" className="story-detail-trigger" aria-label={`Ver detalle de ${story.title}`}>Ver detalle <ArrowRight className="ml-2 h-4 w-4" /></Button></DialogTrigger>
         <DialogContent className="panorama-story-dialog"><DialogHeader><DialogTitle>{story.question}</DialogTitle><DialogDescription>{story.scope} · {story.periodLabel}{story.cutoff && ` · Corte: ${dateLabel(story.cutoff)}`}</DialogDescription></DialogHeader>
           <p className="story-conclusion">{story.message}</p>

@@ -72,22 +72,33 @@
 .story-index { display: flex; align-items: center; justify-content: center; flex: none; width: 40px; height: 40px; border-radius: 10px; background: var(--story-tint); color: var(--story-accent); font-size: 18px; font-weight: 750; }
 .story-heading-text { min-width: 0; flex: 1; }
 .story-header h2 { font-size: 18px; font-weight: 750; letter-spacing: -.025em; line-height: 22px; }
-.story-heading-text p { font-size: 13px; line-height: 19px; color: #687181; }
 .story-period { margin-left: auto; padding-top: 2px; color: #687181; font-size: 12px; line-height: 18px; text-align: right; flex: none; max-width: 128px; }
-.story-summary-metric { display: flex; align-items: flex-start; justify-content: flex-start; gap: 20px; align-self: center; min-width: 0; }
+.story-summary-metric { display: flex; align-items: flex-end; justify-content: flex-start; gap: 12px; align-self: center; min-width: 0; }
 .story-summary-metric dl { flex: 0 1 auto; min-width: 0; }
 .story-datum dt { font-size: 12px; color: #687181; }
 .story-datum dd { font-size: 20px; font-weight: 650; font-variant-numeric: tabular-nums; }
 .story-summary-metric .story-datum-primary dd { font-size: 36px; line-height: 42px; font-weight: 750; letter-spacing: -.045em; white-space: nowrap; }
-.story-percentage { display: flex; flex-direction: column; align-items: flex-start; padding-top: 2px; min-width: 0; }
+.story-summary-metric .story-datum-previous { display: flex; flex-wrap: wrap; align-items: baseline; gap: 2px 7px; margin-top: 3px; }
+.story-summary-metric .story-datum-previous dt { font-size: 11px; }
+.story-summary-metric .story-datum-previous dd { font-size: 14px; font-weight: 650; }
+.story-percentage { display: flex; flex-direction: column; align-items: flex-start; padding-bottom: 2px; min-width: 0; }
 .story-percentage strong { padding: 5px 10px; border-radius: 7px; color: #137354; background: #e7f5ee; font-size: 16px; line-height: 22px; font-weight: 750; white-space: nowrap; }
 .story-percentage[data-direction="down"] strong { color: #ad3437; background: #fff0ed; }
 .story-percentage[data-kind="composition"] strong { color: var(--story-accent); background: var(--story-tint); }
-.story-percentage span, .story-no-comparison { font-size: 11px; line-height: 14px; color: #707786; margin-top: 4px; overflow-wrap: anywhere; }
-.story-no-comparison { max-width: 120px; padding-top: 6px; }
+.story-percentage span { font-size: 11px; line-height: 14px; color: #707786; margin-top: 4px; overflow-wrap: anywhere; }
 .story-chart { min-width: 0; margin: 0; }
 .story-chart figcaption { display: flex; justify-content: space-between; font-size: 12px; margin-bottom: 10px; }
 .story-chart-mini { grid-column: 2; grid-row: 2 / 4; align-self: center; }
+.story-comparison-columns { display: flex; justify-content: center; gap: 22px; height: 102px; padding: 3px 8px 0; }
+.story-comparison-columns > div { display: flex; flex-direction: column; align-items: center; justify-content: flex-end; width: 64px; min-width: 0; height: 100%; }
+.story-comparison-bar { display: block; width: 100%; min-height: 2px; max-height: calc(100% - 20px); border-radius: 5px 5px 0 0; }
+.story-comparison-bar--previous { background: #b7c2cd; }
+.story-comparison-bar--current { background: var(--story-accent); }
+.story-comparison-columns small { width: 100%; padding-top: 3px; color: #687181; font-size: 11px; text-align: center; }
+.story-negative-list ul { display: grid; gap: 7px; }
+.story-negative-list li { display: flex; align-items: baseline; justify-content: space-between; gap: 8px; min-width: 0; border-bottom: 1px solid hsl(var(--border)); padding: 4px 0; font-size: 12px; }
+.story-negative-list li span { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.story-negative-list li strong { flex: none; color: #ae3e3e; font-variant-numeric: tabular-nums; }
 .story-chart-canvas { min-width: 0; width: 100%; }
 .story-chart-canvas .recharts-text { fill: #727b88; }
 .panorama-story .story-detail-trigger { grid-column: 1; grid-row: 3; justify-self: start; align-self: end; min-height: 28px; height: 28px; margin: 0; border: 0; padding: 0; background: transparent; font-size: 14px; font-weight: 650; color: var(--story-accent); }

@@ -59,7 +59,7 @@ function monthly(report: Report, key: string, field: string): number {
   return metric(row[field], field);
 }
 function base(id: StoryTopicId, sources: Source[], asOf: string): PanoramaStory {
-  return { id, visitKey: `${id}:v1:${asOf.slice(0, 7)}`, title: id === 'ventas_facturacion' ? 'Facturación' : 'Clientes de repuestos', question: id === 'ventas_facturacion' ? '¿Cómo viene la facturación?' : '¿Cuántos clientes tuvieron movimientos?', status: 'ready', message: '', scope: sources.map(source => source.label).join(' + '), sections: sources.map(source => source.section), cutoff: null, periodLabel: `01/${asOf.slice(5, 7)}–${asOf.slice(8, 10)}/${asOf.slice(5, 7)}/${asOf.slice(0, 4)}`, primary: null, supporting: [], chart: null, breakdown: [], details: ['Fecha de factura. Ventas y notas de crédito con su signo.', 'La fecha de referencia limita el período; la fuente no informa su fecha real de actualización.'], source: sources.map(source => source.rpc).join(' + '), route: sources[0]?.route ?? '/campi' };
+  return { id, visitKey: `${id}:v1:${asOf.slice(0, 7)}`, title: id === 'ventas_facturacion' ? 'Facturación' : 'Identidades de repuestos', question: id === 'ventas_facturacion' ? '¿Cómo viene la facturación?' : '¿Cuántas identidades aparecen en documentos de repuestos?', status: 'ready', message: '', scope: sources.map(source => source.label).join(' + '), sections: sources.map(source => source.section), cutoff: null, periodLabel: `01/${asOf.slice(5, 7)}–${asOf.slice(8, 10)}/${asOf.slice(5, 7)}/${asOf.slice(0, 4)}`, primary: null, supporting: [], chart: null, breakdown: [], details: ['Fecha de factura. Ventas y notas de crédito con su signo.', 'La fecha de referencia limita el período; la fuente no informa su fecha real de actualización.'], source: sources.map(source => source.rpc).join(' + '), route: sources[0]?.route ?? '/campi' };
 }
 
 export const loadSalesStories: StoryLoader = async (topics, granted, asOf) => {
@@ -105,11 +105,11 @@ export const loadSalesStories: StoryLoader = async (topics, granted, asOf) => {
       const ytdLY = loaded.reduce((sum, row) => sum + metric(row.previous.summary[field(row.source)], field(row.source)), 0);
       const lastMonth = loaded.reduce((sum, row) => sum + monthly(row.december ?? row.current, ranges.previousMonthFrom.slice(0, 7), field(row.source)), 0);
       const unit = clients ? 'count' as const : 'USD' as const;
-      story.primary = { label: clients ? 'Clientes facturados del mes' : 'Facturación del mes', value: mtd, unit, comparison: { value: mtdLY, label: `Mismo tramo de ${ranges.year - 1}` } };
+      story.primary = { label: clients ? 'Identidades del mes' : 'Facturación del mes', value: mtd, unit, comparison: { value: mtdLY, label: `Mismo tramo de ${ranges.year - 1}` } };
       story.supporting = [
         { label: 'Variación interanual del mes', value: salesChange(mtd, mtdLY), unit: 'percent', note: mtdLY === 0 ? 'Sin base: el período anterior es cero.' : undefined },
         { label: 'Mes anterior completo', value: lastMonth, unit, note: `${ranges.previousMonthFrom} al ${ranges.previousMonthTo}; contexto, no comparación de tramos iguales.` },
-        { label: clients ? 'Clientes facturados del año' : 'Acumulado del año', value: ytd, unit, comparison: { value: ytdLY, label: `Mismo tramo de ${ranges.year - 1}` } },
+        { label: clients ? 'Identidades del año' : 'Acumulado del año', value: ytd, unit, comparison: { value: ytdLY, label: `Mismo tramo de ${ranges.year - 1}` } },
       ];
       const annualChange = salesChange(ytd, ytdLY);
       story.supporting.push({ label: 'Variación interanual acumulada', value: annualChange, unit: 'percent', note: ytdLY === 0 ? 'Sin base comparable.' : undefined });
@@ -119,13 +119,13 @@ export const loadSalesStories: StoryLoader = async (topics, granted, asOf) => {
       });
       const partialMonth = Number(asOf.slice(8)) < new Date(Date.UTC(ranges.year, ranges.month, 0)).getUTCDate();
       if (partialMonth && rows.length) rows[rows.length - 1].label += '*';
-      story.chart = { kind: 'trend', title: (clients ? 'Clientes por mes' : 'Facturación por mes') + (partialMonth ? ' · *mes parcial' : ''), rows, unit, currentLabel: String(ranges.year), previousLabel: String(ranges.year - 1) };
+      story.chart = { kind: 'trend', title: (clients ? 'Identidades por mes' : 'Facturación por mes') + (partialMonth ? ' · *mes parcial' : ''), rows, unit, currentLabel: String(ranges.year), previousLabel: String(ranges.year - 1) };
       story.breakdown = clients ? [] : loaded.map(({ source }, index) => ({ label: source.label, value: currentMonth[index], unit: 'USD', route: source.route }));
       const monthlyChange = salesChange(mtd, mtdLY);
       const pct = (value: number) => new Intl.NumberFormat('es-PY', { maximumFractionDigits: 1 }).format(Math.abs(value)) + '%';
       const movement = (value: number) => value === 0 ? 'sin variación' : `${pct(value)} ${value > 0 ? 'por encima' : 'por debajo'}`;
       story.message = clients
-        ? `${mtd} clientes con movimientos este mes, frente a ${mtdLY} en el mismo tramo de ${ranges.year - 1}.`
+        ? `${mtd} identidades en documentos este mes, frente a ${mtdLY} en el mismo tramo de ${ranges.year - 1}.`
         : monthlyChange === null ? 'El mismo tramo del año anterior no tiene importe para calcular una variación porcentual.'
         : `El mes está ${movement(monthlyChange)} del mismo tramo de ${ranges.year - 1}${annualChange === null ? '.' : `; el acumulado, ${movement(annualChange)}.`}`;
       story.attention = !clients && monthlyChange !== null && monthlyChange < 0;

@@ -11,13 +11,20 @@ describe('compact overview panel', () => {
     render(<MemoryRouter><StoryPanel story={story} index={0} retrying={false} onRetry={vi.fn()} /></MemoryRouter>);
     expect(screen.getByRole('heading', { name: 'Facturación' })).toBeInTheDocument();
     expect(screen.getByText('+12%')).toBeInTheDocument();
-    expect(screen.getAllByTestId('chart')).toHaveLength(1);
+    expect(screen.getByText('Facturación del mes')).toBeInTheDocument();
+    expect(screen.getByText('$ 112')).toBeInTheDocument();
+    expect(screen.getByText('Mismo tramo de 2025')).toBeInTheDocument();
+    expect(screen.getByText('$ 100')).toBeInTheDocument();
+    expect(screen.queryByText('Sin base histórica comparable')).not.toBeInTheDocument();
+    expect(screen.getByRole('figure', { name: 'Comparación de Facturación del mes' })).toBeInTheDocument();
+    expect(screen.queryByTestId('chart')).not.toBeInTheDocument();
     expect(screen.queryByText(story.message)).not.toBeInTheDocument();
     expect(screen.queryByText('Acumulado anual')).not.toBeInTheDocument();
     expect(screen.queryByText(/Servicios \+ Máquinas \+ Repuestos/)).not.toBeInTheDocument();
     expect(screen.getByText('Octubre 2026')).toHaveClass('story-period');
     fireEvent.click(screen.getByRole('button', { name: 'Ver detalle de Facturación' }));
     expect(screen.getByRole('dialog')).toBeInTheDocument();
+    expect(screen.getByTestId('chart')).toBeInTheDocument();
     expect(screen.getByText(story.message)).toBeInTheDocument();
     expect(screen.getByText('Acumulado anual')).toBeInTheDocument();
     expect(screen.getByText('Método de cálculo completo')).toBeInTheDocument();
@@ -33,5 +40,22 @@ describe('compact overview panel', () => {
     expect(screen.queryByText('+12%')).not.toBeInTheDocument();
     fireEvent.click(screen.getByRole('button', { name: 'Reintentar fuente' }));
     expect(retry).toHaveBeenCalledOnce();
+  });
+  it('shows a zero prior value without inventing a percentage', () => {
+    render(<MemoryRouter><StoryPanel story={{ ...story, primary: { ...story.primary!, comparison: { value: 0, label: 'Mismo tramo de 2025' } } }} index={0} retrying={false} onRetry={vi.fn()} /></MemoryRouter>);
+    expect(screen.getByText('$ 0')).toBeInTheDocument();
+    expect(screen.queryByText('+12%')).not.toBeInTheDocument();
+    expect(screen.queryByText('Variación % sin base positiva')).not.toBeInTheDocument();
+  });
+  it('does not imply an earlier period for a snapshot without comparison', () => {
+    render(<MemoryRouter><StoryPanel story={{ ...story, id: 'maquinas_proyeccion', primary: { label: 'Modelos con saldo negativo', value: 2, unit: 'count' }, chart: null }} index={0} retrying={false} onRetry={vi.fn()} /></MemoryRouter>);
+    expect(screen.getByText('Modelos con saldo negativo')).toBeInTheDocument();
+    expect(screen.queryByText('Sin base histórica comparable')).not.toBeInTheDocument();
+    expect(screen.queryByText('Mismo tramo de 2025')).not.toBeInTheDocument();
+  });
+  it('shows negative model balances with readable labels in the card', () => {
+    render(<MemoryRouter><StoryPanel story={{ ...story, id: 'maquinas_proyeccion', primary: { label: 'Modelos con saldo negativo', value: 2, unit: 'count' }, chart: { kind: 'bars', title: 'Saldo por modelo', unit: 'count', rows: [{ label: 'CLAAS Axion 870', value: -2 }] } }} index={0} retrying={false} onRetry={vi.fn()} /></MemoryRouter>);
+    expect(screen.getByRole('figure', { name: 'Saldo por modelo' })).toHaveTextContent('CLAAS Axion 870');
+    expect(screen.getByRole('figure', { name: 'Saldo por modelo' })).toHaveTextContent('-2');
   });
 });
