@@ -51,3 +51,7 @@ Una unidad pendiente permite corregir el valor acordado antes de adjuntar su fac
 ## Ajuste local móvil del 07/10/2026
 
 En Máquinas del parque, `Nueva máquina` pasa de `FiltersBar.actions` al `PageHeader`. Bajo 640 px conserva nombre accesible y objetivo táctil, y desde 640 px mantiene texto visible. El mismo `NuevaMaquinaDialog` responsivo sigue controlando el alta; permisos, carga posterior, filtros, transferencias y datos no cambian. Validación local por prueba de página; revisión visual real pendiente.
+
+## Panorama de abastecimiento — 19/10/2026
+
+La rama `feat/campi-panorama-alternativa` agregó `campi_pedidos_abastecimiento_v1`, lectura autorizada por `parque.operaciones` aplicada en Lovable Cloud. Clasifica por identidad de unidad de pedido el vínculo único con stock positivo o importación activa. El indicador observado fue 7 de 17 unidades de **operaciones activas** sin vínculo; abre cada NP afectada. Operación activa no significa entrega pendiente: el estado de entrega por unidad no está acreditado para todo el universo, y facturación no reemplaza entrega. Por ello la cifra no se titula «pedidos atrasados» ni se combina con saldos proyectados de modelos. El frontend sigue solo en la rama local; ver `docs/campi-panorama-alternativa.md` para grano, exclusiones y pruebas.

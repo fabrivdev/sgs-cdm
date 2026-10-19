@@ -43,12 +43,12 @@ describe('Campi alternative story dashboard', () => {
     expect(screen.queryByText(/Datos al/)).not.toBeInTheDocument();
     expect(screen.queryByRole('link')).not.toBeInTheDocument();
   });
-  it('keeps all eight selected topics and explains the extra rows', async () => {
+  it('keeps all selected topics and explains the extra rows', async () => {
     const ids = PANORAMA_TOPICS.map(topic => topic.id);
     load.mockResolvedValue(ids.map(id => story(id)));
     show(ids);
-    await waitFor(() => expect(screen.getAllByRole('article')).toHaveLength(8));
-    expect(screen.getByText(/Elegiste 8 temas/)).toHaveTextContent('Se muestran todos');
+    await waitFor(() => expect(screen.getAllByRole('article')).toHaveLength(ids.length));
+    expect(screen.getByText(new RegExp(`Elegiste ${ids.length} temas`))).toHaveTextContent('Se muestran todos');
   });
   it('opens the native detail with comparisons, breakdown, method and specific navigation', async () => {
     load.mockResolvedValue([story('ventas_facturacion')]); show();

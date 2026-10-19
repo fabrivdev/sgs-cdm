@@ -11,6 +11,12 @@ export function storySummaryPercentage(story: PanoramaStory): StorySummaryPercen
       ? { value: primary.value / total * 100, label: 'del valor positivo valorizado', kind: 'composition' }
       : null;
   }
+  if (story.id === 'maquinas_pedidos') {
+    const total = story.supporting.find(datum => datum.label === 'Unidades activas')?.value;
+    return typeof total === 'number' && Number.isFinite(total) && total > 0 && primary.value >= 0 && primary.value <= total
+      ? { value: primary.value / total * 100, label: 'de unidades activas', kind: 'composition' }
+      : null;
+  }
   const previous = primary.comparison?.value;
   if (previous !== undefined && Number.isFinite(previous) && previous > 0) {
     return { value: (primary.value - previous) / previous * 100, label: `vs. ${primary.comparison!.label.toLowerCase()}`, kind: 'variation' };

@@ -25,9 +25,9 @@ describe('Campi Panorama configuration', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Cómo viene la facturación' }));
     fireEvent.click(screen.getByRole('button', { name: 'Stock antiguo de repuestos' }));
     fireEvent.click(screen.getByRole('button', { name: 'Qué máquinas hay en stock' }));
-    fireEvent.click(screen.getByRole('button', { name: 'Cuánto queda pendiente en pedidos de máquinas' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Abastecimiento de pedidos activos' }));
     expect(screen.getByText('4 priorizados')).toBeInTheDocument();
-    fireEvent.click(screen.getByRole('button', { name: 'Subir Cuánto queda pendiente en pedidos de máquinas' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Subir Abastecimiento de pedidos activos' }));
     fireEvent.click(screen.getByRole('button', { name: 'Guardar orden' }));
     expect(localStorage.getItem(panoramaStorageKey('manager-a')))
       .toBe('["ventas_facturacion","repuestos_stock","maquinas_pedidos","maquinas_stock"]');
@@ -62,9 +62,9 @@ describe('Campi Panorama configuration', () => {
   it('reorders topics by dragging as well as with keyboard-accessible buttons', () => {
     render(<CampiPanorama />);
     fireEvent.click(screen.getByRole('button', { name: 'Cómo viene la facturación' }));
-    fireEvent.click(screen.getByRole('button', { name: 'Cuánto queda pendiente en pedidos de máquinas' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Abastecimiento de pedidos activos' }));
     const first = screen.getByText('Cómo viene la facturación').closest('li');
-    const second = screen.getByText('Cuánto queda pendiente en pedidos de máquinas').closest('li');
+    const second = screen.getByText('Abastecimiento de pedidos activos').closest('li');
     expect(first).not.toBeNull();
     expect(second).not.toBeNull();
     fireEvent.dragStart(first!, { dataTransfer: { effectAllowed: 'move' } });

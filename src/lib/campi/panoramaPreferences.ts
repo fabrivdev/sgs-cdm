@@ -8,8 +8,8 @@ export type PanoramaTopic = { id: StoryTopicId; label: string; group: PanoramaTo
 
 export const PANORAMA_TOPICS: readonly PanoramaTopic[] = [
   { id: 'ventas_facturacion', label: 'Cómo viene la facturación', group: 'Resultados', sections: ['servicios.ventas', 'parque.ventas', 'repuestos.ventas'] },
-  { id: 'maquinas_pedidos', label: 'Cuánto queda pendiente en pedidos de máquinas', group: 'Compromisos', sections: ['parque.operaciones'] },
-  { id: 'servicios_pendientes', label: 'Qué órdenes de servicio siguen abiertas', group: 'Compromisos', sections: ['servicios.ordenes'] },
+  { id: 'maquinas_pedidos', label: 'Abastecimiento de pedidos activos', group: 'Compromisos', sections: ['parque.operaciones'] },
+  { id: 'servicios_pendientes', label: 'Resolución de órdenes de servicio', group: 'Operación', sections: ['servicios.ordenes'] },
   { id: 'repuestos_stock', label: 'Stock antiguo de repuestos', group: 'Disponibilidad', sections: ['repuestos.analisis'] },
   { id: 'maquinas_stock', label: 'Qué máquinas hay en stock', group: 'Disponibilidad', sections: ['parque.stock'] },
   { id: 'maquinas_proyeccion', label: 'Cómo cambia la disponibilidad de máquinas', group: 'Disponibilidad', sections: ['parque.stock_proyectado'] },

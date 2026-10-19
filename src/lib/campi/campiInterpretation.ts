@@ -29,6 +29,14 @@ export function interpretCampi(stories: readonly PanoramaStory[]) {
     if (s.id === 'repuestos_stock' && s.notices?.length) {
       return finding('attention', `Stock antiguo de repuestos: ${s.notices[0].text}. Podés abrir los códigos incluidos en el detalle.`, 70);
     }
+    if (s.id === 'maquinas_pedidos' && p.value! > 0) {
+      const total = s.supporting.find(d => d.label === 'Unidades activas')?.value;
+      return finding('attention', `${s.title}: ${amount(p)} de ${valid(total) ? number.format(total) : 'las'} unidades activas no tienen abastecimiento vinculado de forma única. Revisá los pedidos afectados; no es una medida de entregas atrasadas.`, 65);
+    }
+    if (s.id === 'servicios_pendientes' && valid(p.comparison?.value) && p.comparison.value > 0) {
+      const difference = p.value! - p.comparison.value;
+      if (difference !== 0) return finding('change', `${s.title}: la mediana ${difference > 0 ? 'aumentó' : 'bajó'} ${number.format(Math.abs(difference))} días frente al mes anterior (${amount({ ...p, value: p.comparison.value })} → ${amount(p)}). Compará también el volumen de cierres y las OS abiertas.`, 45);
+    }
     // An age bucket, a static color and a negative projected model are not
     // evidence of improvement, breach or a business alert.
     if (['ventas_facturacion', 'repuestos_clientes'].includes(s.id) && valid(p.comparison?.value) && p.comparison.value > 0) {

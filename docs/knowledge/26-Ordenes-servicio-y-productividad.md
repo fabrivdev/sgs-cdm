@@ -39,3 +39,7 @@ Estas reglas se contrastaron con los archivos locales de la rama `codex/machine-
 Órdenes usa tres columnas uniformes de KPI y una fila Identidad/Actividad/Estado. Productividad móvil muestra Técnico/Productividad sin ancho forzado; estado e incidencias viven en `Más filtros`, mientras el drawer conserva jornadas. Cumplimiento mueve período y Trabajos/Horas a Filtros y reemplaza abreviaturas crípticas por texto explícito. Escritorio, fuentes, fórmulas, permisos y exportaciones no cambian.
 
 Pruebas locales de DOM cubren 320/390/639/640/768/1280; la aprobación visual, overflow medido y producción permanecen pendientes.
+
+## Panorama de resolución — 19/10/2026
+
+La rama alternativa usa `campi_resolucion_os_v1`, aplicada en Lovable Cloud y autorizada por `servicios.ordenes`. Calcula la mediana de días calendario apertura→**cierre operativo** para cierres del último mes calendario transcurrido y la compara con el mes anterior. No usa factura ni última jornada como cierre. Septiembre de 2026: 84 cierres, mediana 14 días; agosto: 66, mediana 16,5 días. Las 1.301 OS cerradas históricas sin fecha de cierre quedan explícitamente excluidas; las 76 abiertas y su percentil 90 de antigüedad (123 días) se informan como resguardo. El enlace del panel abrió las 84 OS cerradas de septiembre y las 76 abiertas en Órdenes. La caída de la mediana no acredita una mejora de servicio ni cumplimiento de plazo. Falta fuente confiable de fecha prometida, completitud del corte importado y ciclos de reapertura. El frontend no está publicado en `main`.

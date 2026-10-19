@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { answerCampi, interpretCampi } from './campiInterpretation';
 import type { PanoramaStory } from './panoramaStoryTypes';
-const story = (overrides: Partial<PanoramaStory> = {}): PanoramaStory => ({ id: 'maquinas_pedidos', title: 'Pedidos', question: '¿Cuántos pedidos hay?', status: 'ready', message: '', scope: 'Autorizado', sections: ['parque.operaciones'], cutoff: null, periodLabel: 'Foto vigente', primary: { label: 'Unidades pendientes', value: 23, unit: 'count' }, supporting: [], chart: null, breakdown: [], details: [], source: 'Fuente comprobada', route: '', ...overrides });
+const story = (overrides: Partial<PanoramaStory> = {}): PanoramaStory => ({ id: 'maquinas_stock', title: 'Stock', question: '¿Cuánto stock hay?', status: 'ready', message: '', scope: 'Autorizado', sections: ['parque.operaciones'], cutoff: null, periodLabel: 'Foto vigente', primary: { label: 'Unidades', value: 23, unit: 'count' }, supporting: [], chart: null, breakdown: [], details: [], source: 'Fuente comprobada', route: '', ...overrides });
 const billing = story({ id: 'ventas_facturacion', title: 'Facturación', primary: { label: 'Facturación del mes', value: 448000, unit: 'USD', comparison: { value: 400000, label: 'Mismo tramo de 2025' } } });
 const orders = story({ id: 'servicios_pendientes', title: 'OS', primary: { label: 'OS abiertas', value: 37, unit: 'count' }, supporting: [{ label: 'Abiertas hace más de 30 días', value: 8, unit: 'count' }] });
 describe('deterministic Campi interpretation', () => {

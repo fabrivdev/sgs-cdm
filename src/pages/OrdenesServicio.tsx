@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
+import { useSearchParams } from "react-router-dom";
 import { ClipboardList, Clock3, CircleCheck, CircleAlert, Target, Percent, CalendarDays } from "lucide-react";
 import { PageHeader, PageShell, KpiStrip, KpiItem } from "@/components/layout/AppPrimitives";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
@@ -45,6 +46,7 @@ export default function OrdenesServicio() {
 }
 
 export function OrdersWorkspace() {
+  const [searchParams] = useSearchParams();
   const phone = useIsMobile(640);
   const compact = useIsMobile(1024);
   const { setPageFilters, clearPageFilters } = useAssistantPageContext();
@@ -54,7 +56,17 @@ export function OrdersWorkspace() {
   const [selectedTechnician, setSelectedTechnician] = useState<string | null>(null);
   const [matrixMetric, setMatrixMetric] = useState<"trabajos" | "horas">("trabajos");
   const [complianceBucket, setComplianceBucket] = useState("");
-  const defaults = useMemo<OperationsFilters>(() => ({ ...defaultServiceOrdersPeriod(today), periodMode: "mes", q: "", fSucursales: [], fMarcas: [], fTiposTiempo: [], fEstadosTrabajo: [], fTécnicos: [], fResponsablesOS: [], fEstadosOS: [], fOSRubros: [] }), [today]);
+  const defaults = useMemo<OperationsFilters>(() => {
+    const period = defaultServiceOrdersPeriod(today);
+    const state = searchParams.get("estado");
+    const from = searchParams.get("desde");
+    const to = searchParams.get("hasta");
+    const linkedPeriod = from && to && validOperationsRange(from, to) ? { dateFrom: from, dateTo: to } : null;
+    const openHistory = state === "abierta" && !linkedPeriod;
+    return { ...(linkedPeriod ?? (openHistory ? { dateFrom: "2000-01-01", dateTo: period.dateTo } : period)),
+      periodMode: openHistory ? "anio" : "mes", q: "", fSucursales: [], fMarcas: [], fTiposTiempo: [], fEstadosTrabajo: [], fTécnicos: [], fResponsablesOS: [],
+      fEstadosOS: state === "abierta" || state === "cerrada" ? [state] : [], fOSRubros: [] };
+  }, [today, searchParams]);
   const [filters, setFilters] = useState(defaults);
   const change = <K extends keyof OperationsFilters>(key: K, value: OperationsFilters[K]) => setFilters(previous => ({ ...previous, [key]: value }));
   const valid = validOperationsRange(filters.dateFrom, filters.dateTo);
