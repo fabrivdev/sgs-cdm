@@ -1,0 +1,26 @@
+import type { PanoramaStory, StoryTopicId, StoryUnit } from './panoramaStoryTypes';
+
+export type StoryVisitSnapshot = { at: string; values: { id: StoryTopicId; value: number; unit: StoryUnit; fingerprint: string }[] };
+const key = (userId: string) => `sig-cdm:panorama:alternativa:visita:v1:${userId}`;
+const fingerprint = (story: PanoramaStory) => JSON.stringify([story.sections.slice().sort(), story.scope, story.visitKey ?? story.periodLabel, story.source]);
+export function readStoryVisit(userId: string): StoryVisitSnapshot | null {
+  if (!userId) return null;
+  try {
+    const data: unknown = JSON.parse(localStorage.getItem(key(userId)) ?? 'null');
+    if (!data || typeof data !== 'object' || !('at' in data) || typeof data.at !== 'string' || !Number.isFinite(Date.parse(data.at)) || !('values' in data) || !Array.isArray(data.values)) return null;
+    if (!data.values.every(row => row && typeof row.id === 'string' && typeof row.fingerprint === 'string' && typeof row.unit === 'string' && typeof row.value === 'number' && Number.isFinite(row.value))) return null;
+    return data as StoryVisitSnapshot;
+  } catch { return null; }
+}
+export function storyVisitChange(story: PanoramaStory, snapshot: StoryVisitSnapshot | null): number | null {
+  if (!['ready', 'empty'].includes(story.status) || story.primary?.value == null || !Number.isFinite(story.primary.value)) return null;
+  const old = snapshot?.values.find(row => row.id === story.id && row.unit === story.primary?.unit && row.fingerprint === fingerprint(story));
+  return old ? story.primary.value - old.value : null;
+}
+export function saveStoryVisit(userId: string, stories: readonly PanoramaStory[], at = new Date().toISOString()): void {
+  if (!userId || !stories.length || stories.some(story => story.status === 'error')) return;
+  const values = stories.flatMap(story => ['ready', 'empty'].includes(story.status) && story.primary?.value != null && Number.isFinite(story.primary.value)
+    ? [{ id: story.id, value: story.primary.value, unit: story.primary.unit, fingerprint: fingerprint(story) }] : []);
+  if (!values.length) return;
+  try { localStorage.setItem(key(userId), JSON.stringify({ at, values })); } catch { /* Optional local reference; the report remains usable. */ }
+}

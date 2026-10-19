@@ -59,3 +59,23 @@ Cobertura actual del catálogo de trece temas:
 Los diez temas sin KPI propio siguen siendo destinos autorizados sin cifra inventada. Antes de convertirlos en indicadores hay que fijar grano, unidad, corte, exclusiones, estado sin datos, permiso de lectura y destino de detalle; no interpretar una fila de tabla como KPI de negocio.
 
 Fuente: `src/pages/CampiPanorama.tsx`, `src/lib/campi/panoramaPreferences.ts`, `src/components/campi/CampiPanoramaAvatar.tsx`, `src/components/campi/CampiWelcome.tsx`, `src/App.tsx` y `src/components/AppLayout.tsx`. Las 24 pruebas específicas de estos cambios, TypeScript, lint y build pasaron en la rama; se comprobaron clic y teclado en Chrome local autenticado. No hay migración SQL para esta etapa ni validación de producción.
+
+## Alternativa de temas completos — 16/10/2026
+
+La rama `feat/campi-panorama-alternativa`, derivada de `3337f6d`, conserva la anterior para comparar. Reemplaza el límite de tres indicadores por todos los temas elegidos, cada uno con conclusión, jerarquía, gráfico y detalle modal. Facturación consolida las áreas autorizadas. El catálogo habilitado se reduce a ocho temas con contrato verificable y preguntas específicas; no convierte temas incompletos en simples enlaces. Preferencias y referencia de visitas locales tienen namespace propio. No usa la migración de visitas pendiente ni aplica SQL.
+
+Ver `docs/campi-panorama-alternativa.md` para contratos, cobertura, límites de clientes con NC, stock de análisis, unidades pendientes de máquinas (sin monto aún consolidado), pruebas y validación visual/productiva pendiente. Esta sección describe solo la alternativa, no reemplaza el estado de la rama original ni acredita publicación.
+
+### Ajuste de densidad de la alternativa — 16/10/2026
+
+La revisión posterior reemplaza las largas secciones iniciales por cuatro tarjetas simultáneas en cuadrícula 2×2 de escritorio. Campi ocupa una franja breve; cada tema muestra cifra, porcentaje con base explícita y minigráfico. El análisis completo queda en modal. Las selecciones de más de cuatro se conservan con aviso de filas adicionales. Porcentajes temporales solo con comparación válida; composiciones se etiquetan como tales. Fuentes y permisos no cambian. Ver `docs/campi-panorama-alternativa.md`, `StoryPanel.tsx`, `panorama-dashboard.css` y `storySummary.ts`. Build y pruebas locales no acreditan ajuste visual en navegador ni publicación Lovable.
+
+### Interpretación y boceto de la alternativa — 16/10/2026
+
+La revisión posterior sustituye la franja breve por un hero de tres zonas: mascota protagonista, dos hechos de la selección y consulta con dos preguntas sugeridas. Las cuatro prioridades siguen en orden del usuario, en tarjetas horizontales 2×2; la relevancia de los hechos se calcula por separado. El motor `campiInterpretation.ts` solo usa `PanoramaStory` ya autorizado: compara facturación/clientes cuando hay base válida y señala antigüedad de OS, clasificación roja o saldos proyectados negativos con motivo explícito. Cantidades pendientes sin contexto son neutrales. No infiere causas ni vencimientos, no usa IA externa ni dispara consultas adicionales. Preguntas no cubiertas reciben un límite explícito. Al cambiar permisos se retiran también las respuestas. La composición sigue el boceto facilitado; ajuste de 1440×900 y validación visual real siguen pendientes, no demostrados por pruebas DOM. Sin cambios en main, push, SQL ni Lovable.
+
+### Jerarquía del boceto corregida — 16/10/2026
+
+La captura aportada por el usuario mostró una jerarquía demasiado pequeña y tarjetas con alcance repetido antes de la cifra. La alternativa reorganiza los componentes reales: título de 36 px, hero de tres zonas con titular breve de 22 px y dos acciones que abren respuestas ya soportadas, tarjetas con encabezado de 18 px, KPI de 36 px y comparación contigua. El período queda a la derecha; alcance, fuente, límites y comparación completa permanecen en el detalle. Las barras muestran etiquetas y valores directos. La mini tendencia muestra la serie actual; la comparación histórica completa se conserva en el gráfico del detalle. No se agregan cifras, navegación ficticia ni variaciones sin base. Se mantienen las cuatro prioridades seleccionadas y el motor determinista.
+
+La revisión independiente de código detectó y corrigió riesgos de solapamiento con títulos/períodos largos e importes grandes: filas de altura mínima expandible, períodos acotados, fallback para cifras extensas y etiquetas compactas en barras. La referencia visual utilizada fue la captura del usuario y su boceto; Chromium no se ejecutó por bloqueo de sandbox, de modo que los tests y la inspección de CSS no acreditan una comparación renderizada final. Sin push, merge, SQL ni Lovable.

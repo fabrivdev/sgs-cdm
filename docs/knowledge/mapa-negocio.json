@@ -675,11 +675,21 @@
       "id": "panorama-permisos-y-comparacion",
       "title": "Panorama por permisos y visitas comparables",
       "module": "asistente",
-      "description": "Los temas ordenan solo indicadores autorizados por módulo y sección. El panel destaca hasta tres métricas; los temas aún sin KPI mantienen un acceso útil al detalle. Las ventas comparan el mes en curso hasta el corte con el tramo equivalente del mes anterior, sin interpretar una variación como mejora. El hallazgo de stock rojo usa el valor y el total del mismo corte valorizado de Repuestos y abre ese grupo filtrado. La comparación entre visitas aún no se presenta: requiere cálculos y registro confiables en servidor; un dato faltante o un corte no comparable no es cero ni mejora.",
-      "check": "Probar revocación de módulo/sección, fuente fallida, primer ingreso, recarga en la misma sesión, cambio de mes, moneda y fila histórica propia por RLS. No convertir el snapshot enviado por el cliente en alerta o síntesis causal hasta calcularlo en servidor.",
-      "entities": ["usuario", "permiso"],
-      "sources": ["src/lib/campi/panoramaPreferences.ts", "src/lib/campi/panoramaData.ts", "src/lib/campi/panoramaVisits.ts", "supabase/migrations/20261016190000_campi_panorama_visits.sql", "docs/knowledge/36-Campi-bienvenida.md"],
-      "evidence": "Rama feat/campi-panorama; SQL probado en PostgreSQL aislado y pantalla local, sin despliegue ni ejecución remota de la migración"
+      "description": "En la alternativa, todos los temas seleccionados tienen un resumen completo en orden. Facturación consolida solo áreas autorizadas; comparación MTD/YTD con igual tramo LY. Las fuentes sin corte acreditado no dicen datos al día. Ocho temas con contrato reemplazan accesos sin KPI. La referencia local de visita compara alcance, período, moneda y definición iguales sin atribuir ventas nuevas.",
+      "check": "Probar permisos antes de consulta, todos los temas sin límite, consolidación sin subtotales ante fallo, cero válido, cambio de mes/alcance, modal y teclado. Referencia local no es historial contable. Validación visual y productiva pendientes.",
+      "entities": [
+        "usuario",
+        "permiso"
+      ],
+      "sources": [
+        "src/lib/campi/panoramaPreferences.ts",
+        "src/lib/campi/panoramaStories.ts",
+        "src/lib/campi/salesStories.ts",
+        "src/lib/campi/operationsStories.ts",
+        "src/lib/campi/panoramaStoryVisits.ts",
+        "docs/campi-panorama-alternativa.md"
+      ],
+      "evidence": "Rama alternativa derivada de 3337f6d; pruebas con fixtures, build, sin SQL remoto ni publicación."
     },
     {
       "id": "mora-cxc-fuente",
@@ -1706,10 +1716,28 @@
       "title": "Priorizar temas y leer Panorama",
       "module": "asistente",
       "description": "El usuario autorizado ordena temas específicos y abre un panel variable sin cifras ficticias.",
-      "steps": ["Filtrar el catálogo por rol, módulo y sección.", "Guardar el orden elegido por usuario y navegador.", "Consultar solo las fuentes autorizadas por los temas elegidos.", "Comparar tramos de venta equivalentes y contextualizar el stock proyectado.", "Destacar hasta tres métricas y un hallazgo validado del semáforo, sin duplicar cifras, y abrir cada detalle autorizado.", "Mantener una ruta autorizada y útil para cada tema sin KPI consolidado."],
-      "entities": ["usuario", "permiso"],
-      "rules": ["panorama-permisos-y-comparacion"],
-      "sources": ["src/pages/CampiPanorama.tsx", "src/components/campi/PanoramaDashboard.tsx", "src/lib/campi/panoramaData.ts", "src/lib/campi/panoramaVisits.ts"]
+      "steps": [
+        "Filtrar temas específicos por permisos de su fuente real.",
+        "Guardar orden en navegador con namespace independiente.",
+        "Consultar y conciliar agregados completos autorizados.",
+        "Mostrar todos los temas elegidos con métricas, gráficos y contexto.",
+        "Abrir detalle modal con composición y fuentes.",
+        "Guardar referencia local solo con respuestas completas sin errores, conservando cero válido."
+      ],
+      "entities": [
+        "usuario",
+        "permiso"
+      ],
+      "rules": [
+        "panorama-permisos-y-comparacion"
+      ],
+      "sources": [
+        "src/pages/CampiPanorama.tsx",
+        "src/components/campi/PanoramaDashboard.tsx",
+        "src/components/campi/StoryPanel.tsx",
+        "src/lib/campi/panoramaStories.ts",
+        "src/lib/campi/panoramaStoryVisits.ts"
+      ]
     },
     {
       "id": "planificar-trabajo",
@@ -2353,9 +2381,15 @@
       "id": "asistente.panorama",
       "title": "Panorama de Campi",
       "module": "asistente",
-      "description": "Selector de prioridades y panel variable en la rama de desarrollo. El historial entre visitas exige la migración pendiente; no afirmar métricas de los temas aún sin fuente consolidada.",
-      "sources": ["src/pages/CampiPanorama.tsx", "src/components/campi/PanoramaDashboard.tsx", "docs/knowledge/36-Campi-bienvenida.md"],
-      "flows": ["configurar-y-leer-panorama"]
+      "description": "Alternativa en rama: todos los temas seleccionados, facturación consolidada autorizada, detalle modal y referencia local sin depender de migración. No acredita publicación ni validación visual/productiva.",
+      "sources": [
+        "src/pages/CampiPanorama.tsx",
+        "src/components/campi/PanoramaDashboard.tsx",
+        "docs/knowledge/36-Campi-bienvenida.md"
+      ],
+      "flows": [
+        "configurar-y-leer-panorama"
+      ]
     },
     {
       "id": "servicios.planificador",

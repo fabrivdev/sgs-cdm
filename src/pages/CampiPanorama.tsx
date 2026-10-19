@@ -1,4 +1,5 @@
 import { useMemo, useState } from 'react';
+import type { StoryTopicId } from '@/lib/campi/panoramaStoryTypes';
 import { Activity, ArrowDown, ArrowUp, BarChart3, Boxes, CalendarDays, Check, ClipboardList, GripVertical, HandCoins, Package, Plus, Ship, ShoppingCart, Tractor, Truck, Wrench, X } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { PageHeader, PageShell, Panel } from '@/components/layout/AppPrimitives';
@@ -19,6 +20,8 @@ const GROUPS: readonly PanoramaTopicGroup[] = ['Resultados', 'Compromisos', 'Dis
 const topicIcons: Record<PanoramaTopicId, typeof BarChart3> = {
   ventas_facturacion: BarChart3,
   repuestos_demanda: Activity,
+  repuestos_clientes: Activity,
+  repuestos_sucursales: Package,
   maquinas_pedidos: Truck,
   servicios_pendientes: ClipboardList,
   maquinas_stock: Tractor,
@@ -48,16 +51,17 @@ export default function CampiPanorama() {
   const [saved, setSaved] = useState<PanoramaTopicId[] | null>(() => readPanoramaPreferences(userId));
   const [editing, setEditing] = useState(() => readPanoramaPreferences(userId) === null);
   const [draft, setDraft] = useState<PanoramaTopicId[]>(() => reconcilePanoramaOrder(readPanoramaPreferences(userId), available));
-  const [dragged, setDragged] = useState<PanoramaTopicId | null>(null);
+  const [dragged, setDragged] = useState<StoryTopicId | null>(null);
   const [reaction, setReaction] = useState<CampiPanoramaReaction | null>(null);
   const selected = reconcilePanoramaOrder(draft, available);
   const persisted = reconcilePanoramaOrder(saved, available);
+  const cancel = () => { setDraft(persisted); setEditing(false); };
   const changed = saved === null || selected.join('|') !== persisted.join('|');
   const topicById = new Map(available.map(topic => [topic.id, topic]));
   const unselected = available.filter(topic => !selected.includes(topic.id));
   const react = (kind: CampiPanoramaReaction['kind']) => setReaction(current => ({ kind, token: (current?.token ?? 0) + 1 }));
 
-  const add = (id: PanoramaTopicId) => {
+  const add = (id: StoryTopicId) => {
     setDraft(current => {
       const permitted = reconcilePanoramaOrder(current, available);
       return permitted.includes(id) ? permitted : [...permitted, id];
@@ -87,12 +91,12 @@ export default function CampiPanorama() {
 
   return <PageShell className="max-w-[1440px] space-y-4">
     <PageHeader title="Panorama" />
-    <Panel className="relative isolate min-h-[178px] overflow-visible border-primary/15 bg-gradient-to-r from-emerald-50/70 via-background to-primary/5 px-6 py-5 lg:px-8">
+    <Panel className="relative isolate min-h-[240px] overflow-hidden border-primary/15 bg-gradient-to-r from-emerald-50/70 via-background to-primary/5 px-6 py-5 lg:px-8">
       <div className="relative z-10 max-w-[590px] space-y-2 lg:py-5">
         <h2 className="text-[25px] font-semibold tracking-tight">Hola, soy Campi</h2>
         <p className="max-w-lg text-[15px] leading-6 text-foreground/85">Te ayudaré a ver qué cambió y qué necesita atención, con información verificada.</p>
       </div>
-      <div className="absolute bottom-0 right-[190px] z-20 hidden h-[200px] w-[200px] lg:block"><CampiPanoramaAvatar reaction={reaction} /></div>
+      <div className="absolute bottom-5 right-[190px] z-20 hidden h-[200px] w-[200px] lg:block"><CampiPanoramaAvatar reaction={reaction} /></div>
       <div className="absolute right-5 top-1/2 z-10 hidden w-[165px] -translate-y-1/2 rounded-xl border bg-card px-3.5 py-3 text-[13px] font-semibold shadow-sm before:absolute before:-left-[7px] before:top-[calc(50%-7px)] before:h-3.5 before:w-3.5 before:rotate-45 before:border-b before:border-l before:bg-card lg:block">Tus temas, en el orden que prefieras.</div>
     </Panel>
     <div className="grid items-start gap-4 lg:grid-cols-[minmax(0,1.55fr)_minmax(360px,0.85fr)]">
@@ -144,7 +148,8 @@ export default function CampiPanorama() {
           })}
           {!selected.length && <li className="flex min-h-[172px] items-center justify-center text-[13px] text-muted-foreground">Sin prioridades todavía.</li>}
         </ol>
-        <div className="flex justify-end">
+        <div className="flex justify-end gap-2">
+          {saved !== null && <Button size="sm" variant="outline" onClick={cancel}>Volver al panorama</Button>}
           <Button size="sm" onClick={save} disabled={!selected.length || !changed}><Check className="mr-2 h-4 w-4" />{changed ? 'Guardar orden' : 'Orden guardado'}</Button>
         </div>
       </Panel>

@@ -22,12 +22,12 @@ describe('Campi Panorama topics', () => {
     }
   });
 
-  it('requires module and section access and keeps commissions admin-only', () => {
+  it('requires module and section access and excludes unimplemented themes', () => {
     const allowed = availablePanoramaTopics(module => module === 'servicios', section =>
       ['servicios.ventas', 'servicios.comisiones'].includes(section), false);
     expect(allowed.map(topic => topic.id)).toEqual(['ventas_facturacion']);
     expect(availablePanoramaTopics(() => false, () => true, true)).toEqual([]);
-    expect(availablePanoramaTopics(() => true, () => true, true).some(topic => topic.id === 'servicios_comisiones')).toBe(true);
+    expect(availablePanoramaTopics(() => true, () => true, true).map(topic => topic.id)).not.toContain('servicios_comisiones');
   });
 
   it('removes revoked and duplicate topics without limiting the number or changing order', () => {
@@ -42,9 +42,9 @@ describe('Campi Panorama topics', () => {
   it('persists order per user and ignores obsolete section-based preferences', () => {
     localStorage.setItem('sig-cdm:panorama:v3:a', '["servicios.ventas","parque.stock"]');
     expect(readPanoramaPreferences('a')).toBeNull();
-    savePanoramaPreferences('a', ['ventas_facturacion', 'maquinas_stock', 'repuestos_stock', 'servicios_agenda']);
+    savePanoramaPreferences('a', ['ventas_facturacion', 'maquinas_stock', 'repuestos_stock', 'repuestos_sucursales']);
     savePanoramaPreferences('b', ['repuestos_stock']);
-    expect(readPanoramaPreferences('a')).toEqual(['ventas_facturacion', 'maquinas_stock', 'repuestos_stock', 'servicios_agenda']);
+    expect(readPanoramaPreferences('a')).toEqual(['ventas_facturacion', 'maquinas_stock', 'repuestos_stock', 'repuestos_sucursales']);
     expect(readPanoramaPreferences('b')).toEqual(['repuestos_stock']);
     expect(localStorage.getItem(panoramaStorageKey('a'))).not.toBe(localStorage.getItem(panoramaStorageKey('b')));
   });
