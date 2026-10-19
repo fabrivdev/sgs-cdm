@@ -43,12 +43,21 @@ describe('Campi alternative story dashboard', () => {
     expect(screen.queryByText(/Datos al/)).not.toBeInTheDocument();
     expect(screen.queryByRole('link')).not.toBeInTheDocument();
   });
-  it('keeps all selected topics and explains the extra rows', async () => {
+  it('keeps all selected topics without adding an explanatory line', async () => {
     const ids = PANORAMA_TOPICS.map(topic => topic.id);
     load.mockResolvedValue(ids.map(id => story(id)));
     show(ids);
     await waitFor(() => expect(screen.getAllByRole('article')).toHaveLength(ids.length));
-    expect(screen.getByText(new RegExp(`Elegiste ${ids.length} temas`))).toHaveTextContent('Se muestran todos');
+    expect(screen.queryByText(/Elegiste .* temas/)).not.toBeInTheDocument();
+  });
+  it('shows every selected topic while sources are still loading', () => {
+    load.mockReturnValue(new Promise(() => {}));
+    const ids: StoryTopicId[] = ['servicios_pendientes', 'repuestos_stock'];
+    show(ids);
+    expect(screen.getAllByRole('status', { name: /Consultando/ })).toHaveLength(ids.length);
+    expect(screen.getByRole('heading', { name: 'Resolución de órdenes de servicio' })).toBeInTheDocument();
+    expect(screen.getByRole('heading', { name: 'Stock antiguo de repuestos' })).toBeInTheDocument();
+    expect(screen.queryByText('0')).not.toBeInTheDocument();
   });
   it('opens the native detail with comparisons, breakdown, method and specific navigation', async () => {
     load.mockResolvedValue([story('ventas_facturacion')]); show();

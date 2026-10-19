@@ -105,11 +105,15 @@ async function machineStock() {
   rows.forEach(r => branches.set(r.sucursal || 'Sin sucursal', (branches.get(r.sucursal || 'Sin sucursal') ?? 0) + r.saldo_actual!));
   story.status = rows.length ? 'ready' : 'empty';
   story.scope = 'Foto autoritativa de Stock de Maquinarias · nuevas y usadas';
-  story.message = 'Existencias físicas informadas, agrupadas por sucursal.';
+  story.message = 'Existencias físicas informadas, separadas por condición y sucursal.';
   story.primary = { label: 'Saldo físico', value: sum(rows), unit: 'count' };
   story.supporting = [{ label: 'Nuevas', value: sum(rows.filter(r => r.estado === 'Nuevo')), unit: 'count' }, { label: 'Usadas', value: sum(rows.filter(r => r.estado === 'Usado')), unit: 'count' }, { label: 'Otra condición / sin informar', value: sum(rows.filter(r => !['Nuevo', 'Usado'].includes(r.estado ?? ''))), unit: 'count' }];
-  story.chart = { kind: 'bars', title: 'Saldo por sucursal', rows: [...branches].map(([label,value]) => ({label,value})), unit: 'count' };
-  story.breakdown = story.chart.rows.map(r => ({...r, unit: 'count'}));
+  const branchRows = [...branches].map(([label, value]) => ({ label, value }));
+  const conditionRows = story.supporting.filter(item => item.value !== null && item.value > 0).map(item => ({ label: item.label, value: item.value! }));
+  story.chart = branches.size > 1
+    ? { kind: 'bars', title: 'Saldo por sucursal', rows: branchRows, unit: 'count' }
+    : { kind: 'bars', title: 'Saldo por condición', rows: conditionRows, unit: 'count' };
+  story.breakdown = branchRows.map(r => ({ ...r, unit: 'count' }));
   story.details = ['La fecha de importación no acredita la fecha de corte de la foto.', 'Saldo físico no equivale a disponibilidad comercial: reservas, vínculos y conflictos se revisan en Stock. No se agregan máquinas del Parque como existencias.'];
   return story;
 }

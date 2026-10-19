@@ -68,4 +68,10 @@ describe('compact overview panel', () => {
     expect(screen.getByText('30%')).toBeInTheDocument();
     expect(screen.getByRole('link', { name: /Un código podría pasar a rojo/ })).toHaveAttribute('href', '/repuestos/analisis?color=GRIS&compra_dias_min=971&compra_dias_max=1000&vista=detalle');
   });
+  it('shows service closure volume and open queue without treating shorter resolution as a verified improvement', () => {
+    render(<MemoryRouter><StoryPanel story={{ ...story, id: 'servicios_pendientes', title: 'Resolución de órdenes de servicio', primary: { label: 'Mediana de resolución', value: 14, unit: 'days', comparison: { label: 'agosto de 2026', value: 16.5 } }, supporting: [{ label: 'OS cerradas en septiembre de 2026', value: 84, unit: 'count' }, { label: 'OS abiertas registradas', value: 76, unit: 'count' }], chart: null }} index={0} retrying={false} onRetry={vi.fn()} /></MemoryRouter>);
+    expect(screen.getByText('-15,15%').parentElement).toHaveAttribute('data-direction', 'neutral');
+    expect(screen.getByText('OS cerradas').nextSibling).toHaveTextContent('84');
+    expect(screen.getByText('OS abiertas').nextSibling).toHaveTextContent('76');
+  });
 });

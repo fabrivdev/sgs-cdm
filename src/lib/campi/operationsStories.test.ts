@@ -47,4 +47,14 @@ describe('operational Panorama loaders', () => {
     mocks.from.mockReturnValueOnce(chain({ data: [], count: 1, error: null }));
     expect((await loadOperationsStories(['maquinas_stock'], ['parque.stock'], asOf))[0].status).toBe('error');
   });
+  it('shows stock composition when a sole branch would just repeat the total', async () => {
+    mocks.from.mockReturnValueOnce(chain({ data: [
+      { id: 'a', estado: 'Nuevo', sucursal: 'Santa Rita', saldo_actual: 36 },
+      { id: 'b', estado: 'Usado', sucursal: 'Santa Rita', saldo_actual: 51 },
+    ], count: 2, error: null }));
+    const [story] = await loadOperationsStories(['maquinas_stock'], ['parque.stock'], asOf);
+    expect(story.primary?.value).toBe(87);
+    expect(story.chart?.rows).toEqual([{ label: 'Nuevas', value: 36 }, { label: 'Usadas', value: 51 }]);
+    expect(story.breakdown).toEqual([{ label: 'Santa Rita', value: 87, unit: 'count' }]);
+  });
 });

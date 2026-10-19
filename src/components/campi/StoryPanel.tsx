@@ -77,6 +77,19 @@ function ProjectionComponents({ story }: { story: PanoramaStory }) {
   })}</dl>;
 }
 
+function ResolutionComparison({ story }: { story: PanoramaStory }) {
+  const primary = story.primary!;
+  const current = story.supporting.find(item => item.label.startsWith('OS cerradas en '));
+  const open = story.supporting.find(item => item.label === 'OS abiertas registradas');
+  return <div className="story-resolution-comparison">
+    <StoryComparisonChart current={primary.value!} previous={primary.comparison!.value} label={primary.label} unit={primary.unit} />
+    <dl className="story-resolution-guardrails">
+      {current && <div><dt>OS cerradas</dt><dd>{storyValue(current.value, current.unit)}</dd></div>}
+      {open && <div><dt>OS abiertas</dt><dd>{storyValue(open.value, open.unit)}</dd></div>}
+    </dl>
+  </div>;
+}
+
 export function StoryPanel({ story, index, onRetry, retrying, visitChange = null }: { story: PanoramaStory; index: number; onRetry: () => void; retrying: boolean; visitChange?: number | null }) {
   const titleId = `story-${story.id}`;
   const percentage = storySummaryPercentage(story);
@@ -88,10 +101,10 @@ export function StoryPanel({ story, index, onRetry, retrying, visitChange = null
           <div className="story-datum story-datum-primary"><dt>{story.primary.label}</dt><dd data-long={storyValue(story.primary.value, story.primary.unit).length > 12}>{storyValue(story.primary.value, story.primary.unit)}</dd></div>
           {story.primary.comparison && <div className="story-datum story-datum-previous"><dt>{story.primary.comparison.label}</dt><dd>{storyValue(story.primary.comparison.value, story.primary.unit)}</dd></div>}
         </>}</dl>
-        {percentage && <div className="story-percentage" data-kind={percentage.kind} data-direction={percentage.value < 0 ? 'down' : 'up'}><strong>{percentage.kind === 'variation' && percentage.value > 0 ? '+' : ''}{numbers.format(percentage.value)}%</strong><span>{percentage.kind === 'variation' ? 'Variación' : percentage.label}</span></div>}
+        {percentage && <div className="story-percentage" data-kind={percentage.kind} data-direction={percentage.kind === 'variation' ? 'neutral' : 'composition'}><strong>{percentage.kind === 'variation' && percentage.value > 0 ? '+' : ''}{numbers.format(percentage.value)}%</strong><span>{percentage.kind === 'variation' ? 'Variación' : percentage.label}</span></div>}
       </div>
       {!!story.notices?.length && <div className="story-notices" aria-label={story.id === 'repuestos_stock' ? 'Avisos preventivos' : 'Puntos para revisar'}>{story.notices.map((notice, i) => <Link key={i} to={notice.route}>{notice.text}<ArrowUpRight className="h-3 w-3 shrink-0" /></Link>)}</div>}
-      {story.id === 'maquinas_proyeccion' && ['Stock calculado', 'Compras pendientes', 'Ventas pendientes'].every(label => story.supporting.some(item => item.label === label)) ? <ProjectionComponents story={story} /> : story.primary?.comparison && story.primary.value !== null && Number.isFinite(story.primary.value) && Number.isFinite(story.primary.comparison.value) && story.primary.value >= 0 && story.primary.comparison.value >= 0 ? <StoryComparisonChart current={story.primary.value} previous={story.primary.comparison.value} label={story.primary.label} unit={story.primary.unit} /> : story.chart && story.chart.rows.length > 0 ? <StoryChart chart={story.chart} mini /> : <p className="story-no-chart">{story.message}</p>}
+      {story.id === 'maquinas_proyeccion' && ['Stock calculado', 'Compras pendientes', 'Ventas pendientes'].every(label => story.supporting.some(item => item.label === label)) ? <ProjectionComponents story={story} /> : story.id === 'servicios_pendientes' && story.primary?.comparison && story.primary.value !== null && Number.isFinite(story.primary.value) && Number.isFinite(story.primary.comparison.value) && story.primary.value >= 0 && story.primary.comparison.value >= 0 ? <ResolutionComparison story={story} /> : story.primary?.comparison && story.primary.value !== null && Number.isFinite(story.primary.value) && Number.isFinite(story.primary.comparison.value) && story.primary.value >= 0 && story.primary.comparison.value >= 0 ? <StoryComparisonChart current={story.primary.value} previous={story.primary.comparison.value} label={story.primary.label} unit={story.primary.unit} /> : story.chart && story.chart.rows.length > 0 ? <StoryChart chart={story.chart} mini /> : <p className="story-no-chart">{story.message}</p>}
       <Dialog><DialogTrigger asChild><Button variant="outline" className="story-detail-trigger" aria-label={`Ver detalle de ${story.title}`}>Ver detalle <ArrowRight className="ml-2 h-4 w-4" /></Button></DialogTrigger>
         <DialogContent className="panorama-story-dialog"><DialogHeader><DialogTitle>{story.question}</DialogTitle><DialogDescription>{story.scope} · {story.periodLabel}{story.cutoff && ` · Corte: ${dateLabel(story.cutoff)}`}</DialogDescription></DialogHeader>
           <p className="story-conclusion">{story.message}</p>
