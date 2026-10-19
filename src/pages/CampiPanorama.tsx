@@ -9,6 +9,7 @@ import { useAuth } from '@/hooks/useAuth';
 import { cn } from '@/lib/utils';
 import {
   availablePanoramaTopics,
+  MAX_PANORAMA_TOPICS,
   readPanoramaPreferences,
   reconcilePanoramaOrder,
   savePanoramaPreferences,
@@ -53,23 +54,32 @@ export default function CampiPanorama() {
   const [draft, setDraft] = useState<PanoramaTopicId[]>(() => reconcilePanoramaOrder(readPanoramaPreferences(userId), available));
   const [dragged, setDragged] = useState<StoryTopicId | null>(null);
   const [reaction, setReaction] = useState<CampiPanoramaReaction | null>(null);
+  const [replacing, setReplacing] = useState<StoryTopicId | null>(null);
   const selected = reconcilePanoramaOrder(draft, available);
   const persisted = reconcilePanoramaOrder(saved, available);
-  const cancel = () => { setDraft(persisted); setEditing(false); };
+  const cancel = () => { setDraft(persisted); setReplacing(null); setEditing(false); };
   const changed = saved === null || selected.join('|') !== persisted.join('|');
   const topicById = new Map(available.map(topic => [topic.id, topic]));
   const unselected = available.filter(topic => !selected.includes(topic.id));
   const react = (kind: CampiPanoramaReaction['kind']) => setReaction(current => ({ kind, token: (current?.token ?? 0) + 1 }));
 
   const add = (id: StoryTopicId) => {
+    if (selected.length >= MAX_PANORAMA_TOPICS) { setReplacing(id); react('remove'); return; }
     setDraft(current => {
       const permitted = reconcilePanoramaOrder(current, available);
       return permitted.includes(id) ? permitted : [...permitted, id];
     });
     react('select');
   };
+  const replace = (index: number) => {
+    if (!replacing || !available.some(topic => topic.id === replacing)) return;
+    setDraft(selected.map((id, position) => position === index ? replacing : id));
+    setReplacing(null);
+    react('select');
+  };
   const remove = (id: PanoramaTopicId) => {
     setDraft(current => reconcilePanoramaOrder(current, available).filter(item => item !== id));
+    setReplacing(null);
     react('remove');
   };
   const move = (from: number, to: number) => {
@@ -84,6 +94,7 @@ export default function CampiPanorama() {
     setSaved(selected);
     react('save');
     setEditing(false);
+    setReplacing(null);
   };
 
   if (!editing && persisted.length) return <PanoramaDashboard userId={userId} topics={persisted} available={available}
@@ -103,7 +114,7 @@ export default function CampiPanorama() {
       <Panel className="min-w-0 space-y-3">
         <div className="flex min-h-9 items-center justify-between gap-2">
           <h2 className="text-[15px] font-semibold">Temas de interés</h2>
-          <span className="text-[12px] tabular-nums text-muted-foreground">{available.length} disponibles</span>
+          <span className="text-[12px] tabular-nums text-muted-foreground">{available.length} disponibles · {selected.length} seleccionados · {unselected.length} por agregar</span>
         </div>
         <div className="max-h-[430px] space-y-3 overflow-y-auto pr-1" aria-label="Temas disponibles">
           {GROUPS.map(group => {
@@ -116,7 +127,7 @@ export default function CampiPanorama() {
                 return <button key={topic.id} type="button" onClick={() => add(topic.id)}
                   className="flex min-h-[54px] w-full items-center gap-3 rounded-lg border bg-card px-3 text-left transition-colors hover:bg-accent focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring">
                   <span className={cn('flex h-8 w-8 shrink-0 items-center justify-center rounded-full', groupTone[group])}><Icon className="h-4 w-4" /></span>
-                  <span className="min-w-0 flex-1 truncate text-[13px] font-semibold">{topic.label}</span>
+                  <span className="min-w-0 flex-1"><strong className="block text-[13px] font-semibold">{topic.label}</strong><span className="block text-[12px] text-muted-foreground">{topic.question} · {topic.preview}</span></span>
                   <Plus className="h-4 w-4 shrink-0 text-muted-foreground" />
                 </button>;
               })}
@@ -128,8 +139,9 @@ export default function CampiPanorama() {
       <Panel className="space-y-3 lg:sticky lg:top-3">
         <div className="flex min-h-9 items-center justify-between gap-2">
           <h2 className="text-[15px] font-semibold">Tu enfoque</h2>
-          <span className="text-[12px] tabular-nums text-muted-foreground">{selected.length} priorizados</span>
+          <span className="text-[12px] tabular-nums text-muted-foreground">{selected.length} de {MAX_PANORAMA_TOPICS}</span>
         </div>
+        {replacing && <div role="status" className="rounded-lg border border-primary/25 bg-primary/5 px-3 py-2 text-[12px]">Elegí qué tema reemplazar por «{topicById.get(replacing)?.label}». <button type="button" className="ml-2 underline" onClick={() => setReplacing(null)}>Cancelar</button></div>}
         <ol className="max-h-[430px] min-h-[172px] divide-y overflow-y-auto rounded-lg border">
           {selected.map((id, index) => {
             const topic = topicById.get(id);
@@ -140,7 +152,7 @@ export default function CampiPanorama() {
               className="flex min-h-[57px] items-center gap-1.5 px-2.5">
               <GripVertical className="h-3.5 w-3.5 shrink-0 cursor-grab text-muted-foreground" aria-hidden="true" />
               <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-primary/15 text-[11px] font-semibold text-primary">{index + 1}</span>
-              <span className="min-w-0 flex-1 truncate text-[12px] font-medium" title={topic.label}>{topic.label}</span>
+              {replacing ? <button type="button" className="min-w-0 flex-1 truncate rounded px-1 text-left text-[12px] font-medium text-primary underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring" onClick={() => replace(index)} aria-label={`Reemplazar ${topic.label} por ${topicById.get(replacing)?.label}`}>{topic.label}</button> : <span className="min-w-0 flex-1 truncate text-[12px] font-medium" title={topic.label}>{topic.label}</span>}
               <button type="button" className="rounded p-1.5 hover:bg-accent disabled:opacity-30" aria-label={`Subir ${topic.label}`} disabled={index === 0} onClick={() => move(index, index - 1)}><ArrowUp className="h-3.5 w-3.5" /></button>
               <button type="button" className="rounded p-1.5 hover:bg-accent disabled:opacity-30" aria-label={`Bajar ${topic.label}`} disabled={index === selected.length - 1} onClick={() => move(index, index + 1)}><ArrowDown className="h-3.5 w-3.5" /></button>
               <button type="button" className="rounded p-1.5 hover:bg-accent" aria-label={`Quitar ${topic.label}`} onClick={() => remove(id)}><X className="h-3.5 w-3.5" /></button>

@@ -1,7 +1,7 @@
 import type { PanoramaStory, StoryDatum, StoryTopicId } from './panoramaStoryTypes';
 import { storyVisitComparison, type StoryVisitSnapshot } from './panoramaStoryVisits';
 
-export type CampiFinding = { topic: StoryTopicId; kind: 'change' | 'attention' | 'neutral'; text: string; rank: number };
+export type CampiFinding = { topic: StoryTopicId; kind: 'change' | 'attention' | 'neutral'; text: string; urgency: 'confirmed' | 'review' | 'none' };
 const number = new Intl.NumberFormat('es-PY', { maximumFractionDigits: 1 });
 const money = new Intl.NumberFormat('es-PY', { maximumFractionDigits: 2 });
 const valid = (n: number | null | undefined): n is number => typeof n === 'number' && Number.isFinite(n);
@@ -25,39 +25,47 @@ export function interpretCampi(stories: readonly PanoramaStory[]) {
   const usable = stories.filter(s => s.status === 'ready' && s.primary && valid(s.primary.value));
   const findings: CampiFinding[] = usable.map(s => {
     const p = s.primary!;
-    const finding = (kind: CampiFinding['kind'], text: string, rank: number): CampiFinding => ({ topic: s.id, kind, text, rank });
+    const finding = (kind: CampiFinding['kind'], text: string, urgency: CampiFinding['urgency'] = 'none'): CampiFinding => ({ topic: s.id, kind, text, urgency });
+    if (s.id === 'ventas_facturacion') {
+      const gross = s.supporting.find(d => d.label === 'Ventas antes de NC del mes')?.value;
+      const credit = s.supporting.find(d => d.label === 'Notas de crédito del mes')?.value;
+      if (valid(gross) && gross > 0 && valid(credit) && credit <= 0 && Math.abs(gross + credit - p.value!) <= 0.02 && -credit / gross >= 0.5) {
+        return finding('attention', `Facturación: las NC restaron ${amount({ ...p, value: -credit })} de ${amount({ ...p, value: gross })} en ventas; el neto quedó en ${amount(p)}. Revisá la composición por área.`, 'confirmed');
+      }
+    }
     if (s.id === 'repuestos_stock' && s.notices?.length) {
-      return finding('attention', `Stock antiguo de repuestos: ${s.notices[0].text}. Podés abrir los códigos incluidos en el detalle.`, 70);
+      return finding('attention', `Stock antiguo de repuestos: ${s.notices[0].text}. Podés abrir los códigos incluidos en el detalle.`, 'review');
     }
     if (s.id === 'maquinas_pedidos' && p.value! > 0) {
       const total = s.supporting.find(d => d.label === 'Unidades activas')?.value;
-      return finding('attention', `${s.title}: ${amount(p)} de ${valid(total) ? number.format(total) : 'las'} unidades activas no tienen abastecimiento vinculado de forma única. Revisá los pedidos afectados; no es una medida de entregas atrasadas.`, 65);
+      return finding('neutral', `${s.title}: ${amount(p)} de ${valid(total) ? number.format(total) : 'las'} unidades activas no tienen abastecimiento vinculado de forma única. Es diagnóstico de vínculos, no de entregas atrasadas.`);
     }
     if (s.id === 'servicios_pendientes' && valid(p.comparison?.value) && p.comparison.value > 0) {
       const difference = p.value! - p.comparison.value;
-      if (difference !== 0) return finding('change', `${s.title}: la mediana ${difference > 0 ? 'aumentó' : 'bajó'} ${number.format(Math.abs(difference))} días frente al mes anterior (${amount({ ...p, value: p.comparison.value })} → ${amount(p)}). Compará también el volumen de cierres y las OS abiertas.`, 45);
+      if (difference !== 0) return finding('change', `${s.title}: la mediana ${difference > 0 ? 'aumentó' : 'bajó'} ${number.format(Math.abs(difference))} días frente al mes anterior (${amount({ ...p, value: p.comparison.value })} → ${amount(p)}). Compará también cierres y OS abiertas.`);
     }
     // An age bucket, a static color and a negative projected model are not
     // evidence of improvement, breach or a business alert.
     if (['ventas_facturacion', 'repuestos_clientes'].includes(s.id) && valid(p.comparison?.value) && p.comparison.value > 0) {
       const delta = (p.value! - p.comparison.value) / p.comparison.value * 100;
-      if (delta !== 0) return finding('change', `${s.title}: ${lowercaseFirst(p.label)} ${delta > 0 ? 'subió' : 'bajó'} ${number.format(Math.abs(delta))}% frente a ${lowercaseFirst(p.comparison.label)} (${amount({ ...p, value: p.comparison.value })} → ${amount(p)}).${billingAreaContext(s, p.value!, p.comparison.value)}`, 50);
+      if (delta !== 0) return finding('change', `${s.title}: ${lowercaseFirst(p.label)} ${delta > 0 ? 'subió' : 'bajó'} ${number.format(Math.abs(delta))}% frente a ${lowercaseFirst(p.comparison.label)} (${amount({ ...p, value: p.comparison.value })} → ${amount(p)}).${billingAreaContext(s, p.value!, p.comparison.value)}`);
     }
-    return finding('neutral', `${s.title}: ${amount(p)} en ${lowercaseFirst(p.label)}.`, 0);
+    return finding('neutral', `${s.title}: ${amount(p)} en ${lowercaseFirst(p.label)}.`);
   });
-  // A comparable movement precedes a snapshot; chosen topic order breaks ties.
-  const priority = new Map(stories.map((story, index) => [story.id, index]));
-  const ordered = [...findings].sort((a, b) => b.rank - a.rank || (priority.get(a.topic) ?? Infinity) - (priority.get(b.topic) ?? Infinity));
-  const selected = ordered.slice(0, 2);
-  const sentences = selected.map(f => f.text);
-  if (!sentences.length) sentences.push('Todavía no tengo cifras verificadas para interpretar estos temas.');
-  if (sentences.length < 2) sentences.push(stories.some(s => s.status === 'error') ? 'Hay fuentes que no se pudieron verificar; revisá el tema indicado.' : 'No hay otro hecho con base suficiente para destacar en esta selección.');
+  // Only a reconciled majority of sales reversed by NC overrides the user's order.
+  // Other observations follow the chosen topic order; no cross-unit score is computed.
+  const ordered = [...findings.filter(f => f.urgency === 'confirmed'), ...findings.filter(f => f.urgency !== 'confirmed' && f.kind !== 'neutral'), ...findings.filter(f => f.kind === 'neutral')];
+  const selected = ordered.filter(f => f.kind !== 'neutral').slice(0, 2);
+  const sentences = selected.length ? selected.map(f => f.text) : [stories.some(s => s.status === 'error') ? 'Hay fuentes que no pude verificar; revisá los temas señalados.' : usable.length ? 'No encontré novedades relevantes comprobadas en estos temas.' : 'Todavía no tengo cifras verificadas para interpretar estos temas.'];
   const suggestions = selected.map(f => {
     const s = usable.find(s => s.id === f.topic)!;
     return { question: `¿Qué muestran los datos de ${s.title.toLowerCase()}?`, topic: s.id };
   });
-  if (suggestions.length < 2 && usable.length) suggestions.push({ question: '¿Qué límites tienen estos datos?', topic: usable[0].id });
-  return { findings: ordered, sentences, suggestions, attention: ordered.some(f => f.kind === 'attention') };
+  for (const story of usable) {
+    if (suggestions.length >= 2) break;
+    if (!suggestions.some(suggestion => suggestion.topic === story.id)) suggestions.push({ question: `¿Qué muestran los datos de ${story.title.toLowerCase()}?`, topic: story.id });
+  }
+  return { findings: ordered, sentences, suggestions, attention: selected.some(f => f.kind === 'attention') };
 }
 
 export function answerCampi(question: string, stories: readonly PanoramaStory[], previous: StoryVisitSnapshot | null = null): string {

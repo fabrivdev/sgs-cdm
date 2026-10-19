@@ -18,8 +18,8 @@ describe('Campi in Panorama', () => {
     expect(screen.getByTestId('campi-pose')).toHaveTextContent('welcome');
     act(() => vi.advanceTimersByTime(1600));
     expect(screen.getByTestId('campi-pose')).toHaveTextContent('idle');
-    act(() => vi.advanceTimersByTime(12400));
-    expect(screen.getByTestId('campi-pose')).toHaveTextContent('welcome');
+    act(() => vi.advanceTimersByTime(16400));
+    expect(screen.getByTestId('campi-pose')).toHaveAttribute('data-action', 'approve');
     act(() => vi.advanceTimersByTime(1600));
     expect(screen.getByTestId('campi-pose')).toHaveTextContent('idle');
   });
@@ -44,6 +44,6 @@ describe('Campi in Panorama', () => {
     expect(screen.getByTestId('campi-pose')).toHaveAttribute('data-action', 'approve');
     act(() => vi.advanceTimersByTime(1300));
     fireEvent.click(campi);
-    expect(screen.getByTestId('campi-pose')).toHaveAttribute('data-action', 'step');
+    expect(screen.getByTestId('campi-pose')).toHaveAttribute('data-action', 'consider');
   });
 });

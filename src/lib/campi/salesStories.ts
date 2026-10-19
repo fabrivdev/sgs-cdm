@@ -69,7 +69,7 @@ function monthly(report: Report, key: string, field: string): number {
   return metric(row[field]);
 }
 function base(id: StoryTopicId, sources: Source[], asOf: string): PanoramaStory {
-  return { id, visitKey: `${id}:v2:${asOf.slice(0, 7)}`, title: id === 'ventas_facturacion' ? 'Facturación' : 'Ventas de repuestos', question: id === 'ventas_facturacion' ? '¿Cómo viene la facturación?' : '¿Cómo se componen las ventas y notas de crédito de repuestos?', status: 'ready', message: '', scope: sources.map(source => source.label).join(' + '), sections: sources.map(source => source.section), cutoff: null, periodLabel: `01/${asOf.slice(5, 7)}–${asOf.slice(8, 10)}/${asOf.slice(5, 7)}/${asOf.slice(0, 4)}`, primary: null, supporting: [], chart: null, breakdown: [], details: ['Fecha de factura. Ventas antes de NC y notas de crédito por separado.', 'La fecha de referencia limita el período; la fuente no informa su fecha real de actualización.'], source: sources.map(source => source.rpc).join(' + '), route: sources[0]?.route ?? '/campi' };
+  return { id, visitKey: `${id}:v3:${asOf.slice(0, 7)}`, title: id === 'ventas_facturacion' ? 'Facturación' : 'Ventas de repuestos', question: id === 'ventas_facturacion' ? '¿Cómo viene la facturación?' : '¿Cómo se componen las ventas y notas de crédito de repuestos?', status: 'ready', message: '', scope: sources.map(source => source.label).join(' + '), sections: sources.map(source => source.section), cutoff: null, periodLabel: `01/${asOf.slice(5, 7)}–${asOf.slice(8, 10)}/${asOf.slice(5, 7)}/${asOf.slice(0, 4)}`, primary: null, supporting: [], chart: null, breakdown: [], details: ['Fecha de factura. Ventas antes de NC y notas de crédito por separado.', 'La fecha de referencia limita el período; la fuente no informa su fecha real de actualización.'], source: sources.map(source => source.rpc).join(' + '), route: sources.length === 1 ? sources[0].route : '' };
 }
 
 export const loadSalesStories: StoryLoader = async (topics, granted, asOf) => {
@@ -103,14 +103,13 @@ export const loadSalesStories: StoryLoader = async (topics, granted, asOf) => {
   const load = async (id: StoryTopicId, sources: Source[]): Promise<PanoramaStory> => {
     const story = base(id, sources, asOf);
     try {
+      const monthFrom = `${ranges.year}-${String(ranges.month).padStart(2, '0')}-01`;
+      const monthLYFrom = `${ranges.year - 1}-${String(ranges.month).padStart(2, '0')}-01`;
       const loaded = await Promise.all(sources.map(async source => {
         const [current, previous, december] = await Promise.all([report(source, ranges.from, ranges.to), report(source, ranges.previousFrom, ranges.previousTo), ...(ranges.month === 1 ? [report(source, ranges.previousMonthFrom, ranges.previousMonthTo)] : [])]);
         return { source, current, previous, december };
       }));
       if (id === 'ventas_facturacion') {
-        const monthFrom = `${ranges.year}-${String(ranges.month).padStart(2, '0')}-01`;
-        const previousMonthYear = ranges.previousTo.slice(0, 4);
-        const monthLYFrom = `${previousMonthYear}-${String(ranges.month).padStart(2, '0')}-01`;
         const monthlyReports = await Promise.all(loaded.map(async ({ source, current, previous, december }) => {
           const period = (r: Report, key: string) => {
             const row = r.periods.get(key);
@@ -129,23 +128,25 @@ export const loadSalesStories: StoryLoader = async (topics, granted, asOf) => {
         const sum = (pick: (item: typeof monthlyReports[number]) => Row, field: 'gross' | 'credit' | 'amount') => monthlyReports.reduce((total, item) => total + numeric(pick(item)[item.source[field]]), 0);
         const gross = sum(item => item.month, 'gross'), grossLY = sum(item => item.monthLY, 'gross');
         const credits = monthlyReports.reduce((total, item) => total + numeric(item.month[item.source.credit]) * (item.source.creditSigned ? -1 : 1), 0);
-        const net = sum(item => item.month, 'amount');
+        const net = sum(item => item.month, 'amount'), netLY = sum(item => item.monthLY, 'amount');
+        const ytdNet = sum(item => item.current, 'amount'), ytdNetLY = sum(item => item.previous, 'amount');
         const ytdGross = sum(item => item.current, 'gross'), ytdGrossLY = sum(item => item.previous, 'gross');
         if (Math.abs(gross - credits - net) > Math.max(0.01, Math.abs(net) * 1e-10)) throw new Error('Las ventas y NC consolidadas no concilian con el neto.');
         const unit = 'USD' as const;
-        story.primary = { label: 'Ventas antes de NC del mes', value: gross, unit, comparison: { value: grossLY, label: `Mismo tramo de ${ranges.year - 1}` } };
+        story.visitKey = `${id}:neto-v3:${asOf.slice(0, 7)}`;
+        story.primary = { label: 'Facturación neta del mes', value: net, unit, comparison: { value: netLY, label: `Mismo tramo de ${ranges.year - 1}` } };
         story.supporting = [
+          { label: 'Ventas antes de NC del mes', value: gross, unit, comparison: { value: grossLY, label: `Mismo tramo de ${ranges.year - 1}` } },
           { label: 'Notas de crédito del mes', value: -credits, unit },
-          { label: 'Facturación neta del mes', value: net, unit },
-          { label: 'Variación interanual de ventas', value: salesChange(gross, grossLY), unit: 'percent', note: grossLY === 0 ? 'Sin base comparable.' : undefined },
+          { label: 'Facturación neta acumulada', value: ytdNet, unit, comparison: { value: ytdNetLY, label: `Mismo tramo de ${ranges.year - 1}` } },
           { label: 'Ventas acumuladas antes de NC', value: ytdGross, unit, comparison: { value: ytdGrossLY, label: `Mismo tramo de ${ranges.year - 1}` } },
           { label: 'Mes anterior completo, antes de NC', value: sum(item => item.lastMonth, 'gross'), unit },
         ];
-        story.chart = { kind: 'bars', title: 'Ventas antes de NC por área', rows: monthlyReports.map(item => ({ label: item.source.label, value: numeric(item.month[item.source.gross]), previous: numeric(item.monthLY[item.source.gross]) })), unit, currentLabel: String(ranges.year), previousLabel: String(ranges.year - 1) };
-        story.breakdown = monthlyReports.map(item => ({ label: item.source.label, value: numeric(item.month[item.source.gross]), unit, route: item.source.route, note: 'Ventas antes de NC' }));
-        story.message = grossLY === 0 ? 'El mismo tramo del año anterior no tiene ventas para calcular una variación porcentual.' : `Ventas antes de notas de crédito del mes: USD ${new Intl.NumberFormat('es-PY', { maximumFractionDigits: 2 }).format(gross)}. Las notas de crédito se muestran por separado.`;
+        story.chart = { kind: 'bars', title: 'Neto por área autorizada', rows: monthlyReports.map(item => ({ label: item.source.label, value: numeric(item.month[item.source.amount]), previous: numeric(item.monthLY[item.source.amount]) })), unit, currentLabel: String(ranges.year), previousLabel: String(ranges.year - 1) };
+        story.breakdown = monthlyReports.map(item => { const areaGross = numeric(item.month[item.source.gross]); const areaNet = numeric(item.month[item.source.amount]); return { label: item.source.label, value: areaNet, unit, route: item.source.route, note: `Ventas USD ${new Intl.NumberFormat('es-PY', { maximumFractionDigits: 2 }).format(areaGross)} − NC USD ${new Intl.NumberFormat('es-PY', { maximumFractionDigits: 2 }).format(areaGross - areaNet)}` }; });
+        story.message = `Facturación neta del mes: USD ${new Intl.NumberFormat('es-PY', { maximumFractionDigits: 2 }).format(net)}, después de USD ${new Intl.NumberFormat('es-PY', { maximumFractionDigits: 2 }).format(credits)} en notas de crédito.`;
         story.attention = false;
-        story.details.push('Cada área usa su mismo contrato de movimientos en USD. Ventas antes de NC − importe de NC = neto; no se mezclan signos en el indicador principal.', `Comparación del ${monthFrom} al ${ranges.to} con ${monthLYFrom} al ${ranges.previousTo}.`, 'El acumulado usa el mismo corte de fechas de ambos años y ventas antes de NC.');
+        story.details.push('Cada área usa su mismo contrato de movimientos en USD. Ventas antes de NC − importe de NC = neto; el signo de NC se normaliza exactamente una vez.', `Comparación del ${monthFrom} al ${ranges.to} con ${monthLYFrom} al ${ranges.previousTo}.`, 'El acumulado neto usa el mismo corte de fechas de ambos años. El mes anterior completo es solo contexto, no un tramo equivalente.');
         return story;
       }
       const composition = id === 'repuestos_clientes';

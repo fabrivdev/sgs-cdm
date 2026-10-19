@@ -70,7 +70,7 @@ describe('deterministic Campi interpretation', () => {
   it('explains last-visit changes only with a matching saved scope', () => {
     const previous = { at: '2026-10-15T10:00:00Z', values: [{ id: 'ventas_facturacion' as const, value: 400000, unit: 'USD' as const, fingerprint: JSON.stringify([['parque.operaciones'], 'Otro alcance', 'Foto vigente', 'Fuente comprobada']) }] };
     expect(answerCampi('¿Qué cambió desde mi última visita?', [billing], previous)).toContain('No hay un cambio comparable');
-    const matching = { ...previous, values: [{ ...previous.values[0], fingerprint: JSON.stringify([['parque.operaciones'], 'Autorizado', 'Foto vigente', 'Fuente comprobada', 'ventas-brutas-nc-separadas-v2']) }] };
+    const matching = { ...previous, values: [{ ...previous.values[0], fingerprint: JSON.stringify([['parque.operaciones'], 'Autorizado', 'Foto vigente', 'Fuente comprobada', 'ventas-netas-nc-separadas-v3']) }] };
     const comparable = story({ id: 'ventas_facturacion', primary: { label: 'Facturación', value: 448000, unit: 'USD' } });
     expect(answerCampi('¿Qué cambió desde mi última visita?', [comparable], matching)).toContain('400.000 → USD 448.000');
   });

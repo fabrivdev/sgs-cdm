@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { CampiSprite } from './CampiSprite';
+import type { CampiMood } from './CampiSprite';
 import type { CampiAction } from './campiActions';
 import './campi.css';
 import './campi-panorama.css';
@@ -13,7 +14,8 @@ const REACTION_ACTION: Record<CampiPanoramaReaction['kind'], CampiAction> = {
   save: 'approve',
 };
 
-export function CampiPanoramaAvatar({ reaction, attention = false, change = false }: { reaction?: CampiPanoramaReaction | null; attention?: boolean; change?: boolean }) {
+export function CampiPanoramaAvatar({ reaction, attention = false, change = false, mood, quiet = false }: { reaction?: CampiPanoramaReaction | null; attention?: boolean; change?: boolean; mood?: CampiMood; quiet?: boolean }) {
+  const currentMood: CampiMood = mood ?? (attention ? 'atento' : change ? 'contento' : 'sereno');
   const [state, setState] = useState<'welcome' | 'idle'>('welcome');
   const [visible, setVisible] = useState(() => !document.hidden);
   const [reduced, setReduced] = useState(() => window.matchMedia(REDUCED).matches);
@@ -21,6 +23,7 @@ export function CampiPanoramaAvatar({ reaction, attention = false, change = fals
   const [action, setAction] = useState<CampiAction>('neutral');
   const actionTimeout = useRef<number | undefined>(undefined);
   const interactionIndex = useRef(0);
+  const idleIndex = useRef(0);
 
   const play = useCallback((next: CampiAction) => {
     window.clearTimeout(actionTimeout.current);
@@ -31,12 +34,11 @@ export function CampiPanoramaAvatar({ reaction, attention = false, change = fals
   useEffect(() => {
     let settle = window.setTimeout(() => setState('idle'), 1600);
     const gesture = window.setInterval(() => {
-      if (document.hidden || window.matchMedia(REDUCED).matches) return;
-      if (attention) play('consider');
-      else if (change) play('step');
-      else setState('welcome');
+      if (document.hidden || window.matchMedia(REDUCED).matches || quiet || document.querySelector('[role="dialog"]')) return;
+      const variants: Record<CampiMood, CampiAction[]> = { sereno: ['approve', 'consider'], contento: ['approve', 'celebrate'], atento: ['consider', 'step'], preocupado: ['consider', 'sad'], pensativo: ['consider', 'approve'], triste: ['sad', 'consider'] };
+      play(variants[currentMood][idleIndex.current++ % variants[currentMood].length]);
       settle = window.setTimeout(() => setState('idle'), 1600);
-    }, 14000);
+    }, 18000);
     const media = window.matchMedia(REDUCED);
     const onVisibility = () => setVisible(!document.hidden);
     const onMotion = () => setReduced(media.matches);
@@ -49,7 +51,9 @@ export function CampiPanoramaAvatar({ reaction, attention = false, change = fals
       media.removeEventListener('change', onMotion);
       window.clearTimeout(actionTimeout.current);
     };
-  }, [attention, change, play]);
+  }, [currentMood, play, quiet]);
+
+  useEffect(() => { if (quiet) { window.clearTimeout(actionTimeout.current); setAction('neutral'); } }, [quiet]);
 
   useEffect(() => {
     if (reduced) { window.clearTimeout(actionTimeout.current); setAction('neutral'); return; }
@@ -57,19 +61,20 @@ export function CampiPanoramaAvatar({ reaction, attention = false, change = fals
   }, [reaction, reduced, play]);
 
   useEffect(() => {
-    if (attention && visible && !reduced) play('consider');
-    else if (change && visible && !reduced) play('step');
-  }, [attention, change, visible, reduced, play]);
+    if (currentMood === 'atento' && visible && !reduced) play('consider');
+    else if (currentMood === 'contento' && visible && !reduced) play('approve');
+    else if (currentMood === 'preocupado' && visible && !reduced) play('consider');
+  }, [currentMood, visible, reduced, play]);
 
   const interact = () => {
-    if (!visible || reduced) return;
-    const gestures: CampiAction[] = attention ? ['consider', 'step', 'approve'] : change ? ['step', 'consider', 'approve'] : ['approve', 'step', 'celebrate'];
+    if (!visible || reduced || quiet) return;
+    const gestures: CampiAction[] = currentMood === 'preocupado' || currentMood === 'atento' ? ['consider', 'step', 'approve'] : currentMood === 'contento' ? ['approve', 'step', 'celebrate'] : ['approve', 'consider', 'step'];
     play(gestures[interactionIndex.current++ % gestures.length]);
   };
 
   return <button type="button" className="campi-panorama-avatar" data-paused={!visible || reduced}
     onPointerEnter={() => setCurious(true)} onPointerLeave={() => setCurious(false)}
     onClick={interact} aria-label="Saludar a Campi">
-    <CampiSprite state={state} active={visible} reduced={reduced} curious={curious || attention} action={action} />
+    <CampiSprite state={state} active={visible} reduced={reduced} curious={curious} action={action} mood={currentMood} />
   </button>;
 }

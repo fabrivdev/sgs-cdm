@@ -4,7 +4,7 @@ export type StoryTopicId = 'ventas_facturacion' | 'repuestos_clientes' | 'repues
 export type StoryUnit = 'USD' | 'PYG' | 'count' | 'percent' | 'days';
 export type StoryDatum = { label: string; value: number | null; unit: StoryUnit; note?: string; comparison?: { value: number; label: string } };
 export type StoryChartRow = { label: string; value: number; previous?: number };
-export type StoryBreakdown = { label: string; value: number; unit: StoryUnit; route?: string; note?: string };
+export type StoryBreakdown = { label: string; value: number; unit: StoryUnit; route?: string; note?: string; group?: string };
 export type PanoramaStory = {
   id: StoryTopicId;
   title: string;

@@ -12,6 +12,8 @@ interface ResponsiveDrawerProps {
   size?: "sm" | "md" | "lg" | "xl";
   className?: string;
   onEscapeKeyDown?: (event: KeyboardEvent) => void;
+  onCloseAutoFocus?: (event: Event) => void;
+  title?: string;
 }
 
 const SIZE_MAP = {
@@ -28,7 +30,7 @@ const SIZE_MAP = {
  *
  * Usalo con <ResponsiveDrawerHeader/>, <ResponsiveDrawerBody/>, <ResponsiveDrawerFooter/>.
  */
-export function ResponsiveDrawer({ open, onOpenChange, children, size = "lg", className, onEscapeKeyDown }: ResponsiveDrawerProps) {
+export function ResponsiveDrawer({ open, onOpenChange, children, size = "lg", className, onEscapeKeyDown, onCloseAutoFocus, title = "Panel" }: ResponsiveDrawerProps) {
   const isMobile = useIsMobile();
 
   return (
@@ -42,6 +44,7 @@ export function ResponsiveDrawer({ open, onOpenChange, children, size = "lg", cl
         />
         <SheetPrimitive.Content
           onEscapeKeyDown={onEscapeKeyDown}
+          onCloseAutoFocus={onCloseAutoFocus}
           className={cn(
             "fixed z-50 flex flex-col bg-background shadow-2xl",
             "transition ease-in-out data-[state=open]:animate-in data-[state=closed]:animate-out",
@@ -62,7 +65,7 @@ export function ResponsiveDrawer({ open, onOpenChange, children, size = "lg", cl
           {isMobile && (
             <div className="mx-auto mt-2 mb-1 h-1 w-12 rounded-full bg-muted-foreground/30 shrink-0" />
           )}
-          <SheetPrimitive.Title className="sr-only">Panel</SheetPrimitive.Title>
+          <SheetPrimitive.Title className="sr-only">{title}</SheetPrimitive.Title>
           <SheetPrimitive.Description className="sr-only">Detalle</SheetPrimitive.Description>
           {children}
           <SheetPrimitive.Close className="absolute right-2 top-2 z-20 flex h-11 w-11 items-center justify-center rounded-md text-muted-foreground hover:bg-muted hover:text-foreground focus:outline-none focus:ring-2 focus:ring-ring">

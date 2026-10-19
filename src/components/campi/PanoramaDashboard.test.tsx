@@ -34,10 +34,10 @@ function show(topics: PanoramaTopicId[] = ['ventas_facturacion'], hasAccess: (se
 
 describe('Campi alternative story dashboard', () => {
   it('renders every selected topic and chart in the chosen order, including the fourth', async () => {
-    const ids: StoryTopicId[] = ['maquinas_stock', 'ventas_facturacion', 'repuestos_stock', 'maquinas_proyeccion'];
+    const ids: StoryTopicId[] = ['maquinas_stock', 'ventas_facturacion', 'repuestos_stock', 'repuestos_sucursales'];
     load.mockResolvedValue([...ids].reverse().map(id => story(id)));
     show(ids);
-    await screen.findByRole('heading', { name: 'Tema maquinas_proyeccion' });
+    await screen.findByRole('heading', { name: 'Tema repuestos_sucursales' });
     expect(screen.getAllByRole('article').map(item => item.getAttribute('data-story'))).toEqual(ids);
     ids.forEach(id => expect(screen.getByRole('figure', { name: `Evolución ${id}` })).toBeInTheDocument());
     expect(screen.queryByText(/Datos al/)).not.toBeInTheDocument();
@@ -59,6 +59,14 @@ describe('Campi alternative story dashboard', () => {
     expect(screen.getByRole('heading', { name: 'Stock antiguo de repuestos' })).toBeInTheDocument();
     expect(screen.queryByText('0')).not.toBeInTheDocument();
   });
+  it('reveals a verified topic while a slower authorized source is still loading', async () => {
+    load.mockImplementation((ids: StoryTopicId[]) => ids[0] === 'ventas_facturacion'
+      ? new Promise(() => {}) : Promise.resolve([story(ids[0]) ]));
+    show(['ventas_facturacion', 'repuestos_stock']);
+    await screen.findByRole('heading', { name: 'Tema repuestos_stock' });
+    expect(screen.getByRole('status', { name: /Consultando Facturación/ })).toBeInTheDocument();
+    expect(screen.getByText('USD 1.234,56')).toBeInTheDocument();
+  });
   it('opens the native detail with comparisons, breakdown, method and specific navigation', async () => {
     load.mockResolvedValue([story('ventas_facturacion')]); show();
     fireEvent.click(await screen.findByRole('button', { name: 'Ver detalle de Tema ventas_facturacion' }));
@@ -76,24 +84,24 @@ describe('Campi alternative story dashboard', () => {
     load.mockResolvedValue([story('ventas_facturacion', { sections: ['repuestos.ventas', 'servicios.ventas'], message: 'Secreto de servicios' })]);
     show(['ventas_facturacion'], section => section === 'repuestos.ventas');
     await waitFor(() => expect(load).toHaveBeenCalledWith(['ventas_facturacion'], ['repuestos.ventas'], expect.any(String)));
-    expect(await screen.findByText(/Hay temas sin una respuesta autorizada/)).toBeInTheDocument();
+    expect(await screen.findByText(/La fuente no devolvió una respuesta completa/)).toBeInTheDocument();
     expect(screen.queryByText('Secreto de servicios')).not.toBeInTheDocument();
-    expect(screen.queryByText('$ 1.234,56')).not.toBeInTheDocument();
+    expect(screen.queryByText('USD 1.234,56')).not.toBeInTheDocument();
   });
   it('shows source errors with retry and never substitutes zero', async () => {
     load.mockResolvedValueOnce([story('ventas_facturacion', { status: 'error', message: 'No respondió Ventas.', primary: null, supporting: [], chart: null })]).mockResolvedValueOnce([story('ventas_facturacion')]);
     show();
     expect(await screen.findByRole('alert')).toHaveTextContent('No respondió Ventas.');
-    expect(screen.queryByText('$ 0')).not.toBeInTheDocument();
+    expect(screen.queryByText('USD 0')).not.toBeInTheDocument();
     fireEvent.click(screen.getByRole('button', { name: 'Reintentar fuente' }));
-    expect(await screen.findByText('$ 1.234,56')).toBeInTheDocument();
+    expect(await screen.findByText('USD 1.234,56')).toBeInTheDocument();
     expect(load).toHaveBeenCalledTimes(2);
   });
   it('retains the explicit absence of a metric and presents an empty topic', async () => {
     load.mockResolvedValue([story('ventas_facturacion', { status: 'empty', message: 'No hay datos para este período.', primary: { label: 'Principal', value: null, unit: 'USD' }, supporting: [], chart: null })]); show();
     expect(await screen.findByText('No hay datos para este período.')).toBeInTheDocument();
     expect(screen.getByText('—')).toBeInTheDocument();
-    expect(screen.queryByText('$ 0')).not.toBeInTheDocument();
+    expect(screen.queryByText('USD 0')).not.toBeInTheDocument();
   });
   it('does not query sources or reveal topics removed by permissions', async () => {
     show(['maquinas_stock'], () => false);
@@ -107,10 +115,10 @@ describe('Campi alternative story dashboard', () => {
     expect(await screen.findByRole('heading', { name: 'Tema ventas_facturacion: +USD 234,56 desde tu última visita.' })).toBeInTheDocument();
     expect(screen.getByLabelText(/Comparación de Tema ventas_facturacion desde tu última visita/)).toHaveTextContent('USD 1.000 → USD 1.234,56');
     fireEvent.click(await screen.findByRole('button', { name: 'Ver detalle de Tema ventas_facturacion' }));
-    expect(await screen.findByText('El total visible cambió +$ 234,56 desde tu última visita en este navegador.')).toBeInTheDocument();
+    expect(await screen.findByText('El total visible cambió +USD 234,56 desde tu última visita en este navegador.')).toBeInTheDocument();
     await waitFor(() => expect(JSON.parse(localStorage.getItem('sig-cdm:panorama:alternativa:visita:v1:manager-a')!).values[0].value).toBe(1234.56));
     expect(readStoryVisit('manager-a')?.values[0].value).toBe(1000);
-    expect(screen.getByText('El total visible cambió +$ 234,56 desde tu última visita en este navegador.')).toBeInTheDocument();
+    expect(screen.getByText('El total visible cambió +USD 234,56 desde tu última visita en este navegador.')).toBeInTheDocument();
     expect(screen.queryByText(/ventas nuevas/i)).not.toBeInTheDocument();
   });
   it('preserves the old baseline while any topic has failed', async () => {
@@ -133,8 +141,9 @@ describe('Campi alternative story dashboard', () => {
   });
   it('shows a recoverable query error instead of stale or invented results', async () => {
     load.mockRejectedValue(new Error('Offline')); show();
-    expect(await screen.findByRole('alert')).toHaveTextContent('No se pudo cargar Panorama');
+    expect(await screen.findByText(/No se pudo consultar una fuente/)).toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Reintentar' })).toBeInTheDocument();
-    expect(screen.queryByRole('article')).not.toBeInTheDocument();
+    expect(screen.getAllByRole('article')).toHaveLength(1);
+    expect(screen.queryByText('USD 3.000')).not.toBeInTheDocument();
   });
 });

@@ -30,7 +30,7 @@ describe('Campi Panorama topics', () => {
     expect(availablePanoramaTopics(() => true, () => true, true).map(topic => topic.id)).not.toContain('servicios_comisiones');
   });
 
-  it('removes revoked and duplicate topics without limiting the number or changing order', () => {
+  it('removes revoked and duplicate topics and keeps only four ordered priorities', () => {
     const available = availablePanoramaTopics(() => true, () => true, true);
     expect(reconcilePanoramaOrder([
       'ventas_facturacion', 'repuestos_stock', 'ventas_facturacion', 'maquinas_stock', 'maquinas_pedidos',
@@ -38,7 +38,9 @@ describe('Campi Panorama topics', () => {
     expect(reconcilePanoramaOrder(['maquinas_stock', 'repuestos_stock'], available.filter(topic => topic.id !== 'maquinas_stock')))
       .toEqual(['repuestos_stock']);
     expect(reconcilePanoramaOrder(['repuestos_clientes', 'ventas_facturacion', 'repuestos_sucursales', 'repuestos_stock'], available))
-      .toEqual(['ventas_facturacion', 'repuestos_stock']);
+      .toEqual(['ventas_facturacion', 'repuestos_sucursales', 'repuestos_stock']);
+    expect(reconcilePanoramaOrder(['maquinas_proyeccion'], available)).toEqual(['maquinas_stock']);
+    expect(reconcilePanoramaOrder(PANORAMA_TOPICS.map(topic => topic.id), available)).toEqual(PANORAMA_TOPICS.slice(0, 4).map(topic => topic.id));
   });
 
   it('persists order per user and ignores obsolete section-based preferences', () => {

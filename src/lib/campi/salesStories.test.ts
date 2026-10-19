@@ -23,14 +23,15 @@ describe('sales story source contracts', () => {
     const [story] = await loadSalesStories(['ventas_facturacion', 'repuestos_clientes'], ['servicios.ventas'], '2026-10-16');
     expect(rpc).toHaveBeenCalledTimes(2);
     expect(story.sections).toEqual(['servicios.ventas']);
-    expect(story.primary?.value).toBe(0);
+    expect(story.primary?.value).toBe(-20);
   });
-  it('sums authorized gross sales, keeps credit notes separate, and reuses parts sales', async () => {
+  it('shows reconciled net billing first, with gross sales and credit notes separately', async () => {
     const [billing, clients] = await loadSalesStories(['ventas_facturacion', 'repuestos_clientes'], ['repuestos.ventas', 'servicios.ventas', 'parque.ventas'], '2026-10-16');
     expect(rpc).toHaveBeenCalledTimes(9);
-    expect(billing.primary).toMatchObject({ value: 320, unit: 'USD', comparison: { value: 170 } });
-    expect(billing.supporting[0].value).toBe(-40);
-    expect(billing.supporting[1].value).toBe(280);
+    expect(billing.primary).toMatchObject({ value: 280, unit: 'USD', comparison: { value: 150 } });
+    expect(billing.supporting[0].value).toBe(320);
+    expect(billing.supporting[1].value).toBe(-40);
+    expect(billing.supporting[2].value).toBe(2800);
     expect(billing.supporting[3].value).toBe(3200);
     expect(billing.chart?.rows).toHaveLength(3);
     expect(billing.cutoff).toBeNull();
@@ -65,7 +66,7 @@ describe('sales story source contracts', () => {
     });
     const [story] = await loadSalesStories(['ventas_facturacion'], ['repuestos.ventas'], '2026-10-16');
     expect(story.primary?.value).toBe(0);
-    expect(story.supporting[2].value).toBeNull();
+    expect(story.supporting[2].value).toBe(0);
     expect(salesChange(10, 0)).toBeNull();
     expect(salesChange(0, -10)).toBe(100);
   });
@@ -122,7 +123,7 @@ describe('sales story source contracts', () => {
     expect(billing.status).toBe('error');
     expect(clients).toMatchObject({ status: 'error', primary: null });
   });
-  it('does not let a machine credit note erase positive sales in the headline', async () => {
+  it('makes a large machine credit note visible in the headline without discounting it twice', async () => {
     rpc.mockImplementation(async (name, args) => {
       const result = response(name, args);
       if (args.p_desde.startsWith('2026-') && args.p_hasta.startsWith('2026-10')) {
@@ -139,9 +140,10 @@ describe('sales story source contracts', () => {
     });
     const [billing] = await loadSalesStories(['ventas_facturacion'], ['repuestos.ventas', 'servicios.ventas', 'parque.ventas'], '2026-10-16');
     expect(billing.status).toBe('ready');
-    expect(billing.primary?.value).toBeCloseTo(215150.25, 2);
-    expect(billing.supporting[0].value).toBeCloseTo(-212403.40, 2);
-    expect(billing.supporting[1].value).toBeCloseTo(2746.85, 2);
+    expect(billing.primary?.value).toBeCloseTo(2746.85, 2);
+    expect(billing.supporting[0].value).toBeCloseTo(215150.25, 2);
+    expect(billing.supporting[1].value).toBeCloseTo(-212403.40, 2);
+    expect(billing.chart?.rows.reduce((sum, row) => sum + row.value, 0)).toBeCloseTo(2746.85, 2);
   });
   it('refuses gross service sales when credit-note signs contradict their document type', async () => {
     rpc.mockImplementation(async (name, args) => {

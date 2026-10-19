@@ -4,15 +4,17 @@ import type { CampiAction } from './campiActions';
 import type { CampiState } from './campiState';
 
 type BodyPose = 'rest' | 'wave' | 'wave2';
-type FacePose = 'rest' | 'blink' | 'smile' | 'curious' | 'surprised' | 'wink';
-const ASSETS = { rest: '/campi/campi-rest.webp', wave: '/campi/campi-wave.webp', wave2: '/campi/campi-wave2.webp', blink: '/campi/campi-blink.webp', smile: '/campi/campi-smile.webp', curious: '/campi/campi-curious.webp', surprised: '/campi/campi-surprised.webp', wink: '/campi/campi-wink.webp' };
+type FacePose = 'rest' | 'blink' | 'smile' | 'curious' | 'surprised' | 'wink' | 'sad';
+const ASSETS = { rest: '/campi/campi-rest.webp', wave: '/campi/campi-wave.webp', wave2: '/campi/campi-wave2.webp', blink: '/campi/campi-blink.webp', smile: '/campi/campi-smile.webp', curious: '/campi/campi-curious.webp', surprised: '/campi/campi-surprised.webp', wink: '/campi/campi-wink.webp', sad: '/campi/campi-sad.webp' };
+export type CampiMood = 'sereno' | 'contento' | 'atento' | 'preocupado' | 'pensativo' | 'triste';
+const moodFace: Record<CampiMood, FacePose> = { sereno: 'rest', contento: 'smile', atento: 'curious', preocupado: 'surprised', pensativo: 'curious', triste: 'sad' };
 
 /** Authored gestures and faces; no business data drives them. */
-export function CampiSprite({ state, active, reduced, curious = false, action = 'neutral' }: { state: CampiState; active: boolean; reduced: boolean; curious?: boolean; action?: CampiAction }) {
+export function CampiSprite({ state, active, reduced, curious = false, action = 'neutral', mood = 'sereno' }: { state: CampiState; active: boolean; reduced: boolean; curious?: boolean; action?: CampiAction; mood?: CampiMood }) {
   const [pose, setPose] = useState<BodyPose>('rest');
   const [face, setFace] = useState<FacePose>('rest');
   useEffect(() => {
-    setPose('rest'); setFace('rest');
+    setPose('rest'); setFace(moodFace[mood]);
     if (!active || action !== 'neutral') return;
     if (reduced) return;
     const timers: number[] = [];
@@ -23,18 +25,18 @@ export function CampiSprite({ state, active, reduced, curious = false, action = 
     if (state === 'welcome') {
       setFace('smile');
       later(100, 'wave'); later(350, 'wave2'); later(600, 'wave');
-      later(850, 'wave2'); later(1100, 'rest'); expression(1300, 'rest');
+      later(850, 'wave2'); later(1100, 'rest'); expression(1300, moodFace[mood]);
     } else if (state === 'farewell') {
       setFace('smile'); later(0, 'wave'); later(220, 'wave2');
     } else if (state === 'idle') {
       const blink = () => {
         setFace('blink');
-        blinkEnd = window.setTimeout(() => setFace('rest'), 160);
+        blinkEnd = window.setTimeout(() => setFace(moodFace[mood]), 160);
       };
       timers.push(window.setTimeout(() => { blink(); blinkInterval = window.setInterval(blink, 6500); }, 4800));
     }
     return () => { timers.forEach(window.clearTimeout); window.clearInterval(blinkInterval); window.clearTimeout(blinkEnd); };
-  }, [state, active, reduced, action]);
+  }, [state, active, reduced, action, mood]);
 
   if (action !== 'neutral') return <CampiActionSprite action={action} active={active} reduced={reduced} />;
   const visibleFace = curious && active && state === 'idle' ? 'curious' : face;
