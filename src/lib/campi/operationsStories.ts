@@ -2,6 +2,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { fetchSemaforoHistorico, SEMAFORO_COLORES, type SemaforoResultado } from '@/hooks/useSemaforoHistorico';
 import type { SectionKey } from '@/lib/permissions';
 import type { PanoramaStory, StoryLoader, StoryTopicId } from './panoramaStoryTypes';
+import { parsePartsExposure, partsExposureStory } from './partsExposure';
 
 const number = (v: unknown): number | null => typeof v === 'number' && Number.isFinite(v) ? v : null;
 const required = (v: unknown) => { const n = number(v); if (n === null) throw new Error('La fuente devolvió un valor incompleto.'); return n; };
@@ -12,7 +13,7 @@ const day = (v: unknown): string | null => {
 };
 const definitions: Partial<Record<StoryTopicId, { title: string; question: string; section: SectionKey; route: string; source: string }>> = {
   repuestos_sucursales: { title: 'Antigüedad de repuestos por sucursal', question: '¿Cuánto tiempo hace desde la última compra por sucursal?', section: 'repuestos.analisis', route: '/repuestos/analisis', source: 'repuestos_analisis_valorizado · sucursales' },
-  repuestos_stock: { title: 'Situación del stock de repuestos', question: '¿Qué stock necesita atención?', section: 'repuestos.analisis', route: '/repuestos/analisis', source: 'repuestos_analisis_valorizado · semáforo histórico' },
+  repuestos_stock: { title: 'Stock antiguo de repuestos', question: '¿Qué valor de repuestos está en gris o rojo?', section: 'repuestos.analisis', route: '/repuestos/analisis', source: 'campi_repuestos_exposicion_v1' },
   maquinas_pedidos: { title: 'Pedidos de máquinas pendientes', question: '¿Qué unidades de pedidos siguen sin facturar?', section: 'parque.operaciones', route: '/parque-operaciones', source: 'maquinaria_pedidos_lineas_estado_actual + maquinaria_unidades_facturadas_confirmadas' },
   maquinas_stock: { title: 'Stock físico de máquinas', question: '¿Qué existencias informa la última foto?', section: 'parque.stock', route: '/parque-stock', source: 'parque_stock_maquinas · saldo_actual' },
   maquinas_proyeccion: { title: 'Proyección de máquinas nuevas', question: '¿Qué saldo queda después de compras y ventas pendientes?', section: 'parque.stock_proyectado', route: '/parque-stock-proyectado', source: 'parque_stock_proyectado_v1' },
@@ -150,7 +151,12 @@ export const loadOperationsStories: StoryLoader = async (topics, granted, asOf) 
   let partsRequest: Promise<SemaforoResultado> | undefined;
   return Promise.all(selected.map(async id => {
     try {
-      if (id === 'repuestos_stock' || id === 'repuestos_sucursales') {
+      if (id === 'repuestos_stock') {
+        const response = await supabase.rpc('campi_repuestos_exposicion_v1' as never);
+        if (response.error) throw response.error;
+        return partsExposureStory(parsePartsExposure(response.data));
+      }
+      if (id === 'repuestos_sucursales') {
         partsRequest ??= fetchSemaforoHistorico({ busqueda: '', marca: '', color: '', sucursal: '' }, 0, 1);
         return parts(id, await partsRequest);
       }
@@ -158,8 +164,11 @@ export const loadOperationsStories: StoryLoader = async (topics, granted, asOf) 
       if (id === 'maquinas_stock') return await machineStock();
       if (id === 'maquinas_pedidos') return await machineOrders();
       return await serviceOrders(asOf);
-    } catch {
-      return { ...base(id), status: 'error' as const, message: 'No se pudo verificar la fuente completa. Abrí la sección de origen o volvé a intentar.' };
+    } catch (error) {
+      const migrationMissing = id === 'repuestos_stock' && typeof error === 'object' && error !== null && 'code' in error && error.code === 'PGRST202';
+      return { ...base(id), status: 'error' as const, message: migrationMissing
+        ? 'La lectura de stock antiguo aún no está activa en la base.'
+        : 'No se pudo verificar la fuente completa. Abrí la sección de origen o volvé a intentar.' };
     }
   }));
 };

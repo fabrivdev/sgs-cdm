@@ -63,4 +63,9 @@ describe('compact overview panel', () => {
     expect(screen.getByLabelText('Componentes de la proyección')).toHaveTextContent('Stock calculado13');
     expect(screen.queryByRole('figure', { name: 'Saldo por modelo' })).not.toBeInTheDocument();
   });
+  it('shows stock exposure percentage and a link to the approaching-red cohort', () => {
+    render(<MemoryRouter><StoryPanel story={{ ...story, id: 'repuestos_stock', title: 'Stock antiguo de repuestos', primary: { label: 'Valor de stock gris y rojo', value: 30, unit: 'USD' }, supporting: [{ label: 'Valor positivo valorizado', value: 100, unit: 'USD' }], notices: [{ text: 'Un código podría pasar a rojo', route: '/repuestos/analisis?color=GRIS&compra_dias_min=971&compra_dias_max=1000&vista=detalle' }], chart: null }} index={0} retrying={false} onRetry={vi.fn()} /></MemoryRouter>);
+    expect(screen.getByText('30%')).toBeInTheDocument();
+    expect(screen.getByRole('link', { name: /Un código podría pasar a rojo/ })).toHaveAttribute('href', '/repuestos/analisis?color=GRIS&compra_dias_min=971&compra_dias_max=1000&vista=detalle');
+  });
 });

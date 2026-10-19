@@ -7,8 +7,8 @@ vi.mock('./salesStories', () => ({ loadSalesStories: vi.fn(async () => []) }));
 vi.mock('./operationsStories', () => ({ loadOperationsStories: vi.fn(async () => []) }));
 describe('catalog to source contract', () => {
   it('grants the exact analysis permission for the distribution topic alone', () => {
-    expect(storySectionsForTopics(['repuestos_sucursales'], () => true)).toEqual(['repuestos.analisis']);
-    expect(storySectionsForTopics(['repuestos_sucursales'], section => section === 'repuestos.stock')).toEqual([]);
+    expect(storySectionsForTopics(['repuestos_stock'], () => true)).toEqual(['repuestos.analisis']);
+    expect(storySectionsForTopics(['repuestos_stock'], section => section === 'repuestos.stock')).toEqual([]);
   });
   it('consolidates all authorized sales sectors, without expanding permissions', () => {
     expect(storySectionsForTopics(['ventas_facturacion'], () => true).sort()).toEqual(['servicios.ventas','repuestos.ventas','parque.ventas'].sort());

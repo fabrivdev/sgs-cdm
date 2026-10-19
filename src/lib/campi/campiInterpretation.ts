@@ -26,6 +26,9 @@ export function interpretCampi(stories: readonly PanoramaStory[]) {
   const findings: CampiFinding[] = usable.map(s => {
     const p = s.primary!;
     const finding = (kind: CampiFinding['kind'], text: string, rank: number): CampiFinding => ({ topic: s.id, kind, text, rank });
+    if (s.id === 'repuestos_stock' && s.notices?.length) {
+      return finding('attention', `Stock antiguo de repuestos: ${s.notices[0].text}. Podés abrir los códigos incluidos en el detalle.`, 70);
+    }
     // An age bucket, a static color and a negative projected model are not
     // evidence of improvement, breach or a business alert.
     if (['ventas_facturacion', 'repuestos_clientes'].includes(s.id) && valid(p.comparison?.value) && p.comparison.value > 0) {

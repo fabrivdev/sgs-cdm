@@ -675,8 +675,8 @@
       "id": "panorama-permisos-y-comparacion",
       "title": "Panorama por permisos y visitas comparables",
       "module": "asistente",
-      "description": "En la alternativa, todos los temas seleccionados tienen un resumen completo en orden. Facturación destaca ventas antes de NC de áreas autorizadas, con NC y neto conciliados por separado; comparación MTD/YTD bruta con igual tramo LY. La RPC campi_ventas_servicios_componentes_v1 fue ejecutada en Lovable Cloud el 19/10 y verificada desde la rama local autenticada. Ventas de repuestos separa ventas antes de NC, NC y neto. Sucursales muestra días desde última compra ponderados por USD con cobertura; proyección muestra saldo calculado y componentes. Las fuentes sin corte acreditado no dicen datos al día. Ocho temas con contrato reemplazan accesos sin KPI. Campi ordena cambios comparables por prioridad elegida, no por porcentaje; nombra la mayor diferencia entre áreas solo si el desglose concilia. OS antiguas, valor rojo y saldo negativo de un modelo no son alertas automáticas sin meta, vencimiento o umbral acreditado. La referencia local de visita compara alcance, período, unidad y definición iguales, permanece fija durante la sesión y alinea cifra, alcance y acción del mismo tema.",
-      "check": "Probar permisos antes de consulta, ocho temas sin límite, conciliación ventas/NC/neto y stock+compras-ventas, ponderación y cobertura de compra por sucursal, consolidación sin subtotales ante fallo, cero válido, cambio de mes/alcance/definición, recarga en la misma sesión, modal y teclado. Referencia local no es historial contable. Los ocho temas se revisaron en app local autenticada con fuentes reales; publicación pública sin verificar.",
+      "description": "En la alternativa, todos los temas seleccionados tienen un resumen completo en orden. Facturación destaca ventas antes de NC de áreas autorizadas, con NC y neto conciliados por separado; comparación MTD/YTD bruta con igual tramo LY. La RPC campi_ventas_servicios_componentes_v1 fue ejecutada en Lovable Cloud el 19/10 y verificada desde la rama local autenticada. Ventas de repuestos es desglose de Facturación según permisos; Stock antiguo muestra valor positivo gris + rojo y porcentaje, con sucursales y familias en detalle. Los avisos a gris o rojo requieren 1–30 días al umbral y ausencia de nuevos movimientos; proyección de máquinas conserva sus componentes. Las fuentes sin corte acreditado no dicen datos al día. Seis temas seleccionables con contrato reemplazan accesos sin KPI y evitan duplicar Facturación. Campi ordena cambios comparables por prioridad elegida, no por porcentaje; nombra la mayor diferencia entre áreas solo si el desglose concilia. OS antiguas, valor rojo y saldo negativo de un modelo no son alertas automáticas sin meta, vencimiento o umbral acreditado. La referencia local de visita compara alcance, período, unidad y definición iguales, permanece fija durante la sesión y alinea cifra, alcance y acción del mismo tema.",
+      "check": "Probar permisos antes de consulta, seis temas seleccionables sin límite de orden, conciliación ventas/NC/neto y stock+compras-ventas, distribución de stock antiguo gris/rojo, filtros exactos de alertas, consolidación sin subtotales ante fallo, cero válido, cambio de mes/alcance/definición, recarga en la misma sesión, modal y teclado. Referencia local no es historial contable. La RPC de stock antiguo se aplicó en Lovable Cloud el 19/10 y se verificaron importe, porcentaje y los dos enlaces en la app local autenticada. Publicación pública sin verificar.",
       "entities": [
         "usuario",
         "permiso"
@@ -686,6 +686,8 @@
         "src/lib/campi/panoramaStories.ts",
         "src/lib/campi/salesStories.ts",
         "src/lib/campi/operationsStories.ts",
+        "src/lib/campi/partsExposure.ts",
+        "supabase/migrations/20261019150000_campi_parts_exposure.sql",
         "src/lib/campi/panoramaStoryVisits.ts",
         "src/lib/campi/campiInterpretation.ts",
         "docs/campi-panorama-alternativa.md"
@@ -2382,7 +2384,7 @@
       "id": "asistente.panorama",
       "title": "Panorama de Campi",
       "module": "asistente",
-      "description": "Alternativa en rama: todos los temas seleccionados, facturación consolidada autorizada, detalle modal y referencia local sin depender de migración. No acredita publicación ni validación visual/productiva.",
+      "description": "Alternativa en rama: seis temas seleccionables, facturación consolidada autorizada y stock antiguo con valor y participación. La nueva RPC de stock antiguo se aplicó en Lovable Cloud y se comprobó en la app local autenticada; el frontend no está publicado.",
       "sources": [
         "src/pages/CampiPanorama.tsx",
         "src/components/campi/PanoramaDashboard.tsx",

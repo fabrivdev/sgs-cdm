@@ -66,6 +66,9 @@
 .panorama-story { --story-accent: #137354; --story-tint: #e6f3ed; min-width: 0; min-height: 165px; display: grid; grid-template-columns: minmax(0, .95fr) minmax(0, 1.05fr); grid-template-rows: minmax(40px, auto) minmax(70px, auto) 28px; column-gap: 10px; padding: 14px 22px 10px; border: 1px solid color-mix(in srgb, var(--story-accent) 34%, white); border-top-width: 2px; border-radius: 12px; background: hsl(var(--card)); position: relative; overflow: hidden; }
 .panorama-story::before { content: ''; position: absolute; top: 0; left: 0; width: 19px; height: 19px; background: var(--story-accent); opacity: .45; clip-path: polygon(0 0, 100% 0, 0 100%); }
 .panorama-story[data-story="repuestos_clientes"], .panorama-story[data-story="maquinas_stock"] { --story-accent: #1677cb; --story-tint: #e8f3fd; }
+.story-notices { display: grid; gap: 5px; }
+.story-notices a { display: flex; align-items: center; justify-content: space-between; gap: 8px; border: 1px solid #e7c47a; border-radius: 8px; background: #fff9e9; padding: 6px 9px; color: #744b10; font-size: 12px; font-weight: 600; }
+.story-notices a:focus-visible { outline: 2px solid hsl(var(--ring)); outline-offset: 2px; }
 .panorama-story[data-story="maquinas_pedidos"], .panorama-story[data-story="repuestos_stock"] { --story-accent: #b97a22; --story-tint: #fcf0dd; }
 .panorama-story[data-story="servicios_pendientes"], .panorama-story[data-story="maquinas_proyeccion"] { --story-accent: #8052b5; --story-tint: #f0eafb; }
 .story-header { grid-column: 1 / -1; display: flex; align-items: flex-start; gap: 17px; min-width: 0; }

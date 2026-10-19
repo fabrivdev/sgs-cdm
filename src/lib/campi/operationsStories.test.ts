@@ -1,10 +1,11 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 const mocks = vi.hoisted(() => ({ rpc: vi.fn(), from: vi.fn(), parts: vi.fn() }));
 vi.mock('@/integrations/supabase/client', () => ({ supabase: { rpc: mocks.rpc, from: mocks.from } }));
-vi.mock('@/hooks/useSemaforoHistorico', () => ({ fetchSemaforoHistorico: mocks.parts, SEMAFORO_COLORES: [{ id: 'ROJO', label: 'Rojo', descripcion: 'Sin ventas trianuales y compra antigua' }, { id: 'SIN_DATOS', label: 'Sin datos' }] }));
+vi.mock('@/hooks/useSemaforoHistorico', () => ({ fetchSemaforoHistorico: mocks.parts, SEMAFORO_COLORES: [{ id: 'GRIS', label: 'Gris' }, { id: 'ROJO', label: 'Rojo', descripcion: 'Sin ventas trianuales y compra antigua' }, { id: 'VERDE_CLARO', label: 'Verde claro' }, { id: 'SIN_DATOS', label: 'Sin datos' }] }));
 import { loadOperationsStories, pendingMachineOrder } from './operationsStories';
 const asOf = '2026-10-16';
 const partData = () => ({ lineas: 12000, valor_kardex_usd: 100, unidades_stock: 400, ubicaciones_sin_valor: 3, fecha_analisis: asOf, kardex_cargado_en: asOf, rows: [{ codigo_interno: 'one' }], por_color: [{ color: 'ROJO', lineas: 20, valor_kardex_usd: 110 }, { color: 'SIN_DATOS', lineas: 2, valor_kardex_usd: -10 }], sucursales: [{ nombre: 'Santa Rita', unidades: 40, valor_kardex_usd: 100, dias_compra_promedio: 400, valor_compra_con_fecha_usd: 60, valor_positivo_usd: 100 }, { nombre: 'Katuete', unidades: 2, valor_kardex_usd: null, dias_compra_promedio: null, valor_compra_con_fecha_usd: 0, valor_positivo_usd: 0 }] });
+const exposure = () => ({ fecha_analisis: asOf, codigos_stock: 10, ubicaciones_stock: 12, ubicaciones_sin_valor: 0, ubicaciones_valor_no_positivo: 0, ubicaciones_sin_saldo_kardex: 0, ubicaciones_saldo_distinto: 0, valor_total_usd: 100, valor_antiguo_usd: 30, codigos_antiguos: 3, valor_sin_fecha_usd: 0, valor_residual_sin_stock_usd: 0, colores: [{ color: 'GRIS', codigos: 2, valor_usd: 10 }, { color: 'ROJO', codigos: 1, valor_usd: 20 }, { color: 'VERDE_CLARO', codigos: 7, valor_usd: 70 }], avisos: [{ destino: 'GRIS', umbral_dias: 366, codigos: 0, valor_usd: 0 }, { destino: 'ROJO', umbral_dias: 1001, codigos: 1, valor_usd: 2 }], sucursales: [{ nombre: 'Santa Rita', valor_total_usd: 100, valor_antiguo_usd: 30, codigos_antiguos: 3 }], familias: [{ nombre: 'Filtros', valor_total_usd: 100, valor_antiguo_usd: 30, codigos_antiguos: 3 }] });
 const chain = (result: unknown) => { const q: Record<string, unknown> = {}; for (const key of ['select','order','range','in','ilike','gte','lt']) q[key] = vi.fn(() => q); q.then = (resolve: (v: unknown) => void) => Promise.resolve(result).then(resolve); return q; };
 beforeEach(() => vi.resetAllMocks());
 describe('operations stories', () => {
@@ -12,17 +13,19 @@ describe('operations stories', () => {
     expect(await loadOperationsStories(['repuestos_stock', 'maquinas_stock', 'maquinas_pedidos', 'servicios_pendientes', 'maquinas_proyeccion'], ['repuestos.stock', 'parque.maquinas', 'servicios.ventas'], asOf)).toEqual([]);
     expect(mocks.rpc).not.toHaveBeenCalled(); expect(mocks.from).not.toHaveBeenCalled(); expect(mocks.parts).not.toHaveBeenCalled();
   });
-  it('shares one aggregate, never treats the one-row page as universe or analysis/load date as inventory cutoff', async () => {
+  it('uses the protected positive-value aggregate for stock and keeps the old branch topic isolated', async () => {
     mocks.parts.mockResolvedValue(partData());
+    mocks.rpc.mockResolvedValue({ data: exposure(), error: null });
     const stories = await loadOperationsStories(['repuestos_stock', 'repuestos_sucursales'], ['repuestos.analisis'], asOf);
     expect(mocks.parts).toHaveBeenCalledTimes(1);
-    expect(stories[0].supporting[0].value).toBe(12000);
+    expect(mocks.rpc).toHaveBeenCalledWith('campi_repuestos_exposicion_v1');
+    expect(stories[0].primary?.value).toBe(30);
     expect(stories.every(s => s.cutoff === null)).toBe(true);
-    expect(stories[0].chart?.rows.map(r => r.value)).toEqual([110,-10]);
+    expect(stories[0].chart?.rows.map(r => r.value)).toEqual([20,10]);
     expect(stories[1].primary).toMatchObject({ label: 'Días desde última compra', value: 400, unit: 'days' });
     expect(stories[1].supporting.find(r => r.label === 'Cobertura del valor positivo')?.value).toBe(60);
     expect(stories[1].breakdown[0].note).toContain('60%');
-    expect(stories[0].details.join(' ')).toContain('Sin equivalencia no significa sin movimiento');
+    expect(stories[0].details.join(' ')).toContain('corte del inventario');
   });
   it('weights branch purchase age by USD with a dated purchase, not by branch ranking', async () => {
     const data = partData();
@@ -32,13 +35,13 @@ describe('operations stories', () => {
     expect(story.supporting.find(r => r.label === 'Cobertura del valor positivo')?.value).toBe(80);
     expect(story.chart?.rows.map(r => r.value)).toEqual([100,500]);
   });
-  it('preserves missing Kardex value and propagates shared errors', async () => {
-    mocks.parts.mockResolvedValue({ ...partData(), valor_kardex_usd: null });
-    expect((await loadOperationsStories(['repuestos_stock'], ['repuestos.analisis'], asOf))[0].primary?.value).toBeNull();
-    mocks.parts.mockRejectedValue(new Error('timeout'));
+  it('rejects incomplete exposure values and source errors', async () => {
+    mocks.rpc.mockResolvedValue({ data: { ...exposure(), valor_total_usd: null }, error: null });
+    expect((await loadOperationsStories(['repuestos_stock'], ['repuestos.analisis'], asOf))[0].status).toBe('error');
+    mocks.rpc.mockResolvedValue({ data: null, error: { message: 'timeout' } });
     const stories = await loadOperationsStories(['repuestos_stock', 'repuestos_sucursales'], ['repuestos.analisis'], asOf);
-    expect(stories.map(s => s.status)).toEqual(['error','error']);
-    expect(stories.every(s => s.primary === null)).toBe(true);
+    expect(stories[0].status).toBe('error');
+    expect(stories[0].primary).toBeNull();
   });
   it('rejects projected null numerics, validates reconciliation and preserves negative model balances', async () => {
     const data = { fecha_corte: asOf, disponible_desde: '2026-08-31', solo_nuevas: true, filas: [{ marca: 'A', modelo: 'M', stock: 1, pedidos_compra: 0, ventas_pendientes: 3, stock_proyectado: -2 }] };

@@ -27,6 +27,18 @@ import {
 
 const SUCURSALES = ["Santa Rita", "Santa Rosa", "Campo 9", "Misiones", "Loma Plata", "Katuete"];
 const INITIAL_FILTERS: SemaforoFiltros = { busqueda: "", marca: "", color: "", sucursal: "" };
+const deepLinkFilters = (params: URLSearchParams): SemaforoFiltros => {
+  const color = params.get("color") ?? "";
+  const min = params.get("compra_dias_min") ?? "";
+  const max = params.get("compra_dias_max") ?? "";
+  const pendingGrey = color === "LILA" && min === "336" && max === "365";
+  const pendingRed = color === "GRIS" && min === "971" && max === "1000";
+  return { ...INITIAL_FILTERS,
+    color: SEMAFORO_COLORES.some(item => item.id === color) ? color : "",
+    sucursal: params.get("sucursal") ?? "", familia: params.get("familia") ?? "",
+    ...(pendingGrey || pendingRed ? { compra_dias_min: min, compra_dias_max: max } : {}),
+  };
+};
 const quantity = (value: number | null | undefined) => value == null ? "—" : Number(value).toLocaleString("es-PY", { maximumFractionDigits: 6 });
 const usd = (value: number | null | undefined) => value == null ? "—" : `$ ${Number(value).toLocaleString("es-PY", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
 const fecha = (value: string | null | undefined) => value ? new Date(`${value.slice(0, 10)}T12:00:00`).toLocaleDateString("es-PY") : "—";
@@ -113,11 +125,14 @@ export function StockSemaphoreSection({ canExport }: { canExport: boolean }) {
   const [searchParams] = useSearchParams();
   const [search, setSearch] = useState("");
   const debounced = useDebouncedValue(search, 300);
-  const [filtros, setFiltros] = useState<SemaforoFiltros>(() => ({ ...INITIAL_FILTERS, color: searchParams.get("color") === "ROJO" ? "ROJO" : "" }));
+  const [filtros, setFiltros] = useState<SemaforoFiltros>(() => deepLinkFilters(searchParams));
+  const [tab, setTab] = useState(() => searchParams.get("vista") === "detalle" ? "detalle" : "resumen");
   useEffect(() => {
-    if (searchParams.get("color") === "ROJO") setFiltros(current => ({ ...current, color: "ROJO" }));
+    if (searchParams.toString()) {
+      setFiltros(deepLinkFilters(searchParams));
+      if (searchParams.get("vista") === "detalle") setTab("detalle");
+    }
   }, [searchParams]);
-  const [tab, setTab] = useState("resumen");
   const [agrupacion, setAgrupacion] = useState<SemaforoAgrupacion>("marca");
   const [path, setPath] = useState<Array<{ key: SemaforoAgrupacion; value: string }>>([]);
   const [selected, setSelected] = useState<SemaforoFila | null>(null);

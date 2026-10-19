@@ -21,9 +21,9 @@ afterEach(cleanup);
 describe('Campi Panorama configuration', () => {
   it('saves more than three ordered topics and restores them', () => {
     const view = render(<CampiPanorama />);
-    expect(screen.getByText('6 disponibles')).toBeInTheDocument();
+    expect(screen.getByText('5 disponibles')).toBeInTheDocument();
     fireEvent.click(screen.getByRole('button', { name: 'Cómo viene la facturación' }));
-    fireEvent.click(screen.getByRole('button', { name: 'Qué parte del stock necesita revisión' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Stock antiguo de repuestos' }));
     fireEvent.click(screen.getByRole('button', { name: 'Qué máquinas hay en stock' }));
     fireEvent.click(screen.getByRole('button', { name: 'Cuánto queda pendiente en pedidos de máquinas' }));
     expect(screen.getByText('4 priorizados')).toBeInTheDocument();

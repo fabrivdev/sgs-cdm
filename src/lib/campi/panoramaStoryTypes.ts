@@ -24,6 +24,7 @@ export type PanoramaStory = {
   source: string;
   route: string;
   attention?: boolean;
+  notices?: { text: string; route: string }[];
 };
 
 export type StoryLoader = (topics: readonly StoryTopicId[], granted: readonly SectionKey[], asOf: string) => Promise<PanoramaStory[]>;

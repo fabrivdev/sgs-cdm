@@ -37,6 +37,8 @@ describe('Campi Panorama topics', () => {
     ], available)).toEqual(['ventas_facturacion', 'repuestos_stock', 'maquinas_stock', 'maquinas_pedidos']);
     expect(reconcilePanoramaOrder(['maquinas_stock', 'repuestos_stock'], available.filter(topic => topic.id !== 'maquinas_stock')))
       .toEqual(['repuestos_stock']);
+    expect(reconcilePanoramaOrder(['repuestos_clientes', 'ventas_facturacion', 'repuestos_sucursales', 'repuestos_stock'], available))
+      .toEqual(['ventas_facturacion', 'repuestos_stock']);
   });
 
   it('persists order per user and ignores obsolete section-based preferences', () => {
