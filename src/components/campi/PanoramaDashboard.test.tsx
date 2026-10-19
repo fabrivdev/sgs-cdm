@@ -94,6 +94,8 @@ describe('Campi alternative story dashboard', () => {
   it('compares a local baseline without rebasing the displayed change or claiming new sales', async () => {
     saveStoryVisit('manager-a', [story('ventas_facturacion', { primary: { label: 'Principal', value: 1000, unit: 'USD' } })], '2026-10-15T10:00:00Z');
     load.mockResolvedValue([story('ventas_facturacion')]); show();
+    expect(await screen.findByRole('heading', { name: 'Tema ventas_facturacion: +USD 234,56 desde tu última visita.' })).toBeInTheDocument();
+    expect(screen.getByLabelText(/Comparación de Tema ventas_facturacion desde tu última visita/)).toHaveTextContent('USD 1.000 → USD 1.234,56');
     fireEvent.click(await screen.findByRole('button', { name: 'Ver detalle de Tema ventas_facturacion' }));
     expect(await screen.findByText('El total visible cambió +$ 234,56 desde tu última visita en este navegador.')).toBeInTheDocument();
     await waitFor(() => expect(readStoryVisit('manager-a')?.values[0].value).toBe(1234.56));

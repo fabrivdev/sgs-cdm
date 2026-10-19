@@ -13,7 +13,7 @@ const REACTION_ACTION: Record<CampiPanoramaReaction['kind'], CampiAction> = {
   save: 'approve',
 };
 
-export function CampiPanoramaAvatar({ reaction, attention = false }: { reaction?: CampiPanoramaReaction | null; attention?: boolean }) {
+export function CampiPanoramaAvatar({ reaction, attention = false, change = false }: { reaction?: CampiPanoramaReaction | null; attention?: boolean; change?: boolean }) {
   const [state, setState] = useState<'welcome' | 'idle'>('welcome');
   const [visible, setVisible] = useState(() => !document.hidden);
   const [reduced, setReduced] = useState(() => window.matchMedia(REDUCED).matches);
@@ -33,6 +33,7 @@ export function CampiPanoramaAvatar({ reaction, attention = false }: { reaction?
     const gesture = window.setInterval(() => {
       if (document.hidden || window.matchMedia(REDUCED).matches) return;
       if (attention) play('consider');
+      else if (change) play('step');
       else setState('welcome');
       settle = window.setTimeout(() => setState('idle'), 1600);
     }, 14000);
@@ -48,7 +49,7 @@ export function CampiPanoramaAvatar({ reaction, attention = false }: { reaction?
       media.removeEventListener('change', onMotion);
       window.clearTimeout(actionTimeout.current);
     };
-  }, [attention, play]);
+  }, [attention, change, play]);
 
   useEffect(() => {
     if (reduced) { window.clearTimeout(actionTimeout.current); setAction('neutral'); return; }
@@ -57,11 +58,12 @@ export function CampiPanoramaAvatar({ reaction, attention = false }: { reaction?
 
   useEffect(() => {
     if (attention && visible && !reduced) play('consider');
-  }, [attention, visible, reduced, play]);
+    else if (change && visible && !reduced) play('step');
+  }, [attention, change, visible, reduced, play]);
 
   const interact = () => {
     if (!visible || reduced) return;
-    const gestures: CampiAction[] = attention ? ['consider', 'step', 'approve'] : ['approve', 'step', 'celebrate'];
+    const gestures: CampiAction[] = attention ? ['consider', 'step', 'approve'] : change ? ['step', 'consider', 'approve'] : ['approve', 'step', 'celebrate'];
     play(gestures[interactionIndex.current++ % gestures.length]);
   };
 

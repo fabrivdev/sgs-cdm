@@ -2,7 +2,7 @@ import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/re
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { CampiInterpreter } from './CampiInterpreter';
 import type { PanoramaStory } from '@/lib/campi/panoramaStoryTypes';
-vi.mock('./CampiPanoramaAvatar', () => ({ CampiPanoramaAvatar: () => <div>Mascota</div> }));
+vi.mock('./CampiPanoramaAvatar', () => ({ CampiPanoramaAvatar: ({ attention, change }: { attention?: boolean; change?: boolean }) => <div data-mood={attention ? 'attention' : change ? 'change' : 'serene'}>Mascota</div> }));
 afterEach(cleanup);
 const billing: PanoramaStory = { id: 'ventas_facturacion', title: 'Facturación', question: '¿Cómo viene la facturación?', status: 'ready', message: '', scope: 'Repuestos', sections: ['repuestos.ventas'], cutoff: null, periodLabel: 'Octubre', primary: { label: 'Facturación del mes', value: 448000, unit: 'USD', comparison: { value: 400000, label: 'Mismo tramo de 2025' } }, supporting: [], chart: null, breakdown: [], details: [], source: 'Prueba', route: '' };
 describe('Campi questions', () => {
@@ -24,23 +24,36 @@ describe('Campi questions', () => {
     expect(screen.getByRole('dialog')).not.toHaveTextContent('448.000');
     expect(screen.getByRole('dialog')).toHaveTextContent('No puedo responder');
   });
-  it('shows a concise evidence-based headline and a working primary action', () => {
+  it('shows an evidenced finding and a working primary action', () => {
     render(<CampiInterpreter stories={[billing]} loading={false} />);
-    expect(screen.getByRole('heading', { name: 'La facturación subió 12% frente al período comparable.' })).toBeInTheDocument();
-    expect(screen.queryByText(/400.000 →/)).not.toBeInTheDocument();
-    fireEvent.click(screen.getByRole('button', { name: 'Explorar facturación' }));
+    expect(screen.getByRole('heading', { name: /Facturación: facturación del mes subió 12%/ })).toBeInTheDocument();
+    expect(screen.getByRole('heading', { name: /USD 400.000 → USD 448.000/ })).toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: 'Ver datos de facturación' }));
     expect(screen.getByRole('dialog')).toHaveTextContent('Fuente: Prueba');
   });
-  it('never turns a missing comparison into growth', () => {
+  it('shows a verified neutral total without claiming growth when comparison is missing', () => {
     render(<CampiInterpreter stories={[{ ...billing, primary: { ...billing.primary!, comparison: undefined } }]} loading={false} />);
-    expect(screen.getByRole('heading', { name: 'Tus prioridades, en un solo lugar.' })).toBeInTheDocument();
+    expect(screen.getByRole('heading', { name: /Facturación: USD 448.000/ })).toBeInTheDocument();
     expect(screen.queryByText(/subió/)).not.toBeInTheDocument();
+  });
+  it('prioritizes an identified alert, changes the hero mood, and keeps a comparable visit visible', () => {
+    const stock: PanoramaStory = { ...billing, id: 'repuestos_stock', title: 'Situación del stock', sections: ['repuestos.analisis'], primary: { label: 'Valor Kardex', value: 220, unit: 'USD' }, supporting: [{ label: 'Rojo · valor Kardex', value: 70, unit: 'USD' }] };
+    render(<CampiInterpreter stories={[billing, stock]} loading={false} previous={{ at: '2026-10-15T10:00:00Z', values: [{ id: 'ventas_facturacion', value: 400000, unit: 'USD', fingerprint: JSON.stringify([['repuestos.ventas'], 'Repuestos', 'Octubre', 'Prueba']) }] }} />);
+    expect(screen.getByRole('heading', { name: /USD 70 de valor Kardex en rojo/ })).toBeInTheDocument();
+    expect(screen.getByText('Mascota')).toHaveAttribute('data-mood', 'attention');
+    expect(screen.getByLabelText(/Comparación de Facturación desde tu última visita/)).toHaveTextContent('USD 400.000 → USD 448.000');
+    expect(screen.getByLabelText(/Comparación de Facturación desde tu última visita/)).toHaveTextContent('Cambio +USD 48.000');
   });
   it('blocks submissions during loading and for whitespace', () => {
     const view = render(<CampiInterpreter stories={[]} loading />);
-    expect(screen.getByLabelText('Preguntale a Campi')).toBeDisabled();
+    expect(screen.queryByLabelText('Preguntale a Campi')).not.toBeInTheDocument();
     view.rerender(<CampiInterpreter stories={[billing]} loading={false} />);
     fireEvent.change(screen.getByLabelText('Preguntale a Campi'), { target: { value: '   ' } });
     expect(screen.getByRole('button', { name: 'Preguntar a Campi' })).toBeDisabled();
+  });
+  it('does not offer a question box when no verified story is available', () => {
+    render(<CampiInterpreter stories={[]} loading={false} />);
+    expect(screen.getByRole('heading', { name: /Todavía no tengo cifras verificadas/ })).toBeInTheDocument();
+    expect(screen.queryByLabelText('Preguntale a Campi')).not.toBeInTheDocument();
   });
 });

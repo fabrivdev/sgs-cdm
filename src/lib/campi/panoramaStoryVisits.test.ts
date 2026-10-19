@@ -1,6 +1,6 @@
 import { beforeEach, describe, expect, it } from 'vitest';
 import type { PanoramaStory } from './panoramaStoryTypes';
-import { readStoryVisit, saveStoryVisit, storyVisitChange } from './panoramaStoryVisits';
+import { readStoryVisit, saveStoryVisit, storyVisitChange, storyVisitComparison } from './panoramaStoryVisits';
 const story: PanoramaStory = { id: 'ventas_facturacion', title: 'Facturación', question: '¿Cómo va?', status: 'ready', message: '', scope: 'Repuestos', sections: ['repuestos.ventas'], cutoff: null, periodLabel: 'Octubre 1–16', visitKey: '2026-10:v1', primary: { label: 'Mes', value: 10, unit: 'USD' }, supporting: [], chart: null, breakdown: [], details: [], source: 'ventas:v1', route: '/repuestos/ventas' };
 beforeEach(() => localStorage.clear());
 describe('local visit reference', () => {
@@ -8,6 +8,7 @@ describe('local visit reference', () => {
     saveStoryVisit('a', [story]);
     expect(readStoryVisit('b')).toBeNull();
     expect(storyVisitChange({ ...story, periodLabel: 'Octubre 1–17', primary: { ...story.primary!, value: 12 } }, readStoryVisit('a'))).toBe(2);
+    expect(storyVisitComparison({ ...story, primary: { ...story.primary!, value: 12 } }, readStoryVisit('a'))).toMatchObject({ before: 10, current: 12, change: 2, unit: 'USD' });
   });
   it('never compares different scope, definition, month or missing values', () => {
     saveStoryVisit('a', [story]); const old = readStoryVisit('a');
