@@ -20,7 +20,7 @@ const definitions: Partial<Record<StoryTopicId, { title: string; question: strin
 };
 function base(id: StoryTopicId): PanoramaStory {
   const d = definitions[id]!;
-  return { id, title: d.title, question: d.question, sections: [d.section], route: d.route, source: d.source, status: 'ready', message: '', scope: '', cutoff: null, periodLabel: 'Foto vigente · corte no informado', primary: null, supporting: [], chart: null, breakdown: [], details: [] };
+  return { id, title: d.title, question: d.question, sections: [d.section], route: d.route, source: d.source, status: 'ready', message: '', scope: '', cutoff: null, periodLabel: 'Corte no informado', primary: null, supporting: [], chart: null, breakdown: [], details: [] };
 }
 function parts(id: StoryTopicId, data: SemaforoResultado): PanoramaStory {
   const story = base(id);

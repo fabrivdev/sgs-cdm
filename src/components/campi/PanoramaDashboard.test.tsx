@@ -18,7 +18,7 @@ vi.mock('recharts', async importOriginal => {
   const real = await importOriginal<typeof import('recharts')>();
   return { ...real, ResponsiveContainer: ({ children }: { children: React.ReactElement }) => <div>{children}</div> };
 });
-beforeEach(() => { load.mockReset(); localStorage.clear(); });
+beforeEach(() => { load.mockReset(); localStorage.clear(); sessionStorage.clear(); });
 afterEach(cleanup);
 
 const story = (id: StoryTopicId, overrides: Partial<PanoramaStory> = {}): PanoramaStory => ({
@@ -93,17 +93,20 @@ describe('Campi alternative story dashboard', () => {
   });
   it('compares a local baseline without rebasing the displayed change or claiming new sales', async () => {
     saveStoryVisit('manager-a', [story('ventas_facturacion', { primary: { label: 'Principal', value: 1000, unit: 'USD' } })], '2026-10-15T10:00:00Z');
+    sessionStorage.clear();
     load.mockResolvedValue([story('ventas_facturacion')]); show();
     expect(await screen.findByRole('heading', { name: 'Tema ventas_facturacion: +USD 234,56 desde tu última visita.' })).toBeInTheDocument();
     expect(screen.getByLabelText(/Comparación de Tema ventas_facturacion desde tu última visita/)).toHaveTextContent('USD 1.000 → USD 1.234,56');
     fireEvent.click(await screen.findByRole('button', { name: 'Ver detalle de Tema ventas_facturacion' }));
     expect(await screen.findByText('El total visible cambió +$ 234,56 desde tu última visita en este navegador.')).toBeInTheDocument();
-    await waitFor(() => expect(readStoryVisit('manager-a')?.values[0].value).toBe(1234.56));
+    await waitFor(() => expect(JSON.parse(localStorage.getItem('sig-cdm:panorama:alternativa:visita:v1:manager-a')!).values[0].value).toBe(1234.56));
+    expect(readStoryVisit('manager-a')?.values[0].value).toBe(1000);
     expect(screen.getByText('El total visible cambió +$ 234,56 desde tu última visita en este navegador.')).toBeInTheDocument();
     expect(screen.queryByText(/ventas nuevas/i)).not.toBeInTheDocument();
   });
   it('preserves the old baseline while any topic has failed', async () => {
     saveStoryVisit('manager-a', [story('ventas_facturacion')], '2026-10-15T10:00:00Z');
+    sessionStorage.clear();
     load.mockResolvedValue([story('ventas_facturacion', { primary: { label: 'Principal', value: 3000, unit: 'USD' } }), story('maquinas_stock', { status: 'error' })]);
     show(['ventas_facturacion', 'maquinas_stock']);
     await screen.findByRole('heading', { name: 'Tema maquinas_stock' });
@@ -111,12 +114,13 @@ describe('Campi alternative story dashboard', () => {
   });
   it('records a complete empty result with a genuine zero alongside the other topics', async () => {
     saveStoryVisit('manager-a', [story('ventas_facturacion')], '2026-10-15T10:00:00Z');
+    sessionStorage.clear();
     load.mockResolvedValue([story('ventas_facturacion', { primary: { label: 'Principal', value: 3000, unit: 'USD' } }), story('servicios_pendientes', { status: 'empty', primary: { label: 'Órdenes abiertas', value: 0, unit: 'count' }, supporting: [], chart: null })]);
     show(['ventas_facturacion', 'servicios_pendientes']);
     await screen.findByRole('heading', { name: 'Tema servicios_pendientes' });
-    await waitFor(() => expect(readStoryVisit('manager-a')?.values.find(value => value.id === 'servicios_pendientes')?.value).toBe(0));
-    expect(readStoryVisit('manager-a')?.values.find(value => value.id === 'ventas_facturacion')?.value).toBe(3000);
-    expect(readStoryVisit('manager-a')?.at).not.toBe('2026-10-15T10:00:00Z');
+    await waitFor(() => expect(JSON.parse(localStorage.getItem('sig-cdm:panorama:alternativa:visita:v1:manager-a')!).values.find((value: { id: string }) => value.id === 'servicios_pendientes')?.value).toBe(0));
+    expect(JSON.parse(localStorage.getItem('sig-cdm:panorama:alternativa:visita:v1:manager-a')!).values.find((value: { id: string }) => value.id === 'ventas_facturacion')?.value).toBe(3000);
+    expect(readStoryVisit('manager-a')?.at).toBe('2026-10-15T10:00:00Z');
   });
   it('shows a recoverable query error instead of stale or invented results', async () => {
     load.mockRejectedValue(new Error('Offline')); show();

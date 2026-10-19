@@ -27,19 +27,20 @@ export function CampiInterpreter({ stories, loading, previous = null }: { storie
       const comparison = storyVisitComparison(story, previous);
       return comparison?.change ? [{ story, comparison }] : [];
     })[0];
-  const lead = attention ?? result.findings.find(f => f.kind === 'advance') ?? result.findings[0];
+  const lead = attention ?? result.findings.find(f => f.kind === 'change') ?? result.findings[0];
   const leadStory = stories.find(story => story.id === lead?.topic);
-  const tone = loading || !lead ? 'unknown' : attention ? 'attention' : visit ? 'change' : 'serene';
+  const tone = loading || !lead ? 'unknown' : attention ? 'attention' : visit || lead.kind === 'change' ? 'change' : 'serene';
   const headline = loading ? 'Estoy revisando tus temas.'
     : attention ? attention.text
     : visit ? `${visit.story.title}: ${signedValue(visit.comparison.change, visit.comparison.unit)} desde tu última visita.`
     : lead ? lead.text : 'Todavía no tengo cifras verificadas para resumir tus temas.';
   const actions = leadStory ? [leadStory] : [];
+  const suggestions = visit ? [{ question: '¿Qué cambió desde mi última visita?', topic: visit.story.id }, ...result.suggestions.filter(s => s.topic !== visit.story.id)].slice(0, 2) : result.suggestions;
   const ask = (text: string) => { if (text.trim()) setAsked(text.trim()); };
   return <Panel className={`panorama-hero panorama-hero--${tone}`}>
     <div className="panorama-hero-avatar"><CampiPanoramaAvatar attention={tone === 'attention'} change={tone === 'change'} /></div>
     <div className="panorama-hero-message">
-      <div className="panorama-hero-context"><span className="panorama-hero-kicker">{tone === 'attention' ? 'Para revisar' : tone === 'change' ? 'Desde tu última visita' : 'Campi · panorama'}</span>{!loading && leadStory && <span>{leadStory.scope} · {leadStory.periodLabel}</span>}</div>
+      <div className="panorama-hero-context"><span className="panorama-hero-kicker">{tone === 'attention' ? 'Para revisar' : tone === 'change' ? visit ? 'Desde tu última visita' : 'Cambio observado' : 'Campi · panorama'}</span>{!loading && leadStory && <span>{leadStory.scope} · {leadStory.periodLabel}</span>}</div>
       <div className="campi-synthesis" aria-live="polite"><h2>{headline}</h2></div>
       {!loading && visit && <div className="campi-visit-snapshot" aria-label={`Comparación de ${visit.story.title} desde tu última visita en este navegador`}>
         <span>Desde tu última visita del {visitDate(visit.comparison.at)} · {visit.story.title}</span>
@@ -55,8 +56,8 @@ export function CampiInterpreter({ stories, loading, previous = null }: { storie
         <Button type="submit" size="icon" disabled={loading || !question.trim()} aria-label="Preguntar a Campi"><ArrowRight className="h-5 w-5" /></Button>
       </form>
       <span className="campi-suggestions-label">Preguntas sugeridas</span>
-      <div className="campi-suggestions">{!loading && result.suggestions.map(s => <button key={s.question} type="button" onClick={() => ask(s.question)}>{s.question}<ArrowRight aria-hidden="true" className="h-4 w-4" /></button>)}</div>
+      <div className="campi-suggestions">{!loading && suggestions.map(s => <button key={s.question} type="button" onClick={() => ask(s.question)}>{s.question}<ArrowRight aria-hidden="true" className="h-4 w-4" /></button>)}</div>
     </div>}
-    <Dialog open={asked !== null} onOpenChange={open => { if (!open) setAsked(null); }}><DialogContent className="campi-answer-dialog" onCloseAutoFocus={event => { event.preventDefault(); inputRef.current?.focus(); }}><DialogHeader><DialogTitle>Campi</DialogTitle><DialogDescription>Lectura basada en reglas y datos cargados; sin IA externa.</DialogDescription></DialogHeader><p className="campi-asked">{asked}</p><p className="campi-answer">{asked ? answerCampi(asked, stories) : ''}</p></DialogContent></Dialog>
+    <Dialog open={asked !== null} onOpenChange={open => { if (!open) setAsked(null); }}><DialogContent className="campi-answer-dialog" onCloseAutoFocus={event => { event.preventDefault(); inputRef.current?.focus(); }}><DialogHeader><DialogTitle>Campi</DialogTitle><DialogDescription>Lectura basada en reglas y datos cargados; sin IA externa.</DialogDescription></DialogHeader><p className="campi-asked">{asked}</p><p className="campi-answer">{asked ? answerCampi(asked, stories, previous) : ''}</p></DialogContent></Dialog>
   </Panel>;
 }

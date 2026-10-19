@@ -1,6 +1,7 @@
 import type { PanoramaStory, StoryDatum, StoryTopicId } from './panoramaStoryTypes';
+import { storyVisitComparison, type StoryVisitSnapshot } from './panoramaStoryVisits';
 
-export type CampiFinding = { topic: StoryTopicId; kind: 'advance' | 'attention' | 'neutral'; text: string; rank: number };
+export type CampiFinding = { topic: StoryTopicId; kind: 'change' | 'attention' | 'neutral'; text: string; rank: number };
 const number = new Intl.NumberFormat('es-PY', { maximumFractionDigits: 1 });
 const valid = (n: number | null | undefined): n is number => typeof n === 'number' && Number.isFinite(n);
 const amount = (d: StoryDatum) => `${d.unit === 'USD' ? 'USD ' : d.unit === 'PYG' ? '₲ ' : ''}${number.format(d.value!)}${d.unit === 'percent' ? '%' : ''}`;
@@ -27,15 +28,14 @@ export function interpretCampi(stories: readonly PanoramaStory[]) {
     // Positive sales movement is not a claim about profitability, demand or its cause.
     if (['ventas_facturacion', 'repuestos_clientes'].includes(s.id) && valid(p.comparison?.value) && p.comparison.value > 0) {
       const delta = (p.value! - p.comparison.value) / p.comparison.value * 100;
-      if (delta !== 0) return finding(delta > 0 ? 'advance' : 'attention', `${s.title}: ${p.label.toLowerCase()} ${delta > 0 ? 'subió' : 'bajó'} ${number.format(Math.abs(delta))}% frente a ${p.comparison.label.toLowerCase()} (${amount({ ...p, value: p.comparison.value })} → ${amount(p)}).`, 50 + Math.min(Math.abs(delta), 30));
+      if (delta !== 0) return finding('change', `${s.title}: ${p.label.toLowerCase()} ${delta > 0 ? 'subió' : 'bajó'} ${number.format(Math.abs(delta))}% frente a ${p.comparison.label.toLowerCase()} (${amount({ ...p, value: p.comparison.value })} → ${amount(p)}).`, 50 + Math.min(Math.abs(delta), 30));
     }
     return finding('neutral', `${s.title}: ${amount(p)} en ${p.label.toLowerCase()}, sin base suficiente para calificarlo como mejora o alerta.`, 0);
   });
-  const ordered = [...findings].sort((a, b) => b.rank - a.rank || a.topic.localeCompare(b.topic));
-  const advance = ordered.find(f => f.kind === 'advance');
-  const attention = ordered.find(f => f.kind === 'attention');
-  const selected: CampiFinding[] = [advance, attention].filter((f): f is CampiFinding => Boolean(f));
-  for (const f of ordered) if (selected.length < 2 && !selected.some(x => x.topic === f.topic)) selected.push(f);
+  // Severity precedes user preference; the chosen topic order breaks equal-rank ties.
+  const priority = new Map(stories.map((story, index) => [story.id, index]));
+  const ordered = [...findings].sort((a, b) => b.rank - a.rank || (priority.get(a.topic) ?? Infinity) - (priority.get(b.topic) ?? Infinity));
+  const selected = ordered.slice(0, 2);
   const sentences = selected.map(f => f.text);
   if (!sentences.length) sentences.push('Todavía no tengo cifras verificadas para interpretar estos temas.');
   if (sentences.length < 2) sentences.push(stories.some(s => s.status === 'error') ? 'Hay fuentes que no se pudieron verificar; revisá el tema indicado.' : 'No hay otro hecho con base suficiente para destacar en esta selección.');
@@ -44,17 +44,25 @@ export function interpretCampi(stories: readonly PanoramaStory[]) {
     return { question: `¿Qué muestran los datos de ${s.title.toLowerCase()}?`, topic: s.id };
   });
   if (suggestions.length < 2 && usable.length) suggestions.push({ question: '¿Qué límites tienen estos datos?', topic: usable[0].id });
-  return { findings, sentences, suggestions, attention: Boolean(attention) };
+  return { findings: ordered, sentences, suggestions, attention: ordered.some(f => f.kind === 'attention') };
 }
 
-export function answerCampi(question: string, stories: readonly PanoramaStory[]): string {
+export function answerCampi(question: string, stories: readonly PanoramaStory[], previous: StoryVisitSnapshot | null = null): string {
   const interpretation = interpretCampi(stories);
   const q = normalize(question);
   const chosen = interpretation.suggestions.find(s => normalize(s.question) === q);
   if (q === 'que limites tienen estos datos' && interpretation.findings.length) return 'Solo interpreto los temas seleccionados y autorizados que ya están cargados. Una cantidad pendiente no acredita demora; una subida no acredita su causa ni rentabilidad. Las fuentes sin corte informado no acreditan actualización en tiempo real.';
+  if (q === 'que cambio desde mi ultima visita') {
+    const changes = stories.flatMap(story => {
+      const comparison = storyVisitComparison(story, previous);
+      return comparison?.change ? [`${story.title}: ${amount({ ...story.primary!, value: comparison.before })} → ${amount({ ...story.primary!, value: comparison.current })} desde la referencia guardada de esta sesión; ${comparison.change > 0 ? 'aumentó' : 'disminuyó'} ${amount({ ...story.primary!, value: Math.abs(comparison.change) })}.`] : [];
+    });
+    return changes.length ? changes.join(' ') : 'No hay un cambio comparable desde tu visita anterior para los temas seleccionados. Falta una referencia previa, cambió el alcance o los valores permanecen iguales.';
+  }
   if (['que mejoro', 'que merece atencion', 'que cambio'].includes(q)) {
-    const kind = q === 'que mejoro' ? 'advance' : q === 'que merece atencion' ? 'attention' : null;
-    const found = interpretation.findings.filter(f => !kind || f.kind === kind);
+    if (q === 'que mejoro') return 'No puedo determinar una mejora de negocio solo con estos indicadores. Puedo mostrar los cambios observados y los puntos que requieren revisión.';
+    const kind = q === 'que merece atencion' ? 'attention' : 'change';
+    const found = interpretation.findings.filter(f => f.kind === kind);
     return found.length ? found.map(f => f.text).join(' ') : 'No hay evidencia comparable suficiente en estos datos para afirmar eso.';
   }
   const story = chosen ? stories.find(s => s.id === chosen.topic) : stories.find(s => normalize(s.question) === q && interpretation.findings.some(f => f.topic === s.id));

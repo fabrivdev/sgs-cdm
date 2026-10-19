@@ -675,8 +675,8 @@
       "id": "panorama-permisos-y-comparacion",
       "title": "Panorama por permisos y visitas comparables",
       "module": "asistente",
-      "description": "En la alternativa, todos los temas seleccionados tienen un resumen completo en orden. Facturación consolida solo áreas autorizadas; comparación MTD/YTD con igual tramo LY. Las fuentes sin corte acreditado no dicen datos al día. Ocho temas con contrato reemplazan accesos sin KPI. La referencia local de visita compara alcance, período, moneda y definición iguales sin atribuir ventas nuevas.",
-      "check": "Probar permisos antes de consulta, todos los temas sin límite, consolidación sin subtotales ante fallo, cero válido, cambio de mes/alcance, modal y teclado. Referencia local no es historial contable. Validación visual y productiva pendientes.",
+      "description": "En la alternativa, todos los temas seleccionados tienen un resumen completo en orden. Facturación consolida solo áreas autorizadas; comparación MTD/YTD con igual tramo LY. Las fuentes sin corte acreditado no dicen datos al día. Ocho temas con contrato reemplazan accesos sin KPI. Alertas con criterio acreditado preceden cambios observados; prioridad elegida desempata. La referencia local de visita compara alcance, período, moneda y definición iguales y permanece fija durante la sesión del navegador, sin atribuir ventas nuevas.",
+      "check": "Probar permisos antes de consulta, todos los temas sin límite, consolidación sin subtotales ante fallo, cero válido, cambio de mes/alcance, recarga en la misma sesión, modal y teclado. Referencia local no es historial contable. Cuatro temas se verificaron en app local autenticada con fuentes reales; quedan cuatro y publicación pública sin verificar.",
       "entities": [
         "usuario",
         "permiso"
@@ -687,9 +687,10 @@
         "src/lib/campi/salesStories.ts",
         "src/lib/campi/operationsStories.ts",
         "src/lib/campi/panoramaStoryVisits.ts",
+        "src/lib/campi/campiInterpretation.ts",
         "docs/campi-panorama-alternativa.md"
       ],
-      "evidence": "Rama alternativa derivada de 3337f6d; pruebas con fixtures, build, sin SQL remoto ni publicación."
+      "evidence": "Rama alternativa derivada de 3337f6d; pruebas con fixtures y cuatro temas revisados en app local autenticada, sin SQL remoto ni publicación."
     },
     {
       "id": "mora-cxc-fuente",

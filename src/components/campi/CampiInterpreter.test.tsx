@@ -28,6 +28,8 @@ describe('Campi questions', () => {
     render(<CampiInterpreter stories={[billing]} loading={false} />);
     expect(screen.getByRole('heading', { name: /Facturación: facturación del mes subió 12%/ })).toBeInTheDocument();
     expect(screen.getByRole('heading', { name: /USD 400.000 → USD 448.000/ })).toBeInTheDocument();
+    expect(screen.getByText('Mascota')).toHaveAttribute('data-mood', 'change');
+    expect(screen.getByText('Cambio observado')).toBeInTheDocument();
     fireEvent.click(screen.getByRole('button', { name: 'Ver datos de facturación' }));
     expect(screen.getByRole('dialog')).toHaveTextContent('Fuente: Prueba');
   });
@@ -43,6 +45,8 @@ describe('Campi questions', () => {
     expect(screen.getByText('Mascota')).toHaveAttribute('data-mood', 'attention');
     expect(screen.getByLabelText(/Comparación de Facturación desde tu última visita/)).toHaveTextContent('USD 400.000 → USD 448.000');
     expect(screen.getByLabelText(/Comparación de Facturación desde tu última visita/)).toHaveTextContent('Cambio +USD 48.000');
+    fireEvent.click(screen.getByRole('button', { name: '¿Qué cambió desde mi última visita?' }));
+    expect(screen.getByRole('dialog')).toHaveTextContent('USD 400.000 → USD 448.000');
   });
   it('blocks submissions during loading and for whitespace', () => {
     const view = render(<CampiInterpreter stories={[]} loading />);

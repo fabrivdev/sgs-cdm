@@ -58,4 +58,9 @@ describe('compact overview panel', () => {
     expect(screen.getByRole('figure', { name: 'Saldo por modelo' })).toHaveTextContent('CLAAS Axion 870');
     expect(screen.getByRole('figure', { name: 'Saldo por modelo' })).toHaveTextContent('-2');
   });
+  it('shows projection components instead of a chart of zero balances', () => {
+    render(<MemoryRouter><StoryPanel story={{ ...story, id: 'maquinas_proyeccion', primary: { label: 'Modelos con saldo negativo', value: 0, unit: 'count' }, supporting: [{ label: 'Stock calculado', value: 13, unit: 'count' }, { label: 'Compras pendientes', value: 5, unit: 'count' }, { label: 'Ventas pendientes', value: 2, unit: 'count' }], chart: { kind: 'bars', title: 'Saldo por modelo', unit: 'count', rows: [{ label: 'Modelo A', value: 0 }] } }} index={0} retrying={false} onRetry={vi.fn()} /></MemoryRouter>);
+    expect(screen.getByLabelText('Componentes de la proyección')).toHaveTextContent('Stock calculado13');
+    expect(screen.queryByRole('figure', { name: 'Saldo por modelo' })).not.toBeInTheDocument();
+  });
 });

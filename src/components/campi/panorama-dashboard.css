@@ -75,6 +75,9 @@
 .story-period { margin-left: auto; padding-top: 2px; color: #687181; font-size: 12px; line-height: 18px; text-align: right; flex: none; max-width: 128px; }
 .story-summary-metric { display: flex; align-items: flex-end; justify-content: flex-start; gap: 12px; align-self: center; min-width: 0; }
 .story-summary-metric dl { flex: 0 1 auto; min-width: 0; }
+.story-summary-metric--long { display: block; }
+.story-summary-metric--long dl { width: 100%; }
+.story-summary-metric--long .story-percentage { margin-top: 6px; }
 .story-datum dt { font-size: 12px; color: #687181; }
 .story-datum dd { font-size: 20px; font-weight: 650; font-variant-numeric: tabular-nums; }
 .story-summary-metric .story-datum-primary dd { font-size: 36px; line-height: 42px; font-weight: 750; letter-spacing: -.045em; white-space: nowrap; }
@@ -95,10 +98,18 @@
 .story-comparison-bar--previous { background: #b7c2cd; }
 .story-comparison-bar--current { background: var(--story-accent); }
 .story-comparison-columns small { width: 100%; padding-top: 3px; color: #687181; font-size: 11px; text-align: center; }
-.story-negative-list ul { display: grid; gap: 7px; }
-.story-negative-list li { display: flex; align-items: baseline; justify-content: space-between; gap: 8px; min-width: 0; border-bottom: 1px solid hsl(var(--border)); padding: 4px 0; font-size: 12px; }
-.story-negative-list li span { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.story-negative-list li strong { flex: none; color: #ae3e3e; font-variant-numeric: tabular-nums; }
+.story-mini-bars ul:not(.sr-only) { display: grid; gap: 7px; }
+.story-mini-bars li { display: grid; grid-template-columns: minmax(70px, 42%) minmax(24px, 1fr) auto; align-items: center; gap: 7px; min-width: 0; font-size: 11px; }
+.story-mini-bar-label { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: #606b79; }
+.story-mini-bar-track { height: 13px; border-radius: 3px; background: var(--story-tint); }
+.story-mini-bar-track > span { display: block; height: 100%; border-radius: 3px; background: var(--story-accent); }
+.story-mini-bars li[data-negative="true"] .story-mini-bar-track > span { background: #ae3e3e; }
+.story-mini-bars li strong { min-width: 0; font-size: 11px; font-weight: 650; font-variant-numeric: tabular-nums; }
+.story-mini-bars li[data-negative="true"] strong { color: #ae3e3e; }
+.story-projection-components { grid-column: 2; grid-row: 2 / 4; align-self: center; display: grid; gap: 6px; min-width: 0; }
+.story-projection-components > div { display: flex; align-items: baseline; justify-content: space-between; gap: 8px; border-bottom: 1px solid hsl(var(--border)); padding: 4px 0; }
+.story-projection-components dt { min-width: 0; color: #687181; font-size: 12px; }
+.story-projection-components dd { flex: none; font-size: 14px; font-weight: 650; font-variant-numeric: tabular-nums; }
 .story-chart-canvas { min-width: 0; width: 100%; }
 .story-chart-canvas .recharts-text { fill: #727b88; }
 .panorama-story .story-detail-trigger { grid-column: 1; grid-row: 3; justify-self: start; align-self: end; min-height: 28px; height: 28px; margin: 0; border: 0; padding: 0; background: transparent; font-size: 14px; font-weight: 650; color: var(--story-accent); }
@@ -120,6 +131,7 @@
  .campi-questions { grid-column: 2; }
  .panorama-story { padding: 14px; grid-template-columns: 1fr; grid-template-rows: auto auto auto auto; row-gap: 8px; }
  .story-chart-mini { grid-column: 1; grid-row: 3; }
+ .story-projection-components { grid-column: 1; grid-row: 3; }
  .panorama-story .story-detail-trigger { grid-row: 4; }
  .story-period { font-size: 11px; }
 }
@@ -147,5 +159,5 @@
 }
 @media (prefers-reduced-motion: reduce) { .panorama-dashboard *, .panorama-story-dialog * { animation: none !important; transition: none !important; scroll-behavior: auto !important; } }
 
-.story-summary-metric .story-datum-primary dd[data-long="true"] { font-size: 28px; line-height: 34px; white-space: normal; overflow-wrap: anywhere; }
+.story-summary-metric .story-datum-primary dd[data-long="true"] { font-size: clamp(22px, 2.1vw, 28px); line-height: 34px; white-space: nowrap; }
 @media (min-width: 1200px) and (max-width: 1359px) { .story-summary-metric { gap: 12px; } .story-summary-metric .story-datum-primary dd { font-size: 30px; } }
