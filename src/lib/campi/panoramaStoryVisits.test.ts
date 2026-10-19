@@ -44,6 +44,17 @@ describe('local visit reference', () => {
     sessionStorage.clear();
     expect(storyVisitChange({ ...story, primary: { ...story.primary!, value: 12 } }, readStoryVisit('a'))).toBe(0);
   });
+  it('does not compare old primary definitions with the new branch and projection KPIs', () => {
+    for (const id of ['repuestos_sucursales', 'maquinas_proyeccion'] as const) {
+      const unit = id === 'maquinas_proyeccion' ? 'count' as const : 'USD' as const;
+      const current = { ...story, id, primary: { ...story.primary!, unit } };
+      const legacy = { at: '2026-10-15T10:00:00Z', values: [{ id, value: 100, unit, fingerprint: JSON.stringify([['repuestos.ventas'], 'Repuestos', '2026-10:v1', 'ventas:v1']) }] };
+      expect(storyVisitComparison(current, legacy)).toBeNull();
+      saveStoryVisit(id, [current]);
+      sessionStorage.clear();
+      expect(storyVisitComparison(current, readStoryVisit(id))).not.toBeNull();
+    }
+  });
   it('rejects malformed saved data', () => {
     localStorage.setItem('sig-cdm:panorama:alternativa:visita:v1:a', '{"at":"bad","values":[]}');
     expect(readStoryVisit('a')).toBeNull();
