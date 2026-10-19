@@ -165,7 +165,7 @@ export const loadOperationsStories: StoryLoader = async (topics, granted, asOf) 
 };
 
 
-type Order = { id: string; unidad_id: string | null; cantidad: number; operacion_id: string; marca: string | null; modelo: string | null; estado_fuente: string | null; estado_operacion: string | null; factura_venta: string | null; factura_fecha: string | null; es_historico: boolean };
+type Order = { id: string; unidad_id: string | null; cantidad: number; operacion_id: string; np_numero: string | null; marca: string | null; modelo: string | null; estado_fuente: string | null; estado_operacion: string | null; factura_venta: string | null; factura_fecha: string | null; es_historico: boolean };
 /** Matches Operaciones' simpleOrderState/orderBillingState, including historical evidence. */
 export function pendingMachineOrder(row: Order, unitState: string, confirmed: boolean): boolean {
   const state = (value: string | null) => {
@@ -190,7 +190,7 @@ async function machineOrders() {
   const rows: Order[] = [];
   let total: number | null = null;
   for (let offset = 0; ; offset += 500) {
-    const result = await db.from('maquinaria_pedidos_lineas_estado_actual').select('id,unidad_id,cantidad,operacion_id,marca,modelo,estado_fuente,estado_operacion,factura_venta,factura_fecha,es_historico', { count: 'exact' }).order('id').range(offset, offset + 499);
+    const result = await db.from('maquinaria_pedidos_lineas_estado_actual').select('id,unidad_id,cantidad,operacion_id,np_numero,marca,modelo,estado_fuente,estado_operacion,factura_venta,factura_fecha,es_historico', { count: 'exact' }).order('id').range(offset, offset + 499);
     if (result.error) throw result.error;
     if (!Array.isArray(result.data)) throw new Error('Pedidos incompletos.');
     const count = required(result.count);
@@ -229,13 +229,20 @@ async function machineOrders() {
   const models = new Map<string, number>();
   pending.forEach(r => { const key = `${r.marca || 'Sin marca'} · ${r.modelo || 'Sin modelo'}`; models.set(key, (models.get(key) ?? 0) + r.cantidad); });
   const grouped = [...models].map(([label,value]) => ({label,value})).sort((a,b) => b.value-a.value);
+  const orders = new Map<string, { label: string; value: number; historical: number }>();
+  pending.forEach(r => {
+    const current = orders.get(r.operacion_id) ?? { label: r.np_numero?.trim() || 'Pedido sin NP', value: 0, historical: 0 };
+    current.value += r.cantidad;
+    if (r.es_historico) current.historical += r.cantidad;
+    orders.set(r.operacion_id, current);
+  });
   story.status = pending.length ? 'ready' : 'empty';
   story.scope = 'Unidades de pedidos actuales e históricos · excluye canceladas y facturadas según Operaciones';
   story.message = 'Unidades pendientes de facturar, con conciliación por chasis en pedidos actuales.';
   story.primary = { label: 'Unidades pendientes', value: pending.reduce((n,r) => n + r.cantidad, 0), unit: 'count' };
   story.supporting = [{ label: 'Pedidos con pendientes', value: new Set(pending.map(r => r.operacion_id)).size, unit: 'count' }, { label: 'Pendientes históricos', value: pending.filter(r => r.es_historico).reduce((n,r) => n + r.cantidad, 0), unit: 'count' }, { label: 'Modelos pendientes', value: models.size, unit: 'count' }];
   story.chart = { kind: 'bars', title: 'Unidades pendientes por modelo', rows: grouped.slice(0,10), unit: 'count' };
-  story.breakdown = grouped.map(r => ({...r, unit: 'count'}));
-  story.details = ['Una unidad actual requiere venta positiva confirmada por su chasis; un PDF o estado agregado de la NP no factura a sus otras unidades.', 'Históricos conservan la evidencia documental y de estado del módulo Operaciones. Pendiente no significa no entregada.', 'Monto pendiente no consolidado: valor_venta mezcla valores de unidad, documento histórico y valor acordado; moneda_valor puede asumir USD. No se suman como un monto pendiente ni como facturación.', 'El gráfico muestra hasta 10 modelos y el detalle incluye todos.', 'Lectura completa paginada y conciliación en lotes de 200; cualquier fallo invalida el resumen. Máximo 2.000 unidades: superar ese límite produce error explícito, no un subtotal.'];
+  story.breakdown = [...orders].map(([id, order]) => ({ label: order.label, value: order.value, unit: 'count' as const, route: `/parque-operaciones?operacion=${encodeURIComponent(id)}`, note: order.historical ? `${order.historical} pendiente${order.historical === 1 ? '' : 's'} histórico${order.historical === 1 ? '' : 's'}` : undefined })).sort((a,b) => b.value - a.value || a.label.localeCompare(b.label));
+  story.details = ['Una unidad actual requiere venta positiva confirmada por su chasis; un PDF o estado agregado de la NP no factura a sus otras unidades.', 'Históricos conservan la evidencia documental y de estado del módulo Operaciones. Pendiente no significa no entregada.', 'La fecha de NP acredita cuándo se registró el pedido; ETA estima llegada de importación. Ninguna es una fecha comprometida de entrega al cliente. No se clasifican atrasos sin ese dato.', 'Monto pendiente no consolidado: valor_venta mezcla valores de unidad, documento histórico y valor acordado; moneda_valor puede asumir USD. No se suman como un monto pendiente ni como facturación.', 'El gráfico muestra hasta 10 modelos; el desglose incluye todos los pedidos pendientes y abre cada NP.', 'Lectura completa paginada y conciliación en lotes de 200; cualquier fallo invalida el resumen. Máximo 2.000 unidades: superar ese límite produce error explícito, no un subtotal.'];
   return story;
 }

@@ -67,7 +67,7 @@ describe('operations stories', () => {
     expect((await loadOperationsStories(['servicios_pendientes'], ['servicios.ordenes'], asOf))[0].status).toBe('error');
   });
 });
-const order = { id: 'u', unidad_id: 'u', cantidad: 1, operacion_id: 'np', marca: 'M', modelo: 'A', estado_fuente: 'PENDIENTE', estado_operacion: 'FACTURADA', factura_venta: 'PDF', factura_fecha: null, es_historico: false };
+const order = { id: 'u', unidad_id: 'u', cantidad: 1, operacion_id: 'np', np_numero: 'NP0001', marca: 'M', modelo: 'A', estado_fuente: 'PENDIENTE', estado_operacion: 'FACTURADA', factura_venta: 'PDF', factura_fecha: null, es_historico: false };
 describe('machine pending billing contract', () => {
   it('does not propagate a PDF or billed NP state to unbilled siblings', () => {
     expect(pendingMachineOrder(order, 'FACTURADA', false)).toBe(true);
@@ -81,6 +81,8 @@ describe('machine pending billing contract', () => {
     mocks.rpc.mockResolvedValue({ data: [{ unidad_id: 'v' }], error: null });
     const story = (await loadOperationsStories(['maquinas_pedidos'], ['parque.operaciones'], asOf))[0];
     expect(story.primary?.value).toBe(1); expect(story.supporting[0].value).toBe(1);
+    expect(story.breakdown).toEqual([{ label: 'NP0001', value: 1, unit: 'count', route: '/parque-operaciones?operacion=np', note: undefined }]);
+    expect(story.details.join(' ')).toContain('Ninguna es una fecha comprometida de entrega');
     mocks.rpc.mockResolvedValue({ data: null, error: { message: 'timeout' } });
     expect((await loadOperationsStories(['maquinas_pedidos'], ['parque.operaciones'], asOf))[0].status).toBe('error');
   });
@@ -88,6 +90,7 @@ describe('machine pending billing contract', () => {
     mocks.from.mockReturnValue(chain({ data: [{ ...order, id: 'line', unidad_id: null, cantidad: 4, es_historico: true, factura_venta: null, estado_operacion: 'PENDIENTE' }], count: 1, error: null }));
     const story = (await loadOperationsStories(['maquinas_pedidos'], ['parque.operaciones'], asOf))[0];
     expect(story.primary?.value).toBe(4); expect(mocks.rpc).not.toHaveBeenCalled();
+    expect(story.breakdown[0]).toMatchObject({ label: 'NP0001', value: 4, route: '/parque-operaciones?operacion=np', note: '4 pendientes históricos' });
   });
 });
 
