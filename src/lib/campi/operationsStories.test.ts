@@ -32,8 +32,15 @@ describe('operational Panorama loaders', () => {
     expect(stories.map(s => s.primary?.value)).toEqual([17, 14]);
     expect(stories[0].breakdown[0].route).toBe('/parque-operaciones?operacion=abc');
     expect(stories[1].primary?.comparison?.value).toBe(16.5);
+    expect(stories[1].chart).toMatchObject({ unit: 'days', rows: [{ value: 16.5 }, { value: 14 }] });
     expect(stories[1].details.join(' ')).toContain('1301');
     expect(mocks.from).not.toHaveBeenCalled();
+  });
+  it('does not turn an absent resolution cohort into zero days on the chart', async () => {
+    mocks.rpc.mockResolvedValue({ data: { ...resolution(), cierres_mes_anterior: 0, mediana_mes_anterior: null }, error: null });
+    const [story] = await loadOperationsStories(['servicios_pendientes'], ['servicios.ordenes'], asOf);
+    expect(story.primary?.comparison).toBeUndefined();
+    expect(story.chart?.rows).toEqual([{ label: 'septiembre de 2026', value: 14 }]);
   });
   it('separates the open OS queue from resolution and reads the same verified source once', async () => {
     mocks.rpc.mockResolvedValue({ data: resolution(), error: null });
@@ -43,6 +50,18 @@ describe('operational Panorama loaders', () => {
     expect(open.primary?.value).toBe(76);
     expect(open.supporting[0].value).toBe(60);
     expect(open.message).not.toContain('atraso');
+  });
+  it('isolates an invalid cohort rather than hiding a valid independent indicator', async () => {
+    mocks.rpc.mockResolvedValue({ data: { ...resolution(), apertura_invalida: 1 }, error: null });
+    const topics = ['servicios_pendientes', 'servicios_abiertas'] as const;
+    const [closed, open] = await loadOperationsStories(topics, ['servicios.ordenes'], asOf);
+    expect(closed.status).toBe('ready');
+    expect(closed.supporting.find(row => row.label === 'Percentil 90 de edad abierta')?.value).toBeNull();
+    expect(open.status).toBe('error');
+    mocks.rpc.mockResolvedValue({ data: { ...resolution(), invalidas_ultimo_mes: 1 }, error: null });
+    const [invalidClosed, validOpen] = await loadOperationsStories(topics, ['servicios.ordenes'], asOf);
+    expect(invalidClosed.status).toBe('error');
+    expect(validOpen.status).toBe('ready');
   });
   it('fails closed on a partial aggregate or unavailable source', async () => {
     mocks.rpc.mockResolvedValueOnce({ data: { ...supply(), unidades: 16 }, error: null })

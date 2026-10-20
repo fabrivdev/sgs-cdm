@@ -33,6 +33,22 @@ function show(topics: PanoramaTopicId[] = ['ventas_facturacion'], hasAccess: (se
 }
 
 describe('Campi alternative story dashboard', () => {
+  it('reviews permitted topics without changing preferences or the visit baseline', async () => {
+    localStorage.setItem('sig-cdm:panorama:alternativa:v1:manager-a', '["ventas_facturacion"]');
+    load.mockImplementation(async (ids: StoryTopicId[]) => ids.map(id => story(id, { sections: ['servicios.ordenes'] })));
+    show(['ventas_facturacion'], section => section === 'servicios.ordenes');
+    fireEvent.click(screen.getByRole('button', { name: 'Revisar temas' }));
+    const select = screen.getByRole('combobox', { name: 'Tema a revisar' });
+    expect(within(select).getAllByRole('option')).toHaveLength(2);
+    expect(within(select).queryByText('Composición del stock físico')).not.toBeInTheDocument();
+    fireEvent.change(select, { target: { value: 'servicios_abiertas' } });
+    expect(await screen.findByRole('heading', { name: 'Tema servicios_abiertas' })).toBeInTheDocument();
+    expect(localStorage.getItem('sig-cdm:panorama:alternativa:v1:manager-a')).toBe('["ventas_facturacion"]');
+    expect(localStorage.getItem('sig-cdm:panorama:alternativa:visita:v1:manager-a')).toBeNull();
+    fireEvent.click(screen.getByRole('button', { name: 'Volver a mis prioridades' }));
+    expect(screen.queryByRole('combobox')).not.toBeInTheDocument();
+    expect(screen.queryByRole('heading', { name: 'Tema servicios_abiertas' })).not.toBeInTheDocument();
+  });
   it('shares one authorized sales query between Ventas and Facturación', async () => {
     load.mockResolvedValue([story('ventas_evolucion', { sections: ['servicios.ventas'] }), story('ventas_facturacion', { sections: ['servicios.ventas'] })]);
     show(['ventas_evolucion', 'ventas_facturacion'], section => section === 'servicios.ventas');
@@ -79,11 +95,11 @@ describe('Campi alternative story dashboard', () => {
     load.mockResolvedValue([story('ventas_facturacion')]); show();
     fireEvent.click(await screen.findByRole('button', { name: 'Ver detalle de Tema ventas_facturacion' }));
     const dialog = screen.getByRole('dialog');
-    expect(within(dialog).getByText('Mismo período del año anterior')).toBeInTheDocument();
-    expect(within(dialog).getByText('Acumulado anual')).toBeInTheDocument();
+    expect(within(dialog).getByText('Octubre 2026')).toBeInTheDocument();
+    expect(within(dialog).getByText('Corte por confirmar')).toBeInTheDocument();
     expect(within(dialog).getByText('Repuestos')).toBeInTheDocument();
-    expect(within(dialog).getByText('Se conservan las notas de crédito.')).toBeInTheDocument();
-    expect(within(dialog).getByText('Fuente: Fuente verificada')).toBeInTheDocument();
+    expect(within(dialog).queryByText('Se conservan las notas de crédito.')).not.toBeInTheDocument();
+    expect(within(dialog).queryByText('Fuente: Fuente verificada')).not.toBeInTheDocument();
     expect(within(dialog).getByRole('link')).toHaveAttribute('href', '/repuestos/ventas');
     fireEvent.keyDown(dialog, { key: 'Escape' });
     await waitFor(() => expect(screen.queryByRole('dialog')).not.toBeInTheDocument());

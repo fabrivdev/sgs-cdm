@@ -38,7 +38,7 @@ const close = (a: number, b: number) => Math.abs(a - b) <= Math.max(0.02, Math.a
 
 export function parsePartsExposure(input: unknown): Exposure {
   const data = record(input);
-  if (typeof data.fecha_analisis !== 'string' || !/^\d{4}-\d{2}-\d{2}$/.test(data.fecha_analisis)) throw new Error('Falta la fecha de clasificación.');
+  if (typeof data.fecha_analisis !== 'string' || !/^\d{4}-\d{2}-\d{2}$/.test(data.fecha_analisis) || !Number.isFinite(Date.parse(data.fecha_analisis + 'T00:00:00Z')) || new Date(data.fecha_analisis + 'T00:00:00Z').toISOString().slice(0, 10) !== data.fecha_analisis) throw new Error('Falta la fecha de clasificación.');
   if (!Array.isArray(data.colores) || !Array.isArray(data.avisos)) throw new Error('Falta la distribución de stock antiguo.');
   const colors = data.colores.map(item => {
     const row = record(item);
@@ -67,6 +67,9 @@ export function parsePartsExposure(input: unknown): Exposure {
       !close(colors.filter(row => row.color === 'GRIS' || row.color === 'ROJO').reduce((sum, row) => sum + row.valor_usd, 0), parsed.valor_antiguo_usd) ||
       !close(parsed.sucursales.reduce((sum, row) => sum + row.valor_total_usd, 0), parsed.valor_total_usd) ||
       !close(parsed.familias.reduce((sum, row) => sum + row.valor_total_usd, 0), parsed.valor_total_usd) ||
+      !close(parsed.sucursales.reduce((sum, row) => sum + row.valor_antiguo_usd, 0), parsed.valor_antiguo_usd) ||
+      !close(parsed.familias.reduce((sum, row) => sum + row.valor_antiguo_usd, 0), parsed.valor_antiguo_usd) ||
+      [...parsed.sucursales, ...parsed.familias].some(row => row.valor_antiguo_usd > row.valor_total_usd + 0.02) ||
       alerts.some(row => row.valor_usd > parsed.valor_total_usd + 0.02)) throw new Error('La distribución de stock antiguo no concilia.');
   return parsed;
 }
@@ -74,7 +77,7 @@ export function parsePartsExposure(input: unknown): Exposure {
 export function partsExposureStory(data: Exposure): PanoramaStory {
   const pct = data.valor_total_usd > 0 ? data.valor_antiguo_usd / data.valor_total_usd * 100 : null;
   const labels = new Map(SEMAFORO_COLORES.map(color => [color.id, color.label]));
-  const activeAlerts = data.avisos.filter(row => row.codigos > 0 && row.valor_usd > 0).sort((a, b) => a.destino === 'ROJO' ? -1 : b.destino === 'ROJO' ? 1 : 0);
+  const activeAlerts = data.avisos.filter(row => row.codigos > 0).sort((a, b) => a.destino === 'ROJO' ? -1 : b.destino === 'ROJO' ? 1 : 0);
   const link = (row: Alert) => row.destino === 'ROJO'
     ? '/repuestos/analisis?color=GRIS&compra_dias_min=971&compra_dias_max=1000&vista=detalle'
     : '/repuestos/analisis?color=LILA&compra_dias_min=336&compra_dias_max=365&vista=detalle';
@@ -90,7 +93,7 @@ export function partsExposureStory(data: Exposure): PanoramaStory {
       { label: 'Valor positivo valorizado', value: data.valor_total_usd, unit: 'USD' },
       { label: 'Participación de stock antiguo', value: pct, unit: 'percent' },
       { label: 'Códigos en gris y rojo', value: data.codigos_antiguos, unit: 'count' },
-      { label: 'Valor sin fecha de compra', value: data.valor_sin_fecha_usd, unit: 'USD' },
+      { label: 'Valor en categoría Sin datos', value: data.valor_sin_fecha_usd, unit: 'USD', note: 'Sin ventas trianuales ni compra fechada; no incluye todos los códigos sin fecha de compra.' },
       { label: 'Ubicaciones sin valor', value: data.ubicaciones_sin_valor, unit: 'count' },
     ],
     chart: { kind: 'bars', title: 'Valor de stock antiguo por color', unit: 'USD', rows: ['ROJO', 'GRIS'].map(color => ({ label: labels.get(color as typeof SEMAFORO_COLORES[number]['id']) ?? color, value: data.colores.find(row => row.color === color)?.valor_usd ?? 0 })) },
@@ -107,13 +110,13 @@ export function partsExposureStory(data: Exposure): PanoramaStory {
       'La fecha de clasificación no acredita el corte del inventario. Los avisos se recalculan al abrir Panorama y solo proyectan el paso de color si no hay nuevos movimientos.',
     ],
     source: 'campi_repuestos_exposicion_v1 · semáforo histórico, stock y Kardex', route: '/repuestos/analisis',
-    notices: activeAlerts.map(row => ({ text: `${row.codigos} códigos, $ ${new Intl.NumberFormat('es-PY', { maximumFractionDigits: 2 }).format(row.valor_usd)}, podrían pasar a ${row.destino.toLowerCase()} en 1–30 días`, route: link(row) })),
+    notices: activeAlerts.map(row => ({ text: `${row.codigos} códigos, ${row.valor_usd > 0 ? `$ ${new Intl.NumberFormat('es-PY', { maximumFractionDigits: 2 }).format(row.valor_usd)}` : 'sin valor positivo acreditado'}, podrían pasar a ${row.destino.toLowerCase()} en 1–30 días`, route: link(row) })),
   };
 }
 
 export function partsAlertsStory(data: Exposure): PanoramaStory {
   const original = partsExposureStory(data);
-  const alerts = data.avisos.filter(row => row.codigos > 0 && row.valor_usd > 0);
+  const alerts = data.avisos.filter(row => row.codigos > 0);
   const total = alerts.reduce((sum, row) => sum + row.valor_usd, 0);
   const codes = alerts.reduce((sum, row) => sum + row.codigos, 0);
   return {
@@ -121,7 +124,7 @@ export function partsAlertsStory(data: Exposure): PanoramaStory {
     title: 'Cambios próximos de clasificación', question: '¿Qué valor podría pasar a gris o rojo en 30 días?',
     status: data.codigos_stock ? 'ready' : 'empty',
     message: codes ? `${codes} códigos podrían pasar a gris o rojo en 30 días si no hay compras ni ventas nuevas.` : 'No hay códigos próximos a gris o rojo dentro de 30 días.',
-    primary: { label: 'Valor expuesto en 30 días', value: total, unit: 'USD' },
+    primary: { label: 'Valor positivo expuesto en 30 días', value: total, unit: 'USD', note: codes > 0 && total === 0 ? 'Hay códigos expuestos sin valor positivo acreditado.' : undefined },
     supporting: [{ label: 'Códigos expuestos', value: codes, unit: 'count' }, { label: 'Valor positivo valorizado', value: data.valor_total_usd, unit: 'USD' }],
     chart: { kind: 'bars', title: 'Valor próximo a cambiar de color', unit: 'USD', rows: data.avisos.map(row => ({ label: row.destino === 'ROJO' ? 'Rojo' : 'Gris', value: row.valor_usd })) },
     breakdown: original.breakdown.filter(row => row.group === 'Avisos'),

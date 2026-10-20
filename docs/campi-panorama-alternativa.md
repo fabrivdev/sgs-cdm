@@ -1,6 +1,171 @@
 # Panorama alternativo: temas con contexto
 
-## Estado vigente — 20/10/2026
+## Seguimiento vigente · Plan definitivo · 20/10/2026
+
+Este seguimiento reemplaza los planes anteriores. Las secciones posteriores son antecedentes, no certificaciones del estado actual. Fuente: plan definitivo entregado por el usuario el 20/10/2026. Base comprobada: `c2dd297`, rama `feat/campi-panorama-alternativa`, árbol limpio antes de esta actualización documental.
+
+### Reglas de ejecución y cierre
+
+- Trabajar exclusivamente en la rama alternativa local; no tocar `main` ni publicar Lovable.
+- Preservar cambios posteriores, cuadrícula, paneles laterales, distinción 7/17 y ciclo de comentarios.
+- No borrar preferencias, modificar datos de negocio ni alterar permisos reales para probar.
+- No integrar una IA nueva ni describir las reglas como inteligencia autónoma.
+- Máximo cuatro prioridades seleccionadas; catálogo amplio, sin cuota artificial por sector.
+- Cada casilla se marca solo con evidencia del resultado. Código y pruebas automáticas no sustituyen conciliación de origen ni comprobación en pantalla.
+- Registrar por tarea: estado, cambio, evidencia, resultado y pendiente concreto. Estados: pendiente, en curso, bloqueada, verificada. Un bloqueo no cierra la tarea.
+- Conservar por separado pruebas aprobadas, fallidas, bloqueadas y no realizadas.
+
+**Foco siguiente:** cerrar E1.3 (universos de OS/stock, comparación contra origen y cortes) y E2.6 (revisión exhaustiva de detalles). No ampliar el catálogo antes de resolver estos contratos.
+
+| Etapa | Estado | Condición para cerrar |
+| --- | --- | --- |
+| 1 · Auditoría y coherencia | En curso: diez contratos y diez temas observados; conciliación de origen parcial | Diez temas examinados; matriz con origen, resultado y diferencias acreditadas |
+| 2 · Detalles laterales | En curso: componente compactado; comprobación visual parcial | Detalles compactos comprobados en pantalla con patrón Operaciones |
+| 3 · Ampliar catálogo | Pendiente | Candidatos clasificados y temas habilitados solo con respaldo |
+| 4 · Registro ampliable | Pendiente | Registro común alimenta selector, portada, detalle y Campi |
+| 5 · Movimiento y expresión | Pendiente | Conflicto CSS resuelto y dos minutos reales de variedad sin clics |
+| 6 · Comentarios y bienvenida | Pendiente | Ciclo y primer acceso real autorizados comprobados de extremo a extremo |
+| 7 · Validación y entrega | Pendiente | Evidencias, permisos, pruebas y pendientes entregados sin sobreafirmaciones |
+
+Orden de trabajo: **1 → 2 → diseño/implementación de 4 → integración de 3 → cierre de 5 y 6 → 7**. La investigación de candidatos de 3 puede realizarse antes de 4; su integración depende del registro común. Las correcciones de Campi pueden avanzar sin bloquear la conciliación.
+
+### Etapa 1 · Auditar los diez temas
+
+- [x] **E1.1** Identificar por tema pregunta, fórmula, unidad, moneda, período, población, exclusiones, fuente, corte y permisos. Contratos revisados en loaders/SQL; limitaciones consignadas abajo.
+- [x] **E1.2** Habilitar revisión de todos los temas autorizados sin cambiar prioridades guardadas. Botón local «Revisar temas», recorrido real y prueba de aislamiento de preferencias/última visita.
+- [ ] **E1.3** Conciliar cada tema contra su sección de origen con los mismos filtros y corte; guardar diferencias y evidencia.
+- [ ] **E1.4** Revisar total, subconjuntos, porcentajes, comparaciones, gráfico, detalle y comentarios como una misma definición.
+- [ ] **E1.5** Probar cero, información ausente, error de fuente y comparación no disponible como estados distintos.
+- [x] **E1.6** Corregir gráficos que no representen el indicador; detalle de resolución ahora grafica medianas en días, no cantidad de cierres. Verificado con datos reales 16,5 y 14 días; ausencia de cohorte no se dibuja como cero.
+- [ ] **E1.7** Acreditar corte de inventario o mantener limitación explícita; no sustituirlo por importación/clasificación.
+- [ ] **E1.8** Revisar lenguaje: OS antigua no implica atraso; antigüedad de compra no es rotación; falta de vínculo no implica incumplimiento.
+
+Matriz de auditoría obligatoria. Resultados permitidos: **conciliado**, **consistente internamente**, **pendiente de evidencia**, **con error**. El estado inicial no juzga el cálculo: indica que no se hizo todavía la auditoría del plan definitivo.
+
+| Tema | Resultado inicial | Evidencia pendiente |
+| --- | --- | --- |
+| Facturación neta | Consistente internamente | Mes actual concilia ventas − NC; netos mensuales coinciden a precisión visible con las tres secciones. Faltan comparación histórica completa y corte acreditado. |
+| Evolución de ventas | Consistente internamente | Serie y períodos equivalentes revisados; mes actual enlaza a los mismos componentes de facturación. Falta contraste completo de serie interanual. |
+| Abastecimiento de pedidos activos | Consistente internamente | Pantalla: 17 = 7 sin vínculo + 6 stock + 1 tránsito + 3 arribadas. Falta conciliación unidad por unidad contra Operaciones. |
+| Cambios próximos de clasificación | Consistente internamente | Corregida omisión de códigos sin USD positivo; 30 días y umbrales revisados. Falta conciliar cohortes completas contra origen. |
+| Tiempo de resolución de Servicios | Consistente internamente | Medianas 16,5/14 días y 66/84 cierres; gráfico corregido. Validación independiente de cohortes; falta recomputar mediana desde OS origen. |
+| Órdenes abiertas | Con error de contrato | SQL solo reconoce texto «abierta»; origen considera abierta toda OS no cerrada/cancelada/anulada. 81 observadas; impacto real de otros estados pendiente. |
+| Stock antiguo de Repuestos | Con error de correspondencia con origen | Exposición limita ubicaciones a stock>0 y USD>0; Análisis incluye otros saldos. Se informa diferencia; falta drilldown al mismo universo y corte real. |
+| Concentración del stock antiguo | Con error de correspondencia con origen | Rechaza ahora subtotales antiguos inconsistentes; enlaces por familia/sucursal no aplican todo el universo de exposición. Falta conciliación y ajuste de filtros. |
+| Antigüedad de compra por sucursal | Consistente internamente | Promedio ponderado por USD con compra fechada, no edad física local; 896,23 días observados. Falta contraste completo por sucursal y corte. |
+| Stock físico de Máquinas | Pendiente de evidencia | Fórmula coincide con StockMaquinasTab; 87 = 36 nuevas + 51 usadas. Faltan corte real, contraste de origen completo y política desplegada de sección. |
+
+#### Evidencia de auditoría del 20/10/2026
+
+Los valores siguientes son observaciones de la app local autenticada, no constantes de código ni certificación del corte. Sesión autorizada de Administrador; no se cambiaron datos, permisos ni prioridades.
+
+| Tema / contrato | Origen inspeccionado | Ventana / unidad / alcance |
+| --- | --- | --- |
+| Facturación neta y ventas | `salesStories.ts`; RPC Repuestos/Máquinas consumidas por sus ventas y `campi_ventas_servicios_componentes_v1`, que reutiliza la fuente Servicios | Mes hasta fecha local Asunción contra mismos días año previo, acumulado equivalente; USD, solo secciones `*.ventas` autorizadas; un fallo requerido invalida el consolidado |
+| Abastecimiento | `operationalOutcomes.ts`, `20261019160000_campi_operational_outcomes.sql`, `MaquinariaOperaciones.tsx` | Unidades de operaciones activas; excluye cerradas/facturadas/canceladas. Vínculo individual con prioridad stock para evitar doble conteo; `parque.operaciones` |
+| Resolución y abiertas | Mismo SQL, `useOperationsModel.ts:canonicalSituacion` | Mediana cierre−apertura de último mes completo; cola abierta y P90 hasta lectura; días/conteos, `servicios.ordenes`. Histórico sin cierre excluido; no equivale a atraso |
+| Stock antiguo, concentración y cambios próximos | `partsExposure.ts`, `20261019150000_campi_parts_exposure.sql`, semáforo origen | REP con stock global positivo, valor USD positivo de ubicaciones con stock; gris+rojo / mismo denominador; top tres familias / valor antiguo; lila336–365 y gris971–1000. `repuestos.analisis` |
+| Antigüedad sucursales | `operationsStories.ts:parts`, `repuestos_analisis_valorizado` | Σ días×USD positivo con fecha / ΣUSD con fecha; compra global del código, no compra local. Incluye valor positivo aun si saldo local≤0, a diferencia de exposición |
+| Stock físico | `operationsStories.ts:machineStock`, `StockMaquinasTab`, `parque_stock_maquinas` | Σsaldo_actual; nuevas/usadas/otras, conteo físico; `parque.stock` cliente. Paginación completa y count verificados; corte no acreditado |
+
+Observaciones de pantalla:
+- Facturación de octubre hasta 20/10: ventas USD 220.494,48 − NC USD 212.403,40 = neto USD 8.091,08. Por área: Repuestos 114.768,32; Servicios 33.323,06; Máquinas −140.000,30.
+- Origen Repuestos, rango visible 01–20/10: ventas 187.171, NC −72.403 y neto 114.768 (redondeados por la sección). Servicios y Máquinas, filas de octubre de sus reportes hasta 20/10: netos 33.323 y −140.000. Coincidencia a precisión visible, no conciliación de centavos/histórico completo.
+- Stock antiguo observado USD 1.128.981,69 = rojo845.924,67 + gris283.057,02; participación23,91%. Concentración top3: (211.392,94 + 198.605,99 + 107.370,06) / 1.128.981,69 =45,83%.
+- Cambios próximos: USD 10.364,73 =6.247,89 rojo +4.116,84 gris. No se certificó cobertura monetaria de todos los códigos.
+- Antigüedad ponderada896,23 días; sucursales: Santa Rita1062,42, Misiones752,88, Campo9 693,54, Katuete948,90, Loma Plata769,57, Santa Rosa500,44. Los redondeos de promedios fuente impiden afirmar precisión de días individual.
+
+Correcciones verificadas por pruebas:
+- Avisos conservan códigos aun con valor positivo cero y explican la ausencia de valorización positiva.
+- «Valor sin fecha de compra» se renombra «Valor en categoría Sin datos»: el SQL usa color SIN_DATOS, que no cubre todos los códigos sin compra fechada.
+- Exposición rechaza sumas antiguas de familias/sucursales que no concilian o exceden su total; fecha calendario inválida también se rechaza.
+- Errores de fechas en abiertas no inutilizan la mediana válida de cerradas, ni viceversa; la edad auxiliar inválida se muestra ausente.
+- Portada de neto muestra ventas y NC como componentes, sin descontar NC dos veces.
+
+Pendientes de evidencia/corrección, no cerrados:
+- **E1-P1:** unificar definición de abierta entre RPC y origen; consultar distribución real de estados antes de cuantificar impacto. No se modificó SQL desplegado.
+- **E1-P2:** drilldowns de exposición/concentración deben aplicar igual universo y gris+rojo. Hoy la advertencia explicita diferencia, pero no la resuelve.
+- **E1-P3:** `visitKey` diario en abastecimiento/abiertas/exposición/alertas/concentración impide comparar días distintos. Definir comparación de lecturas y envejecimiento, conservando controles de alcance.
+- **E1-P4:** falta corte de inventario y garantía de completitud histórica trianual. Fecha de lectura/clasificación no lo sustituye.
+- **E1-P5:** política local SELECT de stock máquinas encontrada verifica módulo Parque, no sección Stock. Falta contrastar políticas realmente desplegadas con cuenta limitada; no se afirma aislamiento de servidor verificado.
+- **E1-P6:** faltan contraste exacto de centavos y períodos anteriores y recomputación de medianas/cohortes desde filas de origen.
+
+### Etapa 2 · Renovar detalles laterales
+
+- [x] **E2.1** Examinar panel nativo de Operaciones y reutilizar componentes, tipografía, espaciados y jerarquía. Referencia `MaquinariaOperaciones.tsx`, ResponsiveDrawer y Tabs existentes.
+- [ ] **E2.2** Mostrar encabezado con tema/período/alcance, principal y comparación; secundarios solo si aportan algo distinto.
+- [ ] **E2.3** Elegir gráfico/desglose específico y tabla compacta únicamente para identificar casos útiles.
+- [x] **E2.4** Retirar de la vista habitual fuentes técnicas, tablas/RPC, metodología, textos genéricos y cifras repetidas. Trazabilidad conservada en objetos de historia; se omitieron conclusiones repetidas y métricas redundantes.
+- [ ] **E2.5** Conservar trazabilidad interna y limitaciones materiales breves visibles, como «cálculo parcial» y «corte por confirmar».
+- [ ] **E2.6** Verificar todos los detalles en pantalla, teclado, cierre y retorno de foco; entender y explorar sin leer un informe.
+
+### Etapa 3 · Inventariar y ampliar con respaldo
+
+- [ ] **E3.1** Inventariar indicadores existentes y clasificar cada candidato: reutilizable, pendiente de conciliación o pendiente de datos/definición.
+- [ ] **E3.2** Servicios: productividad, eficiencia, rendimiento, cumplimiento, carga/capacidad, resolución y edad de OS.
+- [ ] **E3.3** Clientes: cobertura por clientes del parque en Servicios/Repuestos; activos, nuevos, recurrentes, retenidos, reactivados e inactivos.
+- [ ] **E3.4** Parque instalado: evolución, altas, bajas, crecimiento neto y composición respaldada; separado del stock para venta.
+- [ ] **E3.5** Abastecimiento: compras pendientes, pedidos y proyección por modelo solo con stock/ingresos/compras/reservas conciliados.
+- [ ] **E3.6** Validar horas y universos: productividad = trabajadas/disponibles; eficiencia = facturadas/trabajadas; rendimiento = facturadas/disponibles. No multiplicar indicadores actuales con poblaciones incompatibles.
+- [ ] **E3.7** Mantener incidencias/exclusiones; distinguir programación futura de incumplimiento y cobertura por cliente de cobertura por máquina.
+- [ ] **E3.8** Definir ventanas/cohortes para retención y reactivación; exigir eventos fechados para crecimiento del parque.
+- [ ] **E3.9** Evitar doble conteo de compras ingresadas/reservas; documentar exactamente la evidencia faltante por candidato.
+- [ ] **E3.10** Integrar solo candidatos validados usando el registro de E4; no llenar una cuota con duplicados u opciones vacías.
+
+### Etapa 4 · Registro común ampliable
+
+- [ ] **E4.1** Definir contrato: identificador, módulo, nombre/pregunta, permisos/alcance, cálculo/unidad/período/comparación.
+- [ ] **E4.2** Incluir presentación portada/detalle, estados vacíos/error/limitaciones, comentarios respaldados, pruebas y criterio de habilitación.
+- [ ] **E4.3** Centralizar el registro para alimentar selector, portada, detalle y Campi; eliminar listas sectoriales y reglas dispersas.
+- [ ] **E4.4** Comprobar incorporación de un tema validado sin rehacer Panorama ni cambiar prioridades persistidas; conservar máximo cuatro.
+- [ ] **E4.5** Documentar revisión de aportes a Panorama como parte del desarrollo de nuevos módulos; sin prometer descubrimiento automático.
+
+### Etapa 5 · Movimiento y expresividad
+
+- [ ] **E5.1** Reproducir conflicto de transformaciones entre los tres CSS y separar encaje/escala del movimiento; verificar que `scale(1.08)` no anule pasos/inclinaciones.
+- [ ] **E5.2** Recuperar desplazamientos y duración propios de cada gesto.
+- [ ] **E5.3** Crear secuencias con preparación, movimiento, pausa y regreso; variar apoyo, cabeza, mirada y brazos.
+- [ ] **E5.4** Coordinar expresión y gesto con evidencia/comentario/interacción; identificar recursos visuales faltantes.
+- [ ] **E5.5** Verificar base estable, pausas naturales, lectura sin distracción, movimiento reducido y pestaña oculta.
+- [ ] **E5.6** Observar personaje real durante dos minutos a tamaño normal sin clics: posturas distintas, reacciones comprensibles, sin tapar controles.
+
+### Etapa 6 · Comentarios y primera experiencia
+
+- [ ] **E6.1** Revalidar ciclo completo con retorno al primero, sin repetición consecutiva ni monopolio de un tema.
+- [ ] **E6.2** Corregir pausas por mouse/foco residual y reanudación al cerrar detalles/volver de pestaña, sin ráfaga de cambios acumulados.
+- [ ] **E6.3** Actualizar comentarios ante cambios de datos/período/selección/permisos; mantener texto, gesto y evidencia coherentes.
+- [ ] **E6.4** Probar primera experiencia con cuenta nueva autorizada; no borrar preferencias ni inferirla desde cuenta configurada.
+- [ ] **E6.5** Verificar presentación breve, selección, orden, reemplazo, abandono, error de guardado y regreso; completar solo tras guardar.
+- [ ] **E6.6** Verificar «Ver mi Panorama», continuidad de Campi y edición posterior rápida sin repetir bienvenida.
+
+### Etapa 7 · Validación final y entrega
+
+- [ ] **E7.1** Probar cuentas autorizadas limitadas y de varias áreas; cubrir consultas, comentarios, respuestas, detalles y resultados reutilizados.
+- [ ] **E7.2** Revalidar 7/17 y envío por botón/Enter sin cerrar conversación.
+- [ ] **E7.3** Verificar todos los temas habilitados contra origen y corte en versión final.
+- [ ] **E7.4** Añadir pruebas de navegador con personaje real; una simulación del avatar no acredita movimiento.
+- [ ] **E7.5** Revisar 1366×768 y 1440×900 al 100%, teclado, foco y movimiento reducido.
+- [ ] **E7.6** Ejecutar pruebas técnicas del proyecto sobre versión final y clasificar aprobadas/fallidas/bloqueadas/no realizadas.
+- [ ] **E7.7** Entregar matriz, capturas de bienvenida/selector/portada/detalles y video real de movimiento/rotación solicitado por este plan definitivo.
+- [ ] **E7.8** Entregar rama, commit, pendientes concretos y paso de publicación a cargo del usuario.
+
+### Registro de ejecución
+
+| Fecha | Tarea | Resultado y evidencia | Pendiente |
+| --- | --- | --- | --- |
+| 20/10/2026 | Preparación del seguimiento | Plan leído; rama `feat/campi-panorama-alternativa` y base `c2dd297` comprobadas; árbol limpio antes de editar este documento | Iniciar E1; ninguna etapa nueva se declara terminada |
+| 20/10/2026 | E1 auditoría | Diez contratos examinados y temas leídos en app; contraste mensual visible de tres áreas. Correcciones y límites consignados arriba | E1-P1 a E1-P6; no marcar etapa conciliada |
+| 20/10/2026 | E2 implementación | Encabezado visible, métricas secundarias reducidas, desglose tabulado y grupos en pestañas; facturación con ventas/NC/neto por área; sin metodología técnica en vista habitual | Completar recorrido de los demás detalles en ambas resoluciones |
+
+Validación de este avance:
+- **Aprobadas:** 152 pruebas Campi/contratos en 20 archivos; TypeScript; lint de implementación modificada; build Vite; `git diff --check`. Advertencias preexistentes de Browserslist y tamaño de chunks, sin fallo de build.
+- **Pantalla aprobada dentro de este alcance:** portada con cuatro prioridades a 1366×768 y 1440×900; detalle de facturación a 1366 y de resolución a 1440; cierre devuelve foco. Dimensiones efectivas comprobadas en navegador, sin desbordamiento horizontal de portada (scrollWidth1440 para viewport1440). No se alteraron prioridades guardadas.
+- **Fallidas pendientes:** ninguna prueba automatizada ejecutada quedó fallando. Esto no elimina los errores de contrato E1-P1/E1-P2.
+- **No realizadas:** conciliación histórica completa; recomputación de OS desde filas; cuentas nuevas/limitadas; políticas desplegadas; todos los detalles en ambas resoluciones; movimiento reducido y recorrido integral del plan; video de etapa final.
+- **Sin evidencia disponible en esta revisión:** corte real de inventario y completitud del histórico. No se ejecutaron migraciones ni se modificó la base.
+- Capturas finales: `auditoria-panorama-1366.png`, `auditoria-facturacion-desktop-1366.png`, `auditoria-panorama-1440.png`, `auditoria-resolucion-desktop-1440.png`, en la carpeta de visualizaciones de esta conversación. Las capturas previas con sufijo `-1366` sin `desktop` se tomaron en la vista estrecha original y **no** acreditan escritorio.
+
+## Antecedente — estado registrado antes del plan definitivo
 
 Esta sección prevalece sobre las descripciones históricas que siguen. Panorama continúa en `feat/campi-panorama-alternativa`; no se integra a `main` ni se publica en Lovable. La portada conserva cuatro prioridades ordenadas en una grilla 2×2. Muestra título, indicador, comparación cuando existe y gráfico compacto; las conclusiones, el alcance, el corte y el método están en el panel lateral estándar. Las cifras en dólares se presentan con `$`. La referencia de última visita permanece por usuario y navegador y exige la misma definición y alcance.
 

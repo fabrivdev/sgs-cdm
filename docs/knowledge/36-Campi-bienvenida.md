@@ -16,6 +16,14 @@ La integración está en `AppLayout` y se omite en su modo de vista previa. Solo
 
 El aspecto 3D se logra con poses transparentes y CSS, sin modelo 3D. `CampiDesktopSlot` carga el componente solo en escritorio. Los PNG originales del paquete se conservan como fuente visual; la app solicita WebP comprimidos según el gesto para reducir transferencia. Las escenas con planta y maquinaria CLAAS/HORSCH siguen pendientes.
 
+## Auditoría de Panorama alternativa — 20/10/2026
+
+El seguimiento vigente de la rama local `feat/campi-panorama-alternativa` está en `docs/campi-panorama-alternativa.md`, sección Plan definitivo. No equivale a `main` ni a publicación Lovable. Se revisaron los diez contratos y se habilitó «Revisar temas» solo en desarrollo, sin guardar prioridades ni modificar la referencia de última visita. La auditoría de origen sigue parcial.
+
+Correcciones locales: avisos de clasificación conservan códigos sin USD positivo; categoría «Sin datos» no se presenta como todas las compras sin fecha; concentración exige conciliación de subtotales antiguos; el gráfico de resolución usa medianas en días y las cohortes abiertas/cerradas validan sus errores por separado. El detalle lateral reutiliza ResponsiveDrawer y Tabs, con tabla compacta y trazabilidad técnica interna. No se modificaron datos ni permisos reales.
+
+Pendientes materiales: definición de OS abierta distinta entre RPC y sección, universo de valorización distinto entre exposición y Análisis, comparación entre visitas de días distintos, corte de inventario y políticas desplegadas de Stock por sección. No certificar cifras completas ni permisos de cuentas limitadas a partir de tests simulados.
+
 ## Estado de verificación
 
 Fuente: `src/components/campi/CampiWelcome.tsx`, `CampiSprite.tsx`, `CampiActionSprite.tsx`, `campiState.ts`, `campi.css`, `src/components/AppLayout.tsx` y sus pruebas. El paquete recibido es la revisión V3. El asomo mostrado en el video V5 se retiró por decisión posterior del usuario. No se encontró el objeto local `b99ccea` en el repositorio accesible, por lo que la implementación se preparó en rama aislada desde `95e2779`, sin sobrescribir otros trabajos.

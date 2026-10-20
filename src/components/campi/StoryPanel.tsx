@@ -3,13 +3,14 @@ import { Bar, BarChart, CartesianGrid, Cell, LabelList, Legend, Line, LineChart,
 import { ArrowRight, ArrowUpRight, RefreshCw } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { ResponsiveDrawer, ResponsiveDrawerBody, ResponsiveDrawerFooter, ResponsiveDrawerHeader } from '@/components/ui/responsive-drawer';
 import { storySummaryPercentage } from '@/lib/campi/storySummary';
 import type { PanoramaStory, StoryDatum, StoryUnit } from '@/lib/campi/panoramaStoryTypes';
 
 const numbers = new Intl.NumberFormat('es-PY', { maximumFractionDigits: 2 });
 const compact = new Intl.NumberFormat('es-PY', { notation: 'compact', maximumFractionDigits: 1 });
-const storyValue = (value: number | null, unit: StoryUnit) => value === null || !Number.isFinite(value) ? '—' : `${unit === 'USD' ? '$ ' : unit === 'PYG' ? '₲ ' : ''}${numbers.format(value)}${unit === 'percent' ? '%' : unit === 'days' ? ' días' : ''}`;
+const storyValue = (value: number | null, unit: StoryUnit) => value === null || !Number.isFinite(value) ? '—' : `${unit === 'USD' ? '$ ' : unit === 'PYG' ? '₲ ' : ''}${numbers.format(value === 0 ? 0 : value)}${unit === 'percent' ? '%' : unit === 'days' ? ' días' : ''}`;
 const chartValue = (value: number, unit: StoryUnit) => `${unit === 'USD' ? '$ ' : unit === 'PYG' ? '₲ ' : ''}${compact.format(value)}`;
 const dateLabel = (value: string) => new Intl.DateTimeFormat('es-PY').format(new Date(`${value}T12:00:00`));
 
@@ -36,7 +37,7 @@ function StoryChart({ chart, mini = false }: { mini?: boolean; chart: NonNullabl
   const tooltip = <Tooltip formatter={(value: number) => storyValue(value, chart.unit)} contentStyle={{ borderRadius: 8, fontSize: 12, background: 'hsl(var(--card))', color: 'hsl(var(--foreground))', borderColor: 'hsl(var(--border))' }} />;
   return <figure className={mini ? "story-chart story-chart-mini" : "story-chart"} aria-label={chart.title}>
     <figcaption className={mini ? 'sr-only' : undefined}>{chart.title}{mini && chart.rows.length > shownRows.length && <span>{shownRows.length} de {chart.rows.length} · resto en detalle</span>}{(chart.unit === 'USD' || chart.unit === 'PYG') && <span>{chart.unit === 'USD' ? 'Dólares' : 'Guaraníes'}</span>}</figcaption>
-    <div className="story-chart-canvas" style={{ height: mini ? 92 : chart.kind === 'bars' ? Math.max(250, chart.rows.length * 42) : 280 }} aria-hidden="true">
+    <div className="story-chart-canvas" style={{ height: mini ? 92 : chart.kind === 'bars' ? Math.max(150, chart.rows.length * 30 + 30) : 210 }} aria-hidden="true">
       <ResponsiveContainer width="100%" height="100%">
         {chart.kind === 'trend' ? <LineChart {...common}>
           <CartesianGrid strokeDasharray="3 5" vertical={false} stroke="hsl(var(--border))" />
@@ -114,6 +115,23 @@ export function StoryPanel({ story, index, onRetry, retrying, visitChange = null
   const titleId = `story-${story.id}`;
   const percentage = storySummaryPercentage(story);
   const breakdownGroups = [...new Set(story.breakdown.map(row => row.group ?? 'Desglose'))];
+  const secondary = story.supporting.filter(datum => {
+    if (datum.label === story.primary?.label || (story.id === 'maquinas_pedidos' && datum.label === 'Unidades activas')) return false;
+    if (story.id === 'ventas_facturacion') return ['Ventas antes de NC del mes', 'Notas de crédito del mes', 'Facturación neta acumulada'].includes(datum.label);
+    if (story.id === 'ventas_evolucion') return datum.unit !== 'percent';
+    if (story.id === 'servicios_pendientes') return datum.label.startsWith('OS cerradas en ') || datum.label === 'Percentil 90 de edad abierta';
+    return true;
+  });
+  const excludedClosures = story.supporting.find(datum => datum.label === 'Cerradas históricas sin fecha')?.value;
+  const billingBreakdown = story.id === 'ventas_facturacion' && story.breakdown.length > 0 && story.breakdown.every(row => row.billing);
+  const breakdown = (group: string) => <div className="overflow-x-auto"><table className="w-full text-sm" aria-label={group}>
+    <thead><tr className="border-b text-xs text-muted-foreground"><th className="py-2 text-left font-medium">{group === 'Desglose' ? 'Concepto' : group}</th>{billingBreakdown && <><th className="py-2 text-right font-medium">Ventas</th><th className="py-2 text-right font-medium">NC</th></>}<th className="py-2 text-right font-medium">{billingBreakdown ? 'Neto' : 'Valor'}</th></tr></thead>
+    <tbody>{story.breakdown.filter(row => (row.group ?? 'Desglose') === group).map((row, i) => <tr key={i} className="border-b last:border-0">
+      <td className="max-w-[300px] truncate py-2 pr-3" title={[row.label, row.note].filter(Boolean).join(' · ')}>{row.route ? <Link className="inline-flex items-center gap-1 text-primary" to={row.route}>{row.label}<ArrowUpRight className="h-3 w-3 shrink-0" /></Link> : row.label}</td>
+      {billingBreakdown && <><td className="whitespace-nowrap py-2 pr-3 text-right tabular-nums">{storyValue(row.billing!.sales, row.unit)}</td><td className="whitespace-nowrap py-2 pr-3 text-right tabular-nums">{storyValue(-row.billing!.credits, row.unit)}</td></>}
+      <td className="whitespace-nowrap py-2 text-right tabular-nums">{storyValue(row.value, row.unit)}</td>
+    </tr>)}</tbody>
+  </table></div>;
   return <article className="panorama-story" aria-labelledby={titleId} data-story={story.id}>
     <header className="story-header"><span className="story-index">{String(index + 1).padStart(2, '0')}</span><div className="story-heading-text"><h2 id={titleId}>{story.title}</h2></div>{story.status === 'empty' && <span className="story-empty-label">Sin datos</span>}{story.status === 'ready' && story.cutoff === null && ['maquinas_stock', 'repuestos_stock'].includes(story.id) && <span className="story-cutoff-warning" title="La fuente no acredita la fecha del inventario">Corte por confirmar</span>}</header>
     {story.status === 'error' ? <div role="alert"><p className="story-error">{story.message}</p><Button variant="outline" disabled={retrying} onClick={onRetry}><RefreshCw className="mr-2 h-4 w-4" />{retrying ? 'Consultando…' : 'Reintentar fuente'}</Button></div> : <>
@@ -124,21 +142,27 @@ export function StoryPanel({ story, index, onRetry, retrying, visitChange = null
         </>}</dl>
         <div className="story-percentage" data-kind={percentage?.kind ?? 'missing'} data-direction={percentage?.kind === 'variation' ? 'neutral' : 'composition'}><strong>{percentage ? `${percentage.kind === 'variation' && percentage.value > 0 ? '+' : ''}${numbers.format(percentage.value)}%` : '—'}</strong><span>{percentage ? percentage.kind === 'variation' ? 'Variación' : percentage.label : 'Sin variación comparable'}</span></div>
       </div>
-      {story.id === 'maquinas_proyeccion' && ['Stock calculado', 'Compras pendientes', 'Ventas pendientes'].every(label => story.supporting.some(item => item.label === label)) ? <ProjectionComponents story={story} /> : story.id === 'servicios_pendientes' && story.primary?.comparison && story.primary.value !== null && Number.isFinite(story.primary.value) && Number.isFinite(story.primary.comparison.value) && story.primary.value >= 0 && story.primary.comparison.value >= 0 ? <ResolutionComparison story={story} /> : story.chart && story.chart.rows.length > 0 ? <StoryChart chart={story.chart} mini /> : story.primary?.comparison && story.primary.value !== null && Number.isFinite(story.primary.value) && Number.isFinite(story.primary.comparison.value) && story.primary.value >= 0 && story.primary.comparison.value >= 0 ? <StoryComparisonChart current={story.primary.value} previous={story.primary.comparison.value} label={story.primary.label} unit={story.primary.unit} /> : <p className="story-no-chart">Sin gráfico comparable</p>}
+      {story.primary?.note && <p className="text-xs text-muted-foreground col-span-full">{story.primary.note}</p>}
+      {story.id === 'ventas_facturacion' && ['Ventas antes de NC del mes', 'Notas de crédito del mes'].every(label => story.supporting.some(item => item.label === label && item.value !== null)) ? <BillingBridge story={story} /> : story.id === 'maquinas_proyeccion' && ['Stock calculado', 'Compras pendientes', 'Ventas pendientes'].every(label => story.supporting.some(item => item.label === label)) ? <ProjectionComponents story={story} /> : story.id === 'servicios_pendientes' && story.primary?.comparison && story.primary.value !== null && Number.isFinite(story.primary.value) && Number.isFinite(story.primary.comparison.value) && story.primary.value >= 0 && story.primary.comparison.value >= 0 ? <ResolutionComparison story={story} /> : story.chart && story.chart.rows.length > 0 ? <StoryChart chart={story.chart} mini /> : story.primary?.comparison && story.primary.value !== null && Number.isFinite(story.primary.value) && Number.isFinite(story.primary.comparison.value) && story.primary.value >= 0 && story.primary.comparison.value >= 0 ? <StoryComparisonChart current={story.primary.value} previous={story.primary.comparison.value} label={story.primary.label} unit={story.primary.unit} /> : <p className="story-no-chart">Sin gráfico comparable</p>}
       <Button ref={triggerRef} variant="outline" className="story-detail-trigger" aria-label={`Ver detalle de ${story.title}`} onClick={() => setOpen(true)}>Ver detalle <ArrowRight className="ml-2 h-4 w-4" /></Button>
       <ResponsiveDrawer open={open} onOpenChange={setOpen} size="xl" title={story.title} onCloseAutoFocus={event => { event.preventDefault(); triggerRef.current?.focus(); }}>
-        <ResponsiveDrawerHeader><p className="text-sm text-muted-foreground">{story.scope}</p></ResponsiveDrawerHeader>
-        <ResponsiveDrawerBody className="panorama-story-dialog space-y-5">
-          <p className="story-conclusion">{story.message}</p>
-          {!!story.notices?.length && <div className="story-notices" aria-label={story.id === 'repuestos_stock' ? 'Avisos preventivos' : 'Puntos para revisar'}>{story.notices.map((notice, i) => <Link key={i} to={notice.route}>{notice.text}<ArrowUpRight className="h-3 w-3 shrink-0" /></Link>)}</div>}
+        <ResponsiveDrawerHeader>
+          <h2 className="text-[16px] font-semibold">{story.title}</h2>
+          <div className="mt-1 flex flex-wrap gap-x-3 gap-y-1 text-xs text-muted-foreground"><span>{story.periodLabel}</span><span>{story.cutoff ? `Corte ${dateLabel(story.cutoff)}` : 'Corte por confirmar'}</span></div>
+          <p className="mt-1 text-xs text-muted-foreground">{story.scope}</p>
+        </ResponsiveDrawerHeader>
+        <ResponsiveDrawerBody className="panorama-story-dialog space-y-4">
+          {story.status === 'empty' && <p className="text-sm text-muted-foreground">{story.message}</p>}
+          {typeof excludedClosures === 'number' && excludedClosures > 0 && <p className="text-xs text-muted-foreground">{numbers.format(excludedClosures)} OS históricas sin cierre fechado, excluidas.</p>}
+          {story.id === 'repuestos_alertas' && <p className="text-xs text-muted-foreground">Cambio condicionado a que no haya compras ni ventas nuevas.</p>}
+          {story.id === 'maquinas_pedidos' && <p className="text-xs text-muted-foreground">El vínculo de abastecimiento no acredita atraso ni entrega.</p>}
+          {['repuestos_stock', 'repuestos_concentracion'].includes(story.id) && <p className="text-xs text-muted-foreground">Valor positivo de ubicaciones con stock; la sección de origen incluye otros saldos.</p>}
           {visitChange !== null && visitChange !== 0 && story.primary && <p className="story-visit-change">El total visible cambió {visitChange > 0 ? '+' : ''}{storyValue(visitChange, story.primary.unit)} desde tu última visita en este navegador.</p>}
-          <dl className="story-detail-metrics">{story.primary && <Datum datum={story.primary} primary />}{story.supporting.map((datum, i) => <Datum key={i} datum={datum} />)}</dl>
-          {story.id === 'ventas_facturacion' && story.primary?.value !== null && story.primary?.value !== undefined && story.supporting.some(item => item.label === 'Ventas antes de NC del mes') && <BillingBridge story={story} />}
+          <dl className="story-detail-metrics">{story.primary && <Datum datum={story.primary} primary />}{secondary.map((datum, i) => <Datum key={i} datum={datum} />)}</dl>
           {story.chart && story.chart.rows.length > 0 && <StoryChart chart={story.chart} />}
-          {breakdownGroups.map(group => <section key={group} aria-label={group}><h3 className="story-detail-heading">{group}</h3><dl className="story-breakdown">{story.breakdown.filter(row => (row.group ?? 'Desglose') === group).map((row, i) => <div key={i}><dt>{row.route ? <Link to={row.route}>{row.label}<ArrowUpRight className="inline ml-1 h-3 w-3" /></Link> : row.label}{row.note && <small>{row.note}</small>}</dt><dd>{storyValue(row.value, row.unit)}</dd></div>)}</dl></section>)}
-          <details className="story-method"><summary>Fuente, corte y metodología</summary><p>Período: {story.periodLabel}{story.cutoff && ` · Corte: ${dateLabel(story.cutoff)}`}</p><ul>{story.details.map((detail, i) => <li key={i}>{detail}</li>)}</ul><p>Fuente: {story.source}</p></details>
+          {breakdownGroups.length > 1 ? <Tabs defaultValue={breakdownGroups[0]}><TabsList className="flex h-auto flex-wrap">{breakdownGroups.map(group => <TabsTrigger key={group} value={group}>{group}</TabsTrigger>)}</TabsList>{breakdownGroups.map(group => <TabsContent key={group} value={group}>{breakdown(group)}</TabsContent>)}</Tabs> : breakdownGroups.length === 1 && breakdown(breakdownGroups[0])}
         </ResponsiveDrawerBody>
-        {story.route && <ResponsiveDrawerFooter><Button asChild variant="outline"><Link to={story.route}>Abrir {story.title.toLowerCase()}<ArrowUpRight className="ml-2 h-4 w-4" /></Link></Button></ResponsiveDrawerFooter>}
+        {story.route && <ResponsiveDrawerFooter><Button asChild variant="outline"><Link to={story.route}>Abrir sección de origen<ArrowUpRight className="ml-2 h-4 w-4" /></Link></Button></ResponsiveDrawerFooter>}
       </ResponsiveDrawer>
     </>}
   </article>;

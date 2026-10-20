@@ -84,21 +84,20 @@ export function parseServiceResolution(input: unknown): Resolution {
     mediana_ultimo_mes: optional(row.mediana_ultimo_mes), mediana_mes_anterior: optional(row.mediana_mes_anterior),
     historicas_sin_cierre: integer(row.historicas_sin_cierre), abiertas: integer(row.abiertas), apertura_invalida: integer(row.apertura_invalida),
     p90_edad_abiertas: optional(row.p90_edad_abiertas) };
-  if (nextMonth(result.mes_anterior) !== result.ultimo_mes || nextMonth(result.ultimo_mes) > result.fecha_analisis ||
-      result.invalidas_ultimo_mes || result.invalidas_mes_anterior || result.apertura_invalida ||
-      (result.cierres_ultimo_mes > 0) !== (result.mediana_ultimo_mes !== null) ||
-      (result.cierres_mes_anterior > 0) !== (result.mediana_mes_anterior !== null) ||
-      (result.abiertas > 0) !== (result.p90_edad_abiertas !== null)) throw new Error('La cohorte de resolución de OS no está completa.');
+  if (nextMonth(result.mes_anterior) !== result.ultimo_mes || nextMonth(result.ultimo_mes) > result.fecha_analisis) throw new Error('El período de resolución de OS no está completo.');
   return result;
 }
 
 export function serviceResolutionStory(data: Resolution): PanoramaStory {
+  if (data.invalidas_ultimo_mes || data.invalidas_mes_anterior ||
+      (data.cierres_ultimo_mes > 0) !== (data.mediana_ultimo_mes !== null) ||
+      (data.cierres_mes_anterior > 0) !== (data.mediana_mes_anterior !== null)) throw new Error('La cohorte de resolución de OS no está completa.');
   const period = formatDate(data.ultimo_mes);
   const previous = formatDate(data.mes_anterior);
   return { id: 'servicios_pendientes', visitKey: `servicios_pendientes:resolucion-v1:${data.ultimo_mes}`,
     title: 'Resolución de órdenes de servicio', question: '¿Cuánto tardaron en resolverse las OS cerradas?',
     status: data.cierres_ultimo_mes ? 'ready' : 'empty',
-    message: data.cierres_ultimo_mes ? `Mediana de ${data.cierres_ultimo_mes} OS cerradas con apertura y cierre operativo en ${period}.` : `Sin OS con cierre operativo registrado en ${period}.`,
+    message: data.cierres_ultimo_mes ? `Mediana de ${data.cierres_ultimo_mes} OS cerradas en ${period}, con fechas válidas de apertura y cierre.` : `Sin OS con cierre operativo registrado en ${period}.`,
     scope: 'OS con cierre operativo registrado en el último mes calendario transcurrido; histórico sin fecha separado',
     sections: ['servicios.ordenes'], cutoff: null, periodLabel: period,
     primary: { label: 'Mediana de resolución', value: data.mediana_ultimo_mes, unit: 'days',
@@ -106,9 +105,12 @@ export function serviceResolutionStory(data: Resolution): PanoramaStory {
     supporting: [{ label: `OS cerradas en ${period}`, value: data.cierres_ultimo_mes, unit: 'count' },
       { label: `OS cerradas en ${previous}`, value: data.cierres_mes_anterior, unit: 'count' },
       { label: 'OS abiertas registradas', value: data.abiertas, unit: 'count' },
-      { label: 'Percentil 90 de edad abierta', value: data.p90_edad_abiertas, unit: 'days' },
+      { label: 'Percentil 90 de edad abierta', value: data.apertura_invalida ? null : data.p90_edad_abiertas, unit: 'days', note: data.apertura_invalida ? 'Edad no disponible: hay aperturas inválidas.' : undefined },
       { label: 'Cerradas históricas sin fecha', value: data.historicas_sin_cierre, unit: 'count' }],
-    chart: { kind: 'bars', title: 'OS cerradas por mes', unit: 'count', rows: [{ label: previous, value: data.cierres_mes_anterior }, { label: period, value: data.cierres_ultimo_mes }] },
+    chart: data.mediana_ultimo_mes === null ? null : { kind: 'bars', title: 'Mediana de resolución por mes', unit: 'days', rows: [
+      ...(data.mediana_mes_anterior === null ? [] : [{ label: previous, value: data.mediana_mes_anterior }]),
+      { label: period, value: data.mediana_ultimo_mes },
+    ] },
     breakdown: [{ label: `Cerradas en ${period}`, value: data.cierres_ultimo_mes, unit: 'count', route: `/servicios/ordenes?desde=${data.ultimo_mes}&hasta=${lastDay(data.ultimo_mes)}&estado=cerrada` },
       { label: `Cerradas en ${previous}`, value: data.cierres_mes_anterior, unit: 'count', route: `/servicios/ordenes?desde=${data.mes_anterior}&hasta=${lastDay(data.mes_anterior)}&estado=cerrada` },
       { label: 'Abiertas registradas', value: data.abiertas, unit: 'count', route: '/servicios/ordenes?estado=abierta' }],
@@ -120,6 +122,7 @@ export function serviceResolutionStory(data: Resolution): PanoramaStory {
 }
 
 export function serviceOpenStory(data: Resolution): PanoramaStory {
+  if (data.apertura_invalida || (data.abiertas > 0) !== (data.p90_edad_abiertas !== null)) throw new Error('La cohorte de OS abiertas no está completa.');
   return { id: 'servicios_abiertas', visitKey: `servicios_abiertas:cola-v1:${data.fecha_analisis}`,
     title: 'Órdenes de servicio abiertas', question: '¿Cuántas OS siguen abiertas y qué edad tienen?',
     status: 'ready', message: data.abiertas ? `${data.abiertas} OS figuran abiertas; el percentil 90 de edad es ${data.p90_edad_abiertas} días.` : 'No hay OS abiertas en la fuente consultada.',

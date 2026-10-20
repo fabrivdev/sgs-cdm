@@ -27,7 +27,11 @@ export function PanoramaDashboard({ userId, topics, available, hasAccess, onEdit
   const recorded = useRef<string | null>(null);
   const [openStory, setOpenStory] = useState<{ id: StoryTopicId; token: number } | null>(null);
   const [detailOpen, setDetailOpen] = useState<StoryTopicId | null>(null);
-  const selected = topics.filter(id => available.some(topic => topic.id === id && topic.sections.some(hasAccess))) as StoryTopicId[];
+  // Local review never writes priorities or the last-visit baseline.
+  const [reviewTopic, setReviewTopic] = useState<StoryTopicId | null>(null);
+  const reviewable = available.filter(topic => topic.sections.some(hasAccess));
+  const reviewing = import.meta.env.DEV && reviewTopic !== null;
+  const selected = (reviewing ? [reviewTopic] : topics).filter(id => reviewable.some(topic => topic.id === id)) as StoryTopicId[];
   const granted = storySectionsForTopics(selected, hasAccess);
   const salesIds = selected.filter(id => id === 'ventas_evolucion' || id === 'ventas_facturacion');
   const partsIds = selected.filter(id => id === 'repuestos_stock' || id === 'repuestos_alertas' || id === 'repuestos_concentracion');
@@ -59,18 +63,28 @@ export function PanoramaDashboard({ userId, topics, available, hasAccess, onEdit
     return { id, title: topic.label, question: topic.question, status: 'error', message: report.isError ? 'No se pudo consultar la fuente de este tema.' : 'La fuente no devolvió una respuesta completa.', scope: '', sections: topic.sections.filter(hasAccess), cutoff: null, periodLabel: 'Corte no disponible', primary: null, supporting: [], chart: null, breakdown: [], details: [], source: 'Fuente no disponible', route: '' };
   });
   useEffect(() => {
-    if (recorded.current === userId || !reports.every(report => report.isSuccess) || !selected.length || stories.length !== selected.length || stories.some(story => story.status === 'error')) return;
+    if (reviewing || recorded.current === userId || !reports.every(report => report.isSuccess) || !selected.length || stories.length !== selected.length || stories.some(story => story.status === 'error')) return;
     saveStoryVisit(userId, stories);
     recorded.current = userId;
-  }, [userId, reports, selected.length, stories]);
+  }, [userId, reports, selected.length, stories, reviewing]);
   return <PageShell className="panorama-dashboard max-w-[1440px] space-y-3">
-    <PageHeader className="panorama-page-header" title="Panorama" actions={<Button variant="outline" size="sm" className="panorama-edit" onClick={onEdit}><Settings2 className="mr-2 h-4 w-4" />Editar prioridades</Button>} />
-    <CampiInterpreter key={`${userId}:${selected.join('|')}:${granted.join('|')}`} userId={userId} stories={stories} loading={loading} previous={previous} detailOpen={detailOpen !== null} onOpenStory={id => setOpenStory(current => ({ id, token: (current?.token ?? 0) + 1 }))} />
+    <PageHeader className="panorama-page-header" title="Panorama" actions={<div className="flex items-center gap-2">
+      {import.meta.env.DEV && reviewable.length > 0 && <Button variant="outline" size="sm" onClick={() => { setDetailOpen(null); setOpenStory(null); setReviewTopic(reviewing ? null : reviewable[0].id); }}>{reviewing ? 'Volver a mis prioridades' : 'Revisar temas'}</Button>}
+      {!reviewing && <Button variant="outline" size="sm" className="panorama-edit" onClick={onEdit}><Settings2 className="mr-2 h-4 w-4" />Editar prioridades</Button>}
+    </div>} />
+    {reviewing ? <div className="flex flex-wrap items-center gap-3">
+      <label htmlFor="panorama-review-topic" className="text-sm font-medium">Tema a revisar</label>
+      <select id="panorama-review-topic" className="h-9 max-w-full rounded-md border border-input bg-background px-3 text-sm" value={selected[0] ?? ''} onChange={event => { setDetailOpen(null); setOpenStory(null); setReviewTopic(event.target.value as StoryTopicId); }}>
+        {!selected.length && <option value="" disabled>Sin acceso al tema</option>}
+        {reviewable.map(topic => <option key={topic.id} value={topic.id}>{topic.label}</option>)}
+      </select>
+      <span className="text-sm text-muted-foreground">Revisión local · no cambia tus prioridades</span>
+    </div> : <CampiInterpreter key={`${userId}:${selected.join('|')}:${granted.join('|')}`} userId={userId} stories={stories} loading={loading} previous={previous} detailOpen={detailOpen !== null} onOpenStory={id => setOpenStory(current => ({ id, token: (current?.token ?? 0) + 1 }))} />}
     {failed && <div role="alert" className="panorama-source-error"><p>No se pudo consultar una fuente. Cada prioridad conserva su lugar para que puedas reintentarla.</p><Button variant="outline" disabled={fetching} onClick={retry}><RefreshCw className="mr-2 h-4 w-4" />Reintentar</Button></div>}
-    {!!selected.length && <div className="panorama-priorities-heading"><Bookmark aria-hidden="true" /><h2>Tus prioridades</h2></div>}
+    {!!selected.length && !reviewing && <div className="panorama-priorities-heading"><Bookmark aria-hidden="true" /><h2>Tus prioridades</h2></div>}
     <div className="panorama-stories">{selected.map((id, index) => reportFor(id)?.isLoading
       ? <article key={id} className="panorama-story panorama-story-loading" role="status" aria-label={`Consultando ${available.find(topic => topic.id === id)?.label ?? id}`}><header className="story-header"><span className="story-index">{String(index + 1).padStart(2, '0')}</span><div className="story-heading-text"><h2>{available.find(topic => topic.id === id)?.label ?? id}</h2></div></header><span className="panorama-loading">Consultando…</span></article>
-      : <StoryPanel key={id} story={stories[index]} index={index} visitChange={storyVisitChange(stories[index], previous)} retrying={reportFor(id)?.isFetching ?? false} onRetry={() => void reportFor(id).refetch()} openSignal={openStory?.id === id ? openStory.token : 0} onDetailOpenChange={open => setDetailOpen(current => open ? id : current === id ? null : current)} />)}</div>
+      : <StoryPanel key={id} story={stories[index]} index={index} visitChange={reviewing ? null : storyVisitChange(stories[index], previous)} retrying={reportFor(id)?.isFetching ?? false} onRetry={() => void reportFor(id).refetch()} openSignal={openStory?.id === id ? openStory.token : 0} onDetailOpenChange={open => setDetailOpen(current => open ? id : current === id ? null : current)} />)}</div>
     {!selected.length && <Button variant="outline" onClick={onEdit}>Elegir temas para Panorama</Button>}
   </PageShell>;
 }
