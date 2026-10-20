@@ -9,8 +9,8 @@ const orderDefinition = readFileSync("supabase/migrations/20260528120000_add_os_
 const orderSchema = new Set([...orderDefinition.matchAll(/^\s+(\w+)\s+\w+/gm)].map(match => match[1]));
 orderSchema.add("fecha_cierre_os"); // 20260724150000_add_fecha_cierre_os.sql
 
-function clientFixture(options: { failure?: string; goal?: unknown; missingGoal?: boolean; many?: boolean; manyOrders?: boolean; profileError?: string } = {}) {
-  const calls: Array<{ table: string; fields?: string; order?: string; range?: number[]; date?: string }> = [];
+function clientFixture(options: { failure?: string; goal?: unknown; missingGoal?: boolean; many?: boolean; manyOrders?: boolean; profileError?: string; snapshotIds?: string[] } = {}) {
+  const calls: Array<{ table: string; fields?: string; order?: string; range?: number[]; date?: string; ids?: string[] }> = [];
   const source = (table: string) => {
     const call = { table } as typeof calls[number]; calls.push(call);
     const response = () => {
@@ -25,16 +25,22 @@ function clientFixture(options: { failure?: string; goal?: unknown; missingGoal?
         ? Array.from({ length: 1001 }, (_, i) => demoOrder({ os_numero: `01-${String(i).padStart(8, "0")}` }))
         : [demoOrder({ os_numero: "01-00000001" }), demoOrder({ os_numero: "02-00000001" }), demoOrder({ os_numero: "01-00000002" })]
           .filter((_, i) => call.date === "fecha_abierta_os" ? i < 2 : i > 0);
-      const rows = table === "ordenes_servicio_importadas" ? orders : table === "servicios" && options.many ? Array.from({ length: 1001 }, (_, i) => ({ id: String(i) })) : [];
+      const rows = table === "ordenes_servicio_importadas" ? orders.filter(row => !call.ids || call.ids.includes(row.os_numero)) : table === "servicios" && options.many ? Array.from({ length: 1001 }, (_, i) => ({ id: String(i) })) : [];
       return { data: call.range ? rows.slice(call.range[0], call.range[1] + 1) : rows, error: null };
     };
-    const chain = { select(fields: string) { call.fields = fields; return chain; }, order(column: string) { call.order = column; return chain; }, gte(date: string) { call.date = date; return chain; }, lte() { return chain; }, eq() { return chain; },
+    const chain = { select(fields: string) { call.fields = fields; return chain; }, order(column: string) { call.order = column; return chain; }, gte(date: string) { call.date = date; return chain; }, lte() { return chain; }, eq() { return chain; }, in(_column: string, ids: string[]) { call.ids = ids; return chain; }, ilike() { return chain; },
       range(from: number, to: number) { call.range = [from, to]; return chain; }, abortSignal() { return chain; }, maybeSingle() { return chain; }, then(resolve: (value: unknown) => unknown) { return Promise.resolve(response()).then(resolve); } };
     return chain;
   };
-  return { calls, client: { from: source, rpc: source } };
+  return { calls, client: { from: source, rpc: (name: string) => name === "campi_os_snapshot_numeros_v1" ? Promise.resolve({ data: options.snapshotIds ?? [], error: null }) : source(name) } };
 }
 describe("operational source loader", () => {
+  it("limits Panorama's open cohort to the latest TOTVS report identities", async () => {
+    const { client, calls } = clientFixture({ snapshotIds: ["02-00000001"] });
+    const result = await loadOperationsData(client, "2026-07-01", "2026-10-20", undefined, true);
+    expect(result.data.ordenesServicio.map(order => order.os_numero)).toEqual(["02-00000001"]);
+    expect(calls.find(call => call.table === "ordenes_servicio_importadas")?.ids).toEqual(["02-00000001"]);
+  });
   it("paginates completely and unions date queries by the real OS primary key without losing branch prefixes", async () => {
     const { client, calls } = clientFixture({ many: true });
     const result = await loadOperationsData(client, "2026-09-01", "2026-09-30");

@@ -130,17 +130,19 @@ export function readyOrdersStory(data: ReadyOrders, supply: Supply): PanoramaSto
   };
 }
 
-type OpenDetail = { fecha_analisis: string; abiertas: number; marcas: { nombre: string; cantidad: number }[]; edades: { rango: string; cantidad: number }[]; cortes: { fecha: string; abiertas: number }[] };
+type OpenDetail = { fecha_analisis: string; abiertas: number; marcas: { nombre: string; cantidad: number }[]; edades: { rango: string; cantidad: number }[]; cortes: { fecha: string; abiertas: number }[]; os_numeros: string[] };
 export function parseOpenDetail(input: unknown): OpenDetail {
   const raw = record(input);
-  if (!Array.isArray(raw.marcas) || !Array.isArray(raw.edades) || !Array.isArray(raw.cortes)) throw new Error('Falta el desglose de OS abiertas.');
+  if (!Array.isArray(raw.marcas) || !Array.isArray(raw.edades) || !Array.isArray(raw.cortes) || !Array.isArray(raw.os_numeros)) throw new Error('Falta el desglose de OS abiertas.');
   const brands = raw.marcas.map(item => { const row = record(item); if (typeof row.nombre !== 'string' || !row.nombre) throw new Error('Marca inválida.'); return { nombre: row.nombre, cantidad: integer(row.cantidad) }; });
   const ages = raw.edades.map(item => { const row = record(item); if (typeof row.rango !== 'string' || !row.rango) throw new Error('Rango inválido.'); return { rango: row.rango, cantidad: integer(row.cantidad) }; });
   const cuts = raw.cortes.map(item => { const row = record(item); return { fecha: date(row.fecha), abiertas: integer(row.abiertas) }; });
-  const data = { fecha_analisis: date(raw.fecha_analisis), abiertas: integer(raw.abiertas), marcas: brands, edades: ages, cortes: cuts };
+  const ids = raw.os_numeros.map(value => { if (typeof value !== 'string' || !value.trim()) throw new Error('OS sin identidad.'); return value; });
+  const data = { fecha_analisis: date(raw.fecha_analisis), abiertas: integer(raw.abiertas), marcas: brands, edades: ages, cortes: cuts, os_numeros: ids };
   if (brands.reduce((s,b) => s+b.cantidad,0) !== data.abiertas || ages.reduce((s,a) => s+a.cantidad,0) !== data.abiertas ||
       new Set(brands.map(b => b.nombre)).size !== brands.length || new Set(ages.map(a => a.rango)).size !== ages.length ||
-      new Set(cuts.map(c => c.fecha)).size !== cuts.length || cuts.some(c => c.fecha > data.fecha_analisis)) throw new Error('El desglose de OS no concilia.');
+      new Set(cuts.map(c => c.fecha)).size !== cuts.length || cuts.some(c => c.fecha > data.fecha_analisis) ||
+      ids.length !== data.abiertas || new Set(ids).size !== ids.length) throw new Error('El desglose de OS no concilia.');
   return data;
 }
 
@@ -213,5 +215,5 @@ export function serviceOpenStory(data: Resolution, detail?: OpenDetail): Panoram
     source: 'campi_resolucion_os_v1 · estado y fechas operativas de OS', route: '/servicios/ordenes',
     openOrders: detail ? { asOf: detail.fecha_analisis, count: detail.abiertas,
       brands: detail.marcas.map(row => ({ name: row.nombre, count: row.cantidad })),
-      ages: detail.edades.map(row => ({ label: row.rango, count: row.cantidad })) } : undefined };
+      ages: detail.edades.map(row => ({ label: row.rango, count: row.cantidad })), ids: detail.os_numeros } : undefined };
 }

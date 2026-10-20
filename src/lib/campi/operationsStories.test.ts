@@ -15,6 +15,7 @@ const supply = () => ({ fecha_analisis: asOf, filas: 17, identidades: 17, unidad
   sin_vinculo: 4, stock: 6, importacion_arribada: 4, importacion_transito: 3, pedidos: 7,
   pendientes: [{ operacion_id: 'ghi', np_numero: 'NP-3', unidades: 4, sin_vinculo: 4, sin_identidad_o_conflicto: 0 }] });
 const openDetail = () => ({ fecha_analisis: asOf, abiertas: 76,
+  os_numeros: Array.from({ length: 76 }, (_, i) => `01-${String(i + 1).padStart(8, '0')}`),
   marcas: [{ nombre: 'CLAAS', cantidad: 50 }, { nombre: 'HORSCH', cantidad: 26 }],
   edades: [{ rango: '0–7 días', cantidad: 30 }, { rango: 'Más de 90 días', cantidad: 46 }],
   cortes: [{ fecha: '2026-10-18', abiertas: 75 }, { fecha: asOf, abiertas: 76 }] });

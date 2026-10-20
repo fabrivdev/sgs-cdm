@@ -47,7 +47,7 @@ export const PANORAMA_CONTRACTS = {
     evidence: ['campi_resolucion_os_v1'], tests: ['operationsStories.test.ts'],
   },
   servicios_abiertas: {
-    queryGroup: 'service-outcomes', unit: 'count', formula: 'Conteo de OS abiertas según estado de la fuente.',
+    queryGroup: 'service-outcomes', unit: 'count', formula: 'Conteo de OS abiertas presentes en el último reporte TOTVS completo.',
     population: 'OS con estado que contiene Abiert; excluye En proceso y Sin estado.',
     period: 'Foto de OS abiertas.', comparison: 'snapshot', chart: 'composition',
     limitations: ['Antigüedad no acredita atraso.', 'El universo operativo habitual agrupa otros estados; el enlace usa cohorte explícita.'],

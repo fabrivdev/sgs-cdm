@@ -49,8 +49,17 @@ export async function loadOperationsData(client: any, from: string, to: string, 
     "repuesto_valor", "km_cantidad", "kilometro_valor", "terceros_valor", "situacion_os", "situacion_facturacion", "raw_data",
   ] as const satisfies readonly (keyof Tables<"ordenes_servicio_importadas">)[];
   const orders = async () => {
-    if (openSnapshot) return all<OperationsData["ordenesServicio"][number]>(client.from("ordenes_servicio_importadas")
-      .select(orderColumns.join(",")).ilike("situacion_os", "%abiert%").order("os_numero"));
+    if (openSnapshot) {
+      const { data: snapshotIds, error } = await client.rpc("campi_os_snapshot_numeros_v1");
+      if (error) throw error;
+      if (!Array.isArray(snapshotIds) || snapshotIds.some(value => typeof value !== "string" || !value))
+        throw new Error("El corte TOTVS de OS no está disponible.");
+      const parts = await Promise.all(Array.from({ length: Math.ceil(snapshotIds.length / 200) }, (_, index) =>
+        all<OperationsData["ordenesServicio"][number]>(client.from("ordenes_servicio_importadas")
+          .select(orderColumns.join(",")).in("os_numero", snapshotIds.slice(index * 200, (index + 1) * 200))
+          .ilike("situacion_os", "%abiert%").order("os_numero"))));
+      return parts.flat();
+    }
     const parts = await Promise.all(["fecha_abierta_os", "fecha_cierre_os"].map(date =>
       all<OperationsData["ordenesServicio"][number]>(client.from("ordenes_servicio_importadas").select(orderColumns.join(",")).gte(date, start).lte(date, `${to}T23:59:59`).order("os_numero"))));
     // The table primary key is the full OS number, including branch prefix and leading zeros.

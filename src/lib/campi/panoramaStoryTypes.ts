@@ -45,6 +45,7 @@ export type PanoramaStory = {
     count: number;
     brands: { name: string; count: number }[];
     ages: { label: string; count: number }[];
+    ids: string[];
   };
 };
 

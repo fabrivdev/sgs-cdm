@@ -144,7 +144,9 @@ export function prepareNewSystemImportBundle(input: NewSystemImportBundleInput):
         origenSistema: "new_xml_ordenes_servicio",
         totalFilas: ordenesServicio.rows.length,
         usuarioId: input.usuarioId,
-        metadata: buildImportMetadataEnvelope(ordenesServicio),
+        metadata: buildImportMetadataEnvelope(ordenesServicio, {
+          sourceFileSha256: input.ordenesServicio.sha256,
+        }),
       }),
       productos: buildImportInsert({
         tipo: "facturacion",

@@ -31,11 +31,12 @@ const group = (values: string[]) => [...values.reduce((map, name) => map.set(nam
 const ageLabel = (age: number | null) => age === null ? 'Sin fecha válida' : age <= 7 ? '0–7 días' : age <= 30 ? '8–30 días' : age <= 90 ? '31–90 días' : 'Más de 90 días';
 
 export function buildServiceOpenOrdersDetail(rows: SourceOrder[], scope: Scope): ServiceOpenOrdersDetailData {
-  if (rows.length !== scope.count || !day(scope.asOf)) throw new Error('El detalle de OS cambió desde el resumen. Actualizá Panorama.');
+  if (rows.length !== scope.count || !day(scope.asOf) || new Set(scope.ids).size !== scope.count) throw new Error('El detalle de OS cambió desde el resumen. Actualizá Panorama.');
   const identities = new Set<string>();
+  const included = new Set(scope.ids);
   const asOf = day(scope.asOf)!;
   const orders = rows.map((row): OpenOrderRow => {
-    if (!row.os_numero || identities.has(row.os_numero) || !(row.situacion_os ?? '').toLowerCase().includes('abiert'))
+    if (!row.os_numero || !included.has(row.os_numero) || identities.has(row.os_numero) || !(row.situacion_os ?? '').toLowerCase().includes('abiert'))
       throw new Error('Las OS abiertas no concilian con el resumen.');
     identities.add(row.os_numero);
     const raw = row.raw_data && typeof row.raw_data === 'object' && !Array.isArray(row.raw_data)
@@ -73,16 +74,14 @@ export function buildServiceOpenOrdersDetail(rows: SourceOrder[], scope: Scope):
 export async function loadServiceOpenOrdersDetail(scope: Scope): Promise<ServiceOpenOrdersDetailData> {
   const rows: SourceOrder[] = [];
   let count: number | null = null;
-  for (let offset = 0; ; offset += 500) {
+  for (let offset = 0; offset < scope.ids.length; offset += 200) {
     const result = await supabase.from('ordenes_servicio_importadas')
       .select('os_numero,cliente_nombre,marca,fecha_abierta_os,situacion_os,tipo_tiempo,raw_data', { count: 'exact' })
-      .ilike('situacion_os', '%abiert%').order('os_numero').range(offset, offset + 499);
+      .in('os_numero', scope.ids.slice(offset, offset + 200)).ilike('situacion_os', '%abiert%').order('os_numero');
     if (result.error || !Array.isArray(result.data) || result.count === null) throw new Error('No se pudo cargar el detalle de OS.');
-    if (count === null) count = result.count;
-    if (count !== result.count || count > 5000) throw new Error('El detalle de OS cambió durante la lectura.');
+    count = (count ?? 0) + result.count;
     rows.push(...result.data);
-    if (rows.length === count) break;
-    if (result.data.length !== 500 || rows.length > count) throw new Error('El detalle de OS está incompleto.');
   }
+  if (count !== rows.length) throw new Error('El detalle de OS está incompleto.');
   return buildServiceOpenOrdersDetail(rows, scope);
 }
