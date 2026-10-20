@@ -5,6 +5,21 @@ const story = (overrides: Partial<PanoramaStory> = {}): PanoramaStory => ({ id: 
 const billing = story({ id: 'ventas_facturacion', title: 'Facturación', primary: { label: 'Facturación del mes', value: 448000, unit: 'USD', comparison: { value: 400000, label: 'Mismo tramo de 2025' } } });
 const orders = story({ id: 'servicios_pendientes', title: 'OS', primary: { label: 'OS abiertas', value: 37, unit: 'count' }, supporting: [{ label: 'Abiertas hace más de 30 días', value: 8, unit: 'count' }] });
 describe('deterministic Campi interpretation', () => {
+  it('distinguishes the 17 active units from the 7 without a valid link', () => {
+    const supply = story({ id: 'maquinas_pedidos', title: 'Abastecimiento de pedidos activos',
+      primary: { label: 'Unidades en pedidos activos', value: 17, unit: 'count' },
+      supporting: [{ label: 'Unidades activas', value: 17, unit: 'count' }],
+      chart: { kind: 'bars', title: 'Vínculos', unit: 'count', rows: [
+        { label: 'Sin vínculo válido', value: 7 }, { label: 'Stock identificado', value: 6 },
+        { label: 'Importación en tránsito', value: 1 }, { label: 'Importación arribada', value: 3 },
+      ] },
+    });
+    const text = interpretCampi([supply]).findings[0].text;
+    expect(text).toContain('17 unidades en pedidos activos; 7 sin vínculo válido (41,2%)');
+    expect(text).not.toContain('17 de 17');
+    expect(answerCampi(supply.question, [supply])).toContain('7 sin vínculo válido');
+    expect(interpretCampi([{ ...supply, chart: { ...supply.chart!, rows: [{ label: 'Sin vínculo válido', value: 7 }] } }]).findings[0].text).toContain('no pude conciliar');
+  });
   it('does not turn raw counts or an attention flag into alerts', () => {
     const result = interpretCampi([story({ attention: true }), { ...orders, supporting: [] }]);
     expect(result.findings.every(f => f.kind === 'neutral')).toBe(true);

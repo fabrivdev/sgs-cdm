@@ -38,6 +38,7 @@
 .panorama-hero-context { display: flex; align-items: baseline; flex-wrap: wrap; gap: 4px 12px; margin-bottom: 3px; color: #667083; font-size: 11px; line-height: 16px; }
 .panorama-hero-kicker { display: block; color: #146846; font-size: 16px; line-height: 21px; font-weight: 700; margin-bottom: 6px; }
 .panorama-hero-context .panorama-hero-kicker { margin: 0; }
+.campi-comment-count { margin-left: auto; font-variant-numeric: tabular-nums; font-size: 11px; color: hsl(var(--muted-foreground)); }
 .panorama-hero--attention .panorama-hero-kicker { color: #985f0a; }
 .panorama-hero--change .panorama-hero-kicker { color: #17677c; }
 .panorama-hero--unknown .panorama-hero-kicker { color: #5f6875; }
@@ -49,6 +50,7 @@
 .campi-hero-actions { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 7px; }
 .campi-hero-actions button { display: inline-flex; gap: 7px; height: 31px; min-height: 31px; padding: 0 12px; border-radius: 18px; font-size: 12px; font-weight: 650; color: #126b50; border-color: #18775d; background: transparent; }
 .campi-hero-actions button:first-child { background: #087357; color: white; border: 1px solid #087357; }
+.campi-hero-actions button[aria-label="Siguiente comentario de Campi"] { margin-left: auto; }
 .panorama-hero--attention .campi-hero-actions button:first-child { background: #98600f; border-color: #98600f; }
 .panorama-hero--change .campi-hero-actions button:first-child { background: #17677c; border-color: #17677c; }
 .campi-visit-snapshot { display: flex; flex-wrap: wrap; align-items: baseline; gap: 2px 9px; margin-top: 9px; padding: 7px 10px; border: 1px solid #d7e2e4; border-radius: 9px; background: hsl(var(--card) / .84); font-variant-numeric: tabular-nums; }
@@ -56,11 +58,11 @@
 .campi-visit-snapshot strong { color: #172335; font-size: 15px; line-height: 20px; }
 .campi-visit-snapshot small { color: #5c6674; font-size: 11px; }
 .campi-questions { padding: 18px; }
-.campi-question-form { display: flex; align-items: center; position: relative; }
+.campi-question-form { display: flex; align-items: center; gap: 8px; }
 .campi-answer-block { margin-top: 20px; border-top: 1px solid hsl(var(--border)); padding-top: 16px; }
 .campi-answer-block h3 { font-size: 14px; font-weight: 650; margin-bottom: 8px; }
-.campi-question-form input { width: 100%; min-width: 0; height: 50px; border: 1px solid #dbe0e6; background: hsl(var(--card) / .85); border-radius: 12px; padding: 0 45px 0 18px; font-size: 15px; }
-.campi-question-form button { position: absolute; right: 6px; width: 38px; height: 38px; background: transparent; color: #647080; }
+.campi-question-form input { flex: 1; min-width: 0; height: 44px; border: 1px solid #dbe0e6; background: hsl(var(--card) / .85); border-radius: 10px; padding: 0 12px; font-size: 15px; }
+.campi-question-form button { position: static; flex: none; width: 44px; height: 44px; }
 .campi-question-form input:focus-visible, .campi-suggestions button:focus-visible { outline: 2px solid hsl(var(--ring)); outline-offset: 2px; }
 .campi-suggestions-label { display: block; margin: 12px 0 7px; color: #707786; text-transform: uppercase; font-size: 10px; letter-spacing: .08em; }
 .campi-suggestions { display: flex; flex-direction: column; align-items: flex-start; gap: 7px; }
@@ -83,6 +85,7 @@
 .story-index { display: flex; align-items: center; justify-content: center; flex: none; width: 32px; height: 32px; border-radius: 9px; background: var(--story-tint); color: var(--story-accent); font-size: 16px; font-weight: 750; }
 .story-heading-text { min-width: 0; flex: 1; }
 .story-header h2 { font-size: 14px; font-weight: 600; line-height: 20px; }
+.story-cutoff-warning { margin-left: auto; white-space: nowrap; color: #806021; font-size: 10px; line-height: 20px; }
 .story-period { margin-left: auto; padding-top: 2px; color: #687181; font-size: 12px; line-height: 18px; text-align: right; flex: none; max-width: 128px; }
 .story-summary-metric { display: flex; align-items: flex-end; justify-content: space-between; gap: 8px; align-self: center; min-width: 0; }
 .story-summary-metric dl { flex: 0 1 auto; min-width: 0; }

@@ -1,4 +1,4 @@
-import { beforeEach, describe, expect, it } from 'vitest';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { SECTION_ROUTES } from '@/lib/permissions';
 import {
   availablePanoramaTopics,
@@ -51,5 +51,11 @@ describe('Campi Panorama topics', () => {
     expect(readPanoramaPreferences('a')).toEqual(['ventas_facturacion', 'maquinas_stock', 'repuestos_stock', 'repuestos_sucursales']);
     expect(readPanoramaPreferences('b')).toEqual(['repuestos_stock']);
     expect(localStorage.getItem(panoramaStorageKey('a'))).not.toBe(localStorage.getItem(panoramaStorageKey('b')));
+  });
+  it('does not report a completed welcome when browser storage rejects the save', () => {
+    const denied = vi.spyOn(Storage.prototype, 'setItem').mockImplementation(() => { throw new Error('quota'); });
+    expect(savePanoramaPreferences('a', ['ventas_facturacion'])).toBe(false);
+    expect(readPanoramaPreferences('a')).toBeNull();
+    denied.mockRestore();
   });
 });

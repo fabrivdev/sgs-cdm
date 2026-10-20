@@ -52,7 +52,10 @@ export function readPanoramaPreferences(userId: string): PanoramaTopicId[] | nul
 }
 
 export function savePanoramaPreferences(userId: string, topics: readonly PanoramaTopicId[]) {
-  if (!userId) return;
-  try { localStorage.setItem(panoramaStorageKey(userId), JSON.stringify(topics.slice(0, MAX_PANORAMA_TOPICS))); }
-  catch { /* The page remains usable when browser storage is unavailable. */ }
+  if (!userId) return false;
+  try {
+    const serialized = JSON.stringify(topics.slice(0, MAX_PANORAMA_TOPICS));
+    localStorage.setItem(panoramaStorageKey(userId), serialized);
+    return localStorage.getItem(panoramaStorageKey(userId)) === serialized;
+  } catch { return false; }
 }

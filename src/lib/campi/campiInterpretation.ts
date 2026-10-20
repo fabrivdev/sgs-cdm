@@ -37,8 +37,12 @@ export function interpretCampi(stories: readonly PanoramaStory[]) {
       return finding('attention', `Stock antiguo de repuestos: ${s.notices[0].text}. Podés abrir los códigos incluidos en el detalle.`, 'review');
     }
     if (s.id === 'maquinas_pedidos' && p.value! > 0) {
-      const total = s.supporting.find(d => d.label === 'Unidades activas')?.value;
-      return finding('neutral', `${s.title}: ${amount(p)} de ${valid(total) ? number.format(total) : 'las'} unidades activas no tienen abastecimiento vinculado de forma única. Es diagnóstico de vínculos, no de entregas atrasadas.`);
+      const missing = s.chart?.rows.find(row => row.label === 'Sin vínculo válido')?.value;
+      const chartTotal = s.chart?.rows.reduce((sum, row) => sum + row.value, 0);
+      if (valid(missing) && missing >= 0 && valid(chartTotal) && chartTotal === p.value! && missing <= p.value!) {
+        return finding('neutral', `${s.title}: ${number.format(p.value!)} unidades en pedidos activos; ${number.format(missing)} sin vínculo válido (${number.format(missing / p.value! * 100)}%). Esto no acredita entregas atrasadas.`);
+      }
+      return finding('neutral', `${s.title}: el total de pedidos activos está disponible, pero no pude conciliar el desglose de vínculos.`);
     }
     if (s.id === 'servicios_pendientes' && valid(p.comparison?.value) && p.comparison.value > 0) {
       const difference = p.value! - p.comparison.value;
@@ -97,8 +101,7 @@ export function answerCampi(question: string, stories: readonly PanoramaStory[],
     }
   }
   const finding = interpretation.findings.find(f => f.topic === story.id)!;
-  const period = story.periodLabel ? ` Período: ${story.periodLabel}.` : '';
-  return `${finding.text}${period} Abrí el detalle para ver el desglose y los límites de la fuente.`;
+  return `${finding.text} Abrí el detalle para ver el desglose.`;
 }
 
 export function matchCampiTopic(question: string, stories: readonly PanoramaStory[]): PanoramaStory | undefined {

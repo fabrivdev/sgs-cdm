@@ -23,6 +23,26 @@ El selector presenta cuatro posiciones, permite búsqueda y filtro por área aut
 
 Pendiente de validación productiva: probar una cuenta limitada a cada área con sus permisos reales, corroborar las cifras de Ventas y OS contra sus fuentes bajo el nuevo catálogo y acreditar los cortes de inventario. Las capturas locales comprueban encaje y comportamiento de frontend, no la integridad de un despliegue público. Los importes mencionados más abajo corresponden a lecturas históricas y nunca deben fijarse como valores actuales.
 
+### Corrección por etapas del 20/10/2026
+
+| Etapa | Estado verificable | Límite |
+| --- | --- | --- |
+| 0 · Base | Rama alternativa preservada desde `88a497d`; capturas previas de portada, editor y conversación. | Sin cambios en `main` ni Lovable público. |
+| 1 · Confianza | Abastecimiento distingue 17 unidades activas, 7 sin vínculo válido y 41,18 %. La interpretación exige que el desglose concilie con el total. Conversación con cabecera y envío separados; respuesta anterior se descarta si cambia la evidencia o el alcance. | El vínculo no prueba atraso de entrega. |
+| 2 · Bienvenida | La primera configuración presenta a Campi y termina en «Ver mi Panorama». La edición recurrente no repite la introducción. El guardado se comprueba antes de entrar; selección parcial y permisos revocados se preservan sin completar temas automáticamente. | Las preferencias siguen en el navegador del usuario. |
+| 3 · Comentarios | Un comentario por tema con evidencia, período y acceso al detalle; observaciones de última visita solo con alcance comparable. Avance manual y ciclo automático de 25 s mientras la pantalla está visible. Pausa al leer el bloque, abrir detalle o pregunta, seleccionar texto u ocultar la pestaña. | No hay IA nueva ni causas inferidas. |
+| 4 · Campi | Posturas de reposo alternadas, gesto contextual al cambiar comentario y transición tras guardar. Sin movimiento periódico llamativo; se detiene durante detalle y pregunta y respeta movimiento reducido. | Planta y maquinaria siguen fuera de alcance. |
+| 5 · Datos | La fecha de lectura no se presenta como corte acreditado del stock; la tarjeta física indica «Corte por confirmar». Se mantienen fuera compras pendientes, capacidad y proyección sin conciliación. | Faltan cuentas reales de una sola área y corte de inventario acreditado. Servicios y Máquinas continúan con cuatro opciones cada uno. |
+
+La verificación local cubrió el caso real de abastecimiento en portada y respuesta con Enter, el editor sin alterar las preferencias guardadas y la grilla completa a 1366×768 y 1440×900. Las pruebas automatizadas cubren rotación, pausas, guardado fallido, permisos simulados, falta de datos y el caso 7/17. La publicación y validación con usuarios limitados quedan pendientes.
+
+| Candidato no habilitado | Conciliación requerida antes de ofrecerlo |
+| --- | --- |
+| Compras pendientes de Repuestos | Pedido, recibido, cancelado y pendiente por la misma unidad y corte; evitar sumar partidas ya recibidas. |
+| Agenda y capacidad técnica | Horas disponibles netas de vacaciones, jornadas solapadas y trabajo programado, con identidad de técnico y período. |
+| Saldo proyectado de Máquinas | Stock físico, compras, ingresos, reservas y pedidos conciliados por unidad/modelo, sin contar dos veces un arribo. |
+| Etapas de importación | Universo limitado a unidades vinculadas a pedidos; no presentarlo como cobertura de todas las importaciones. |
+
 ## Registro histórico anterior
 
 ## Comparación de versiones

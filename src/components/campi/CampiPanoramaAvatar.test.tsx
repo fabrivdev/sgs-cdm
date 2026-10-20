@@ -54,4 +54,17 @@ describe('Campi in Panorama', () => {
     render(<CampiPanoramaAvatar greetingKey="user-a" />);
     expect(screen.getByTestId('campi-pose')).toHaveTextContent('idle');
   });
+  it('alternates quiet idle postures and pauses them while a detail is read', () => {
+    const view = render(<CampiPanoramaAvatar greetingKey="user-a" />);
+    const campi = screen.getByRole('button', { name: 'Saludar a Campi' });
+    expect(campi).toHaveAttribute('data-posture', 'center');
+    act(() => vi.advanceTimersByTime(9000));
+    expect(campi).toHaveAttribute('data-posture', 'tilt');
+    view.rerender(<CampiPanoramaAvatar greetingKey="user-a" quiet />);
+    act(() => vi.advanceTimersByTime(30000));
+    expect(campi).toHaveAttribute('data-posture', 'tilt');
+    view.rerender(<CampiPanoramaAvatar greetingKey="user-a" />);
+    act(() => vi.advanceTimersByTime(12000));
+    expect(campi).toHaveAttribute('data-posture', 'center');
+  });
 });

@@ -106,15 +106,16 @@ function ResolutionComparison({ story }: { story: PanoramaStory }) {
   </div>;
 }
 
-export function StoryPanel({ story, index, onRetry, retrying, visitChange = null, openSignal = 0 }: { story: PanoramaStory; index: number; onRetry: () => void; retrying: boolean; visitChange?: number | null; openSignal?: number }) {
+export function StoryPanel({ story, index, onRetry, retrying, visitChange = null, openSignal = 0, onDetailOpenChange }: { story: PanoramaStory; index: number; onRetry: () => void; retrying: boolean; visitChange?: number | null; openSignal?: number; onDetailOpenChange?: (open: boolean) => void }) {
   const [open, setOpen] = useState(false);
   const triggerRef = useRef<HTMLButtonElement>(null);
   useEffect(() => { if (openSignal > 0) setOpen(true); }, [openSignal]);
+  useEffect(() => { onDetailOpenChange?.(open); }, [open, onDetailOpenChange]);
   const titleId = `story-${story.id}`;
   const percentage = storySummaryPercentage(story);
   const breakdownGroups = [...new Set(story.breakdown.map(row => row.group ?? 'Desglose'))];
   return <article className="panorama-story" aria-labelledby={titleId} data-story={story.id}>
-    <header className="story-header"><span className="story-index">{String(index + 1).padStart(2, '0')}</span><div className="story-heading-text"><h2 id={titleId}>{story.title}</h2></div>{story.status === 'empty' && <span className="story-empty-label">Sin datos</span>}</header>
+    <header className="story-header"><span className="story-index">{String(index + 1).padStart(2, '0')}</span><div className="story-heading-text"><h2 id={titleId}>{story.title}</h2></div>{story.status === 'empty' && <span className="story-empty-label">Sin datos</span>}{story.status === 'ready' && story.cutoff === null && ['maquinas_stock', 'repuestos_stock'].includes(story.id) && <span className="story-cutoff-warning" title="La fuente no acredita la fecha del inventario">Corte por confirmar</span>}</header>
     {story.status === 'error' ? <div role="alert"><p className="story-error">{story.message}</p><Button variant="outline" disabled={retrying} onClick={onRetry}><RefreshCw className="mr-2 h-4 w-4" />{retrying ? 'Consultando…' : 'Reintentar fuente'}</Button></div> : <>
       <div className={`story-summary-metric${story.primary && storyValue(story.primary.value, story.primary.unit).length > 12 ? ' story-summary-metric--long' : ''}`}>
         <dl>{story.primary && <>

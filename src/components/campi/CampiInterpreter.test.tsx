@@ -1,4 +1,4 @@
-import { cleanup, fireEvent, render, screen } from '@testing-library/react';
+import { act, cleanup, fireEvent, render, screen } from '@testing-library/react';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { CampiInterpreter } from './CampiInterpreter';
 import type { PanoramaStory } from '@/lib/campi/panoramaStoryTypes';
@@ -24,7 +24,7 @@ describe('Campi questions', () => {
     fireEvent.click(screen.getByRole('button', { name: '¿Qué muestran los datos de facturación?' }));
     view.rerender(<CampiInterpreter stories={[]} loading={false} />);
     expect(screen.getByRole('dialog')).not.toHaveTextContent('$ 448.000');
-    expect(screen.getByRole('dialog')).toHaveTextContent('No tengo una respuesta verificada');
+    expect(screen.getByRole('dialog')).not.toHaveTextContent('Respuesta de Campi');
   });
   it('shows an evidenced finding and a working primary action', () => {
     const openStory = vi.fn();
@@ -38,7 +38,7 @@ describe('Campi questions', () => {
   });
   it('shows a verified neutral total without claiming growth when comparison is missing', () => {
     render(<CampiInterpreter stories={[{ ...billing, primary: { ...billing.primary!, comparison: undefined } }]} loading={false} />);
-    expect(screen.getByRole('heading', { name: /No encontré novedades relevantes comprobadas/ })).toBeInTheDocument();
+    expect(screen.getByRole('heading', { name: /Facturación: \$ 448.000 en facturación del mes/ })).toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Ver datos de facturación' })).toBeInTheDocument();
     expect(screen.queryByText(/subió/)).not.toBeInTheDocument();
   });
@@ -64,6 +64,39 @@ describe('Campi questions', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Preguntale a Campi' }));
     fireEvent.change(screen.getByRole('textbox', { name: 'Preguntale a Campi' }), { target: { value: '   ' } });
     expect(screen.getByRole('button', { name: 'Preguntar a Campi' })).toBeDisabled();
+  });
+  it('cycles through distinct verified topics and returns to the first without announcing every change', () => {
+    const orders: PanoramaStory = { ...billing, id: 'servicios_abiertas', title: 'OS abiertas', sections: ['servicios.ordenes'], primary: { label: 'OS abiertas', value: 76, unit: 'count' } };
+    render(<CampiInterpreter stories={[billing, orders]} loading={false} />);
+    expect(screen.getByRole('heading', { name: /Facturación.*subió/ })).toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: 'Siguiente comentario de Campi' }));
+    expect(screen.getByRole('heading', { name: /OS abiertas: 76/ })).toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: 'Siguiente comentario de Campi' }));
+    expect(screen.getByRole('heading', { name: /Facturación.*subió/ })).toBeInTheDocument();
+    expect(screen.getByText('1 de 2')).toBeInTheDocument();
+    expect(screen.getByText('1 de 2').closest('.panorama-hero')?.querySelector('.campi-synthesis')).toHaveAttribute('aria-live', 'off');
+  });
+  it('pauses automatic comments while a detail is open', () => {
+    vi.useFakeTimers();
+    try {
+      const orders: PanoramaStory = { ...billing, id: 'servicios_abiertas', title: 'OS abiertas', sections: ['servicios.ordenes'], primary: { label: 'OS abiertas', value: 76, unit: 'count' } };
+      const view = render(<CampiInterpreter stories={[billing, orders]} loading={false} detailOpen />);
+      act(() => vi.advanceTimersByTime(26000));
+      expect(screen.getByRole('heading', { name: /Facturación.*subió/ })).toBeInTheDocument();
+      view.rerender(<CampiInterpreter stories={[billing, orders]} loading={false} />);
+      act(() => vi.advanceTimersByTime(25000));
+      expect(screen.getByRole('heading', { name: /OS abiertas: 76/ })).toBeInTheDocument();
+    } finally { vi.useRealTimers(); }
+  });
+  it('keeps the question panel open after Enter and sends from a separate button', () => {
+    render(<CampiInterpreter stories={[billing]} loading={false} />);
+    fireEvent.click(screen.getByRole('button', { name: 'Preguntale a Campi' }));
+    const input = screen.getByRole('textbox', { name: 'Preguntale a Campi' });
+    fireEvent.change(input, { target: { value: '¿Cómo viene la facturación?' } });
+    fireEvent.submit(input.closest('form')!);
+    expect(screen.getByRole('dialog')).toHaveTextContent('Respuesta de Campi');
+    expect(screen.getByRole('dialog')).toContainElement(input);
+    expect(screen.getByRole('button', { name: 'Cerrar' })).toBeInTheDocument();
   });
   it('does not offer a question box when no verified story is available', () => {
     render(<CampiInterpreter stories={[]} loading={false} />);

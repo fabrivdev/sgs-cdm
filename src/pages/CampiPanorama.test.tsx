@@ -21,21 +21,23 @@ afterEach(cleanup);
 describe('Campi Panorama configuration', () => {
   it('saves more than three ordered topics and restores them', () => {
     const view = render(<CampiPanorama />);
-    expect(screen.getByText(/10 disponibles · 0 seleccionados · 10 por agregar/)).toBeInTheDocument();
+    expect(screen.getByText(/10 disponibles · 0 seleccionados · 10 alternativas/)).toBeInTheDocument();
+    expect(screen.getByText('Soy Campi')).toBeInTheDocument();
     fireEvent.click(screen.getByRole('button', { name: /^Facturación y notas de crédito/ }));
     fireEvent.click(screen.getByRole('button', { name: /^Stock antiguo de repuestos/ }));
     fireEvent.click(screen.getByRole('button', { name: /^Composición del stock físico/ }));
     fireEvent.click(screen.getByRole('button', { name: /^Abastecimiento de pedidos activos/ }));
     expect(screen.getByText('4 de 4')).toBeInTheDocument();
     fireEvent.click(screen.getByRole('button', { name: 'Subir Abastecimiento de pedidos activos' }));
-    fireEvent.click(screen.getByRole('button', { name: 'Guardar orden' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Ver mi Panorama' }));
     expect(localStorage.getItem(panoramaStorageKey('manager-a')))
       .toBe('["ventas_facturacion","repuestos_stock","maquinas_pedidos","maquinas_stock"]');
     expect(screen.getByTestId('panorama-panel')).toHaveTextContent('ventas_facturacion|repuestos_stock|maquinas_pedidos|maquinas_stock');
     view.unmount();
     render(<CampiPanorama />);
     fireEvent.click(screen.getByRole('button', { name: 'Editar prioridades' }));
-    expect(screen.getByRole('button', { name: 'Orden guardado' })).toBeDisabled();
+    expect(screen.getByRole('button', { name: 'Prioridades guardadas' })).toBeDisabled();
+    expect(screen.getByText('Editar prioridades')).toBeInTheDocument();
     expect(screen.getByText('4 de 4')).toBeInTheDocument();
   });
 
@@ -71,7 +73,7 @@ describe('Campi Panorama configuration', () => {
     fireEvent.dragOver(second!);
     fireEvent.drop(second!);
     expect(screen.getByRole('img', { name: 'Campi animado' })).toHaveAttribute('data-reaction', 'reorder');
-    fireEvent.click(screen.getByRole('button', { name: 'Guardar orden' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Ver mi Panorama' }));
     expect(screen.getByTestId('panorama-panel')).toBeInTheDocument();
     expect(localStorage.getItem(panoramaStorageKey('manager-a'))).toBe('["maquinas_pedidos","ventas_facturacion"]');
   });
@@ -82,7 +84,25 @@ describe('Campi Panorama configuration', () => {
     expect(screen.getByRole('status')).toHaveTextContent('Elegí qué tema reemplazar');
     expect(screen.getByText('4 de 4')).toBeInTheDocument();
     fireEvent.click(screen.getByRole('button', { name: 'Reemplazar Composición del stock físico por Resolución de órdenes de servicio' }));
-    fireEvent.click(screen.getByRole('button', { name: 'Guardar orden' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Ver mi Panorama' }));
     expect(localStorage.getItem(panoramaStorageKey('manager-a'))).toBe('["ventas_facturacion","repuestos_stock","servicios_pendientes","maquinas_pedidos"]');
+  });
+  it('keeps the welcome open when saving fails and preserves the previous order on cancel', () => {
+    const denied = vi.spyOn(Storage.prototype, 'setItem').mockImplementation(() => { throw new Error('quota'); });
+    render(<CampiPanorama />);
+    fireEvent.click(screen.getByRole('button', { name: 'Evolución de ventas' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Ver mi Panorama' }));
+    expect(screen.getByRole('alert')).toHaveTextContent('No se pudo guardar');
+    expect(screen.getByText('Soy Campi')).toBeInTheDocument();
+    denied.mockRestore();
+  });
+  it('cancels later edits without changing saved priorities', () => {
+    localStorage.setItem(panoramaStorageKey('manager-a'), '["ventas_facturacion","maquinas_stock"]');
+    render(<CampiPanorama />);
+    fireEvent.click(screen.getByRole('button', { name: 'Editar prioridades' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Quitar Composición del stock físico' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Volver al panorama' }));
+    expect(screen.getByTestId('panorama-panel')).toHaveTextContent('ventas_facturacion|maquinas_stock');
+    expect(localStorage.getItem(panoramaStorageKey('manager-a'))).toBe('["ventas_facturacion","maquinas_stock"]');
   });
 });

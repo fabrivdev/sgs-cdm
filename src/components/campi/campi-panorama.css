@@ -17,7 +17,12 @@
 }
 .campi-panorama-avatar .campi-sprite {
   transform: scale(1.08);
+  transform-origin: center bottom;
+  transition: transform 650ms ease-in-out;
 }
+.campi-panorama-avatar[data-posture="tilt"] .campi-sprite:not(.campi-action) { transform: rotate(-2deg) scale(1.08); }
+.campi-panorama-avatar[data-posture="hand"] .campi-sprite:not(.campi-action) { transform: rotate(1deg) scale(1.08); }
+.campi-panorama-avatar[data-posture="look"] .campi-sprite:not(.campi-action) { transform: rotate(2deg) scale(1.08); }
 .campi-panorama-avatar[data-paused="true"] { animation-play-state: paused; }
 @keyframes campi-panorama-breathe {
   0%, 100% { transform: rotate(0) scale(1); }
@@ -25,4 +30,5 @@
 }
 @media (prefers-reduced-motion: reduce) {
   .campi-panorama-avatar { animation: none; }
+  .campi-panorama-avatar .campi-sprite { transition: none; }
 }
