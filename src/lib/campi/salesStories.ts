@@ -159,6 +159,7 @@ export const loadSalesStories: StoryLoader = async (topics, granted, asOf) => {
         const net = sum(item => item.month, 'amount'), netLY = sum(item => item.monthLY, 'amount');
         const ytdNet = sum(item => item.current, 'amount'), ytdNetLY = sum(item => item.previous, 'amount');
         const ytdGross = sum(item => item.current, 'gross'), ytdGrossLY = sum(item => item.previous, 'gross');
+        const ytdCredits = ytdGross - ytdNet;
         if (Math.abs(gross - credits - net) > Math.max(0.01, Math.abs(net) * 1e-10)) throw new Error('Las ventas y NC consolidadas no concilian con el neto.');
         const unit = 'USD' as const;
         if (id === 'ventas_evolucion') {
@@ -185,10 +186,21 @@ export const loadSalesStories: StoryLoader = async (topics, granted, asOf) => {
           { label: 'Notas de crédito del mes', value: -credits, unit },
           { label: 'Facturación neta acumulada', value: ytdNet, unit, comparison: { value: ytdNetLY, label: `Mismo tramo de ${ranges.year - 1}` } },
           { label: 'Ventas acumuladas antes de NC', value: ytdGross, unit, comparison: { value: ytdGrossLY, label: `Mismo tramo de ${ranges.year - 1}` } },
+          { label: 'NC acumuladas del año', value: -ytdCredits, unit },
           { label: 'Mes anterior completo, antes de NC', value: sum(item => item.lastMonth, 'gross'), unit },
         ];
         story.chart = { kind: 'bars', title: 'Neto por área autorizada', rows: monthlyReports.map(item => ({ label: item.source.label, value: numeric(item.month[item.source.amount]), previous: numeric(item.monthLY[item.source.amount]) })), unit, currentLabel: String(ranges.year), previousLabel: String(ranges.year - 1) };
+        story.detailChart = { kind: 'trend', title: 'Evolución mensual de la facturación neta', unit, currentLabel: String(ranges.year), previousLabel: String(ranges.year - 1), rows: Array.from({ length: ranges.month }, (_, index) => {
+          const month = String(index + 1).padStart(2, '0');
+          return { label: ['Ene', 'Feb', 'Mar', 'Abr', 'May', 'Jun', 'Jul', 'Ago', 'Sep', 'Oct', 'Nov', 'Dic'][index],
+            value: loaded.reduce((total, item) => total + monthly(item.current, `${ranges.year}-${month}`, item.source.amount), 0),
+            previous: loaded.reduce((total, item) => total + monthly(item.previous, `${ranges.year - 1}-${month}`, item.source.amount), 0) };
+        }) };
         story.breakdown = monthlyReports.map(item => { const areaGross = numeric(item.month[item.source.gross]); const areaNet = numeric(item.month[item.source.amount]); return { label: item.source.label, value: areaNet, unit, route: item.source.route, billing: { sales: areaGross, credits: areaGross - areaNet } }; });
+        story.breakdown = [
+          ...story.breakdown.map(row => ({ ...row, group: 'Áreas del mes' })),
+          ...story.detailChart.rows.map(row => ({ label: row.label, value: row.value, previous: row.previous, unit, group: 'Mes a mes' })),
+        ];
         story.message = `Facturación neta del mes: $ ${new Intl.NumberFormat('es-PY', { maximumFractionDigits: 2 }).format(net)}, después de $ ${new Intl.NumberFormat('es-PY', { maximumFractionDigits: 2 }).format(credits)} en notas de crédito.`;
         story.attention = false;
         story.details.push('Cada área usa su mismo contrato de movimientos en USD. Ventas antes de NC − importe de NC = neto; el signo de NC se normaliza exactamente una vez.', `Comparación del ${monthFrom} al ${ranges.to} con ${monthLYFrom} al ${ranges.previousTo}.`, 'El acumulado neto usa el mismo corte de fechas de ambos años. El mes anterior completo es solo contexto, no un tramo equivalente.');

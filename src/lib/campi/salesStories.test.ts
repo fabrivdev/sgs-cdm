@@ -33,7 +33,10 @@ describe('sales story source contracts', () => {
     expect(billing.supporting[1].value).toBe(-40);
     expect(billing.supporting[2].value).toBe(2800);
     expect(billing.supporting[3].value).toBe(3200);
+    expect(billing.supporting.find(item => item.label === 'NC acumuladas del año')?.value).toBe(-400);
     expect(billing.chart?.rows).toHaveLength(3);
+    expect(billing.detailChart).toMatchObject({ kind: 'trend', rows: expect.arrayContaining([{ label: 'Oct', value: 280, previous: 150 }]) });
+    expect(billing.breakdown.filter(row => row.group === 'Mes a mes')).toHaveLength(10);
     expect(billing.cutoff).toBeNull();
     expect(clients.primary?.value).toBe(120);
     expect(clients.supporting.find(item => item.label === 'Ventas acumuladas')?.value).toBe(1200);

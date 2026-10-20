@@ -34,12 +34,12 @@ describe('Campi Panorama topics', () => {
     const available = availablePanoramaTopics(() => true, () => true, true);
     expect(reconcilePanoramaOrder([
       'ventas_facturacion', 'repuestos_stock', 'ventas_facturacion', 'maquinas_stock', 'maquinas_pedidos',
-    ], available)).toEqual(['ventas_facturacion', 'repuestos_stock', 'maquinas_stock', 'maquinas_pedidos']);
-    expect(reconcilePanoramaOrder(['maquinas_stock', 'repuestos_stock'], available.filter(topic => topic.id !== 'maquinas_stock')))
+    ], available)).toEqual(['ventas_facturacion', 'repuestos_stock', 'maquinas_pedidos']);
+    expect(reconcilePanoramaOrder(['maquinas_stock', 'repuestos_stock'], available.filter(topic => topic.id !== 'maquinas_pedidos')))
       .toEqual(['repuestos_stock']);
     expect(reconcilePanoramaOrder(['repuestos_clientes', 'ventas_facturacion', 'repuestos_sucursales', 'repuestos_stock'], available))
       .toEqual(['ventas_facturacion', 'repuestos_sucursales', 'repuestos_stock']);
-    expect(reconcilePanoramaOrder(['maquinas_proyeccion'], available)).toEqual(['maquinas_stock']);
+    expect(reconcilePanoramaOrder(['maquinas_proyeccion'], available)).toEqual(['maquinas_pedidos']);
     expect(reconcilePanoramaOrder(PANORAMA_TOPICS.map(topic => topic.id), available)).toEqual(PANORAMA_TOPICS.slice(0, 4).map(topic => topic.id));
   });
 

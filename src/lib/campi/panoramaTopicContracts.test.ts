@@ -25,7 +25,7 @@ describe('reviewed topic registry', () => {
     expect(topicContract('maquinas_proyeccion')).toBeUndefined();
   });
   it('preserves selected order independently of catalog order', () => {
-    const ids = ['repuestos_alertas', 'ventas_facturacion', 'maquinas_stock', 'servicios_abiertas'];
+    const ids = ['repuestos_alertas', 'ventas_facturacion', 'maquinas_pedidos', 'servicios_abiertas'];
     expect(reconcilePanoramaOrder(ids, [...PANORAMA_TOPICS].reverse())).toEqual(ids);
   });
 });

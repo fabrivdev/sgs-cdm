@@ -20,6 +20,7 @@ const date = (value: unknown): string => {
 const nextMonth = (month: string) => new Date(Date.parse(month + 'T00:00:00Z') + 36 * 86400000).toISOString().slice(0, 7) + '-01';
 const lastDay = (month: string) => new Date(Date.parse(nextMonth(month) + 'T00:00:00Z') - 86400000).toISOString().slice(0, 10);
 const formatDate = (value: string) => new Intl.DateTimeFormat('es-PY', { month: 'long', year: 'numeric', timeZone: 'UTC' }).format(new Date(value + 'T12:00:00Z'));
+const formatDay = (value: string) => new Intl.DateTimeFormat('es-PY', { day: '2-digit', month: '2-digit', year: 'numeric', timeZone: 'UTC' }).format(new Date(value + 'T12:00:00Z'));
 
 type SupplyOrder = { operacion_id: string; np_numero: string | null; unidades: number; sin_vinculo: number; sin_identidad_o_conflicto: number };
 type Supply = { fecha_analisis: string; filas: number; identidades: number; unidades_identificadas: number; estados_desconocidos: number; cantidades_invalidas: number; unidades: number; sin_unidad: number; conflicto: number; sin_vinculo: number; stock: number; importacion_arribada: number; importacion_transito: number; pedidos: number; pendientes: SupplyOrder[] };
@@ -53,7 +54,7 @@ export function machineSupplyStory(data: Supply): PanoramaStory {
     status: data.unidades ? 'ready' : 'empty',
     message: data.unidades ? `${risk} de ${data.unidades} unidades de operaciones activas no tienen un vínculo único de abastecimiento comprobado.` : 'No hay unidades en operaciones activas.',
     scope: 'Unidades de operaciones no cerradas, facturadas ni canceladas; vínculo por identidad de unidad',
-    sections: ['parque.operaciones'], cutoff: null, periodLabel: `Lectura ${data.fecha_analisis}`,
+    sections: ['parque.operaciones'], cutoff: null, periodLabel: formatDay(data.fecha_analisis),
     primary: { label: 'Unidades en pedidos activos', value: data.unidades, unit: 'count' },
     supporting: [{ label: 'Unidades activas', value: data.unidades, unit: 'count' }, { label: 'Sin vínculo', value: data.sin_vinculo, unit: 'count' },
       { label: 'Sin unidad individual', value: data.sin_unidad, unit: 'count' }, { label: 'Vínculo ambiguo', value: data.conflicto, unit: 'count' },
@@ -72,6 +73,69 @@ export function machineSupplyStory(data: Supply): PanoramaStory {
     source: 'campi_pedidos_abastecimiento_v1 · pedidos, unidades, stock e importaciones', route: '/parque-operaciones',
     notices: risk ? [{ text: `${risk} de ${data.unidades} unidades activas sin vínculo único de abastecimiento`, route: '/parque-operaciones' }] : [],
   };
+}
+
+type ReadyOrder = { operacion_id: string; np_numero: string | null; unidades_con_stock: number; unidades_activas: number };
+type ReadyOrders = { fecha_analisis: string; unidades_activas: number; unidades_con_stock: number; pedidos_con_stock: number; unidades_facturadas_detectadas: number; identidades: number; pedidos: ReadyOrder[] };
+export function parseReadyOrders(input: unknown): ReadyOrders {
+  const raw = record(input);
+  if (!Array.isArray(raw.pedidos)) throw new Error('Falta el detalle de pedidos con stock.');
+  const pedidos = raw.pedidos.map(item => {
+    const order = record(item);
+    if (typeof order.operacion_id !== 'string' || !order.operacion_id || (order.np_numero !== null && typeof order.np_numero !== 'string')) throw new Error('Pedido sin identidad.');
+    return { operacion_id: order.operacion_id, np_numero: order.np_numero as string | null,
+      unidades_con_stock: integer(order.unidades_con_stock), unidades_activas: integer(order.unidades_activas) };
+  });
+  const data = { fecha_analisis: date(raw.fecha_analisis), unidades_activas: integer(raw.unidades_activas),
+    unidades_con_stock: integer(raw.unidades_con_stock), pedidos_con_stock: integer(raw.pedidos_con_stock),
+    unidades_facturadas_detectadas: integer(raw.unidades_facturadas_detectadas), identidades: integer(raw.identidades), pedidos };
+  if (data.identidades !== data.unidades_activas || data.unidades_con_stock > data.unidades_activas ||
+      data.pedidos_con_stock !== pedidos.length || new Set(pedidos.map(p => p.operacion_id)).size !== pedidos.length ||
+      pedidos.some(p => p.unidades_con_stock <= 0 || p.unidades_con_stock > p.unidades_activas) ||
+      pedidos.reduce((sum, p) => sum + p.unidades_con_stock, 0) !== data.unidades_con_stock) throw new Error('Los pedidos con stock no concilian.');
+  return data;
+}
+export function readyOrdersStory(data: ReadyOrders, supply: Supply): PanoramaStory {
+  const unlinked = supply.sin_vinculo + supply.sin_unidad + supply.conflicto;
+  if (data.fecha_analisis !== supply.fecha_analisis || data.pedidos_con_stock > supply.pedidos ||
+      data.unidades_con_stock > supply.stock || data.unidades_con_stock > supply.unidades) throw new Error('Los pedidos pendientes y su abastecimiento no concilian.');
+  return { id: 'maquinas_pedidos', visitKey: `maquinas_pedidos:abastecimiento-v2:${data.fecha_analisis}`,
+    title: 'Pedidos pendientes', question: '¿Cuántos pedidos pendientes tienen stock para facturar y cómo se abastece el resto?',
+    status: 'ready', message: `${data.pedidos_con_stock} de ${supply.pedidos} pedidos pendientes tienen al menos una unidad con stock para facturar.`,
+    scope: 'Pedidos activos y su abastecimiento por unidad',
+    sections: ['parque.operaciones'], cutoff: null, periodLabel: formatDay(data.fecha_analisis),
+    primary: { label: 'Pedidos pendientes', value: supply.pedidos, unit: 'count' },
+    supporting: [{ label: 'Pedidos con stock', value: data.pedidos_con_stock, unit: 'count', note: `${supply.pedidos ? new Intl.NumberFormat('es-PY', { maximumFractionDigits: 1 }).format(data.pedidos_con_stock / supply.pedidos * 100) : 0}% · ${data.unidades_con_stock} unidades` },
+      { label: 'Unidades pendientes', value: supply.unidades, unit: 'count' },
+      { label: 'Unidades con stock para facturar', value: data.unidades_con_stock, unit: 'count' }],
+    chart: { kind: 'bars', title: 'Abastecimiento de unidades pendientes', unit: 'count', rows: [
+      { label: 'Stock', value: supply.stock },
+      { label: 'Importación arribada', value: supply.importacion_arribada },
+      { label: 'Importación en tránsito', value: supply.importacion_transito },
+      { label: 'Sin vínculo', value: unlinked },
+    ] },
+    breakdown: [
+      ...data.pedidos.map(order => ({ label: order.np_numero?.trim() || 'Pedido sin NP', value: order.unidades_con_stock,
+        unit: 'count' as const, group: 'Con stock para facturar', route: `/parque-operaciones?operacion=${encodeURIComponent(order.operacion_id)}` })),
+      ...supply.pendientes.map(order => ({ label: order.np_numero?.trim() || 'Pedido sin NP', value: order.unidades,
+        unit: 'count' as const, group: 'Sin vínculo', route: `/parque-operaciones?operacion=${encodeURIComponent(order.operacion_id)}` })),
+    ],
+    details: ['El stock está asignado a la misma unidad del pedido y tiene saldo positivo. Se excluyen ventas de la misma máquina confirmadas por chasis. La facturación final requiere la revisión comercial habitual.'],
+    source: 'campi_pedidos_abastecimiento_v1 + campi_pedidos_con_stock_v1', route: '/parque-operaciones' };
+}
+
+type OpenDetail = { fecha_analisis: string; abiertas: number; marcas: { nombre: string; cantidad: number }[]; edades: { rango: string; cantidad: number }[]; cortes: { fecha: string; abiertas: number }[] };
+export function parseOpenDetail(input: unknown): OpenDetail {
+  const raw = record(input);
+  if (!Array.isArray(raw.marcas) || !Array.isArray(raw.edades) || !Array.isArray(raw.cortes)) throw new Error('Falta el desglose de OS abiertas.');
+  const brands = raw.marcas.map(item => { const row = record(item); if (typeof row.nombre !== 'string' || !row.nombre) throw new Error('Marca inválida.'); return { nombre: row.nombre, cantidad: integer(row.cantidad) }; });
+  const ages = raw.edades.map(item => { const row = record(item); if (typeof row.rango !== 'string' || !row.rango) throw new Error('Rango inválido.'); return { rango: row.rango, cantidad: integer(row.cantidad) }; });
+  const cuts = raw.cortes.map(item => { const row = record(item); return { fecha: date(row.fecha), abiertas: integer(row.abiertas) }; });
+  const data = { fecha_analisis: date(raw.fecha_analisis), abiertas: integer(raw.abiertas), marcas: brands, edades: ages, cortes: cuts };
+  if (brands.reduce((s,b) => s+b.cantidad,0) !== data.abiertas || ages.reduce((s,a) => s+a.cantidad,0) !== data.abiertas ||
+      new Set(brands.map(b => b.nombre)).size !== brands.length || new Set(ages.map(a => a.rango)).size !== ages.length ||
+      new Set(cuts.map(c => c.fecha)).size !== cuts.length || cuts.some(c => c.fecha > data.fecha_analisis)) throw new Error('El desglose de OS no concilia.');
+  return data;
 }
 
 type Resolution = { fecha_analisis: string; ultimo_mes: string; mes_anterior: string; cierres_ultimo_mes: number; cierres_mes_anterior: number; invalidas_ultimo_mes: number; invalidas_mes_anterior: number; mediana_ultimo_mes: number | null; mediana_mes_anterior: number | null; historicas_sin_cierre: number; abiertas: number; apertura_invalida: number; p90_edad_abiertas: number | null };
@@ -121,17 +185,23 @@ export function serviceResolutionStory(data: Resolution): PanoramaStory {
   };
 }
 
-export function serviceOpenStory(data: Resolution): PanoramaStory {
+export function serviceOpenStory(data: Resolution, detail?: OpenDetail): PanoramaStory {
   if (data.apertura_invalida || (data.abiertas > 0) !== (data.p90_edad_abiertas !== null)) throw new Error('La cohorte de OS abiertas no está completa.');
+  if (detail && (detail.abiertas !== data.abiertas || detail.fecha_analisis !== data.fecha_analisis)) throw new Error('El detalle de OS no corresponde al resumen.');
   return { id: 'servicios_abiertas', visitKey: `servicios_abiertas:cola-v1:${data.fecha_analisis}`,
     title: 'Órdenes de servicio abiertas', question: '¿Cuántas OS siguen abiertas y qué edad tienen?',
     status: 'ready', message: data.abiertas ? `${data.abiertas} OS figuran abiertas; el percentil 90 de edad es ${data.p90_edad_abiertas} días.` : 'No hay OS abiertas en la fuente consultada.',
     scope: 'OS con estado abierto y fecha de apertura operativa válida', sections: ['servicios.ordenes'], cutoff: null,
-    periodLabel: `Lectura ${formatDate(data.fecha_analisis)}`,
+    periodLabel: formatDay(data.fecha_analisis),
     primary: { label: 'OS abiertas', value: data.abiertas, unit: 'count' },
     supporting: [{ label: 'Percentil 90 de edad', value: data.p90_edad_abiertas, unit: 'days' }],
-    chart: data.abiertas ? { kind: 'bars', title: 'Cola abierta', unit: 'count', rows: [{ label: 'Abiertas', value: data.abiertas }] } : null,
-    breakdown: [{ label: 'Órdenes abiertas', value: data.abiertas, unit: 'count', route: `/servicios/ordenes?estado=abierta&cohorte=open&desde=2000-01-01&hasta=${data.fecha_analisis}` }],
+    chart: detail?.edades.length ? { kind: 'bars', title: 'Edad de las órdenes abiertas', unit: 'count', rows: detail.edades.map(row => ({ label: row.rango, value: row.cantidad })) } : null,
+    detailChart: detail && detail.cortes.length >= 2 ? { kind: 'trend', title: 'Evolución de OS abiertas en cortes importados', unit: 'count', rows: detail.cortes.map(row => ({ label: row.fecha.slice(5), value: row.abiertas })) } : null,
+    secondaryCharts: detail?.marcas.length ? [{ kind: 'bars', title: 'OS abiertas por marca', unit: 'count', rows: detail.marcas.map(row => ({ label: row.nombre, value: row.cantidad })) }] : [],
+    breakdown: detail ? [
+      ...detail.marcas.map(row => ({ label: row.nombre, value: row.cantidad, unit: 'count' as const, group: 'Marcas' })),
+      ...detail.edades.map(row => ({ label: row.rango, value: row.cantidad, unit: 'count' as const, group: 'Antigüedad' })),
+    ] : [],
     details: ['La edad se calcula desde la apertura operativa hasta la fecha de análisis. El percentil 90 indica que nueve de cada diez OS abiertas tienen esa edad o menos.',
       'La fecha de análisis no acredita por sí sola que la fuente esté completa hasta hoy. La edad de una OS no acredita atraso sin una fecha comprometida verificable. Las aperturas inválidas bloquean el indicador en lugar de contarse como cero.'],
     source: 'campi_resolucion_os_v1 · estado y fechas operativas de OS', route: '/servicios/ordenes' };

@@ -12,11 +12,9 @@ export function storySummaryPercentage(story: PanoramaStory): StorySummaryPercen
       : null;
   }
   if (story.id === 'maquinas_pedidos') {
-    const total = story.supporting.find(datum => datum.label === 'Unidades activas')?.value;
-    const withoutLink = ['Sin vínculo', 'Sin unidad individual', 'Vínculo ambiguo'].map(label => story.supporting.find(datum => datum.label === label)?.value);
-    const risk = withoutLink.every(value => typeof value === 'number' && Number.isFinite(value)) ? withoutLink.reduce<number>((sum, value) => sum + (value as number), 0) : null;
-    return typeof total === 'number' && Number.isFinite(total) && total > 0 && risk !== null && risk >= 0 && risk <= total
-      ? { value: risk / total * 100, label: 'sin vínculo válido', kind: 'composition' }
+    const ready = story.supporting.find(datum => datum.label === 'Pedidos con stock')?.value;
+    return typeof ready === 'number' && Number.isFinite(ready) && primary.value > 0 && ready >= 0 && ready <= primary.value
+      ? { value: ready / primary.value * 100, label: 'con stock para facturar', kind: 'composition' }
       : null;
   }
   const previous = primary.comparison?.value;

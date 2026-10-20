@@ -14,7 +14,7 @@ export type TopicContract = {
   evidence: readonly string[];
   tests: readonly string[];
 };
-export type EnabledTopicId = Exclude<StoryTopicId, 'repuestos_clientes' | 'maquinas_proyeccion'>;
+export type EnabledTopicId = Exclude<StoryTopicId, 'repuestos_clientes' | 'maquinas_proyeccion' | 'maquinas_stock'>;
 export const PANORAMA_CONTRACTS = {
   ventas_evolucion: {
     queryGroup: 'sales', unit: 'USD', formula: 'Suma de ventas antes de NC de todas las áreas autorizadas.',
@@ -33,11 +33,11 @@ export const PANORAMA_CONTRACTS = {
     evidence: ['salesStories.ts'], tests: ['salesStories.test.ts'],
   },
   maquinas_pedidos: {
-    queryGroup: 'supply', unit: 'count', formula: 'Unidades de operaciones activas, separadas por vínculo único de abastecimiento.',
-    population: 'Excluye operaciones cerradas, facturadas y canceladas.',
-    period: 'Foto de operaciones activas.', comparison: 'snapshot', chart: 'composition',
-    limitations: ['Sin vínculo no implica atraso ni falta física.', 'No acredita entregas pendientes.'],
-    evidence: ['campi_pedidos_abastecimiento_v1'], tests: ['operationsStories.test.ts'],
+    queryGroup: 'orders-supply', unit: 'count', formula: 'Pedidos activos pendientes; porcentaje con al menos una unidad de stock positivo vinculada y sin venta positiva confirmada.',
+    population: 'Excluye operaciones cerradas, facturadas y canceladas. Clasifica unidades por stock, importación arribada, tránsito y falta de vínculo.',
+    period: 'Lectura de pedidos y abastecimiento.', comparison: 'snapshot', chart: 'composition',
+    limitations: ['Tener stock no reemplaza la revisión comercial para emitir factura.', 'Un pedido puede tener abastecimiento parcial.'],
+    evidence: ['campi_pedidos_abastecimiento_v1', 'campi_pedidos_con_stock_v1'], tests: ['operationsStories.test.ts'],
   },
   servicios_pendientes: {
     queryGroup: 'service-outcomes', unit: 'days', formula: 'Mediana de fecha de cierre operativo menos fecha de apertura.',
@@ -80,13 +80,6 @@ export const PANORAMA_CONTRACTS = {
     period: 'Edad al día de análisis.', comparison: 'snapshot', chart: 'concentration',
     limitations: ['No es rotación.', 'Sin fecha excluido del promedio.', 'Corte físico no acreditado.'],
     evidence: ['operationsStories.ts'], tests: ['operationsStories.test.ts'],
-  },
-  maquinas_stock: {
-    queryGroup: 'machine-stock', unit: 'count', formula: 'Suma de saldo físico por condición.',
-    population: 'Stock físico de máquinas de la fuente autorizada.',
-    period: 'Foto sin corte de origen acreditado.', comparison: 'snapshot', chart: 'composition',
-    limitations: ['No equivale a disponibilidad comercial.', 'No suma compras pendientes.'],
-    evidence: ['parque_stock_maquinas'], tests: ['operationsStories.test.ts'],
   },
 } satisfies Record<EnabledTopicId, TopicContract>;
 

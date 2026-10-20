@@ -789,6 +789,16 @@ export async function persistNewSystemBundle({
     ordenesServicioBloqueadas = Number(reconciliation.bloqueadas ?? 0);
   }
 
+  // Corte de Panorama tras persistir y reconciliar la foto completa. Es un
+  // registro auxiliar: una falla aquí no convierte una importación válida en
+  // "parcial" ni invita al usuario a repetir el lote.
+  try {
+    const { error } = await supabase.rpc("campi_os_abiertas_capturar_v1" as never);
+    if (error && error.code !== "PGRST202") console.warn("No se pudo registrar el corte de OS para Panorama", error);
+  } catch (error) {
+    console.warn("No se pudo registrar el corte de OS para Panorama", error);
+  }
+
   const { error: updateOsImpError } = await supabase
     .from("importaciones")
     .update({

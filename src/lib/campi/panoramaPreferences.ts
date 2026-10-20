@@ -11,14 +11,13 @@ export const MAX_PANORAMA_TOPICS = 4;
 const TOPIC_LABELS: readonly (Omit<PanoramaTopic, 'id' | 'contract'> & { id: EnabledTopicId })[] = [
   { id: 'ventas_evolucion', label: 'Evolución de ventas', title: 'Evolución de ventas', question: '¿Estamos vendiendo más o menos?', preview: 'Ventas antes de NC, mes y acumulado comparables.', group: 'Resultados', sections: ['servicios.ventas', 'parque.ventas', 'repuestos.ventas'], definitionVersion: 'ventas-antes-nc-v1' },
   { id: 'ventas_facturacion', label: 'Facturación y notas de crédito', title: 'Facturación neta', question: '¿Cuánto quedó facturado después de las NC?', preview: 'Neto, ventas y NC por área autorizada.', group: 'Resultados', sections: ['servicios.ventas', 'parque.ventas', 'repuestos.ventas'], definitionVersion: 'ventas-netas-nc-separadas-v3' },
-  { id: 'maquinas_pedidos', label: 'Abastecimiento de pedidos activos', title: 'Abastecimiento de pedidos activos', question: '¿Qué pedidos activos no tienen abastecimiento vinculado?', preview: 'Vínculos con stock e importaciones; no mide atraso.', group: 'Compromisos', sections: ['parque.operaciones'], definitionVersion: 'abastecimiento-v1' },
+  { id: 'maquinas_pedidos', label: 'Pedidos pendientes', title: 'Pedidos pendientes', question: '¿Cuántos pedidos tienen stock para facturar y cómo se abastece el resto?', preview: 'Total pendiente, proporción con stock, importaciones y unidades sin vínculo.', group: 'Compromisos', sections: ['parque.operaciones'], definitionVersion: 'pedidos-abastecimiento-v2' },
   { id: 'servicios_pendientes', label: 'Resolución de órdenes de servicio', title: 'Resolución de órdenes de servicio', question: '¿Cuánto tardaron en resolverse las OS cerradas?', preview: 'Mediana de cierres y resguardo de abiertas.', group: 'Operación', sections: ['servicios.ordenes'], definitionVersion: 'resolucion-v1' },
   { id: 'servicios_abiertas', label: 'Órdenes de servicio abiertas', title: 'Órdenes de servicio abiertas', question: '¿Cuántas OS siguen abiertas y qué edad tienen?', preview: 'Volumen abierto y edad del 90% de las OS.', group: 'Operación', sections: ['servicios.ordenes'], definitionVersion: 'cola-abierta-v1' },
   { id: 'repuestos_stock', label: 'Stock antiguo de repuestos', title: 'Stock antiguo de repuestos', question: '¿Qué valor de repuestos está en gris o rojo?', preview: 'Valor, proporción y cambios próximos de color.', group: 'Disponibilidad', sections: ['repuestos.analisis'], definitionVersion: 'exposicion-valor-positivo-v1' },
   { id: 'repuestos_alertas', label: 'Cambios próximos de clasificación', title: 'Cambios próximos de clasificación', question: '¿Qué valor podría pasar a gris o rojo en 30 días?', preview: 'Importe y códigos, si no hay movimientos nuevos.', group: 'Disponibilidad', sections: ['repuestos.analisis'], definitionVersion: 'transicion-30d-v1' },
   { id: 'repuestos_concentracion', label: 'Concentración del stock antiguo', title: 'Concentración del stock antiguo', question: '¿Qué familias concentran el valor antiguo?', preview: 'Participación de las tres familias principales.', group: 'Disponibilidad', sections: ['repuestos.analisis'], definitionVersion: 'familias-top3-v1' },
   { id: 'repuestos_sucursales', label: 'Antigüedad de compra por sucursal', title: 'Antigüedad de repuestos por sucursal', question: '¿Cuánto tiempo hace desde la última compra por sucursal?', preview: 'Días ponderados por valor con compra fechada.', group: 'Disponibilidad', sections: ['repuestos.analisis'], definitionVersion: 'antiguedad-ponderada-v3' },
-  { id: 'maquinas_stock', label: 'Composición del stock físico', title: 'Stock físico de máquinas', question: '¿Qué existencias informa la última foto?', preview: 'Existencias físicas; corte de fuente no acreditado.', group: 'Disponibilidad', sections: ['parque.stock'], definitionVersion: 'stock-fisico-v1' },
 ];
 export const PANORAMA_TOPICS: readonly PanoramaTopic[] = TOPIC_LABELS.map(topic => ({ ...topic, contract: PANORAMA_CONTRACTS[topic.id] }));
 export const panoramaTopicDefinition = (id: StoryTopicId) => PANORAMA_TOPICS.find(topic => topic.id === id);
@@ -38,7 +37,7 @@ export function availablePanoramaTopics(
 
 export function reconcilePanoramaOrder(saved: readonly string[] | null, available: readonly PanoramaTopic[]) {
   const permitted = new Set<string>(available.map(topic => topic.id));
-  const migrated = (saved ?? []).map(id => id === 'repuestos_clientes' ? 'ventas_facturacion' : id === 'maquinas_proyeccion' ? 'maquinas_stock' : id);
+  const migrated = (saved ?? []).map(id => id === 'repuestos_clientes' ? 'ventas_facturacion' : id === 'maquinas_proyeccion' || id === 'maquinas_stock' ? 'maquinas_pedidos' : id);
   return migrated.filter((id, index, all): id is StoryTopicId =>
     permitted.has(id) && all.indexOf(id) === index,
   ).slice(0, MAX_PANORAMA_TOPICS);

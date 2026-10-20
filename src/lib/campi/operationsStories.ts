@@ -4,7 +4,7 @@ import type { SectionKey } from '@/lib/permissions';
 import type { PanoramaStory, StoryLoader, StoryTopicId } from './panoramaStoryTypes';
 import { panoramaTopicDefinition } from './panoramaPreferences';
 import { parsePartsExposure, partsAlertsStory, partsConcentrationStory, partsExposureStory } from './partsExposure';
-import { machineSupplyStory, parseMachineSupply, parseServiceResolution, serviceOpenStory, serviceResolutionStory } from './operationalOutcomes';
+import { parseMachineSupply, parseOpenDetail, parseReadyOrders, parseServiceResolution, readyOrdersStory, serviceOpenStory, serviceResolutionStory } from './operationalOutcomes';
 
 const number = (v: unknown): number | null => typeof v === 'number' && Number.isFinite(v) ? v : null;
 const required = (v: unknown) => { const n = number(v); if (n === null) throw new Error('La fuente devolvió un valor incompleto.'); return n; };
@@ -18,7 +18,7 @@ const definitions: Partial<Record<StoryTopicId, { section: SectionKey; route: st
   repuestos_stock: { section: 'repuestos.analisis', route: '/repuestos/analisis', source: 'campi_repuestos_exposicion_v1' },
   repuestos_alertas: { section: 'repuestos.analisis', route: '/repuestos/analisis', source: 'campi_repuestos_exposicion_v1' },
   repuestos_concentracion: { section: 'repuestos.analisis', route: '/repuestos/analisis', source: 'campi_repuestos_exposicion_v1' },
-  maquinas_pedidos: { section: 'parque.operaciones', route: '/parque-operaciones', source: 'campi_pedidos_abastecimiento_v1' },
+  maquinas_pedidos: { section: 'parque.operaciones', route: '/parque-operaciones', source: 'campi_pedidos_abastecimiento_v1 + campi_pedidos_con_stock_v1' },
   maquinas_stock: { section: 'parque.stock', route: '/parque-stock', source: 'parque_stock_maquinas · saldo_actual' },
   maquinas_proyeccion: { section: 'parque.stock_proyectado', route: '/parque-stock-proyectado', source: 'parque_stock_proyectado_v1' },
   servicios_pendientes: { section: 'servicios.ordenes', route: '/servicios/ordenes', source: 'campi_resolucion_os_v1' },
@@ -147,15 +147,24 @@ export const loadOperationsStories: StoryLoader = async (topics, granted, asOf) 
       if (id === 'maquinas_proyeccion') return await projected(asOf);
       if (id === 'maquinas_stock') return await machineStock();
       if (id === 'maquinas_pedidos') {
-        const response = await supabase.rpc('campi_pedidos_abastecimiento_v1' as never);
-        if (response.error) throw response.error;
-        return machineSupplyStory(parseMachineSupply(response.data));
+        const [stock, supply] = await Promise.all([
+          supabase.rpc('campi_pedidos_con_stock_v1' as never),
+          supabase.rpc('campi_pedidos_abastecimiento_v1' as never),
+        ]);
+        if (stock.error) throw stock.error;
+        if (supply.error) throw supply.error;
+        return readyOrdersStory(parseReadyOrders(stock.data), parseMachineSupply(supply.data));
       }
       serviceRequest ??= supabase.rpc('campi_resolucion_os_v1' as never);
       const response = await serviceRequest;
       if (response.error) throw response.error;
       const data = parseServiceResolution(response.data);
-      return id === 'servicios_abiertas' ? serviceOpenStory(data) : serviceResolutionStory(data);
+      if (id === 'servicios_abiertas') {
+        const detail = await supabase.rpc('campi_os_abiertas_detalle_v1' as never);
+        if (detail.error) throw detail.error;
+        return serviceOpenStory(data, parseOpenDetail(detail.data));
+      }
+      return serviceResolutionStory(data);
     } catch (error) {
       const migrationMissing = ['repuestos_stock', 'repuestos_alertas', 'repuestos_concentracion', 'maquinas_pedidos', 'servicios_pendientes', 'servicios_abiertas'].includes(id) && typeof error === 'object' && error !== null && 'code' in error && error.code === 'PGRST202';
       return { ...base(id), status: 'error' as const, message: migrationMissing

@@ -37,12 +37,8 @@ export function interpretCampi(stories: readonly PanoramaStory[]) {
       return finding('attention', `Stock antiguo de repuestos: ${s.notices[0].text}. Podés abrir los códigos incluidos en el detalle.`, 'review');
     }
     if (s.id === 'maquinas_pedidos' && p.value! > 0) {
-      const missing = s.chart?.rows.find(row => row.label === 'Sin vínculo válido')?.value;
-      const chartTotal = s.chart?.rows.reduce((sum, row) => sum + row.value, 0);
-      if (valid(missing) && missing >= 0 && valid(chartTotal) && chartTotal === p.value! && missing <= p.value!) {
-        return finding('neutral', `${s.title}: ${number.format(p.value!)} unidades en pedidos activos; ${number.format(missing)} sin vínculo válido (${number.format(missing / p.value! * 100)}%). Esto no acredita entregas atrasadas.`);
-      }
-      return finding('neutral', `${s.title}: el total de pedidos activos está disponible, pero no pude conciliar el desglose de vínculos.`);
+      const ready = s.supporting.find(d => d.label === 'Pedidos con stock')?.value;
+      if (valid(ready) && ready <= p.value!) return finding('neutral', `De ${number.format(p.value!)} pedidos pendientes, ${number.format(ready)} tienen stock para facturar. Abrí el detalle para ver las NP y el resto del abastecimiento.`);
     }
     if (s.id === 'servicios_pendientes' && valid(p.comparison?.value) && p.comparison.value > 0) {
       const difference = p.value! - p.comparison.value;

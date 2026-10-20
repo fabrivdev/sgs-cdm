@@ -1,5 +1,15 @@
 # Panorama alternativo: temas con contexto
 
+## Corrección de utilidad — 20/10/2026 (rama alternativa)
+
+El catálogo deja de ofrecer el saldo físico de máquinas como KPI autónomo. «Pedidos pendientes» vuelve a encabezar la lectura: 12 pedidos en el corte real del 20/10, de los cuales 6 (50%) tienen al menos una unidad con stock para facturar. El gráfico conserva las 19 unidades por abastecimiento: 7 con stock, 3 de importación arribada, 1 en tránsito y 8 sin vínculo comprobado. Cada NP con stock abre su operación; tener stock no reemplaza la revisión comercial final. Las RPC `campi_pedidos_abastecimiento_v1` y `campi_pedidos_con_stock_v1` concilian el total y la parte facturable. La segunda quedó aplicada en Lovable Cloud y comprobada en el navegador local.
+
+Facturación mantiene el neto mensual y separa ventas y NC. La cabecera del lateral muestra tres KPI breves: Neto mes, Neto año y NC año. Los dos netos muestran variación y base LY; NC año muestra su proporción de ventas. El gráfico compara mes a mes con el año anterior, y las tablas conservan importes exactos y áreas autorizadas. Cuando no hay comparación válida se omite ese bloque visual. Se quitaron del lateral las explicaciones permanentes de fuente, población y corte sin acreditar; el contrato técnico sigue documentado internamente.
+
+OS abiertas incorpora desgloses por marca y edad. En el corte real se verificaron 81 abiertas: HORSCH 55, CLAAS 20, sin marca 5 y otras 1; por edad, 5 de hasta 7 días, 24 de 8–30, 31 de 31–90 y 21 de más de 90. El XML solo conserva el estado actual y muchos cierres antiguos carecen de fecha, por lo que no permite reconstruir una curva diaria histórica confiable. La migración aplicada registra el primer corte y el importador registrará los siguientes tras cada carga completa; la evolución aparece con dos o más cortes reales, sin inventar historia.
+
+TypeScript, build, ESLint de los archivos de Panorama tocados y 167 pruebas de Campi/importación pasan tras el último ajuste. El lint global conserva infracciones anteriores fuera de esta corrección. No se publicó en `main` ni en Lovable público.
+
 ## Seguimiento vigente · Plan definitivo · 20/10/2026
 
 Este seguimiento reemplaza los planes anteriores. Las secciones posteriores son antecedentes, no certificaciones del estado actual. Fuente: plan definitivo entregado por el usuario el 20/10/2026. Base comprobada: `c2dd297`, rama `feat/campi-panorama-alternativa`, árbol limpio antes de esta actualización documental.

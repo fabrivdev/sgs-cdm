@@ -58,7 +58,7 @@ describe('Campi alternative story dashboard', () => {
     expect(load).toHaveBeenCalledWith(['ventas_evolucion', 'ventas_facturacion'], ['servicios.ventas'], expect.any(String));
   });
   it('renders every selected topic and chart in the chosen order, including the fourth', async () => {
-    const ids: StoryTopicId[] = ['maquinas_stock', 'ventas_facturacion', 'repuestos_stock', 'repuestos_sucursales'];
+    const ids: StoryTopicId[] = ['maquinas_pedidos', 'ventas_facturacion', 'repuestos_stock', 'repuestos_sucursales'];
     load.mockResolvedValue([...ids].reverse().map(id => story(id)));
     show(ids);
     await screen.findByRole('heading', { name: 'Tema repuestos_sucursales' });
@@ -96,7 +96,7 @@ describe('Campi alternative story dashboard', () => {
     fireEvent.click(await screen.findByRole('button', { name: 'Ver detalle de Tema ventas_facturacion' }));
     const dialog = screen.getByRole('dialog');
     expect(within(dialog).getByText('Octubre 2026')).toBeInTheDocument();
-    expect(within(dialog).getByText('Corte por confirmar')).toBeInTheDocument();
+    expect(within(dialog).queryByText('Corte por confirmar')).not.toBeInTheDocument();
     expect(within(dialog).getByText('Repuestos')).toBeInTheDocument();
     expect(within(dialog).queryByText('Se conservan las notas de crédito.')).not.toBeInTheDocument();
     expect(within(dialog).queryByText('Fuente: Fuente verificada')).not.toBeInTheDocument();
@@ -148,9 +148,9 @@ describe('Campi alternative story dashboard', () => {
   it('preserves the old baseline while any topic has failed', async () => {
     saveStoryVisit('manager-a', [story('ventas_facturacion')], '2026-10-15T10:00:00Z');
     sessionStorage.clear();
-    load.mockResolvedValue([story('ventas_facturacion', { primary: { label: 'Principal', value: 3000, unit: 'USD' } }), story('maquinas_stock', { status: 'error' })]);
-    show(['ventas_facturacion', 'maquinas_stock']);
-    await screen.findByRole('heading', { name: 'Tema maquinas_stock' });
+    load.mockResolvedValue([story('ventas_facturacion', { primary: { label: 'Principal', value: 3000, unit: 'USD' } }), story('maquinas_pedidos', { status: 'error' })]);
+    show(['ventas_facturacion', 'maquinas_pedidos']);
+    await screen.findByRole('heading', { name: 'Tema maquinas_pedidos' });
     expect(readStoryVisit('manager-a')?.at).toBe('2026-10-15T10:00:00Z');
   });
   it('records a complete empty result with a genuine zero alongside the other topics', async () => {

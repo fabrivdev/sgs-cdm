@@ -7,6 +7,26 @@ vi.mock('recharts', async () => ({ ...(await vi.importActual('recharts')), Respo
 afterEach(cleanup);
 const story: PanoramaStory = { id: 'ventas_facturacion', title: 'Facturación', question: '¿Cómo viene la facturación?', status: 'ready', message: 'Análisis completo de las tres áreas.', scope: 'Servicios + Máquinas + Repuestos', sections: ['servicios.ventas','parque.ventas','repuestos.ventas'], cutoff: null, periodLabel: 'Octubre 2026', primary: { label: 'Facturación del mes', value: 112, unit: 'USD', comparison: { value: 100, label: 'Mismo tramo de 2025' } }, supporting: [{ label: 'Acumulado anual', value: 500, unit: 'USD' }], chart: { kind: 'trend', title: 'Facturación mensual', rows: [{ label: 'Oct', value: 112, previous: 100 }], unit: 'USD' }, breakdown: [], details: ['Método de cálculo completo'], source: 'Fuente verificada', route: '' };
 describe('compact overview panel', () => {
+  it('condenses billing to three useful KPIs with LY changes and credit share', () => {
+    const billing = { ...story,
+      primary: { label: 'Facturación neta del mes', value: 8_091, unit: 'USD' as const, comparison: { value: 810_495, label: 'Mismo tramo de 2025' } },
+      supporting: [
+        { label: 'Facturación neta acumulada', value: 15_925_599, unit: 'USD' as const, comparison: { value: 12_099_932, label: 'Mismo tramo de 2025' } },
+        { label: 'Ventas acumuladas antes de NC', value: 17_193_440, unit: 'USD' as const },
+        { label: 'NC acumuladas del año', value: -1_267_841, unit: 'USD' as const },
+      ],
+    };
+    render(<MemoryRouter><StoryPanel story={billing} index={0} retrying={false} onRetry={vi.fn()} /></MemoryRouter>);
+    fireEvent.click(screen.getByRole('button', { name: 'Ver detalle de Facturación' }));
+    const metrics = screen.getByRole('dialog').querySelector('.story-billing-metrics')!;
+    expect(metrics.querySelectorAll('.story-datum')).toHaveLength(3);
+    expect(metrics).toHaveTextContent('Neto mes');
+    expect(metrics).toHaveTextContent('Neto año');
+    expect(metrics).toHaveTextContent('NC año');
+    expect(metrics).toHaveTextContent('vs LY');
+    expect(metrics).toHaveTextContent('de ventas');
+    expect(metrics).not.toHaveTextContent('Mismo tramo de 2025');
+  });
   it('shows sales, credit notes and net both on the overview and per authorized area', () => {
     const billing = { ...story, primary: { label: 'Facturación neta', value: 12, unit: 'USD' as const },
       supporting: [{ label: 'Ventas antes de NC del mes', value: 13, unit: 'USD' as const }, { label: 'Notas de crédito del mes', value: -1, unit: 'USD' as const }],
@@ -14,7 +34,7 @@ describe('compact overview panel', () => {
     render(<MemoryRouter><StoryPanel story={billing} index={0} retrying={false} onRetry={vi.fn()} /></MemoryRouter>);
     expect(screen.getByRole('figure', { name: 'Conciliación de facturación' })).toHaveTextContent('Ventas $ 13 menos notas de crédito $ 1 igual a neto $ 12');
     fireEvent.click(screen.getByRole('button', { name: 'Ver detalle de Facturación' }));
-    expect(screen.getByRole('table', { name: 'Desglose' })).toHaveTextContent('Servicios$ 13$ -1$ 12');
+    expect(screen.getByRole('table', { name: 'Desglose' })).toHaveTextContent('Servicios$ 13−$ 1$ 12');
     expect(screen.queryByText('Fuente, corte y metodología')).not.toBeInTheDocument();
   });
   it('keeps the metric, percentage and mini chart outside, and full analysis inside the dialog', () => {
@@ -74,11 +94,11 @@ describe('compact overview panel', () => {
     expect(screen.getByLabelText('Componentes de la proyección')).toHaveTextContent('Stock calculado13');
     expect(screen.queryByRole('figure', { name: 'Saldo por modelo' })).not.toBeInTheDocument();
   });
-  it('shows stock exposure percentage and keeps the material source-universe limitation', () => {
+  it('shows stock exposure percentage without adding technical source prose to the detail', () => {
     render(<MemoryRouter><StoryPanel story={{ ...story, id: 'repuestos_stock', title: 'Stock antiguo de repuestos', primary: { label: 'Valor de stock gris y rojo', value: 30, unit: 'USD' }, supporting: [{ label: 'Valor positivo valorizado', value: 100, unit: 'USD' }], notices: [{ text: 'Un código podría pasar a rojo', route: '/repuestos/analisis?color=GRIS&compra_dias_min=971&compra_dias_max=1000&vista=detalle' }], chart: null }} index={0} retrying={false} onRetry={vi.fn()} /></MemoryRouter>);
     expect(screen.getByText('30%')).toBeInTheDocument();
     fireEvent.click(screen.getByRole('button', { name: 'Ver detalle de Stock antiguo de repuestos' }));
-    expect(screen.getByText('Valor positivo de ubicaciones con stock. El detalle conserva este universo.')).toBeInTheDocument();
+    expect(screen.queryByText('Valor positivo de ubicaciones con stock. El detalle conserva este universo.')).not.toBeInTheDocument();
   });
   it('shows service closure volume and open queue without treating shorter resolution as a verified improvement', () => {
     render(<MemoryRouter><StoryPanel story={{ ...story, id: 'servicios_pendientes', title: 'Resolución de órdenes de servicio', primary: { label: 'Mediana de resolución', value: 14, unit: 'days', comparison: { label: 'agosto de 2026', value: 16.5 } }, supporting: [{ label: 'OS cerradas en septiembre de 2026', value: 84, unit: 'count' }, { label: 'OS abiertas registradas', value: 76, unit: 'count' }], chart: null }} index={0} retrying={false} onRetry={vi.fn()} /></MemoryRouter>);

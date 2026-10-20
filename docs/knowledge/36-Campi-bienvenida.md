@@ -1,5 +1,7 @@
 # Campi: bienvenida inicial de SIG CDM
 
+Panorama de la rama alternativa: la corrección funcional del 20/10/2026 está registrada al inicio de `docs/campi-panorama-alternativa.md`. Esa sección reemplaza allí el catálogo anterior de stock físico y vínculos faltantes. Las funciones de lectura de pedidos y OS se aplicaron en Lovable Cloud y se comprobaron en la app local; la rama no está publicada en `main` ni en Lovable público.
+
 ## Alcance
 
 Campi se presenta únicamente a usuarios autenticados de Gerencia o Administración, en escritorio con «Soy Campi» y «Muy pronto». Explica que podrá ayudar a encontrar información importante, entender cambios y abrir el detalle, siempre con datos verificados y según los permisos del usuario. El saludo y las expresiones ocurren por sí solos, sin botones de respuesta prefijada. No consulta datos, no responde preguntas de negocio y no activa el asistente analítico ni el futuro Panorama. No hay migraciones ni cambios de permisos. La publicación pública en Lovable queda a cargo del usuario.

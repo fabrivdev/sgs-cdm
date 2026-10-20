@@ -4,7 +4,7 @@ export type StoryTopicId = 'ventas_evolucion' | 'ventas_facturacion' | 'repuesto
 export type StoryUnit = 'USD' | 'PYG' | 'count' | 'percent' | 'days';
 export type StoryDatum = { label: string; value: number | null; unit: StoryUnit; note?: string; comparison?: { value: number; label: string } };
 export type StoryChartRow = { label: string; value: number; previous?: number };
-export type StoryBreakdown = { label: string; value: number; unit: StoryUnit; route?: string; note?: string; group?: string; billing?: { sales: number; credits: number } };
+export type StoryBreakdown = { label: string; value: number; unit: StoryUnit; route?: string; note?: string; group?: string; previous?: number; billing?: { sales: number; credits: number } };
 export type PanoramaStory = {
   id: StoryTopicId;
   title: string;
@@ -19,6 +19,8 @@ export type PanoramaStory = {
   primary: StoryDatum | null;
   supporting: StoryDatum[];
   chart: { kind: 'trend' | 'bars'; title: string; rows: StoryChartRow[]; unit: StoryUnit; currentLabel?: string; previousLabel?: string } | null;
+  detailChart?: PanoramaStory['chart'];
+  secondaryCharts?: NonNullable<PanoramaStory['chart']>[];
   breakdown: StoryBreakdown[];
   details: string[];
   source: string;
