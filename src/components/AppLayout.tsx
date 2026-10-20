@@ -415,4 +415,3 @@ export function AppLayout({ children, preview }: { children?: React.ReactNode; p
     </SidebarProvider>
   );
 }
-

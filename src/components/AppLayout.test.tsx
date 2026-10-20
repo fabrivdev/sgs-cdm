@@ -106,4 +106,3 @@ describe("shared mobile header", () => {
     expect(screen.queryByRole("menuitem", { name: "Administración" })).not.toBeInTheDocument();
   });
 });
-
