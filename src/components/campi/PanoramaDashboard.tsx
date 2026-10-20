@@ -59,7 +59,7 @@ export function PanoramaDashboard({ userId, topics, available, hasAccess, onEdit
     const story = report.data?.find(item => item.id === id && item.sections.length > 0 && item.sections.every(hasAccess));
     if (story) return story;
     const topic = available.find(item => item.id === id)!;
-    return { id, title: topic.label, question: topic.question, status: 'error', message: report.isError ? 'No se pudo consultar la fuente de este tema.' : 'La fuente no devolvió una respuesta completa.', scope: '', sections: topic.sections.filter(hasAccess), cutoff: null, periodLabel: 'Corte no disponible', primary: null, supporting: [], chart: null, breakdown: [], details: [], source: 'Fuente no disponible', route: '' };
+    return { id, title: topic.title, question: topic.question, status: 'error', message: report.isError ? 'No se pudo consultar la fuente de este tema.' : 'La fuente no devolvió una respuesta completa.', scope: '', sections: topic.sections.filter(hasAccess), cutoff: null, periodLabel: 'Corte no disponible', primary: null, supporting: [], chart: null, breakdown: [], details: [], source: 'Fuente no disponible', route: '' };
   });
   useEffect(() => {
     if (reviewing || recorded.current === userId || !reports.every(report => report.isSuccess) || !selected.length || stories.length !== selected.length || stories.some(story => story.status === 'error')) return;

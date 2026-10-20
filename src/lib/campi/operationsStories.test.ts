@@ -82,6 +82,8 @@ describe('operational Panorama loaders', () => {
     ], count: 2, error: null }));
     const [story] = await loadOperationsStories(['maquinas_stock'], ['parque.stock'], asOf);
     expect(story.primary?.value).toBe(87);
+    expect(story.periodLabel).toBe('Foto física');
+    expect(story.cutoff).toBeNull();
     expect(story.chart?.rows).toEqual([{ label: 'Nuevas', value: 36 }, { label: 'Usadas', value: 51 }]);
     expect(story.breakdown).toEqual([{ label: 'Santa Rita', value: 87, unit: 'count' }]);
   });

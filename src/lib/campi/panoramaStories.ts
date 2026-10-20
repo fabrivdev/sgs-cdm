@@ -1,5 +1,5 @@
 import type { SectionKey } from '@/lib/permissions';
-import { PANORAMA_TOPICS, type PanoramaTopicId } from './panoramaPreferences';
+import { PANORAMA_TOPICS, panoramaTopicDefinition, type PanoramaTopicId } from './panoramaPreferences';
 import type { PanoramaStory, StoryTopicId } from './panoramaStoryTypes';
 import { loadSalesStories } from './salesStories';
 import { loadOperationsStories } from './operationsStories';
@@ -13,6 +13,7 @@ export async function loadPanoramaStories(topics: readonly PanoramaTopicId[], gr
   const results = (await Promise.all([loadSalesStories(ids, granted, asOf), loadOperationsStories(ids, granted, asOf)])).flat();
   return ids.flatMap(id => {
     const story = results.find(item => item.id === id);
-    return story ? [story] : [];
+    const topic = panoramaTopicDefinition(id);
+    return story && topic ? [{ ...story, title: topic.title, question: topic.question }] : [];
   });
 }

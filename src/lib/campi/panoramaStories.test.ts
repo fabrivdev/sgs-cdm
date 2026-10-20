@@ -20,4 +20,14 @@ describe('catalog to source contract', () => {
     expect(loadSalesStories).toHaveBeenLastCalledWith(ids, expect.any(Array), '2026-10-16');
     expect(loadOperationsStories).toHaveBeenLastCalledWith(ids, expect.any(Array), '2026-10-16');
   });
+  it('uses the shared topic title and question in the returned story', async () => {
+    vi.mocked(loadSalesStories).mockResolvedValueOnce([{
+      id: 'ventas_facturacion', title: 'Old title', question: 'Old question', status: 'ready', message: '', scope: 'Servicios',
+      sections: ['servicios.ventas'], cutoff: null, periodLabel: 'Octubre', primary: null,
+      supporting: [], chart: null, breakdown: [], details: [], source: 'test', route: '',
+    }]);
+    const [story] = await loadPanoramaStories(['ventas_facturacion'], ['servicios.ventas'], '2026-10-16');
+    expect(story.title).toBe('Facturación neta');
+    expect(story.question).toBe(PANORAMA_TOPICS.find(topic => topic.id === story.id)?.question);
+  });
 });

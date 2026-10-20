@@ -1,6 +1,7 @@
 import { supabase } from '@/integrations/supabase/client';
 import type { SectionKey } from '@/lib/permissions';
 import type { PanoramaStory, StoryLoader, StoryTopicId } from './panoramaStoryTypes';
+import { panoramaTopicDefinition } from './panoramaPreferences';
 
 type Row = Record<string, unknown>;
 type Source = { section: SectionKey; label: string; rpc: string; amount: string; gross: string; credit: string; creditSigned?: boolean; route: string; extra: Row };
@@ -93,7 +94,8 @@ function monthly(report: Report, key: string, field: string): number {
   return metric(row[field]);
 }
 function base(id: StoryTopicId, sources: Source[], asOf: string): PanoramaStory {
-  return { id, visitKey: `${id}:v3:${asOf.slice(0, 7)}`, title: id === 'ventas_evolucion' ? 'Evolución de ventas' : id === 'ventas_facturacion' ? 'Facturación neta' : 'Ventas de repuestos', question: id === 'ventas_evolucion' ? '¿Estamos vendiendo más o menos?' : id === 'ventas_facturacion' ? '¿Cuánto quedó facturado después de las NC?' : '¿Cómo se componen las ventas y notas de crédito de repuestos?', status: 'ready', message: '', scope: sources.map(source => source.label).join(' + '), sections: sources.map(source => source.section), cutoff: null, periodLabel: `01/${asOf.slice(5, 7)}–${asOf.slice(8, 10)}/${asOf.slice(5, 7)}/${asOf.slice(0, 4)}`, primary: null, supporting: [], chart: null, breakdown: [], details: ['Fecha de factura. Ventas antes de NC y notas de crédito por separado.', 'La fecha de referencia limita el período; la fuente no informa su fecha real de actualización.'], source: sources.map(source => source.rpc).join(' + '), route: sources.length === 1 ? sources[0].route : '' };
+  const topic = panoramaTopicDefinition(id);
+  return { id, visitKey: `${id}:v3:${asOf.slice(0, 7)}`, title: topic?.title ?? 'Ventas de repuestos', question: topic?.question ?? '¿Cómo se componen las ventas y notas de crédito de repuestos?', status: 'ready', message: '', scope: sources.map(source => source.label).join(' + '), sections: sources.map(source => source.section), cutoff: null, periodLabel: `01/${asOf.slice(5, 7)}–${asOf.slice(8, 10)}/${asOf.slice(5, 7)}/${asOf.slice(0, 4)}`, primary: null, supporting: [], chart: null, breakdown: [], details: ['Fecha de factura. Ventas antes de NC y notas de crédito por separado.', 'La fecha de referencia limita el período; la fuente no informa su fecha real de actualización.'], source: sources.map(source => source.rpc).join(' + '), route: sources.length === 1 ? sources[0].route : '' };
 }
 
 export const loadSalesStories: StoryLoader = async (topics, granted, asOf) => {

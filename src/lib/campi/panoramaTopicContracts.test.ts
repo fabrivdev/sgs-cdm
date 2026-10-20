@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { PANORAMA_TOPICS, reconcilePanoramaOrder } from './panoramaPreferences';
+import { PANORAMA_TOPICS, panoramaTopicDefinition, reconcilePanoramaOrder } from './panoramaPreferences';
 import { PANORAMA_CONTRACTS, topicContract } from './panoramaTopicContracts';
 
 describe('reviewed topic registry', () => {
@@ -12,6 +12,10 @@ describe('reviewed topic registry', () => {
       expect(topic.contract?.population).toBeTruthy();
       expect(topic.contract?.evidence.length).toBeGreaterThan(0);
       expect(topic.contract?.tests.length).toBeGreaterThan(0);
+      expect(topic.title.trim()).toBeTruthy();
+      expect(topic.question.trim()).toBeTruthy();
+      expect(topic.definitionVersion.trim()).toBeTruthy();
+      expect(panoramaTopicDefinition(topic.id)).toBe(topic);
     }
   });
   it('groups shared sources without grouping distinct accounting and inventory populations', () => {

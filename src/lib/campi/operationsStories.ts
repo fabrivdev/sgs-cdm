@@ -2,6 +2,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { fetchSemaforoHistorico, SEMAFORO_COLORES, type SemaforoResultado } from '@/hooks/useSemaforoHistorico';
 import type { SectionKey } from '@/lib/permissions';
 import type { PanoramaStory, StoryLoader, StoryTopicId } from './panoramaStoryTypes';
+import { panoramaTopicDefinition } from './panoramaPreferences';
 import { parsePartsExposure, partsAlertsStory, partsConcentrationStory, partsExposureStory } from './partsExposure';
 import { machineSupplyStory, parseMachineSupply, parseServiceResolution, serviceOpenStory, serviceResolutionStory } from './operationalOutcomes';
 
@@ -12,26 +13,28 @@ const day = (v: unknown): string | null => {
   const stamp = Date.parse(v + 'T00:00:00Z');
   return Number.isFinite(stamp) && new Date(stamp).toISOString().slice(0, 10) === v ? v : null;
 };
-const definitions: Partial<Record<StoryTopicId, { title: string; question: string; section: SectionKey; route: string; source: string }>> = {
-  repuestos_sucursales: { title: 'Antigüedad de repuestos por sucursal', question: '¿Cuánto tiempo hace desde la última compra por sucursal?', section: 'repuestos.analisis', route: '/repuestos/analisis', source: 'repuestos_analisis_valorizado · sucursales' },
-  repuestos_stock: { title: 'Stock antiguo de repuestos', question: '¿Qué valor de repuestos está en gris o rojo?', section: 'repuestos.analisis', route: '/repuestos/analisis', source: 'campi_repuestos_exposicion_v1' },
-  repuestos_alertas: { title: 'Cambios próximos de clasificación', question: '¿Qué valor podría pasar a gris o rojo en 30 días?', section: 'repuestos.analisis', route: '/repuestos/analisis', source: 'campi_repuestos_exposicion_v1' },
-  repuestos_concentracion: { title: 'Concentración del stock antiguo', question: '¿Qué familias concentran el valor antiguo?', section: 'repuestos.analisis', route: '/repuestos/analisis', source: 'campi_repuestos_exposicion_v1' },
-  maquinas_pedidos: { title: 'Abastecimiento de pedidos activos', question: '¿Qué pedidos activos no tienen abastecimiento vinculado?', section: 'parque.operaciones', route: '/parque-operaciones', source: 'campi_pedidos_abastecimiento_v1' },
-  maquinas_stock: { title: 'Stock físico de máquinas', question: '¿Qué existencias informa la última foto?', section: 'parque.stock', route: '/parque-stock', source: 'parque_stock_maquinas · saldo_actual' },
-  maquinas_proyeccion: { title: 'Proyección de máquinas nuevas', question: '¿Qué saldo queda después de compras y ventas pendientes?', section: 'parque.stock_proyectado', route: '/parque-stock-proyectado', source: 'parque_stock_proyectado_v1' },
-  servicios_pendientes: { title: 'Resolución de órdenes de servicio', question: '¿Cuánto tardaron en resolverse las OS cerradas?', section: 'servicios.ordenes', route: '/servicios/ordenes', source: 'campi_resolucion_os_v1' },
-  servicios_abiertas: { title: 'Órdenes de servicio abiertas', question: '¿Cuántas OS siguen abiertas y qué edad tienen?', section: 'servicios.ordenes', route: '/servicios/ordenes', source: 'campi_resolucion_os_v1' },
+const definitions: Partial<Record<StoryTopicId, { section: SectionKey; route: string; source: string }>> = {
+  repuestos_sucursales: { section: 'repuestos.analisis', route: '/repuestos/analisis', source: 'repuestos_analisis_valorizado · sucursales' },
+  repuestos_stock: { section: 'repuestos.analisis', route: '/repuestos/analisis', source: 'campi_repuestos_exposicion_v1' },
+  repuestos_alertas: { section: 'repuestos.analisis', route: '/repuestos/analisis', source: 'campi_repuestos_exposicion_v1' },
+  repuestos_concentracion: { section: 'repuestos.analisis', route: '/repuestos/analisis', source: 'campi_repuestos_exposicion_v1' },
+  maquinas_pedidos: { section: 'parque.operaciones', route: '/parque-operaciones', source: 'campi_pedidos_abastecimiento_v1' },
+  maquinas_stock: { section: 'parque.stock', route: '/parque-stock', source: 'parque_stock_maquinas · saldo_actual' },
+  maquinas_proyeccion: { section: 'parque.stock_proyectado', route: '/parque-stock-proyectado', source: 'parque_stock_proyectado_v1' },
+  servicios_pendientes: { section: 'servicios.ordenes', route: '/servicios/ordenes', source: 'campi_resolucion_os_v1' },
+  servicios_abiertas: { section: 'servicios.ordenes', route: '/servicios/ordenes', source: 'campi_resolucion_os_v1' },
 };
 function base(id: StoryTopicId): PanoramaStory {
   const d = definitions[id]!;
-  return { id, title: d.title, question: d.question, sections: [d.section], route: d.route, source: d.source, status: 'ready', message: '', scope: '', cutoff: null, periodLabel: 'Corte no informado', primary: null, supporting: [], chart: null, breakdown: [], details: [] };
+  const topic = panoramaTopicDefinition(id);
+  return { id, title: topic?.title ?? 'Proyección de máquinas nuevas', question: topic?.question ?? '¿Qué saldo queda después de compras y ventas pendientes?', sections: [d.section], route: d.route, source: d.source, status: 'ready', message: '', scope: '', cutoff: null, periodLabel: 'Corte no informado', primary: null, supporting: [], chart: null, breakdown: [], details: [] };
 }
 function parts(id: StoryTopicId, data: SemaforoResultado): PanoramaStory {
   const story = base(id);
   const total = required(data.lineas);
   const value = number(data.valor_kardex_usd);
   story.status = total === 0 ? 'empty' : 'ready';
+  story.periodLabel = `Clasificación ${day(data.fecha_analisis) ?? 'sin fecha'}`;
   story.scope = 'REP activos con stock global positivo; valor observado en Kardex en dólares';
   // fecha_analisis is the classification day, NOT the inventory/Kardex cut-off.
   story.details = [`Fecha de clasificación: ${day(data.fecha_analisis) ?? 'no informada'}. El corte del inventario no está acreditado.`, 'El valor es referencial del Kardex; no se recalcula multiplicando saldo por costo. Negativos y valores ausentes se conservan.', 'No incluye pedidos de compra pendientes.'];
@@ -107,6 +110,7 @@ async function machineStock() {
   const branches = new Map<string, number>();
   rows.forEach(r => branches.set(r.sucursal || 'Sin sucursal', (branches.get(r.sucursal || 'Sin sucursal') ?? 0) + r.saldo_actual!));
   story.status = rows.length ? 'ready' : 'empty';
+  story.periodLabel = 'Foto física';
   story.scope = 'Foto autoritativa de Stock de Maquinarias · nuevas y usadas';
   story.message = 'Existencias físicas informadas, separadas por condición y sucursal.';
   story.primary = { label: 'Saldo físico', value: sum(rows), unit: 'count' };

@@ -17,6 +17,14 @@ Este seguimiento reemplaza los planes anteriores. Las secciones posteriores son 
 
 **Foco vigente:** cerrar E1.3 (universos de OS/stock, comparación contra origen y cortes) y E2.6 (revisión exhaustiva de detalles). El registro de contratos y la reparación independiente de movimiento avanzan sin habilitar candidatos todavía no conciliados.
 
+**Avance posterior del 20/10:** consulta de solo lectura a `ordenes_servicio_importadas` en Lovable Cloud: 61 «Abierta» + 20 «ABIERTA» = 81 abiertas; no hay otros estados activos en este corte. Las cohortes cerradas recomputadas desde filas dan agosto: 66 cierres, 0 fechas inválidas y mediana 16,5 días; septiembre: 84 cierres, 0 inválidas y mediana 14 días. Las cifras de Panorama coinciden. La diferencia entre la definición amplia de la sección y el RPC no tiene impacto observado en este corte, pero sigue siendo un riesgo si llega un nuevo estado activo; no se ejecutó SQL de cambio. El registro del selector ahora reúne también título visible, pregunta y versión de comparación; los loaders y la referencia entre visitas consumen esos campos. No equivale aún a un registro único para todas las salidas y comentarios.
+
+La consulta de solo lectura a `parque_stock_maquinas` confirmó 36 filas nuevas/saldo 36 y 50 filas usadas/saldo 51: total físico 87, como la tarjeta. La tabla tiene `importado_en` pero no un campo de corte efectivo de inventario entre sus 18 columnas; permanece «Corte por confirmar». No se convirtió la fecha de importación en corte.
+
+Recorrido real adicional de ocho detalles: Facturación, Abastecimiento, Resolución, OS abiertas, Alertas, Concentración, Antigüedad por sucursal y Stock físico abrieron en panel lateral; Escape cerró los seis últimos y devolvió el selector. Se corrigió el encabezado redundante «Corte no informado / Corte por confirmar» en Antigüedad y Stock físico: ahora indica «Clasificación» con fecha y «Foto física», respectivamente, manteniendo aparte el límite de corte no acreditado. No se declara completada E2.6: falta revisar todas las pestañas, enlaces y foco en ambas resoluciones.
+
+Tras recargar el navegador propio, se comprobaron «Foto física · Corte por confirmar» en Stock y «Clasificación 2026-10-20 · Corte por confirmar» en Antigüedad. La primera prueba automatizada del ajuste falló porque el texto se había colocado en el loader de proyección deshabilitado; se corrigió la ubicación, se repitieron las ocho pruebas de operaciones y quedaron aprobadas. Ese fallo no se contó como aprobación inicial.
+
 ### Avance adicional del 20/10
 
 - Se separó `.campi-panorama-fit` (escala de encaje) de `.campi-sprite` (gesto). Se retiró la regla de portada que anulaba los pasos e inclinaciones. Pausa de detalle/visibilidad ahora llega al rostro y consume reacciones recibidas mientras está pausado. Pruebas unitarias aprobadas; la observación continua y video siguen pendientes.
@@ -74,7 +82,7 @@ Orden de trabajo: **1 → 2 → diseño/implementación de 4 → integración de
 - [ ] **E1.4** Revisar total, subconjuntos, porcentajes, comparaciones, gráfico, detalle y comentarios como una misma definición.
 - [ ] **E1.5** Probar cero, información ausente, error de fuente y comparación no disponible como estados distintos.
 - [x] **E1.6** Corregir gráficos que no representen el indicador; detalle de resolución ahora grafica medianas en días, no cantidad de cierres. Verificado con datos reales 16,5 y 14 días; ausencia de cohorte no se dibuja como cero.
-- [ ] **E1.7** Acreditar corte de inventario o mantener limitación explícita; no sustituirlo por importación/clasificación.
+- [x] **E1.7** No hay corte efectivo acreditado en la fuente de stock físico; la interfaz mantiene «Corte por confirmar» y distingue fecha de lectura/clasificación/importación. Consulta de columnas de `parque_stock_maquinas` y detalle real comprobados. Reabrir si llega una fuente de corte.
 - [ ] **E1.8** Revisar lenguaje: OS antigua no implica atraso; antigüedad de compra no es rotación; falta de vínculo no implica incumplimiento.
 
 Matriz de auditoría obligatoria. Resultados permitidos: **conciliado**, **consistente internamente**, **pendiente de evidencia**, **con error**. El estado inicial no juzga el cálculo: indica que no se hizo todavía la auditoría del plan definitivo.
@@ -83,14 +91,14 @@ Matriz de auditoría obligatoria. Resultados permitidos: **conciliado**, **consi
 | --- | --- | --- |
 | Facturación neta | Consistente internamente | Mes actual concilia ventas − NC; netos mensuales coinciden a precisión visible con las tres secciones. Faltan comparación histórica completa y corte acreditado. |
 | Evolución de ventas | Consistente internamente | Serie y períodos equivalentes revisados; mes actual enlaza a los mismos componentes de facturación. Falta contraste completo de serie interanual. |
-| Abastecimiento de pedidos activos | Consistente internamente | Pantalla: 17 = 7 sin vínculo + 6 stock + 1 tránsito + 3 arribadas. Falta conciliación unidad por unidad contra Operaciones. |
+| Abastecimiento de pedidos activos | Consistente internamente | Lectura posterior: 19 = 8 sin vínculo + 7 stock + 1 tránsito + 3 arribadas. Falta conciliación unidad por unidad contra Operaciones. |
 | Cambios próximos de clasificación | Consistente internamente | Corregida omisión de códigos sin USD positivo; 30 días y umbrales revisados. Falta conciliar cohortes completas contra origen. |
-| Tiempo de resolución de Servicios | Consistente internamente | Medianas 16,5/14 días y 66/84 cierres; gráfico corregido. Validación independiente de cohortes; falta recomputar mediana desde OS origen. |
-| Órdenes abiertas | Con error de contrato | SQL solo reconoce texto «abierta»; origen considera abierta toda OS no cerrada/cancelada/anulada. 81 observadas; impacto real de otros estados pendiente. |
-| Stock antiguo de Repuestos | Con error de correspondencia con origen | Exposición limita ubicaciones a stock>0 y USD>0; Análisis incluye otros saldos. Se informa diferencia; falta drilldown al mismo universo y corte real. |
-| Concentración del stock antiguo | Con error de correspondencia con origen | Rechaza ahora subtotales antiguos inconsistentes; enlaces por familia/sucursal no aplican todo el universo de exposición. Falta conciliación y ajuste de filtros. |
+| Tiempo de resolución de Servicios | Conciliado para agosto/septiembre | SQL independiente desde filas: 66/84 cierres, 16,5/14 días de mediana y cero fechas inválidas. Falta corte de actualización acreditado y reaperturas históricas. |
+| Órdenes abiertas | Conciliado en el corte observado | 61 «Abierta» + 20 «ABIERTA» = 81; no hay otro estado activo observado. El contrato sigue siendo frágil ante estados nuevos. |
+| Stock antiguo de Repuestos | Conciliado en universo positivo; corte pendiente | Detalle y consulta independiente: 4.043 códigos y USD 1.128.981,69; gris 653/USD 283.057,02, rojo 3.390/USD 845.924,67. Sigue faltando corte físico acreditado. |
+| Concentración del stock antiguo | Consistente internamente | Subtotales conciliados con universo positivo; enlaces aplican el mismo universo. Falta auditoría completa de familias/sucursales contra origen y corte real. |
 | Antigüedad de compra por sucursal | Consistente internamente | Promedio ponderado por USD con compra fechada, no edad física local; 896,23 días observados. Falta contraste completo por sucursal y corte. |
-| Stock físico de Máquinas | Pendiente de evidencia | Fórmula coincide con StockMaquinasTab; 87 = 36 nuevas + 51 usadas. Faltan corte real, contraste de origen completo y política desplegada de sección. |
+| Stock físico de Máquinas | Conciliado para saldo y condición; corte pendiente | Consulta directa de tabla: nuevas 36 filas/saldo 36, usadas 50 filas/saldo 51; total 87. Falta corte real y política desplegada de sección. |
 
 #### Evidencia de auditoría del 20/10/2026
 
@@ -120,8 +128,8 @@ Correcciones verificadas por pruebas:
 - Portada de neto muestra ventas y NC como componentes, sin descontar NC dos veces.
 
 Pendientes de evidencia/corrección, no cerrados:
-- **E1-P1:** unificar definición de abierta entre RPC y origen; consultar distribución real de estados antes de cuantificar impacto. No se modificó SQL desplegado.
-- **E1-P2:** drilldowns de exposición/concentración deben aplicar igual universo y gris+rojo. Hoy la advertencia explicita diferencia, pero no la resuelve.
+- **E1-P1:** evaluar un contrato de estado abierto que soporte nuevos estados activos. En el corte observado no hay discrepancia; no se modificó SQL desplegado.
+- **E1-P2:** universo positivo, gris/rojo y enlaces de exposición ya concilian. Falta auditoría exhaustiva por familia y sucursal y corte físico acreditado.
 - **E1-P3:** `visitKey` diario en abastecimiento/abiertas/exposición/alertas/concentración impide comparar días distintos. Definir comparación de lecturas y envejecimiento, conservando controles de alcance.
 - **E1-P4:** falta corte de inventario y garantía de completitud histórica trianual. Fecha de lectura/clasificación no lo sustituye.
 - **E1-P5:** política local SELECT de stock máquinas encontrada verifica módulo Parque, no sección Stock. Falta contrastar políticas realmente desplegadas con cuenta limitada; no se afirma aislamiento de servidor verificado.
@@ -193,6 +201,8 @@ Pendientes de evidencia/corrección, no cerrados:
 | 20/10/2026 | Preparación del seguimiento | Plan leído; rama `feat/campi-panorama-alternativa` y base `c2dd297` comprobadas; árbol limpio antes de editar este documento | Iniciar E1; ninguna etapa nueva se declara terminada |
 | 20/10/2026 | E1 auditoría | Diez contratos examinados y temas leídos en app; contraste mensual visible de tres áreas. Correcciones y límites consignados arriba | E1-P1 a E1-P6; no marcar etapa conciliada |
 | 20/10/2026 | E2 implementación | Encabezado visible, métricas secundarias reducidas, desglose tabulado y grupos en pestañas; facturación con ventas/NC/neto por área; sin metodología técnica en vista habitual | Completar recorrido de los demás detalles en ambas resoluciones |
+| 20/10/2026 | E1.3 · OS de origen | Consulta de solo lectura: estados 61+20 abiertas, 66/84 cierres agosto/septiembre, 0 fechas inválidas, medianas 16,5/14. Coincide con Panorama; ningún dato modificado | Corte de actualización, reaperturas y nuevos estados activos siguen sin acreditarse |
+| 20/10/2026 | E4 · registro común parcial | Título, pregunta y versión de comparación pasan al catálogo tipado; selector, loaders, fallback de portada y referencia entre visitas lo consumen. 53 pruebas focalizadas, TypeScript, lint afectado y build aprobados | E4.2–E4.5 siguen abiertos: presentación completa, comentarios/detalles y alta de un tema validado |
 
 Validación del avance anterior (`b483ecd`; la actualización posterior consta arriba):
 - **Aprobadas:** 152 pruebas Campi/contratos en 20 archivos; TypeScript; lint de implementación modificada; build Vite; `git diff --check`. Advertencias preexistentes de Browserslist y tamaño de chunks, sin fallo de build.
