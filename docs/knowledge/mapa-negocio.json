@@ -2384,7 +2384,7 @@
       "id": "asistente.panorama",
       "title": "Panorama de Campi",
       "module": "asistente",
-      "description": "Alternativa local: 17 preguntas de negocio disponibles según permisos; conserva las nueve originales y añade ocho con fuente y cálculo. Cada tarjeta responde su pregunta; Ver detalle va a la sección de origen con filtros y, en temas consolidados de Ventas, ofrece primero elegir el área autorizada. No abre un panel de detalle de Panorama. La RPC de stock antiguo se aplicó previamente en Lovable Cloud; esta ampliación de frontend permanece en la rama alternativa y no acredita publicación pública.",
+      "description": "Alternativa local: 17 preguntas de negocio disponibles según permisos; conserva las nueve originales y añade ocho con fuente y cálculo. Cada tarjeta responde su pregunta; Ver detalle va a la sección de origen con filtros y, en temas consolidados de Ventas, ofrece primero elegir el área autorizada. Campi presenta síntesis y comentarios, sin el antiguo panel de preguntas por reglas. La RPC de stock antiguo se aplicó previamente en Lovable Cloud; esta ampliación de frontend permanece en la rama alternativa y no acredita publicación pública.",
       "sources": [
         "src/pages/CampiPanorama.tsx",
         "src/components/campi/PanoramaDashboard.tsx",

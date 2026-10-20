@@ -45,7 +45,7 @@
 .panorama-hero::before { content: ''; position: absolute; inset: 6px 6px 6px 132px; background: hsl(var(--card) / .8); border-radius: 12px; z-index: -1; }
 .panorama-hero-avatar { position: relative; width: 122px; height: 122px; align-self: end; }
 .panorama-hero-avatar .campi-panorama-avatar { position: relative; width: 100%; height: 100%; }
-.panorama-hero-message, .campi-questions { min-width: 0; }
+.panorama-hero-message { min-width: 0; }
 .panorama-hero-context { display: flex; align-items: baseline; flex-wrap: wrap; gap: 4px 12px; margin-bottom: 3px; color: #667083; font-size: 11px; line-height: 16px; }
 .panorama-hero-kicker { display: block; color: #146846; font-size: 16px; line-height: 21px; font-weight: 700; margin-bottom: 6px; }
 .panorama-hero-context .panorama-hero-kicker { margin: 0; }
@@ -68,17 +68,6 @@
 .campi-visit-snapshot > span { width: 100%; color: #5c6674; font-size: 11px; }
 .campi-visit-snapshot strong { color: #172335; font-size: 15px; line-height: 20px; }
 .campi-visit-snapshot small { color: #5c6674; font-size: 11px; }
-.campi-questions { padding: 18px; }
-.campi-question-form { display: flex; align-items: center; gap: 8px; }
-.campi-answer-block { margin-top: 20px; border-top: 1px solid hsl(var(--border)); padding-top: 16px; }
-.campi-answer-block h3 { font-size: 14px; font-weight: 650; margin-bottom: 8px; }
-.campi-question-form input { flex: 1; min-width: 0; height: 44px; border: 1px solid #dbe0e6; background: hsl(var(--card) / .85); border-radius: 10px; padding: 0 12px; font-size: 15px; }
-.campi-question-form button { position: static; flex: none; width: 44px; height: 44px; }
-.campi-question-form input:focus-visible, .campi-suggestions button:focus-visible { outline: 2px solid hsl(var(--ring)); outline-offset: 2px; }
-.campi-suggestions-label { display: block; margin: 12px 0 7px; color: #707786; text-transform: uppercase; font-size: 10px; letter-spacing: .08em; }
-.campi-suggestions { display: flex; flex-direction: column; align-items: flex-start; gap: 7px; }
-.campi-suggestions button { display: inline-flex; align-items: center; justify-content: space-between; gap: 14px; max-width: 100%; min-height: 32px; padding: 5px 12px; font-size: 12px; line-height: 18px; text-align: left; color: #485264; background: hsl(var(--card) / .9); border: 1px solid #e1e5e8; border-radius: 12px; }
-.campi-suggestions svg { flex: none; }
 .panorama-priorities-heading { display: flex; align-items: center; gap: 13px; padding: 3px 3px 0; }
 .panorama-priorities-heading > svg { width: 23px; height: 23px; color: #176d53; }
 .panorama-priorities-heading h2 { font-size: 18px; line-height: 24px; font-weight: 600; letter-spacing: -.02em; }
@@ -169,15 +158,11 @@
 .story-conclusion { font-size: 14px; line-height: 1.6; }
 .story-datum p { font-size: 12px; line-height: 1.5; color: #707786; }
 .story-visit-change { font-size: 12px; color: #707786; }
-.panorama-story-dialog, .campi-answer-dialog { max-height: 85dvh; overflow-y: auto; }
-.campi-answer-dialog { max-width: 700px; }
-.campi-asked { font-size: 14px; font-weight: 650; }
-.campi-answer { font-size: 14px; line-height: 1.7; white-space: pre-wrap; }
+.panorama-story-dialog { max-height: 85dvh; overflow-y: auto; }
 @media (max-width: 1199px) {
  .panorama-hero { grid-template-columns: 140px minmax(0, 1fr); gap: 18px; }
  .panorama-hero::before { inset: 12px 12px 12px 168px; }
  .panorama-hero-avatar { width: 140px; height: 188px; grid-row: 1 / 3; }
- .campi-questions { grid-column: 2; }
  .panorama-story { padding: 14px; grid-template-columns: 1fr; grid-template-rows: auto auto auto auto; row-gap: 8px; }
  .story-chart-mini, .story-projection-components, .story-resolution-comparison, .story-billing-bridge { grid-column: 1; grid-row: 3; }
  .panorama-story .story-detail-trigger { grid-row: 4; }
@@ -191,10 +176,7 @@
  .panorama-hero-avatar { width: 84px; height: 140px; grid-row: 1; }
  .campi-synthesis h2 { font-size: 18px; }
  .campi-synthesis p { font-size: 14px; }
- .campi-questions { grid-column: 1 / -1; }
- .campi-question-form input { font-size: 16px; }
  .campi-hero-actions button { min-height: 44px; }
- .campi-suggestions button { min-height: 44px; }
  .panorama-stories { grid-template-columns: 1fr; }
  .panorama-priorities-heading { flex-wrap: wrap; gap: 4px 10px; }
  .panorama-priorities-heading span { flex-basis: 100%; padding-left: 33px; }

@@ -7,13 +7,12 @@ import './campi.css';
 import './campi-panorama.css';
 
 const REDUCED = '(prefers-reduced-motion: reduce)';
-export type CampiPanoramaReaction = { kind: 'select' | 'reorder' | 'remove' | 'save' | 'ask' | 'comment'; token: number };
+export type CampiPanoramaReaction = { kind: 'select' | 'reorder' | 'remove' | 'save' | 'comment'; token: number };
 const REACTION_ACTION: Record<CampiPanoramaReaction['kind'], CampiAction> = {
   select: 'celebrate',
   reorder: 'step',
   remove: 'consider',
   save: 'approve',
-  ask: 'consider',
   comment: 'consider',
 };
 
