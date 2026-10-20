@@ -102,11 +102,49 @@ export function partsExposureStory(data: Exposure): PanoramaStory {
     ],
     details: [
       'Gris: sin ventas en los tres años evaluados y última compra hace 366–1.000 días. Rojo: misma ausencia de ventas y última compra hace más de 1.000 días.',
-      'La proporción usa solo valor USD positivo en ubicaciones con stock físico positivo. El Kardex es referencial, no una valoración contable.',
-      `Cobertura: ${data.ubicaciones_stock} ubicaciones con stock; ${data.ubicaciones_sin_valor} sin valor, ${data.ubicaciones_valor_no_positivo} con valor no positivo, ${data.ubicaciones_sin_saldo_kardex} sin saldo Kardex y ${data.ubicaciones_saldo_distinto} con saldo distinto. Valor positivo en ubicaciones sin stock: USD ${new Intl.NumberFormat('es-PY', { maximumFractionDigits: 2 }).format(data.valor_residual_sin_stock_usd)}; excluido.`,
+      'La proporción usa solo valor positivo en dólares de ubicaciones con stock físico positivo. El Kardex es referencial, no una valoración contable.',
+      `Cobertura: ${data.ubicaciones_stock} ubicaciones con stock; ${data.ubicaciones_sin_valor} sin valor, ${data.ubicaciones_valor_no_positivo} con valor no positivo, ${data.ubicaciones_sin_saldo_kardex} sin saldo Kardex y ${data.ubicaciones_saldo_distinto} con saldo distinto. Valor positivo en ubicaciones sin stock: $ ${new Intl.NumberFormat('es-PY', { maximumFractionDigits: 2 }).format(data.valor_residual_sin_stock_usd)}; excluido.`,
       'La fecha de clasificación no acredita el corte del inventario. Los avisos se recalculan al abrir Panorama y solo proyectan el paso de color si no hay nuevos movimientos.',
     ],
     source: 'campi_repuestos_exposicion_v1 · semáforo histórico, stock y Kardex', route: '/repuestos/analisis',
-    notices: activeAlerts.map(row => ({ text: `${row.codigos} códigos, USD ${new Intl.NumberFormat('es-PY', { maximumFractionDigits: 2 }).format(row.valor_usd)}, podrían pasar a ${row.destino.toLowerCase()} en 1–30 días`, route: link(row) })),
+    notices: activeAlerts.map(row => ({ text: `${row.codigos} códigos, $ ${new Intl.NumberFormat('es-PY', { maximumFractionDigits: 2 }).format(row.valor_usd)}, podrían pasar a ${row.destino.toLowerCase()} en 1–30 días`, route: link(row) })),
+  };
+}
+
+export function partsAlertsStory(data: Exposure): PanoramaStory {
+  const original = partsExposureStory(data);
+  const alerts = data.avisos.filter(row => row.codigos > 0 && row.valor_usd > 0);
+  const total = alerts.reduce((sum, row) => sum + row.valor_usd, 0);
+  const codes = alerts.reduce((sum, row) => sum + row.codigos, 0);
+  return {
+    ...original, id: 'repuestos_alertas', visitKey: `repuestos_alertas:30d-v1:${data.fecha_analisis}`,
+    title: 'Cambios próximos de clasificación', question: '¿Qué valor podría pasar a gris o rojo en 30 días?',
+    status: data.codigos_stock ? 'ready' : 'empty',
+    message: codes ? `${codes} códigos podrían pasar a gris o rojo en 30 días si no hay compras ni ventas nuevas.` : 'No hay códigos próximos a gris o rojo dentro de 30 días.',
+    primary: { label: 'Valor expuesto en 30 días', value: total, unit: 'USD' },
+    supporting: [{ label: 'Códigos expuestos', value: codes, unit: 'count' }, { label: 'Valor positivo valorizado', value: data.valor_total_usd, unit: 'USD' }],
+    chart: { kind: 'bars', title: 'Valor próximo a cambiar de color', unit: 'USD', rows: data.avisos.map(row => ({ label: row.destino === 'ROJO' ? 'Rojo' : 'Gris', value: row.valor_usd })) },
+    breakdown: original.breakdown.filter(row => row.group === 'Avisos'),
+    details: ['Se incluyen códigos a 1–30 días del umbral siguiente: lila hacia gris y gris hacia rojo.', 'Es un aviso condicional: una compra, una venta o una actualización del histórico puede cambiar la clasificación. No expresa una fecha de vencimiento contractual.', ...original.details.slice(1)],
+    notices: original.notices,
+  };
+}
+
+export function partsConcentrationStory(data: Exposure): PanoramaStory {
+  const original = partsExposureStory(data);
+  const families = [...data.familias].filter(row => row.valor_antiguo_usd > 0).sort((a, b) => b.valor_antiguo_usd - a.valor_antiguo_usd);
+  const topValue = families.slice(0, 3).reduce((sum, row) => sum + row.valor_antiguo_usd, 0);
+  const share = data.valor_antiguo_usd > 0 ? topValue / data.valor_antiguo_usd * 100 : null;
+  return {
+    ...original, id: 'repuestos_concentracion', visitKey: `repuestos_concentracion:top3-v1:${data.fecha_analisis}`,
+    title: 'Concentración del stock antiguo', question: '¿Qué familias concentran el valor antiguo?',
+    status: data.valor_antiguo_usd > 0 ? 'ready' : 'empty',
+    message: share === null ? 'No hay valor antiguo positivo para medir concentración.' : `Las tres familias principales concentran ${new Intl.NumberFormat('es-PY', { maximumFractionDigits: 1 }).format(share)}% del valor antiguo.` ,
+    primary: { label: 'Participación de tres familias', value: share, unit: 'percent' },
+    supporting: [{ label: 'Valor de las tres familias', value: topValue, unit: 'USD' }, { label: 'Valor antiguo total', value: data.valor_antiguo_usd, unit: 'USD' }],
+    chart: { kind: 'bars', title: 'Valor antiguo por familia', unit: 'USD', rows: families.slice(0, 5).map(row => ({ label: row.nombre, value: row.valor_antiguo_usd })) },
+    breakdown: original.breakdown.filter(row => row.group === 'Familias' || row.group === 'Sucursales'),
+    details: ['El universo es el valor positivo de ubicaciones con stock físico positivo en gris o rojo; no equivale al stock total.', 'La participación divide el valor de las tres familias mayores por el valor antiguo total del mismo universo. Una familia sin valor no se interpreta como cero stock.', ...original.details.slice(2)],
+    notices: [],
   };
 }

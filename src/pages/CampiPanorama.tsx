@@ -1,6 +1,6 @@
 import { useMemo, useState } from 'react';
 import type { StoryTopicId } from '@/lib/campi/panoramaStoryTypes';
-import { Activity, ArrowDown, ArrowUp, BarChart3, Boxes, CalendarDays, Check, ClipboardList, GripVertical, HandCoins, Package, Plus, Ship, ShoppingCart, Tractor, Truck, Wrench, X } from 'lucide-react';
+import { Activity, ArrowDown, ArrowUp, BarChart3, Boxes, CalendarDays, Check, ClipboardList, GripVertical, HandCoins, Package, Plus, Search, Ship, ShoppingCart, Tractor, Truck, Wrench, X } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { PageHeader, PageShell, Panel } from '@/components/layout/AppPrimitives';
 import { CampiPanoramaAvatar, type CampiPanoramaReaction } from '@/components/campi/CampiPanoramaAvatar';
@@ -19,10 +19,13 @@ import {
 
 const GROUPS: readonly PanoramaTopicGroup[] = ['Resultados', 'Compromisos', 'Disponibilidad', 'Operación', 'Abastecimiento'];
 const topicIcons: Record<PanoramaTopicId, typeof BarChart3> = {
+  ventas_evolucion: BarChart3,
   ventas_facturacion: BarChart3,
   repuestos_demanda: Activity,
   repuestos_clientes: Activity,
   repuestos_sucursales: Package,
+  repuestos_alertas: Package,
+  repuestos_concentracion: Package,
   maquinas_pedidos: Truck,
   servicios_pendientes: ClipboardList,
   maquinas_stock: Tractor,
@@ -34,6 +37,7 @@ const topicIcons: Record<PanoramaTopicId, typeof BarChart3> = {
   maquinas_parque: Tractor,
   repuestos_reposicion: ShoppingCart,
   servicios_comisiones: HandCoins,
+  servicios_abiertas: ClipboardList,
 };
 const groupTone: Record<PanoramaTopicGroup, string> = {
   Resultados: 'bg-emerald-50 text-emerald-700',
@@ -55,12 +59,16 @@ export default function CampiPanorama() {
   const [dragged, setDragged] = useState<StoryTopicId | null>(null);
   const [reaction, setReaction] = useState<CampiPanoramaReaction | null>(null);
   const [replacing, setReplacing] = useState<StoryTopicId | null>(null);
+  const [search, setSearch] = useState('');
+  const [area, setArea] = useState<'todas' | 'repuestos' | 'servicios' | 'parque'>('todas');
   const selected = reconcilePanoramaOrder(draft, available);
   const persisted = reconcilePanoramaOrder(saved, available);
   const cancel = () => { setDraft(persisted); setReplacing(null); setEditing(false); };
   const changed = saved === null || selected.join('|') !== persisted.join('|');
   const topicById = new Map(available.map(topic => [topic.id, topic]));
   const unselected = available.filter(topic => !selected.includes(topic.id));
+  const shown = unselected.filter(topic => (area === 'todas' || topic.sections.some(section => section.startsWith(`${area}.`)))
+    && `${topic.label} ${topic.question} ${topic.preview}`.normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase().includes(search.normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase().trim()));
   const react = (kind: CampiPanoramaReaction['kind']) => setReaction(current => ({ kind, token: (current?.token ?? 0) + 1 }));
 
   const add = (id: StoryTopicId) => {
@@ -100,15 +108,11 @@ export default function CampiPanorama() {
   if (!editing && persisted.length) return <PanoramaDashboard userId={userId} topics={persisted} available={available}
     hasAccess={section => hasModuloAccess(section.split('.')[0]) && hasSectionAccess(section)} onEdit={() => setEditing(true)} />;
 
-  return <PageShell className="max-w-[1440px] space-y-4">
+  return <PageShell className="max-w-[1440px] space-y-3">
     <PageHeader title="Panorama" />
-    <Panel className="relative isolate min-h-[240px] overflow-hidden border-primary/15 bg-gradient-to-r from-emerald-50/70 via-background to-primary/5 px-6 py-5 lg:px-8">
-      <div className="relative z-10 max-w-[590px] space-y-2 lg:py-5">
-        <h2 className="text-[25px] font-semibold tracking-tight">Hola, soy Campi</h2>
-        <p className="max-w-lg text-[15px] leading-6 text-foreground/85">Te ayudaré a ver qué cambió y qué necesita atención, con información verificada.</p>
-      </div>
-      <div className="absolute bottom-5 right-[190px] z-20 hidden h-[200px] w-[200px] lg:block"><CampiPanoramaAvatar reaction={reaction} /></div>
-      <div className="absolute right-5 top-1/2 z-10 hidden w-[165px] -translate-y-1/2 rounded-xl border bg-card px-3.5 py-3 text-[13px] font-semibold shadow-sm before:absolute before:-left-[7px] before:top-[calc(50%-7px)] before:h-3.5 before:w-3.5 before:rotate-45 before:border-b before:border-l before:bg-card lg:block">Tus temas, en el orden que prefieras.</div>
+    <Panel className="flex min-h-[82px] items-center gap-3 border-primary/15 bg-primary/5 px-3 py-2">
+      <div className="h-[64px] w-[64px] shrink-0"><CampiPanoramaAvatar reaction={reaction} greetingKey={userId} /></div>
+      <div className="min-w-0"><h2 className="text-sm font-semibold">Tus prioridades</h2><p className="text-sm text-muted-foreground">Elegí hasta cuatro temas y ordenalos como prefieras.</p></div>
     </Panel>
     <div className="grid items-start gap-4 lg:grid-cols-[minmax(0,1.55fr)_minmax(360px,0.85fr)]">
       <Panel className="min-w-0 space-y-3">
@@ -116,9 +120,13 @@ export default function CampiPanorama() {
           <h2 className="text-[15px] font-semibold">Temas de interés</h2>
           <span className="text-[12px] tabular-nums text-muted-foreground">{available.length} disponibles · {selected.length} seleccionados · {unselected.length} por agregar</span>
         </div>
+        <div className="flex flex-wrap items-center gap-2">
+          <label className="relative min-w-[180px] flex-1"><Search aria-hidden="true" className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" /><span className="sr-only">Buscar temas</span><input type="search" value={search} onChange={event => setSearch(event.target.value)} placeholder="Buscar temas" className="h-9 w-full rounded-md border bg-background pl-9 pr-3 text-sm" /></label>
+          <select aria-label="Área" value={area} onChange={event => setArea(event.target.value as typeof area)} className="h-9 rounded-md border bg-background px-2 text-sm"><option value="todas">Todas las áreas</option>{(['repuestos', 'servicios', 'parque'] as const).filter(module => available.some(topic => topic.sections.some(section => section.startsWith(`${module}.`)))).map(module => <option key={module} value={module}>{module === 'parque' ? 'Máquinas' : module[0].toUpperCase() + module.slice(1)}</option>)}</select>
+        </div>
         <div className="max-h-[430px] space-y-3 overflow-y-auto pr-1" aria-label="Temas disponibles">
           {GROUPS.map(group => {
-            const topics = unselected.filter(topic => topic.group === group);
+            const topics = shown.filter(topic => topic.group === group);
             if (!topics.length) return null;
             return <section key={group} aria-label={group} className="space-y-1.5">
               <h3 className="px-1 text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">{group}</h3>
@@ -127,13 +135,13 @@ export default function CampiPanorama() {
                 return <button key={topic.id} type="button" onClick={() => add(topic.id)}
                   className="flex min-h-[54px] w-full items-center gap-3 rounded-lg border bg-card px-3 text-left transition-colors hover:bg-accent focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring">
                   <span className={cn('flex h-8 w-8 shrink-0 items-center justify-center rounded-full', groupTone[group])}><Icon className="h-4 w-4" /></span>
-                  <span className="min-w-0 flex-1"><strong className="block text-[13px] font-semibold">{topic.label}</strong><span className="block text-[12px] text-muted-foreground">{topic.question} · {topic.preview}</span></span>
+                  <span className="min-w-0 flex-1"><strong className="block text-[13px] font-semibold">{topic.label}</strong><span className="block text-[12px] text-muted-foreground">{topic.preview}</span></span>
                   <Plus className="h-4 w-4 shrink-0 text-muted-foreground" />
                 </button>;
               })}
             </section>;
           })}
-          {!unselected.length && <div className="px-2 py-6 text-center text-[13px] text-muted-foreground">Todos los temas están priorizados.</div>}
+          {!shown.length && <div className="px-2 py-6 text-center text-[13px] text-muted-foreground">{unselected.length ? 'No hay temas para este filtro.' : 'Todos los temas están priorizados.'}</div>}
         </div>
       </Panel>
       <Panel className="space-y-3 lg:sticky lg:top-3">
@@ -158,7 +166,7 @@ export default function CampiPanorama() {
               <button type="button" className="rounded p-1.5 hover:bg-accent" aria-label={`Quitar ${topic.label}`} onClick={() => remove(id)}><X className="h-3.5 w-3.5" /></button>
             </li>;
           })}
-          {!selected.length && <li className="flex min-h-[172px] items-center justify-center text-[13px] text-muted-foreground">Sin prioridades todavía.</li>}
+          {Array.from({ length: MAX_PANORAMA_TOPICS - selected.length }, (_, index) => <li key={`empty-${index}`} className="flex min-h-[57px] items-center gap-2 px-3 text-sm text-muted-foreground"><span className="flex h-6 w-6 items-center justify-center rounded-full bg-muted text-xs">{selected.length + index + 1}</span>Elegí un tema</li>)}
         </ol>
         <div className="flex justify-end gap-2">
           {saved !== null && <Button size="sm" variant="outline" onClick={cancel}>Volver al panorama</Button>}

@@ -8,11 +8,15 @@ export type PanoramaTopic = { id: StoryTopicId; label: string; question: string;
 export const MAX_PANORAMA_TOPICS = 4;
 
 export const PANORAMA_TOPICS: readonly PanoramaTopic[] = [
+  { id: 'ventas_evolucion', label: 'Evolución de ventas', question: '¿Estamos vendiendo más o menos?', preview: 'Ventas antes de NC, mes y acumulado comparables.', group: 'Resultados', sections: ['servicios.ventas', 'parque.ventas', 'repuestos.ventas'] },
   { id: 'ventas_facturacion', label: 'Facturación y notas de crédito', question: '¿Cuánto quedó neto después de las NC?', preview: 'Neto, ventas y NC por área autorizada.', group: 'Resultados', sections: ['servicios.ventas', 'parque.ventas', 'repuestos.ventas'] },
   { id: 'maquinas_pedidos', label: 'Abastecimiento de pedidos activos', question: '¿Qué unidades activas no tienen vínculo único?', preview: 'Vínculos con stock e importaciones; no mide atraso.', group: 'Compromisos', sections: ['parque.operaciones'] },
   { id: 'servicios_pendientes', label: 'Resolución de órdenes de servicio', question: '¿Cuánto tardaron las OS cerradas?', preview: 'Mediana de cierres y resguardo de abiertas.', group: 'Operación', sections: ['servicios.ordenes'] },
-  { id: 'repuestos_stock', label: 'Stock antiguo de repuestos', question: '¿Qué valor está en gris o rojo?', preview: 'Valor USD, proporción y cambios próximos de color.', group: 'Disponibilidad', sections: ['repuestos.analisis'] },
-  { id: 'repuestos_sucursales', label: 'Antigüedad de compra por sucursal', question: '¿Dónde se concentra el tiempo desde la última compra?', preview: 'Días ponderados por valor USD con compra fechada.', group: 'Disponibilidad', sections: ['repuestos.analisis'] },
+  { id: 'servicios_abiertas', label: 'Órdenes de servicio abiertas', question: '¿Cuántas OS siguen abiertas y qué edad tienen?', preview: 'Volumen abierto y edad del 90% de las OS.', group: 'Operación', sections: ['servicios.ordenes'] },
+  { id: 'repuestos_stock', label: 'Stock antiguo de repuestos', question: '¿Qué valor está en gris o rojo?', preview: 'Valor, proporción y cambios próximos de color.', group: 'Disponibilidad', sections: ['repuestos.analisis'] },
+  { id: 'repuestos_alertas', label: 'Cambios próximos de clasificación', question: '¿Qué valor podría pasar a gris o rojo en 30 días?', preview: 'Importe y códigos, si no hay movimientos nuevos.', group: 'Disponibilidad', sections: ['repuestos.analisis'] },
+  { id: 'repuestos_concentracion', label: 'Concentración del stock antiguo', question: '¿Qué familias concentran el valor antiguo?', preview: 'Participación de las tres familias principales.', group: 'Disponibilidad', sections: ['repuestos.analisis'] },
+  { id: 'repuestos_sucursales', label: 'Antigüedad de compra por sucursal', question: '¿Dónde se concentra el tiempo desde la última compra?', preview: 'Días ponderados por valor con compra fechada.', group: 'Disponibilidad', sections: ['repuestos.analisis'] },
   { id: 'maquinas_stock', label: 'Composición del stock físico', question: '¿Cuántas máquinas nuevas y usadas hay?', preview: 'Existencias físicas; corte de fuente no acreditado.', group: 'Disponibilidad', sections: ['parque.stock'] },
 ];
 

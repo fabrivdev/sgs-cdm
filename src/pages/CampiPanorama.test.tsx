@@ -21,7 +21,7 @@ afterEach(cleanup);
 describe('Campi Panorama configuration', () => {
   it('saves more than three ordered topics and restores them', () => {
     const view = render(<CampiPanorama />);
-    expect(screen.getByText(/6 disponibles · 0 seleccionados · 6 por agregar/)).toBeInTheDocument();
+    expect(screen.getByText(/10 disponibles · 0 seleccionados · 10 por agregar/)).toBeInTheDocument();
     fireEvent.click(screen.getByRole('button', { name: /^Facturación y notas de crédito/ }));
     fireEvent.click(screen.getByRole('button', { name: /^Stock antiguo de repuestos/ }));
     fireEvent.click(screen.getByRole('button', { name: /^Composición del stock físico/ }));
@@ -41,7 +41,7 @@ describe('Campi Panorama configuration', () => {
 
   it('shows each topic once and reacts when adding or removing it', () => {
     render(<CampiPanorama />);
-    expect(screen.queryByRole('searchbox')).not.toBeInTheDocument();
+    expect(screen.getByRole('searchbox', { name: 'Buscar temas' })).toBeInTheDocument();
     expect(screen.getByRole('button', { name: /^Composición del stock físico/ })).toBeInTheDocument();
     fireEvent.click(screen.getByRole('button', { name: /^Composición del stock físico/ }));
     expect(screen.getByRole('img', { name: 'Campi animado' })).toHaveAttribute('data-reaction', 'select');

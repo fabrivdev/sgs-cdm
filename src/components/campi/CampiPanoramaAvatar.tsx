@@ -6,24 +6,27 @@ import './campi.css';
 import './campi-panorama.css';
 
 const REDUCED = '(prefers-reduced-motion: reduce)';
-export type CampiPanoramaReaction = { kind: 'select' | 'reorder' | 'remove' | 'save'; token: number };
+export type CampiPanoramaReaction = { kind: 'select' | 'reorder' | 'remove' | 'save' | 'ask'; token: number };
 const REACTION_ACTION: Record<CampiPanoramaReaction['kind'], CampiAction> = {
   select: 'celebrate',
   reorder: 'step',
   remove: 'consider',
   save: 'approve',
+  ask: 'consider',
 };
 
-export function CampiPanoramaAvatar({ reaction, attention = false, change = false, mood, quiet = false }: { reaction?: CampiPanoramaReaction | null; attention?: boolean; change?: boolean; mood?: CampiMood; quiet?: boolean }) {
+export function CampiPanoramaAvatar({ reaction, attention = false, change = false, mood, quiet = false, greetingKey }: { reaction?: CampiPanoramaReaction | null; attention?: boolean; change?: boolean; mood?: CampiMood; quiet?: boolean; greetingKey?: string }) {
   const currentMood: CampiMood = mood ?? (attention ? 'atento' : change ? 'contento' : 'sereno');
-  const [state, setState] = useState<'welcome' | 'idle'>('welcome');
+  const [state, setState] = useState<'welcome' | 'idle'>(() => {
+    try { return greetingKey && sessionStorage.getItem(`sig-cdm:campi:panorama-saludo:${greetingKey}`) ? 'idle' : 'welcome'; }
+    catch { return 'welcome'; }
+  });
   const [visible, setVisible] = useState(() => !document.hidden);
   const [reduced, setReduced] = useState(() => window.matchMedia(REDUCED).matches);
   const [curious, setCurious] = useState(false);
   const [action, setAction] = useState<CampiAction>('neutral');
   const actionTimeout = useRef<number | undefined>(undefined);
   const interactionIndex = useRef(0);
-  const idleIndex = useRef(0);
 
   const play = useCallback((next: CampiAction) => {
     window.clearTimeout(actionTimeout.current);
@@ -32,13 +35,8 @@ export function CampiPanoramaAvatar({ reaction, attention = false, change = fals
   }, []);
 
   useEffect(() => {
-    let settle = window.setTimeout(() => setState('idle'), 1600);
-    const gesture = window.setInterval(() => {
-      if (document.hidden || window.matchMedia(REDUCED).matches || quiet || document.querySelector('[role="dialog"]')) return;
-      const variants: Record<CampiMood, CampiAction[]> = { sereno: ['approve', 'consider'], contento: ['approve', 'celebrate'], atento: ['consider', 'step'], preocupado: ['consider', 'sad'], pensativo: ['consider', 'approve'], triste: ['sad', 'consider'] };
-      play(variants[currentMood][idleIndex.current++ % variants[currentMood].length]);
-      settle = window.setTimeout(() => setState('idle'), 1600);
-    }, 18000);
+    if (greetingKey) { try { sessionStorage.setItem(`sig-cdm:campi:panorama-saludo:${greetingKey}`, '1'); } catch { /* Session storage is optional. */ } }
+    const settle = window.setTimeout(() => setState('idle'), 1600);
     const media = window.matchMedia(REDUCED);
     const onVisibility = () => setVisible(!document.hidden);
     const onMotion = () => setReduced(media.matches);
@@ -46,12 +44,11 @@ export function CampiPanoramaAvatar({ reaction, attention = false, change = fals
     media.addEventListener('change', onMotion);
     return () => {
       window.clearTimeout(settle);
-      window.clearInterval(gesture);
       document.removeEventListener('visibilitychange', onVisibility);
       media.removeEventListener('change', onMotion);
       window.clearTimeout(actionTimeout.current);
     };
-  }, [currentMood, play, quiet]);
+  }, [greetingKey]);
 
   useEffect(() => { if (quiet) { window.clearTimeout(actionTimeout.current); setAction('neutral'); } }, [quiet]);
 

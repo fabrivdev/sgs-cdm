@@ -10,27 +10,27 @@ describe('Campi questions', () => {
     render(<CampiInterpreter stories={[billing]} loading={false} />);
     fireEvent.click(screen.getByRole('button', { name: 'Preguntale a Campi' }));
     fireEvent.click(screen.getByRole('button', { name: '¿Qué muestran los datos de facturación?' }));
-    expect(screen.getByRole('dialog')).toHaveTextContent('Fuente: Prueba');
+    expect(screen.getByRole('dialog')).toHaveTextContent('Abrí el detalle');
     fireEvent.keyDown(screen.getByRole('dialog'), { key: 'Escape' });
     expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
     fireEvent.click(screen.getByRole('button', { name: 'Preguntale a Campi' }));
     fireEvent.change(screen.getByRole('textbox', { name: 'Preguntale a Campi' }), { target: { value: '¿Por qué crecieron las ventas?' } });
     fireEvent.click(screen.getByRole('button', { name: 'Preguntar a Campi' }));
-    expect(screen.getByRole('dialog')).toHaveTextContent('No puedo responder esa consulta');
+    expect(screen.getByRole('dialog')).toHaveTextContent('No tengo una respuesta verificada');
   });
   it('does not retain privileged answers when input stories change', () => {
     const view = render(<CampiInterpreter stories={[billing]} loading={false} />);
     fireEvent.click(screen.getByRole('button', { name: 'Preguntale a Campi' }));
     fireEvent.click(screen.getByRole('button', { name: '¿Qué muestran los datos de facturación?' }));
     view.rerender(<CampiInterpreter stories={[]} loading={false} />);
-    expect(screen.getByRole('dialog')).not.toHaveTextContent('USD 448.000');
-    expect(screen.getByRole('dialog')).toHaveTextContent('No puedo responder');
+    expect(screen.getByRole('dialog')).not.toHaveTextContent('$ 448.000');
+    expect(screen.getByRole('dialog')).toHaveTextContent('No tengo una respuesta verificada');
   });
   it('shows an evidenced finding and a working primary action', () => {
     const openStory = vi.fn();
     render(<CampiInterpreter stories={[billing]} loading={false} onOpenStory={openStory} />);
     expect(screen.getByRole('heading', { name: /Facturación: facturación del mes subió 12%/ })).toBeInTheDocument();
-    expect(screen.getByRole('heading', { name: /USD 400.000 → USD 448.000/ })).toBeInTheDocument();
+    expect(screen.getByRole('heading', { name: /\$ 400.000 → \$ 448.000/ })).toBeInTheDocument();
     expect(screen.getByText('Mascota')).toHaveAttribute('data-mood', 'sereno');
     expect(screen.getByText('Cambio observado')).toBeInTheDocument();
     fireEvent.click(screen.getByRole('button', { name: 'Ver datos de facturación' }));
@@ -47,15 +47,15 @@ describe('Campi questions', () => {
     const parts: PanoramaStory = { ...billing, id: 'repuestos_clientes', title: 'Ventas de repuestos', primary: { ...billing.primary!, value: 420000 } };
     const openStory = vi.fn();
     render(<CampiInterpreter stories={[parts, billing, stock]} loading={false} onOpenStory={openStory} previous={{ at: '2026-10-15T10:00:00Z', values: [{ id: 'ventas_facturacion', value: 400000, unit: 'USD', fingerprint: JSON.stringify([['repuestos.ventas'], 'Repuestos', 'Octubre', 'Prueba', 'ventas-netas-nc-separadas-v3']) }] }} />);
-    expect(screen.getByRole('heading', { name: /Facturación: \+USD 48.000 desde tu última visita/ })).toBeInTheDocument();
+    expect(screen.getByRole('heading', { name: /Facturación: \+\$ 48.000 desde tu última visita/ })).toBeInTheDocument();
     expect(screen.getByText('Mascota')).toHaveAttribute('data-mood', 'sereno');
-    expect(screen.getByLabelText(/Comparación de Facturación desde tu última visita/)).toHaveTextContent('USD 400.000 → USD 448.000');
-    expect(screen.getByText('Repuestos · Octubre')).toBeInTheDocument();
+    expect(screen.getByLabelText(/Comparación de Facturación desde tu última visita/)).toHaveTextContent('$ 400.000 → $ 448.000');
+    expect(screen.queryByText('Repuestos · Octubre')).not.toBeInTheDocument();
     fireEvent.click(screen.getByRole('button', { name: 'Ver datos de facturación' }));
     expect(openStory).toHaveBeenCalledWith('ventas_facturacion');
     fireEvent.click(screen.getByRole('button', { name: 'Preguntale a Campi' }));
     fireEvent.click(screen.getByRole('button', { name: '¿Qué cambió desde mi última visita?' }));
-    expect(screen.getByRole('dialog')).toHaveTextContent('USD 400.000 → USD 448.000');
+    expect(screen.getByRole('dialog')).toHaveTextContent('$ 400.000 → $ 448.000');
   });
   it('blocks submissions during loading and for whitespace', () => {
     const view = render(<CampiInterpreter stories={[]} loading />);

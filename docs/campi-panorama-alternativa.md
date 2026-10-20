@@ -1,5 +1,30 @@
 # Panorama alternativo: temas con contexto
 
+## Estado vigente — 20/10/2026
+
+Esta sección prevalece sobre las descripciones históricas que siguen. Panorama continúa en `feat/campi-panorama-alternativa`; no se integra a `main` ni se publica en Lovable. La portada conserva cuatro prioridades ordenadas en una grilla 2×2. Muestra título, indicador, comparación cuando existe y gráfico compacto; las conclusiones, el alcance, el corte y el método están en el panel lateral estándar. Las cifras en dólares se presentan con `$`. La referencia de última visita permanece por usuario y navegador y exige la misma definición y alcance.
+
+El catálogo ofrece diez temas habilitados por permisos y datos verificables. Ventas y Facturación neta son transversales; un usuario con solo Servicios y permiso de ventas puede elegir ambos, y con permiso de OS agrega Resolución y OS abiertas. Un usuario con solo Máquinas puede elegir Ventas, Facturación neta, Stock físico y Pedidos activos si posee las tres secciones. Repuestos dispone además de cuatro lecturas de Análisis. No se muestran compras pendientes de Repuestos, capacidad técnica, proyección ni etapas de importación como nuevas opciones: sus cálculos y universos aún necesitan conciliación. El objetivo de unas seis alternativas por cada área sigue **parcial** en Servicios y Máquinas, sin rellenarlo con cifras supuestas.
+
+| Tema | Pregunta y cálculo principal | Fuente y permisos | Comparación y límite |
+| --- | --- | --- | --- |
+| Evolución de ventas | Ventas positivas antes de NC del mes; acumulado anual y desglose por áreas autorizadas | RPC de ventas de Repuestos, Servicios y Máquinas; `*.ventas` concedidas | Mismo tramo y mismo corte anual del año previo. Si una fuente autorizada falla, falla el consolidado. |
+| Facturación neta | Ventas antes de NC menos NC; neto del mes y acumulado | Las mismas tres RPC y permisos | Variación sobre neto; bases cero o negativas no generan porcentaje. Conciliación visible en lateral. |
+| Stock antiguo de Repuestos | Valor positivo gris + rojo / valor positivo de ubicaciones con stock | `campi_repuestos_exposicion_v1`; `repuestos.analisis` | Clasificación por compra y ventas históricas; Kardex referencial, sin corte de inventario acreditado. |
+| Cambios próximos de clasificación | Valor y códigos a 1–30 días de pasar a gris o rojo | Misma RPC y permiso de Análisis | Condicionado a ausencia de compras y ventas nuevas; no es vencimiento contractual. |
+| Concentración del stock antiguo | Valor de las tres mayores familias / valor gris + rojo | Misma RPC y permiso de Análisis | Universo de stock antiguo, no total de inventario; desglose por familia y sucursal. |
+| Antigüedad por sucursal | Días desde última compra ponderados por valor positivo con fecha | `repuestos_analisis_valorizado`; `repuestos.analisis` | Sin fecha se excluye e informa cobertura; no se deduce movimiento local. |
+| Resolución de OS | Mediana de días apertura→cierre operativo de OS cerradas | `campi_resolucion_os_v1`; `servicios.ordenes` | Dos meses completos; menos días no prueba mejora por sí solo. |
+| OS abiertas | Cantidad abierta y percentil 90 de edad desde apertura | Misma RPC y permiso de OS | No se llama atraso sin fecha comprometida; fecha de análisis no acredita cobertura hasta hoy. |
+| Stock físico de Máquinas | Saldo físico y composición nueva/usada | `parque_stock_maquinas`; `parque.stock` | Sin corte acreditado ni reservas conciliadas; no equivale a disponibilidad comercial. |
+| Pedidos activos de Máquinas | Unidades en operaciones activas y proporción sin vínculo único de abastecimiento | `campi_pedidos_abastecimiento_v1`; `parque.operaciones` | El vínculo es diagnóstico; no equivale a atraso ni entrega pendiente. Sin monto confiable. |
+
+El selector presenta cuatro posiciones, permite búsqueda y filtro por área autorizada, y guarda cambios solo con «Guardar orden». Campi deja de ejecutar un gesto periódico fijo; saluda una vez por usuario en la sesión del navegador y reacciona a selección, orden, guardado, preguntas y clic directo. Las respuestas se limitan a historias seleccionadas y autorizadas; una pregunta reconocida ofrece abrir su respaldo lateral. La base del personaje permanece estable y sin máscara de desvanecimiento inferior.
+
+Pendiente de validación productiva: probar una cuenta limitada a cada área con sus permisos reales, corroborar las cifras de Ventas y OS contra sus fuentes bajo el nuevo catálogo y acreditar los cortes de inventario. Las capturas locales comprueban encaje y comportamiento de frontend, no la integridad de un despliegue público. Los importes mencionados más abajo corresponden a lecturas históricas y nunca deben fijarse como valores actuales.
+
+## Registro histórico anterior
+
 ## Comparación de versiones
 
 - Base preservada: `feat/campi-panorama`, commit `3337f6db44d1851559e47a8f9cbc54595d0de6de`.

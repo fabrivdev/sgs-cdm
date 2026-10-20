@@ -29,11 +29,20 @@ describe('operational Panorama loaders', () => {
   it('uses complete protected aggregates for active machine supply and service resolution', async () => {
     mocks.rpc.mockImplementation(async name => ({ data: name === 'campi_pedidos_abastecimiento_v1' ? supply() : resolution(), error: null }));
     const stories = await loadOperationsStories(['maquinas_pedidos', 'servicios_pendientes'], ['parque.operaciones', 'servicios.ordenes'], asOf);
-    expect(stories.map(s => s.primary?.value)).toEqual([7, 14]);
+    expect(stories.map(s => s.primary?.value)).toEqual([17, 14]);
     expect(stories[0].breakdown[0].route).toBe('/parque-operaciones?operacion=abc');
     expect(stories[1].primary?.comparison?.value).toBe(16.5);
     expect(stories[1].details.join(' ')).toContain('1301');
     expect(mocks.from).not.toHaveBeenCalled();
+  });
+  it('separates the open OS queue from resolution and reads the same verified source once', async () => {
+    mocks.rpc.mockResolvedValue({ data: resolution(), error: null });
+    const [closed, open] = await loadOperationsStories(['servicios_pendientes', 'servicios_abiertas'], ['servicios.ordenes'], asOf);
+    expect(mocks.rpc).toHaveBeenCalledTimes(1);
+    expect(closed.primary?.value).toBe(14);
+    expect(open.primary?.value).toBe(76);
+    expect(open.supporting[0].value).toBe(60);
+    expect(open.message).not.toContain('atraso');
   });
   it('fails closed on a partial aggregate or unavailable source', async () => {
     mocks.rpc.mockResolvedValueOnce({ data: { ...supply(), unidades: 16 }, error: null })

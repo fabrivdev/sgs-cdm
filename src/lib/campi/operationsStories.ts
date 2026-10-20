@@ -2,8 +2,8 @@ import { supabase } from '@/integrations/supabase/client';
 import { fetchSemaforoHistorico, SEMAFORO_COLORES, type SemaforoResultado } from '@/hooks/useSemaforoHistorico';
 import type { SectionKey } from '@/lib/permissions';
 import type { PanoramaStory, StoryLoader, StoryTopicId } from './panoramaStoryTypes';
-import { parsePartsExposure, partsExposureStory } from './partsExposure';
-import { machineSupplyStory, parseMachineSupply, parseServiceResolution, serviceResolutionStory } from './operationalOutcomes';
+import { parsePartsExposure, partsAlertsStory, partsConcentrationStory, partsExposureStory } from './partsExposure';
+import { machineSupplyStory, parseMachineSupply, parseServiceResolution, serviceOpenStory, serviceResolutionStory } from './operationalOutcomes';
 
 const number = (v: unknown): number | null => typeof v === 'number' && Number.isFinite(v) ? v : null;
 const required = (v: unknown) => { const n = number(v); if (n === null) throw new Error('La fuente devolvió un valor incompleto.'); return n; };
@@ -15,10 +15,13 @@ const day = (v: unknown): string | null => {
 const definitions: Partial<Record<StoryTopicId, { title: string; question: string; section: SectionKey; route: string; source: string }>> = {
   repuestos_sucursales: { title: 'Antigüedad de repuestos por sucursal', question: '¿Cuánto tiempo hace desde la última compra por sucursal?', section: 'repuestos.analisis', route: '/repuestos/analisis', source: 'repuestos_analisis_valorizado · sucursales' },
   repuestos_stock: { title: 'Stock antiguo de repuestos', question: '¿Qué valor de repuestos está en gris o rojo?', section: 'repuestos.analisis', route: '/repuestos/analisis', source: 'campi_repuestos_exposicion_v1' },
+  repuestos_alertas: { title: 'Cambios próximos de clasificación', question: '¿Qué valor podría pasar a gris o rojo en 30 días?', section: 'repuestos.analisis', route: '/repuestos/analisis', source: 'campi_repuestos_exposicion_v1' },
+  repuestos_concentracion: { title: 'Concentración del stock antiguo', question: '¿Qué familias concentran el valor antiguo?', section: 'repuestos.analisis', route: '/repuestos/analisis', source: 'campi_repuestos_exposicion_v1' },
   maquinas_pedidos: { title: 'Abastecimiento de pedidos activos', question: '¿Qué pedidos activos no tienen abastecimiento vinculado?', section: 'parque.operaciones', route: '/parque-operaciones', source: 'campi_pedidos_abastecimiento_v1' },
   maquinas_stock: { title: 'Stock físico de máquinas', question: '¿Qué existencias informa la última foto?', section: 'parque.stock', route: '/parque-stock', source: 'parque_stock_maquinas · saldo_actual' },
   maquinas_proyeccion: { title: 'Proyección de máquinas nuevas', question: '¿Qué saldo queda después de compras y ventas pendientes?', section: 'parque.stock_proyectado', route: '/parque-stock-proyectado', source: 'parque_stock_proyectado_v1' },
   servicios_pendientes: { title: 'Resolución de órdenes de servicio', question: '¿Cuánto tardaron en resolverse las OS cerradas?', section: 'servicios.ordenes', route: '/servicios/ordenes', source: 'campi_resolucion_os_v1' },
+  servicios_abiertas: { title: 'Órdenes de servicio abiertas', question: '¿Cuántas OS siguen abiertas y qué edad tienen?', section: 'servicios.ordenes', route: '/servicios/ordenes', source: 'campi_resolucion_os_v1' },
 };
 function base(id: StoryTopicId): PanoramaStory {
   const d = definitions[id]!;
@@ -29,7 +32,7 @@ function parts(id: StoryTopicId, data: SemaforoResultado): PanoramaStory {
   const total = required(data.lineas);
   const value = number(data.valor_kardex_usd);
   story.status = total === 0 ? 'empty' : 'ready';
-  story.scope = 'REP activos con stock global positivo; valor observado en Kardex (USD)';
+  story.scope = 'REP activos con stock global positivo; valor observado en Kardex en dólares';
   // fecha_analisis is the classification day, NOT the inventory/Kardex cut-off.
   story.details = [`Fecha de clasificación: ${day(data.fecha_analisis) ?? 'no informada'}. El corte del inventario no está acreditado.`, 'El valor es referencial del Kardex; no se recalcula multiplicando saldo por costo. Negativos y valores ausentes se conservan.', 'No incluye pedidos de compra pendientes.'];
   story.primary = { label: 'Valor Kardex referencial', value, unit: 'USD' };
@@ -43,10 +46,10 @@ function parts(id: StoryTopicId, data: SemaforoResultado): PanoramaStory {
     const average = dated > 0 ? measured.reduce((sum, r) => sum + r.days! * r.dated!, 0) / dated : null;
     story.primary = { label: 'Días desde última compra', value: average, unit: 'days' };
     story.supporting = [{ label: 'Valor con compra fechada', value: dated, unit: 'USD' }, { label: 'Cobertura del valor positivo', value: positive > 0 ? dated / positive * 100 : null, unit: 'percent' }];
-    story.message = average === null ? 'No hay valor positivo con última compra comprobada para calcular la antigüedad.' : 'Antigüedad de la última compra por sucursal, ponderada por valor USD positivo con fecha.';
+    story.message = average === null ? 'No hay valor positivo con última compra comprobada para calcular la antigüedad.' : 'Antigüedad de la última compra por sucursal, ponderada por valor positivo en dólares con fecha.';
     story.chart = { kind: 'bars', title: 'Días desde última compra por sucursal', unit: 'days', rows: measured.map(r => ({ label: r.name, value: r.days! })) };
     story.breakdown = measured.map(r => ({ label: r.name, value: r.days!, unit: 'days', note: `Cobertura: ${new Intl.NumberFormat('es-PY', { maximumFractionDigits: 1 }).format(r.dated! / r.positive! * 100)}% del valor positivo.` }));
-    story.details.push('Cada promedio usa el valor USD positivo de esa sucursal con fecha de compra comprobada. El promedio general pondera las sucursales por ese mismo valor; sin fecha o sin valor positivo quedan fuera.', 'Los códigos presentes en varias sucursales no son sumables como códigos únicos. Las ventas históricas del semáforo son globales, no ventas locales.');
+    story.details.push('Cada promedio usa el valor positivo en dólares de esa sucursal con fecha de compra comprobada. El promedio general pondera las sucursales por ese mismo valor; sin fecha o sin valor positivo quedan fuera.', 'Los códigos presentes en varias sucursales no son sumables como códigos únicos. Las ventas históricas del semáforo son globales, no ventas locales.');
   } else {
     story.message = total ? 'Semáforo de ventas de tres años calendario y última compra comprobada.' : 'Sin productos dentro del universo del análisis.';
     story.chart = { kind: 'bars', title: 'Valor Kardex por semáforo', unit: 'USD', rows: data.por_color.flatMap(r => number(r.valor_kardex_usd) === null ? [] : [{ label: SEMAFORO_COLORES.find(c => c.id === r.color)?.label ?? r.color, value: r.valor_kardex_usd! }]) };
@@ -122,12 +125,16 @@ export const loadOperationsStories: StoryLoader = async (topics, granted, asOf) 
   if (!day(asOf)) throw new Error('Fecha de análisis inválida.');
   const selected = [...new Set(topics)].filter(id => definitions[id] && granted.includes(definitions[id]!.section));
   let partsRequest: Promise<SemaforoResultado> | undefined;
+  let exposureRequest: ReturnType<typeof supabase.rpc> | undefined;
+  let serviceRequest: ReturnType<typeof supabase.rpc> | undefined;
   return Promise.all(selected.map(async id => {
     try {
-      if (id === 'repuestos_stock') {
-        const response = await supabase.rpc('campi_repuestos_exposicion_v1' as never);
+      if (id === 'repuestos_stock' || id === 'repuestos_alertas' || id === 'repuestos_concentracion') {
+        exposureRequest ??= supabase.rpc('campi_repuestos_exposicion_v1' as never);
+        const response = await exposureRequest;
         if (response.error) throw response.error;
-        return partsExposureStory(parsePartsExposure(response.data));
+        const data = parsePartsExposure(response.data);
+        return id === 'repuestos_alertas' ? partsAlertsStory(data) : id === 'repuestos_concentracion' ? partsConcentrationStory(data) : partsExposureStory(data);
       }
       if (id === 'repuestos_sucursales') {
         partsRequest ??= fetchSemaforoHistorico({ busqueda: '', marca: '', color: '', sucursal: '' }, 0, 1);
@@ -140,11 +147,13 @@ export const loadOperationsStories: StoryLoader = async (topics, granted, asOf) 
         if (response.error) throw response.error;
         return machineSupplyStory(parseMachineSupply(response.data));
       }
-      const response = await supabase.rpc('campi_resolucion_os_v1' as never);
+      serviceRequest ??= supabase.rpc('campi_resolucion_os_v1' as never);
+      const response = await serviceRequest;
       if (response.error) throw response.error;
-      return serviceResolutionStory(parseServiceResolution(response.data));
+      const data = parseServiceResolution(response.data);
+      return id === 'servicios_abiertas' ? serviceOpenStory(data) : serviceResolutionStory(data);
     } catch (error) {
-      const migrationMissing = ['repuestos_stock', 'maquinas_pedidos', 'servicios_pendientes'].includes(id) && typeof error === 'object' && error !== null && 'code' in error && error.code === 'PGRST202';
+      const migrationMissing = ['repuestos_stock', 'repuestos_alertas', 'repuestos_concentracion', 'maquinas_pedidos', 'servicios_pendientes', 'servicios_abiertas'].includes(id) && typeof error === 'object' && error !== null && 'code' in error && error.code === 'PGRST202';
       return { ...base(id), status: 'error' as const, message: migrationMissing
         ? 'La lectura de este indicador aún no está activa en la base.'
         : 'No se pudo verificar la fuente completa. Abrí la sección de origen o volvé a intentar.' };

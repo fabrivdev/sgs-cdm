@@ -16,14 +16,12 @@
   object-fit: contain;
 }
 .campi-panorama-avatar .campi-sprite {
-  transform: translateY(5px) scale(1.14);
-  -webkit-mask-image: linear-gradient(to bottom, #000 0%, #000 67%, transparent 84%);
-  mask-image: linear-gradient(to bottom, #000 0%, #000 67%, transparent 84%);
+  transform: scale(1.08);
 }
 .campi-panorama-avatar[data-paused="true"] { animation-play-state: paused; }
 @keyframes campi-panorama-breathe {
-  0%, 100% { transform: translateY(0) scale(1); }
-  50% { transform: translateY(-8px) rotate(-1.5deg) scale(1.025); }
+  0%, 100% { transform: rotate(0) scale(1); }
+  50% { transform: rotate(-.7deg) scale(1.012); }
 }
 @media (prefers-reduced-motion: reduce) {
   .campi-panorama-avatar { animation: none; }

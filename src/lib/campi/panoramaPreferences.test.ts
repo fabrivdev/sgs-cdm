@@ -25,7 +25,7 @@ describe('Campi Panorama topics', () => {
   it('requires module and section access and excludes unimplemented themes', () => {
     const allowed = availablePanoramaTopics(module => module === 'servicios', section =>
       ['servicios.ventas', 'servicios.comisiones'].includes(section), false);
-    expect(allowed.map(topic => topic.id)).toEqual(['ventas_facturacion']);
+    expect(allowed.map(topic => topic.id)).toEqual(['ventas_evolucion', 'ventas_facturacion']);
     expect(availablePanoramaTopics(() => false, () => true, true)).toEqual([]);
     expect(availablePanoramaTopics(() => true, () => true, true).map(topic => topic.id)).not.toContain('servicios_comisiones');
   });

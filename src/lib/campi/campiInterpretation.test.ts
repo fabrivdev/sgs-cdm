@@ -28,7 +28,7 @@ describe('deterministic Campi interpretation', () => {
   it('names the largest arithmetic area difference only when the area totals reconcile', () => {
     const input = story({ id: 'ventas_facturacion', title: 'Facturación', primary: { label: 'Ventas antes de NC del mes', value: 215150.25, unit: 'USD', comparison: { value: 793694.64, label: 'Mismo tramo de 2025' } }, chart: { kind: 'bars', title: 'Ventas por área', unit: 'USD', rows: [{ label: 'Repuestos', value: 182886.19, previous: 398983.19 }, { label: 'Servicios', value: 32264.06, previous: 5211.45 }, { label: 'Máquinas', value: 0, previous: 389500 }] } });
     const text = interpretCampi([input]).sentences[0];
-    expect(text).toContain('Mayor diferencia entre áreas: Máquinas (USD 389.500 → USD 0)');
+    expect(text).toContain('Mayor diferencia entre áreas: Máquinas ($ 389.500 → $ 0)');
     expect(text).toContain('NC');
     expect(interpretCampi([{ ...input, chart: { ...input.chart!, rows: [{ label: 'Máquinas', value: 0, previous: 389500 }] } }]).sentences[0]).not.toContain('Mayor diferencia');
   });
@@ -46,20 +46,28 @@ describe('deterministic Campi interpretation', () => {
     expect(result.suggestions).toHaveLength(2);
     for (const suggestion of result.suggestions) {
       const answer = answerCampi(suggestion.question, input);
-      expect(answer).toContain('Fuente comprobada');
-      expect(answer).toContain('Corte: no informado');
+      expect(answer).toContain('Abrí el detalle');
+      expect(answer).not.toContain('Fuente comprobada');
     }
   });
   it('responds explicitly when asked for unavailable causes or deadlines', () => {
-    expect(answerCampi('¿Por qué bajaron las ventas?', [billing])).toContain('No puedo responder');
-    expect(answerCampi('¿Qué pedidos están vencidos?', [story()])).toContain('No puedo responder');
+    expect(answerCampi('¿Por qué bajaron las ventas?', [billing])).toContain('No tengo una respuesta verificada');
+    expect(answerCampi('¿Qué pedidos están vencidos?', [story()])).toContain('No tengo una respuesta verificada');
     expect(answerCampi('¿Qué mejoró?', [billing])).toContain('No puedo determinar una mejora');
     expect(answerCampi('¿Qué cambió?', [billing])).toContain('subió 12%');
     expect(answerCampi('¿Qué merece atención?', [billing])).toContain('fecha comprometida');
   });
+  it('answers sales evolution from reconciled components when net billing is the selected topic', () => {
+    const net = { ...billing, supporting: [{ label: 'Ventas antes de NC del mes', value: 215150.25, unit: 'USD' as const, comparison: { value: 793694.64, label: 'Mismo tramo de 2025' } }] };
+    const answer = answerCampi('¿Cómo evolucionaron las ventas antes de NC?', [net]);
+    expect(answer).toContain('$ 215.150,25');
+    expect(answer).toContain('$ 793.694,64');
+    expect(answer).toContain('Facturación neta');
+    expect(answer).not.toContain('RPC');
+  });
   it('removes answers when the associated authorized story disappears', () => {
     const q = interpretCampi([billing]).suggestions[0].question;
-    expect(answerCampi(q, [orders])).toContain('No puedo responder');
+    expect(answerCampi(q, [orders])).toContain('No tengo una respuesta verificada');
   });
   it('keeps a negative model, red stock and old OS as context rather than unqualified alerts', () => {
     const projection = story({ id: 'maquinas_proyeccion', breakdown: [{ label: 'A', value: -2, unit: 'count' }] });
@@ -72,6 +80,6 @@ describe('deterministic Campi interpretation', () => {
     expect(answerCampi('¿Qué cambió desde mi última visita?', [billing], previous)).toContain('No hay un cambio comparable');
     const matching = { ...previous, values: [{ ...previous.values[0], fingerprint: JSON.stringify([['parque.operaciones'], 'Autorizado', 'Foto vigente', 'Fuente comprobada', 'ventas-netas-nc-separadas-v3']) }] };
     const comparable = story({ id: 'ventas_facturacion', primary: { label: 'Facturación', value: 448000, unit: 'USD' } });
-    expect(answerCampi('¿Qué cambió desde mi última visita?', [comparable], matching)).toContain('400.000 → USD 448.000');
+    expect(answerCampi('¿Qué cambió desde mi última visita?', [comparable], matching)).toContain('$ 400.000 → $ 448.000');
   });
 });

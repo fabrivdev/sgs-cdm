@@ -13,8 +13,10 @@ export function storySummaryPercentage(story: PanoramaStory): StorySummaryPercen
   }
   if (story.id === 'maquinas_pedidos') {
     const total = story.supporting.find(datum => datum.label === 'Unidades activas')?.value;
-    return typeof total === 'number' && Number.isFinite(total) && total > 0 && primary.value >= 0 && primary.value <= total
-      ? { value: primary.value / total * 100, label: 'de unidades activas', kind: 'composition' }
+    const withoutLink = ['Sin vínculo', 'Sin unidad individual', 'Vínculo ambiguo'].map(label => story.supporting.find(datum => datum.label === label)?.value);
+    const risk = withoutLink.every(value => typeof value === 'number' && Number.isFinite(value)) ? withoutLink.reduce<number>((sum, value) => sum + (value as number), 0) : null;
+    return typeof total === 'number' && Number.isFinite(total) && total > 0 && risk !== null && risk >= 0 && risk <= total
+      ? { value: risk / total * 100, label: 'sin vínculo válido', kind: 'composition' }
       : null;
   }
   const previous = primary.comparison?.value;

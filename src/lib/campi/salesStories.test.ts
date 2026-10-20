@@ -155,4 +155,21 @@ describe('sales story source contracts', () => {
     expect(billing).toMatchObject({ status: 'error', primary: null });
   });
 
+  it('shares reconciled machine lines between Ventas and Facturación without extra monthly requests', async () => {
+    rpc.mockImplementation(async (name, args) => {
+      const result = response(name, args);
+      return { data: { ...result.data, lineas: result.data.periodos.flatMap(row => [
+        { fecha: row.periodo, facturado: Number(row.total) + 20 },
+        { fecha: row.periodo, facturado: -20 },
+      ]), resumen: { ...result.data.resumen, venta_bruta: result.data.periodos.reduce((sum, row) => sum + Number(row.total) + 20, 0), notas_credito_monto: result.data.periodos.length * 20 } }, error: null };
+    });
+    const [sales, net] = await loadSalesStories(['ventas_evolucion', 'ventas_facturacion'], ['parque.ventas'], '2026-10-16');
+    expect(rpc).toHaveBeenCalledTimes(2);
+    expect(sales.status).toBe('ready');
+    expect(net.status).toBe('ready');
+    expect(sales.primary?.value).toBe(220);
+    expect(net.primary?.value).toBe(200);
+    expect(sales.chart?.kind).toBe('trend');
+  });
+
 });

@@ -1,6 +1,6 @@
 import type { SectionKey } from '@/lib/permissions';
 
-export type StoryTopicId = 'ventas_facturacion' | 'repuestos_clientes' | 'repuestos_sucursales' | 'repuestos_stock' | 'maquinas_pedidos' | 'maquinas_stock' | 'maquinas_proyeccion' | 'servicios_pendientes';
+export type StoryTopicId = 'ventas_evolucion' | 'ventas_facturacion' | 'repuestos_clientes' | 'repuestos_sucursales' | 'repuestos_stock' | 'repuestos_alertas' | 'repuestos_concentracion' | 'maquinas_pedidos' | 'maquinas_stock' | 'maquinas_proyeccion' | 'servicios_pendientes' | 'servicios_abiertas';
 export type StoryUnit = 'USD' | 'PYG' | 'count' | 'percent' | 'days';
 export type StoryDatum = { label: string; value: number | null; unit: StoryUnit; note?: string; comparison?: { value: number; label: string } };
 export type StoryChartRow = { label: string; value: number; previous?: number };

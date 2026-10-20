@@ -54,7 +54,7 @@ export function machineSupplyStory(data: Supply): PanoramaStory {
     message: data.unidades ? `${risk} de ${data.unidades} unidades de operaciones activas no tienen un vínculo único de abastecimiento comprobado.` : 'No hay unidades en operaciones activas.',
     scope: 'Unidades de operaciones no cerradas, facturadas ni canceladas; vínculo por identidad de unidad',
     sections: ['parque.operaciones'], cutoff: null, periodLabel: `Lectura ${data.fecha_analisis}`,
-    primary: { label: 'Sin vínculo válido', value: risk, unit: 'count' },
+    primary: { label: 'Unidades en pedidos activos', value: data.unidades, unit: 'count' },
     supporting: [{ label: 'Unidades activas', value: data.unidades, unit: 'count' }, { label: 'Sin vínculo', value: data.sin_vinculo, unit: 'count' },
       { label: 'Sin unidad individual', value: data.sin_unidad, unit: 'count' }, { label: 'Vínculo ambiguo', value: data.conflicto, unit: 'count' },
       { label: 'Participación sin vínculo válido', value: data.unidades ? risk / data.unidades * 100 : null, unit: 'percent' }],
@@ -117,4 +117,19 @@ export function serviceResolutionStory(data: Resolution): PanoramaStory {
       'Las OS abiertas y el percentil 90 de su edad son un resguardo: cerrar casos rápidos podría bajar la mediana mientras envejecen casos abiertos. Sin fecha prometida no se declara atraso.'],
     source: 'campi_resolucion_os_v1 · estado y fechas operativas de OS', route: '/servicios/ordenes',
   };
+}
+
+export function serviceOpenStory(data: Resolution): PanoramaStory {
+  return { id: 'servicios_abiertas', visitKey: `servicios_abiertas:cola-v1:${data.fecha_analisis}`,
+    title: 'Órdenes de servicio abiertas', question: '¿Cuántas OS siguen abiertas y qué edad tienen?',
+    status: 'ready', message: data.abiertas ? `${data.abiertas} OS figuran abiertas; el percentil 90 de edad es ${data.p90_edad_abiertas} días.` : 'No hay OS abiertas en la fuente consultada.',
+    scope: 'OS con estado abierto y fecha de apertura operativa válida', sections: ['servicios.ordenes'], cutoff: null,
+    periodLabel: `Lectura ${formatDate(data.fecha_analisis)}`,
+    primary: { label: 'OS abiertas', value: data.abiertas, unit: 'count' },
+    supporting: [{ label: 'Percentil 90 de edad', value: data.p90_edad_abiertas, unit: 'days' }],
+    chart: data.abiertas ? { kind: 'bars', title: 'Cola abierta', unit: 'count', rows: [{ label: 'Abiertas', value: data.abiertas }] } : null,
+    breakdown: [{ label: 'Órdenes abiertas', value: data.abiertas, unit: 'count', route: '/servicios/ordenes?estado=abierta' }],
+    details: ['La edad se calcula desde la apertura operativa hasta la fecha de análisis. El percentil 90 indica que nueve de cada diez OS abiertas tienen esa edad o menos.',
+      'La fecha de análisis no acredita por sí sola que la fuente esté completa hasta hoy. La edad de una OS no acredita atraso sin una fecha comprometida verificable. Las aperturas inválidas bloquean el indicador en lugar de contarse como cero.'],
+    source: 'campi_resolucion_os_v1 · estado y fechas operativas de OS', route: '/servicios/ordenes' };
 }

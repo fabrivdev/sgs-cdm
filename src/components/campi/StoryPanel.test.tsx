@@ -12,21 +12,22 @@ describe('compact overview panel', () => {
     expect(screen.getByRole('heading', { name: 'Facturación' })).toBeInTheDocument();
     expect(screen.getByText('+12%')).toBeInTheDocument();
     expect(screen.getByText('Facturación del mes')).toBeInTheDocument();
-    expect(screen.getByText('USD 112')).toBeInTheDocument();
+    expect(screen.getByText('$ 112')).toBeInTheDocument();
     expect(screen.getByText('Mismo tramo de 2025')).toBeInTheDocument();
-    expect(screen.getByText('USD 100')).toBeInTheDocument();
+    expect(screen.getByText('$ 100')).toBeInTheDocument();
     expect(screen.queryByText('Sin base histórica comparable')).not.toBeInTheDocument();
-    expect(screen.getByRole('figure', { name: 'Comparación de Facturación del mes' })).toBeInTheDocument();
-    expect(screen.queryByTestId('chart')).not.toBeInTheDocument();
-    expect(screen.getAllByText(story.message).length).toBeGreaterThan(0);
+    expect(screen.getByRole('figure', { name: /Facturación mensual/ })).toBeInTheDocument();
+    expect(screen.getAllByTestId('chart').length).toBeGreaterThan(0);
+    expect(screen.queryByText(story.message)).not.toBeInTheDocument();
     expect(screen.queryByText('Acumulado anual')).not.toBeInTheDocument();
     expect(screen.queryByText(/Servicios \+ Máquinas \+ Repuestos/)).not.toBeInTheDocument();
-    expect(screen.getByText('Octubre 2026')).toHaveClass('story-period');
+    expect(screen.queryByText('Octubre 2026')).not.toBeInTheDocument();
     fireEvent.click(screen.getByRole('button', { name: 'Ver detalle de Facturación' }));
     expect(screen.getByRole('dialog')).toBeInTheDocument();
-    expect(screen.getByTestId('chart')).toBeInTheDocument();
+    expect(screen.getAllByTestId('chart').length).toBeGreaterThan(1);
     expect(screen.getAllByText(story.message).length).toBeGreaterThan(0);
     expect(screen.getByText('Acumulado anual')).toBeInTheDocument();
+    fireEvent.click(screen.getByText('Fuente, corte y metodología'));
     expect(screen.getByText('Método de cálculo completo')).toBeInTheDocument();
     fireEvent.click(screen.getByRole('button', { name: 'Cerrar' }));
     expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
@@ -43,7 +44,7 @@ describe('compact overview panel', () => {
   });
   it('shows a zero prior value without inventing a percentage', () => {
     render(<MemoryRouter><StoryPanel story={{ ...story, primary: { ...story.primary!, comparison: { value: 0, label: 'Mismo tramo de 2025' } } }} index={0} retrying={false} onRetry={vi.fn()} /></MemoryRouter>);
-    expect(screen.getByText('USD 0')).toBeInTheDocument();
+    expect(screen.getByText('$ 0')).toBeInTheDocument();
     expect(screen.queryByText('+12%')).not.toBeInTheDocument();
     expect(screen.queryByText('Variación % sin base positiva')).not.toBeInTheDocument();
   });

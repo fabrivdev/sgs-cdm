@@ -5,7 +5,7 @@ export type CampiFinding = { topic: StoryTopicId; kind: 'change' | 'attention' |
 const number = new Intl.NumberFormat('es-PY', { maximumFractionDigits: 1 });
 const money = new Intl.NumberFormat('es-PY', { maximumFractionDigits: 2 });
 const valid = (n: number | null | undefined): n is number => typeof n === 'number' && Number.isFinite(n);
-const amount = (d: StoryDatum) => `${d.unit === 'USD' ? 'USD ' : d.unit === 'PYG' ? '₲ ' : ''}${(d.unit === 'USD' || d.unit === 'PYG' ? money : number).format(d.value!)}${d.unit === 'percent' ? '%' : d.unit === 'days' ? ' días' : ''}`;
+const amount = (d: StoryDatum) => `${d.unit === 'USD' ? '$ ' : d.unit === 'PYG' ? '₲ ' : ''}${(d.unit === 'USD' || d.unit === 'PYG' ? money : number).format(d.value!)}${d.unit === 'percent' ? '%' : d.unit === 'days' ? ' días' : ''}`;
 const normalize = (text: string) => text.normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase().replace(/[¿?!.]/g, '').replace(/\s+/g, ' ').trim();
 const lowercaseFirst = (text: string) => text.charAt(0).toLowerCase() + text.slice(1);
 
@@ -46,7 +46,7 @@ export function interpretCampi(stories: readonly PanoramaStory[]) {
     }
     // An age bucket, a static color and a negative projected model are not
     // evidence of improvement, breach or a business alert.
-    if (['ventas_facturacion', 'repuestos_clientes'].includes(s.id) && valid(p.comparison?.value) && p.comparison.value > 0) {
+    if (['ventas_evolucion', 'ventas_facturacion', 'repuestos_clientes'].includes(s.id) && valid(p.comparison?.value) && p.comparison.value > 0) {
       const delta = (p.value! - p.comparison.value) / p.comparison.value * 100;
       if (delta !== 0) return finding('change', `${s.title}: ${lowercaseFirst(p.label)} ${delta > 0 ? 'subió' : 'bajó'} ${number.format(Math.abs(delta))}% frente a ${lowercaseFirst(p.comparison.label)} (${amount({ ...p, value: p.comparison.value })} → ${amount(p)}).${billingAreaContext(s, p.value!, p.comparison.value)}`);
     }
@@ -86,8 +86,25 @@ export function answerCampi(question: string, stories: readonly PanoramaStory[],
     const found = interpretation.findings.filter(f => f.kind === kind);
     return found.length ? found.map(f => f.text).join(' ') : kind === 'attention' ? 'Estos temas no contienen una meta, fecha comprometida o umbral verificado que permita señalar una alerta. Puedo mostrar los cambios observados y el detalle de cada tema.' : 'No hay una comparación válida con cambio para estos temas.';
   }
-  const story = chosen ? stories.find(s => s.id === chosen.topic) : stories.find(s => normalize(s.question) === q && interpretation.findings.some(f => f.topic === s.id));
-  if (!story) return 'No puedo responder esa consulta con los datos cargados. Puedo explicar los temas seleccionados, sus comparaciones y sus límites; probá una pregunta sugerida. No consulto otras fuentes ni infiero causas, vencimientos o compromisos.';
+  const story = chosen ? stories.find(s => s.id === chosen.topic) : matchCampiTopic(question, stories);
+  if (!story) return `No tengo una respuesta verificada para esa pregunta con tus temas cargados.${interpretation.suggestions[0] ? ` Puedo responder: «${interpretation.suggestions[0].question}».` : ''}`;
+  if (/(venta|vendid)/.test(q) && /(evolu|antes de nc|mas o menos|compar)/.test(q) && story.id === 'ventas_facturacion') {
+    const sales = story.supporting.find(item => item.label === 'Ventas antes de NC del mes' && item.value !== null);
+    if (sales) {
+      const previousSales = sales.comparison?.value;
+      const change = typeof previousSales === 'number' && previousSales > 0 ? (sales.value! - previousSales) / previousSales * 100 : null;
+      return `Las ventas antes de NC del mes fueron ${amount(sales)}.${previousSales !== undefined ? ` En el mismo tramo anterior fueron ${amount({ ...sales, value: previousSales })}.` : ''}${change !== null ? ` El cambio fue ${new Intl.NumberFormat('es-PY', { maximumFractionDigits: 1 }).format(change)}%.` : ' No hay base positiva para calcular una variación.'} Abrí Facturación neta para ver el desglose.`;
+    }
+  }
   const finding = interpretation.findings.find(f => f.topic === story.id)!;
-  return `${finding.text} Alcance: ${story.scope}. Período: ${story.periodLabel}. Corte: ${story.cutoff ?? 'no informado por la fuente'}. Fuente: ${story.source}. ${story.details.join(' ')}`;
+  const period = story.periodLabel ? ` Período: ${story.periodLabel}.` : '';
+  return `${finding.text}${period} Abrí el detalle para ver el desglose y los límites de la fuente.`;
+}
+
+export function matchCampiTopic(question: string, stories: readonly PanoramaStory[]): PanoramaStory | undefined {
+  const q = normalize(question);
+  const ready = stories.filter(s => s.status === 'ready' && s.primary?.value !== null && s.primary?.value !== undefined);
+  if (/(venta|vendid)/.test(q) && /(evolu|antes de nc|mas o menos|compar)/.test(q)) return ready.find(s => s.id === 'ventas_evolucion') ?? ready.find(s => s.id === 'ventas_facturacion' && s.supporting.some(item => item.label === 'Ventas antes de NC del mes' && item.value !== null));
+  if (/(factur|neto|nota de credito|\bnc\b)/.test(q)) return ready.find(s => s.id === 'ventas_facturacion');
+  return ready.find(s => normalize(s.question) === q || q === normalize(`¿Qué muestran los datos de ${s.title.toLowerCase()}?`));
 }
