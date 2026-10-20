@@ -121,7 +121,13 @@ export function readyOrdersStory(data: ReadyOrders, supply: Supply): PanoramaSto
         unit: 'count' as const, group: 'Sin vínculo', route: `/parque-operaciones?operacion=${encodeURIComponent(order.operacion_id)}` })),
     ],
     details: ['El stock está asignado a la misma unidad del pedido y tiene saldo positivo. Se excluyen ventas de la misma máquina confirmadas por chasis. La facturación final requiere la revisión comercial habitual.'],
-    source: 'campi_pedidos_abastecimiento_v1 + campi_pedidos_con_stock_v1', route: '/parque-operaciones' };
+    source: 'campi_pedidos_abastecimiento_v1 + campi_pedidos_con_stock_v1', route: '/parque-operaciones',
+    machineOrders: { asOf: data.fecha_analisis, orders: supply.pedidos, units: supply.unidades,
+      stock: supply.stock, arrived: supply.importacion_arribada, transit: supply.importacion_transito,
+      unlinked, readyUnits: data.unidades_con_stock, billedUnits: data.unidades_facturadas_detectadas,
+      ready: data.pedidos.map(order => ({ id: order.operacion_id, units: order.unidades_con_stock })),
+      unresolved: supply.pendientes.map(order => ({ id: order.operacion_id, units: order.unidades })) },
+  };
 }
 
 type OpenDetail = { fecha_analisis: string; abiertas: number; marcas: { nombre: string; cantidad: number }[]; edades: { rango: string; cantidad: number }[]; cortes: { fecha: string; abiertas: number }[] };

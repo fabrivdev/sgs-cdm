@@ -27,6 +27,19 @@ export type PanoramaStory = {
   route: string;
   attention?: boolean;
   notices?: { text: string; route: string }[];
+  machineOrders?: {
+    asOf: string;
+    orders: number;
+    units: number;
+    stock: number;
+    arrived: number;
+    transit: number;
+    unlinked: number;
+    readyUnits: number;
+    billedUnits: number;
+    ready: { id: string; units: number }[];
+    unresolved: { id: string; units: number }[];
+  };
 };
 
 export type StoryLoader = (topics: readonly StoryTopicId[], granted: readonly SectionKey[], asOf: string) => Promise<PanoramaStory[]>;
