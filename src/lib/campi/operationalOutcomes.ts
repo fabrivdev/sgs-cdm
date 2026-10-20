@@ -130,6 +130,19 @@ export function readyOrdersStory(data: ReadyOrders, supply: Supply): PanoramaSto
   };
 }
 
+export function readyOrdersOpportunityStory(data: ReadyOrders, supply: Supply): PanoramaStory {
+  const original = readyOrdersStory(data, supply);
+  const share = supply.pedidos > 0 ? data.pedidos_con_stock / supply.pedidos * 100 : null;
+  return {
+    ...original, id: 'maquinas_pedidos_stock', visitKey: `maquinas_pedidos_stock:v1:${data.fecha_analisis}`,
+    title: 'Pedidos con stock', question: '¿Qué parte de los pedidos pendientes ya tiene stock?',
+    primary: { label: 'Pedidos con stock', value: data.pedidos_con_stock, unit: 'count' },
+    supporting: [{ label: 'Pedidos pendientes', value: supply.pedidos, unit: 'count' }, { label: 'Participación con stock', value: share, unit: 'percent' }, { label: 'Unidades con stock', value: data.unidades_con_stock, unit: 'count' }],
+    chart: { kind: 'bars', title: 'Pedidos con y sin stock asignado', unit: 'count', rows: [{ label: 'Con stock', value: data.pedidos_con_stock }, { label: 'Sin stock', value: supply.pedidos - data.pedidos_con_stock }] },
+    breakdown: original.breakdown.filter(row => row.group === 'Con stock para facturar'), notices: [],
+  };
+}
+
 type OpenDetail = { fecha_analisis: string; abiertas: number; marcas: { nombre: string; cantidad: number }[]; edades: { rango: string; cantidad: number }[]; cortes: { fecha: string; abiertas: number }[]; os_numeros: string[] };
 export function parseOpenDetail(input: unknown): OpenDetail {
   const raw = record(input);
@@ -216,4 +229,20 @@ export function serviceOpenStory(data: Resolution, detail?: OpenDetail): Panoram
     openOrders: detail ? { asOf: detail.fecha_analisis, count: detail.abiertas,
       brands: detail.marcas.map(row => ({ name: row.nombre, count: row.cantidad })),
       ages: detail.edades.map(row => ({ label: row.rango, count: row.cantidad })), ids: detail.os_numeros } : undefined };
+}
+
+export function serviceOldOpenStory(data: Resolution, detail: OpenDetail): PanoramaStory {
+  const original = serviceOpenStory(data, detail);
+  const old = detail.edades.find(row => row.rango === 'Más de 90 días')?.cantidad ?? 0;
+  const share = detail.abiertas > 0 ? old / detail.abiertas * 100 : null;
+  return {
+    ...original, id: 'servicios_os_antiguas', visitKey: `servicios_os_antiguas:v1:${detail.fecha_analisis}`,
+    title: 'OS abiertas de más de 90 días', question: '¿Cuántas OS abiertas llevan más de 90 días?',
+    message: `${old} de ${detail.abiertas} OS abiertas llevan más de 90 días desde su apertura.`,
+    primary: { label: 'OS de más de 90 días', value: old, unit: 'count' },
+    supporting: [{ label: 'OS abiertas', value: detail.abiertas, unit: 'count' }, { label: 'Participación de la cartera', value: share, unit: 'percent' }],
+    chart: { kind: 'bars', title: 'OS por antigüedad', unit: 'count', rows: detail.edades.map(row => ({ label: row.rango, value: row.cantidad })) },
+    breakdown: original.breakdown.filter(row => row.group === 'Antigüedad'),
+    route: `/servicios/ordenes?estado=abierta&cohorte=open&desde=2000-01-01&hasta=${detail.fecha_analisis}&antiguedad_min=91`, notices: [],
+  };
 }

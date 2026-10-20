@@ -136,7 +136,14 @@ export function StockSemaphoreSection({ canExport }: { canExport: boolean }) {
       if (searchParams.get("vista") === "detalle") setTab("detalle");
     }
   }, [searchParams]);
-  const [agrupacion, setAgrupacion] = useState<SemaforoAgrupacion>("marca");
+  const [agrupacion, setAgrupacion] = useState<SemaforoAgrupacion>(() => {
+    const group = searchParams.get("agrupacion");
+    return group && group in GROUP_LABELS ? group as SemaforoAgrupacion : "marca";
+  });
+  useEffect(() => {
+    const group = searchParams.get("agrupacion");
+    if (group && group in GROUP_LABELS) setAgrupacion(group as SemaforoAgrupacion);
+  }, [searchParams]);
   const [path, setPath] = useState<Array<{ key: SemaforoAgrupacion; value: string }>>([]);
   const [selected, setSelected] = useState<SemaforoFila | null>(null);
   const [detailSort, setDetailSort] = useState<SalesSort>({ key: "usd", direction: "desc" });

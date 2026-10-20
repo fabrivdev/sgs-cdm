@@ -39,7 +39,7 @@ describe('Campi alternative story dashboard', () => {
     show(['ventas_facturacion'], section => section === 'servicios.ordenes');
     fireEvent.click(screen.getByRole('button', { name: 'Revisar temas' }));
     const select = screen.getByRole('combobox', { name: 'Tema a revisar' });
-    expect(within(select).getAllByRole('option')).toHaveLength(2);
+    expect(within(select).getAllByRole('option')).toHaveLength(3);
     expect(within(select).queryByText('Pedidos de máquinas')).not.toBeInTheDocument();
     fireEvent.change(select, { target: { value: 'servicios_abiertas' } });
     expect(await screen.findByRole('heading', { name: 'Tema servicios_abiertas' })).toBeInTheDocument();
@@ -65,7 +65,7 @@ describe('Campi alternative story dashboard', () => {
     expect(screen.getAllByRole('article').map(item => item.getAttribute('data-story'))).toEqual(ids);
     ids.forEach(id => expect(screen.getByRole('figure', { name: `Evolución ${id}` })).toBeInTheDocument());
     expect(screen.queryByText(/Datos al/)).not.toBeInTheDocument();
-    expect(screen.queryByRole('link')).not.toBeInTheDocument();
+    expect(screen.getAllByRole('link', { name: /Ver detalle de Tema/ })).toHaveLength(3);
   });
   it('keeps all selected topics without adding an explanatory line', async () => {
     const ids = PANORAMA_TOPICS.map(topic => topic.id);
@@ -79,7 +79,7 @@ describe('Campi alternative story dashboard', () => {
     const ids: StoryTopicId[] = ['servicios_pendientes', 'repuestos_stock'];
     show(ids);
     expect(screen.getAllByRole('status', { name: /Consultando/ })).toHaveLength(ids.length);
-    expect(screen.getByRole('heading', { name: 'Tiempo de resolución de OS' })).toBeInTheDocument();
+    expect(screen.getByRole('heading', { name: 'Resolución de órdenes de servicio' })).toBeInTheDocument();
     expect(screen.getByRole('heading', { name: 'Stock antiguo de repuestos' })).toBeInTheDocument();
     expect(screen.queryByText('0')).not.toBeInTheDocument();
   });
@@ -89,20 +89,15 @@ describe('Campi alternative story dashboard', () => {
     show(['ventas_facturacion', 'repuestos_stock']);
     await screen.findByRole('heading', { name: 'Tema repuestos_stock' });
     expect(screen.getByRole('status', { name: /Consultando Facturación/ })).toBeInTheDocument();
-    expect(screen.getByText('$ 1.234,56')).toBeInTheDocument();
+    expect(screen.getByText('$ 1.235')).toBeInTheDocument();
   });
-  it('opens the native detail with comparisons, breakdown, method and specific navigation', async () => {
-    load.mockResolvedValue([story('ventas_facturacion')]); show();
-    fireEvent.click(await screen.findByRole('button', { name: 'Ver detalle de Tema ventas_facturacion' }));
-    const dialog = screen.getByRole('dialog');
-    expect(within(dialog).getByText('Octubre 2026')).toBeInTheDocument();
-    expect(within(dialog).queryByText('Corte por confirmar')).not.toBeInTheDocument();
-    expect(within(dialog).getByText('Repuestos')).toBeInTheDocument();
-    expect(within(dialog).queryByText('Se conservan las notas de crédito.')).not.toBeInTheDocument();
-    expect(within(dialog).queryByText('Fuente: Fuente verificada')).not.toBeInTheDocument();
-    expect(within(dialog).getByRole('link')).toHaveAttribute('href', '/repuestos/ventas');
-    fireEvent.keyDown(dialog, { key: 'Escape' });
-    await waitFor(() => expect(screen.queryByRole('dialog')).not.toBeInTheDocument());
+  it('offers an area selector only for consolidated sales, without opening a detail panel', async () => {
+    load.mockResolvedValue([story('ventas_facturacion', { sections: ['repuestos.ventas', 'servicios.ventas'], navigationPeriod: { from: '2026-10-01', to: '2026-10-20' } })]); show();
+    fireEvent.keyDown(await screen.findByRole('button', { name: 'Ver detalle de Tema ventas_facturacion' }), { key: 'Enter' });
+    const menu = screen.getByRole('menu');
+    expect(within(menu).getByRole('menuitem', { name: 'Ventas de repuestos' })).toHaveAttribute('href', '/repuestos/ventas?desde=2026-10-01&hasta=2026-10-20');
+    expect(within(menu).getByRole('menuitem', { name: 'Ventas de servicios' })).toHaveAttribute('href', '/servicios/ventas?desde=2026-10-01&hasta=2026-10-20');
+    expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
   });
   it('passes only granted sources and suppresses aggregates containing denied sources', async () => {
     load.mockResolvedValue([story('ventas_facturacion', { sections: ['repuestos.ventas', 'servicios.ventas'], message: 'Secreto de servicios' })]);
@@ -118,7 +113,7 @@ describe('Campi alternative story dashboard', () => {
     expect(await screen.findByRole('alert')).toHaveTextContent('No respondió Ventas.');
     expect(screen.queryByText('$ 0')).not.toBeInTheDocument();
     fireEvent.click(screen.getByRole('button', { name: 'Reintentar fuente' }));
-    expect(await screen.findByText('$ 1.234,56')).toBeInTheDocument();
+    expect(await screen.findByText('$ 1.235')).toBeInTheDocument();
     expect(load).toHaveBeenCalledTimes(2);
   });
   it('retains the explicit absence of a metric and presents an empty topic', async () => {
@@ -138,11 +133,10 @@ describe('Campi alternative story dashboard', () => {
     load.mockResolvedValue([story('ventas_facturacion')]); show();
     expect(await screen.findByRole('heading', { name: 'Tema ventas_facturacion: +$ 234,56 desde tu última visita.' })).toBeInTheDocument();
     expect(screen.getByLabelText(/Comparación de Tema ventas_facturacion desde tu última visita/)).toHaveTextContent('$ 1.000 → $ 1.234,56');
-    fireEvent.click(await screen.findByRole('button', { name: 'Ver detalle de Tema ventas_facturacion' }));
-    expect(await screen.findByText('El total visible cambió +$ 234,56 desde tu última visita en este navegador.')).toBeInTheDocument();
+    expect(await screen.findByRole('link', { name: 'Ver detalle de Tema ventas_facturacion' })).toHaveAttribute('href', '/repuestos/ventas');
     await waitFor(() => expect(JSON.parse(localStorage.getItem('sig-cdm:panorama:alternativa:visita:v1:manager-a')!).values[0].value).toBe(1234.56));
     expect(readStoryVisit('manager-a')?.values[0].value).toBe(1000);
-    expect(screen.getByText('El total visible cambió +$ 234,56 desde tu última visita en este navegador.')).toBeInTheDocument();
+    expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
     expect(screen.queryByText(/ventas nuevas/i)).not.toBeInTheDocument();
   });
   it('preserves the old baseline while any topic has failed', async () => {

@@ -95,18 +95,21 @@ function monthly(report: Report, key: string, field: string): number {
 }
 function base(id: StoryTopicId, sources: Source[], asOf: string): PanoramaStory {
   const topic = panoramaTopicDefinition(id);
-  return { id, visitKey: `${id}:v3:${asOf.slice(0, 7)}`, title: topic?.title ?? 'Ventas de repuestos', question: topic?.question ?? '¿Cómo se componen las ventas y notas de crédito de repuestos?', status: 'ready', message: '', scope: sources.map(source => source.label).join(' + '), sections: sources.map(source => source.section), cutoff: null, periodLabel: `01/${asOf.slice(5, 7)}–${asOf.slice(8, 10)}/${asOf.slice(5, 7)}/${asOf.slice(0, 4)}`, primary: null, supporting: [], chart: null, breakdown: [], details: ['Fecha de factura. Ventas antes de NC y notas de crédito por separado.', 'La fecha de referencia limita el período; la fuente no informa su fecha real de actualización.'], source: sources.map(source => source.rpc).join(' + '), route: sources.length === 1 ? sources[0].route : '' };
+  return { id, visitKey: `${id}:v3:${asOf.slice(0, 7)}`, title: topic?.title ?? 'Ventas de repuestos', question: topic?.question ?? '¿Cómo se componen las ventas y notas de crédito de repuestos?', status: 'ready', message: '', scope: sources.map(source => source.label).join(' + '), sections: sources.map(source => source.section), cutoff: null, periodLabel: `01/${asOf.slice(5, 7)}–${asOf.slice(8, 10)}/${asOf.slice(5, 7)}/${asOf.slice(0, 4)}`, primary: null, supporting: [], chart: null, breakdown: [], details: ['Fecha de factura. Ventas antes de NC y notas de crédito por separado.', 'La fecha de referencia limita el período; la fuente no informa su fecha real de actualización.'], source: sources.map(source => source.rpc).join(' + '), route: sources.length === 1 ? sources[0].route : '', navigationPeriod: { from: `${asOf.slice(0, 7)}-01`, to: asOf } };
 }
 
 export const loadSalesStories: StoryLoader = async (topics, granted, asOf) => {
-  const billingIds = (['ventas_evolucion', 'ventas_facturacion'] as const).filter(id => topics.includes(id));
+  const billingIds = (['ventas_evolucion', 'ventas_facturacion', 'ventas_neto_anual', 'ventas_nc_impacto', 'ventas_repuestos', 'ventas_servicios', 'ventas_maquinas'] as const).filter(id => topics.includes(id));
   const billingSources = billingIds.length ? SOURCES.filter(source => granted.includes(source.section)) : [];
+  const sourcesFor = (id: StoryTopicId) => id === 'ventas_repuestos' ? billingSources.filter(source => source.section === 'repuestos.ventas')
+    : id === 'ventas_servicios' ? billingSources.filter(source => source.section === 'servicios.ventas')
+    : id === 'ventas_maquinas' ? billingSources.filter(source => source.section === 'parque.ventas') : billingSources;
   const parts = SOURCES[0];
   const wantsComposition = topics.includes('repuestos_clientes') && granted.includes(parts.section);
   if (!billingSources.length && !wantsComposition) return [];
   let ranges: ReturnType<typeof salesRanges>;
   try { ranges = salesRanges(asOf); } catch (error) {
-    return ([...billingIds.map(id => base(id, billingSources, asOf)), ...(wantsComposition ? [base('repuestos_clientes', [parts], asOf)] : [])]).map(story => ({ ...story, status: 'error', message: (error as Error).message }));
+    return ([...billingIds.filter(id => sourcesFor(id).length).map(id => base(id, sourcesFor(id), asOf)), ...(wantsComposition ? [base('repuestos_clientes', [parts], asOf)] : [])]).map(story => ({ ...story, status: 'error', message: (error as Error).message }));
   }
   // Per invocation cache shares Repuestos between stories. Queue caps network concurrency at two.
   let running = 0;
@@ -136,7 +139,7 @@ export const loadSalesStories: StoryLoader = async (topics, granted, asOf) => {
         const [current, previous, december] = await Promise.all([report(source, ranges.from, ranges.to), report(source, ranges.previousFrom, ranges.previousTo), ...(ranges.month === 1 ? [report(source, ranges.previousMonthFrom, ranges.previousMonthTo)] : [])]);
         return { source, current, previous, december };
       }));
-      if (id === 'ventas_facturacion' || id === 'ventas_evolucion') {
+      if (billingIds.some(billingId => billingId === id)) {
         const monthlyReports = await Promise.all(loaded.map(async ({ source, current, previous, december }) => {
           const period = (r: Report, key: string) => {
             const row = r.periods.get(key);
@@ -156,13 +159,14 @@ export const loadSalesStories: StoryLoader = async (topics, granted, asOf) => {
         const sum = (pick: (item: typeof monthlyReports[number]) => Row, field: 'gross' | 'credit' | 'amount') => monthlyReports.reduce((total, item) => total + numeric(pick(item)[item.source[field]]), 0);
         const gross = sum(item => item.month, 'gross'), grossLY = sum(item => item.monthLY, 'gross');
         const credits = monthlyReports.reduce((total, item) => total + numeric(item.month[item.source.credit]) * (item.source.creditSigned ? -1 : 1), 0);
+        const creditsLY = monthlyReports.reduce((total, item) => total + numeric(item.monthLY[item.source.credit]) * (item.source.creditSigned ? -1 : 1), 0);
         const net = sum(item => item.month, 'amount'), netLY = sum(item => item.monthLY, 'amount');
         const ytdNet = sum(item => item.current, 'amount'), ytdNetLY = sum(item => item.previous, 'amount');
         const ytdGross = sum(item => item.current, 'gross'), ytdGrossLY = sum(item => item.previous, 'gross');
         const ytdCredits = ytdGross - ytdNet;
         if (Math.abs(gross - credits - net) > Math.max(0.01, Math.abs(net) * 1e-10)) throw new Error('Las ventas y NC consolidadas no concilian con el neto.');
         const unit = 'USD' as const;
-        if (id === 'ventas_evolucion') {
+        if (id === 'ventas_evolucion' || id === 'ventas_repuestos' || id === 'ventas_servicios' || id === 'ventas_maquinas') {
           story.visitKey = `${id}:brutas-v1:${asOf.slice(0, 7)}`;
           story.primary = { label: 'Ventas antes de NC del mes', value: gross, unit, comparison: { value: grossLY, label: `Mismo tramo de ${ranges.year - 1}` } };
           story.supporting = [
@@ -177,6 +181,28 @@ export const loadSalesStories: StoryLoader = async (topics, granted, asOf) => {
           story.breakdown = monthlyReports.map(item => ({ label: item.source.label, value: numeric(item.month[item.source.gross]), unit, route: item.source.route }));
           story.message = grossLY > 0 ? `Las ventas antes de NC ${gross >= grossLY ? 'subieron' : 'bajaron'} ${new Intl.NumberFormat('es-PY', { maximumFractionDigits: 1 }).format(Math.abs(salesChange(gross, grossLY)!))}% frente al mismo tramo del año anterior.` : 'No hay base comparable para calcular la variación mensual de ventas.';
           story.details.push(`Ventas positivas de facturas entre ${monthFrom} y ${ranges.to}; comparación con ${monthLYFrom} a ${ranges.previousTo}. Las NC se analizan por separado en Facturación neta.`, 'El acumulado compara fechas equivalentes de ambos años.');
+          return story;
+        }
+        if (id === 'ventas_neto_anual') {
+          story.navigationPeriod = { from: ranges.from, to: asOf };
+          story.visitKey = `${id}:v1:${asOf.slice(0, 7)}`;
+          story.primary = { label: 'Neto acumulado del año', value: ytdNet, unit, comparison: { value: ytdNetLY, label: `Mismo corte de ${ranges.year - 1}` } };
+          story.supporting = [{ label: 'Ventas antes de NC acumuladas', value: ytdGross, unit }, { label: 'NC acumuladas', value: -ytdCredits, unit }];
+          story.chart = { kind: 'trend', title: 'Facturación neta mensual', unit, currentLabel: String(ranges.year), previousLabel: String(ranges.year - 1), rows: Array.from({ length: ranges.month }, (_, index) => {
+            const month = String(index + 1).padStart(2, '0');
+            return { label: ['Ene', 'Feb', 'Mar', 'Abr', 'May', 'Jun', 'Jul', 'Ago', 'Sep', 'Oct', 'Nov', 'Dic'][index], value: loaded.reduce((total, item) => total + monthly(item.current, `${ranges.year}-${month}`, item.source.amount), 0), previous: loaded.reduce((total, item) => total + monthly(item.previous, `${ranges.year - 1}-${month}`, item.source.amount), 0) };
+          }) };
+          story.breakdown = monthlyReports.map(item => ({ label: item.source.label, value: numeric(item.current[item.source.amount]), unit, route: item.source.route }));
+          story.message = ytdNetLY === 0 ? 'Sin base anual comparable.' : `El neto acumulado ${ytdNet >= ytdNetLY ? 'supera' : 'queda por debajo de'} el mismo corte del año anterior.`;
+          return story;
+        }
+        if (id === 'ventas_nc_impacto') {
+          story.visitKey = `${id}:v1:${asOf.slice(0, 7)}`;
+          story.primary = { label: 'NC del mes', value: credits, unit, comparison: { value: creditsLY, label: `Mismo tramo de ${ranges.year - 1}` } };
+          story.supporting = [{ label: 'Participación sobre ventas', value: gross > 0 ? credits / gross * 100 : null, unit: 'percent' }, { label: 'Ventas antes de NC', value: gross, unit }, { label: 'Neto del mes', value: net, unit }];
+          story.chart = { kind: 'bars', title: 'NC por área autorizada', unit, rows: monthlyReports.map(item => ({ label: item.source.label, value: numeric(item.month[item.source.credit]) * (item.source.creditSigned ? -1 : 1) })) };
+          story.breakdown = monthlyReports.map(item => ({ label: item.source.label, value: numeric(item.month[item.source.credit]) * (item.source.creditSigned ? -1 : 1), unit, route: item.source.route }));
+          story.message = gross > 0 ? `Las NC equivalen al ${new Intl.NumberFormat('es-PY', { maximumFractionDigits: 1 }).format(credits / gross * 100)}% de las ventas antes de NC del mes.` : 'Sin ventas positivas para expresar las NC como porcentaje.';
           return story;
         }
         story.visitKey = `${id}:neto-v3:${asOf.slice(0, 7)}`;
@@ -266,5 +292,5 @@ export const loadSalesStories: StoryLoader = async (topics, granted, asOf) => {
       return { ...story, status: 'error', message: error instanceof Error ? error.message : 'No se pudo consultar la fuente.', primary: null, supporting: [], chart: null, breakdown: [], attention: true };
     }
   };
-  return Promise.all([...billingIds.map(id => load(id, billingSources)), ...(wantsComposition ? [load('repuestos_clientes', [parts])] : [])]);
+  return Promise.all([...billingIds.filter(id => sourcesFor(id).length).map(id => load(id, sourcesFor(id))), ...(wantsComposition ? [load('repuestos_clientes', [parts])] : [])]);
 };

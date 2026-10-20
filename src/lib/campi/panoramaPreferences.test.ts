@@ -2,7 +2,6 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { SECTION_ROUTES } from '@/lib/permissions';
 import {
   availablePanoramaTopics,
-  PANORAMA_PENDING_TOPICS,
   PANORAMA_TOPICS,
   panoramaStorageKey,
   readPanoramaPreferences,
@@ -14,22 +13,25 @@ beforeEach(() => localStorage.clear());
 
 describe('Campi Panorama topics', () => {
   it('offers business themes mapped to real sections, not a menu copy', () => {
-    expect(PANORAMA_TOPICS.map(topic => topic.id)).toEqual([
-      'ventas_facturacion', 'maquinas_pedidos', 'servicios_pendientes', 'servicios_abiertas', 'repuestos_stock',
-    ]);
+    expect(PANORAMA_TOPICS).toHaveLength(17);
+    expect(PANORAMA_TOPICS.map(topic => topic.id)).toEqual(expect.arrayContaining([
+      'ventas_evolucion', 'ventas_facturacion', 'maquinas_pedidos', 'servicios_pendientes', 'servicios_abiertas',
+      'repuestos_stock', 'repuestos_alertas', 'repuestos_concentracion', 'repuestos_sucursales',
+      'ventas_neto_anual', 'ventas_nc_impacto', 'ventas_repuestos', 'ventas_servicios', 'ventas_maquinas',
+      'maquinas_pedidos_stock', 'servicios_os_antiguas', 'repuestos_rojo',
+    ]));
     const known = new Set(SECTION_ROUTES.map(route => route.id));
     for (const topic of PANORAMA_TOPICS) {
       expect(topic.sections.length).toBeGreaterThan(0);
       expect(topic.sections.every(section => known.has(section))).toBe(true);
     }
-    expect(PANORAMA_PENDING_TOPICS.map(topic => topic.id)).toEqual(['clientes_actividad', 'maquinas_parque']);
-    expect(PANORAMA_PENDING_TOPICS.every(topic => !PANORAMA_TOPICS.some(enabled => enabled.id === topic.id))).toBe(true);
+    expect(new Set(PANORAMA_TOPICS.map(topic => topic.id)).size).toBe(PANORAMA_TOPICS.length);
   });
 
   it('requires module and section access and excludes unimplemented themes', () => {
     const allowed = availablePanoramaTopics(module => module === 'servicios', section =>
       ['servicios.ventas', 'servicios.comisiones'].includes(section), false);
-    expect(allowed.map(topic => topic.id)).toEqual(['ventas_facturacion']);
+    expect(allowed.map(topic => topic.id)).toEqual(['ventas_evolucion', 'ventas_facturacion', 'ventas_neto_anual', 'ventas_nc_impacto', 'ventas_servicios']);
     expect(availablePanoramaTopics(() => false, () => true, true)).toEqual([]);
     expect(availablePanoramaTopics(() => true, () => true, true).map(topic => topic.id)).not.toContain('servicios_comisiones');
   });
@@ -38,11 +40,11 @@ describe('Campi Panorama topics', () => {
     const available = availablePanoramaTopics(() => true, () => true, true);
     expect(reconcilePanoramaOrder([
       'ventas_evolucion', 'repuestos_alertas', 'repuestos_concentracion', 'maquinas_stock', 'servicios_abiertas',
-    ], available)).toEqual(['ventas_facturacion', 'repuestos_stock', 'maquinas_pedidos', 'servicios_abiertas']);
+    ], available)).toEqual(['ventas_evolucion', 'repuestos_alertas', 'repuestos_concentracion', 'maquinas_pedidos']);
     expect(reconcilePanoramaOrder(['maquinas_stock', 'repuestos_stock'], available.filter(topic => topic.id !== 'maquinas_pedidos')))
       .toEqual(['repuestos_stock']);
     expect(reconcilePanoramaOrder(['repuestos_clientes', 'ventas_facturacion', 'repuestos_sucursales', 'repuestos_stock'], available))
-      .toEqual(['ventas_facturacion', 'repuestos_stock']);
+      .toEqual(['ventas_facturacion', 'repuestos_sucursales', 'repuestos_stock']);
     expect(reconcilePanoramaOrder(['maquinas_proyeccion'], available)).toEqual(['maquinas_pedidos']);
     expect(reconcilePanoramaOrder(PANORAMA_TOPICS.map(topic => topic.id), available)).toEqual(PANORAMA_TOPICS.slice(0, 4).map(topic => topic.id));
   });

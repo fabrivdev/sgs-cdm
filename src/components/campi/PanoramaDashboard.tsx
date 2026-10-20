@@ -9,8 +9,8 @@ import type { PanoramaTopic, PanoramaTopicId } from '@/lib/campi/panoramaPrefere
 import type { PanoramaStory, StoryTopicId } from '@/lib/campi/panoramaStoryTypes';
 import { topicContract } from '@/lib/campi/panoramaTopicContracts';
 import { CampiInterpreter } from './CampiInterpreter';
-import { StoryPanel } from './StoryPanel';
-import { readStoryVisit, saveStoryVisit, storyVisitChange } from '@/lib/campi/panoramaStoryVisits';
+import { PanoramaStoryCard } from './PanoramaStoryCard';
+import { readStoryVisit, saveStoryVisit } from '@/lib/campi/panoramaStoryVisits';
 import './panorama-dashboard.css';
 
 const today = () => {
@@ -83,7 +83,7 @@ export function PanoramaDashboard({ userId, topics, available, hasAccess, onEdit
     {!!selected.length && !reviewing && <div className="panorama-priorities-heading"><Bookmark aria-hidden="true" /><h2>Tus prioridades</h2></div>}
     <div className="panorama-stories">{selected.map((id, index) => reportFor(id)?.isLoading
       ? <article key={id} className="panorama-story panorama-story-loading" role="status" aria-label={`Consultando ${available.find(topic => topic.id === id)?.label ?? id}`}><header className="story-header"><span className="story-index">{String(index + 1).padStart(2, '0')}</span><div className="story-heading-text"><h2>{available.find(topic => topic.id === id)?.label ?? id}</h2></div></header><span className="panorama-loading">Consultando…</span></article>
-      : <StoryPanel key={id} story={stories[index]} index={index} visitChange={reviewing ? null : storyVisitChange(stories[index], previous)} retrying={reportFor(id)?.isFetching ?? false} onRetry={() => void reportFor(id).refetch()} openSignal={openStory?.id === id ? openStory.token : 0} onDetailOpenChange={open => setDetailOpen(current => open ? id : current === id ? null : current)} />)}</div>
+      : <PanoramaStoryCard key={id} story={stories[index]} index={index} retrying={reportFor(id)?.isFetching ?? false} onRetry={() => void reportFor(id).refetch()} openSignal={openStory?.id === id ? openStory.token : 0} onSelectorOpenChange={open => setDetailOpen(current => open ? id : current === id ? null : current)} />)}</div>
     {!selected.length && <Button variant="outline" onClick={onEdit}>Elegir temas para Panorama</Button>}
   </PageShell>;
 }

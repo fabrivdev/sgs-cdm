@@ -3,8 +3,8 @@ import { fetchSemaforoHistorico, SEMAFORO_COLORES, type SemaforoResultado } from
 import type { SectionKey } from '@/lib/permissions';
 import type { PanoramaStory, StoryLoader, StoryTopicId } from './panoramaStoryTypes';
 import { panoramaTopicDefinition } from './panoramaPreferences';
-import { parsePartsExposure, partsAlertsStory, partsConcentrationStory, partsExposureStory } from './partsExposure';
-import { parseMachineSupply, parseOpenDetail, parseReadyOrders, parseServiceResolution, readyOrdersStory, serviceOpenStory, serviceResolutionStory } from './operationalOutcomes';
+import { parsePartsExposure, partsAlertsStory, partsConcentrationStory, partsExposureStory, partsRedStory } from './partsExposure';
+import { parseMachineSupply, parseOpenDetail, parseReadyOrders, parseServiceResolution, readyOrdersStory, readyOrdersOpportunityStory, serviceOpenStory, serviceOldOpenStory, serviceResolutionStory } from './operationalOutcomes';
 
 const number = (v: unknown): number | null => typeof v === 'number' && Number.isFinite(v) ? v : null;
 const required = (v: unknown) => { const n = number(v); if (n === null) throw new Error('La fuente devolvió un valor incompleto.'); return n; };
@@ -18,11 +18,14 @@ const definitions: Partial<Record<StoryTopicId, { section: SectionKey; route: st
   repuestos_stock: { section: 'repuestos.analisis', route: '/repuestos/analisis', source: 'campi_repuestos_exposicion_v1' },
   repuestos_alertas: { section: 'repuestos.analisis', route: '/repuestos/analisis', source: 'campi_repuestos_exposicion_v1' },
   repuestos_concentracion: { section: 'repuestos.analisis', route: '/repuestos/analisis', source: 'campi_repuestos_exposicion_v1' },
+  repuestos_rojo: { section: 'repuestos.analisis', route: '/repuestos/analisis', source: 'campi_repuestos_exposicion_v1' },
   maquinas_pedidos: { section: 'parque.operaciones', route: '/parque-operaciones', source: 'campi_pedidos_abastecimiento_v1 + campi_pedidos_con_stock_v1' },
+  maquinas_pedidos_stock: { section: 'parque.operaciones', route: '/parque-operaciones', source: 'campi_pedidos_abastecimiento_v1 + campi_pedidos_con_stock_v1' },
   maquinas_stock: { section: 'parque.stock', route: '/parque-stock', source: 'parque_stock_maquinas · saldo_actual' },
   maquinas_proyeccion: { section: 'parque.stock_proyectado', route: '/parque-stock-proyectado', source: 'parque_stock_proyectado_v1' },
   servicios_pendientes: { section: 'servicios.ordenes', route: '/servicios/ordenes', source: 'campi_resolucion_os_v1' },
   servicios_abiertas: { section: 'servicios.ordenes', route: '/servicios/ordenes', source: 'campi_resolucion_os_v1' },
+  servicios_os_antiguas: { section: 'servicios.ordenes', route: '/servicios/ordenes', source: 'campi_resolucion_os_v1 + campi_os_abiertas_detalle_v1' },
 };
 function base(id: StoryTopicId): PanoramaStory {
   const d = definitions[id]!;
@@ -41,6 +44,7 @@ function parts(id: StoryTopicId, data: SemaforoResultado): PanoramaStory {
   story.primary = { label: 'Valor Kardex referencial', value, unit: 'USD' };
   story.supporting = [{ label: 'Códigos con stock', value: total, unit: 'count' }, { label: 'Ubicaciones sin valor', value: number(data.ubicaciones_sin_valor), unit: 'count' }];
   if (id === 'repuestos_sucursales') {
+    story.route = '/repuestos/analisis?vista=resumen&agrupacion=sucursal&universo=STOCK_POSITIVO_PANORAMA';
     const branches = data.sucursales.map(r => ({ name: r.nombre, days: number(r.dias_compra_promedio), dated: number(r.valor_compra_con_fecha_usd), positive: number(r.valor_positivo_usd) }));
     if (branches.some(r => r.dated === null || r.positive === null || r.dated < 0 || r.positive < 0 || r.dated > r.positive || (r.days === null) !== (r.dated === 0))) throw new Error('Cobertura de compras por sucursal incompleta.');
     const measured = branches.filter(r => r.days !== null && r.dated! > 0);
@@ -131,14 +135,17 @@ export const loadOperationsStories: StoryLoader = async (topics, granted, asOf) 
   let partsRequest: Promise<SemaforoResultado> | undefined;
   let exposureRequest: PromiseLike<{ data: unknown; error: unknown }> | undefined;
   let serviceRequest: PromiseLike<{ data: unknown; error: unknown }> | undefined;
+  let readyRequest: PromiseLike<{ data: unknown; error: unknown }> | undefined;
+  let supplyRequest: PromiseLike<{ data: unknown; error: unknown }> | undefined;
+  let openDetailRequest: PromiseLike<{ data: unknown; error: unknown }> | undefined;
   return Promise.all(selected.map(async id => {
     try {
-      if (id === 'repuestos_stock' || id === 'repuestos_alertas' || id === 'repuestos_concentracion') {
+      if (id === 'repuestos_stock' || id === 'repuestos_alertas' || id === 'repuestos_concentracion' || id === 'repuestos_rojo') {
         exposureRequest ??= supabase.rpc('campi_repuestos_exposicion_v1' as never);
         const response = await exposureRequest;
         if (response.error) throw response.error;
         const data = parsePartsExposure(response.data);
-        return id === 'repuestos_alertas' ? partsAlertsStory(data) : id === 'repuestos_concentracion' ? partsConcentrationStory(data) : partsExposureStory(data);
+        return id === 'repuestos_alertas' ? partsAlertsStory(data) : id === 'repuestos_concentracion' ? partsConcentrationStory(data) : id === 'repuestos_rojo' ? partsRedStory(data) : partsExposureStory(data);
       }
       if (id === 'repuestos_sucursales') {
         partsRequest ??= fetchSemaforoHistorico({ busqueda: '', marca: '', color: '', sucursal: '' }, 0, 1);
@@ -146,23 +153,27 @@ export const loadOperationsStories: StoryLoader = async (topics, granted, asOf) 
       }
       if (id === 'maquinas_proyeccion') return await projected(asOf);
       if (id === 'maquinas_stock') return await machineStock();
-      if (id === 'maquinas_pedidos') {
+      if (id === 'maquinas_pedidos' || id === 'maquinas_pedidos_stock') {
+        readyRequest ??= supabase.rpc('campi_pedidos_con_stock_v1' as never);
+        supplyRequest ??= supabase.rpc('campi_pedidos_abastecimiento_v1' as never);
         const [stock, supply] = await Promise.all([
-          supabase.rpc('campi_pedidos_con_stock_v1' as never),
-          supabase.rpc('campi_pedidos_abastecimiento_v1' as never),
+          readyRequest, supplyRequest,
         ]);
         if (stock.error) throw stock.error;
         if (supply.error) throw supply.error;
-        return readyOrdersStory(parseReadyOrders(stock.data), parseMachineSupply(supply.data));
+        const ready = parseReadyOrders(stock.data), pending = parseMachineSupply(supply.data);
+        return id === 'maquinas_pedidos_stock' ? readyOrdersOpportunityStory(ready, pending) : readyOrdersStory(ready, pending);
       }
       serviceRequest ??= supabase.rpc('campi_resolucion_os_v1' as never);
       const response = await serviceRequest;
       if (response.error) throw response.error;
       const data = parseServiceResolution(response.data);
-      if (id === 'servicios_abiertas') {
-        const detail = await supabase.rpc('campi_os_abiertas_detalle_v1' as never);
+      if (id === 'servicios_abiertas' || id === 'servicios_os_antiguas') {
+        openDetailRequest ??= supabase.rpc('campi_os_abiertas_detalle_v1' as never);
+        const detail = await openDetailRequest;
         if (detail.error) throw detail.error;
-        return serviceOpenStory(data, parseOpenDetail(detail.data));
+        const openDetail = parseOpenDetail(detail.data);
+        return id === 'servicios_os_antiguas' ? serviceOldOpenStory(data, openDetail) : serviceOpenStory(data, openDetail);
       }
       return serviceResolutionStory(data);
     } catch (error) {

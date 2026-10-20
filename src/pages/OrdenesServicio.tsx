@@ -67,7 +67,8 @@ export function OrdersWorkspace() {
     return { ...(linkedPeriod ?? (openHistory ? { dateFrom: "2000-01-01", dateTo: period.dateTo } : period)),
       periodMode: openHistory ? "anio" : "mes", q: searchParams.get("q") ?? "", fSucursales: [], fMarcas: [], fTiposTiempo: [], fEstadosTrabajo: [], fTécnicos: [], fResponsablesOS: [],
       fEstadosOS: state === "abierta" || state === "cerrada" ? [state] : [], fOSRubros: [],
-      panoramaCohort: cohort === "resolution" || cohort === "open" ? cohort : undefined };
+      panoramaCohort: cohort === "resolution" || cohort === "open" ? cohort : undefined,
+      panoramaMinAgeDays: cohort === "open" && searchParams.get("antiguedad_min") === "91" ? 91 : undefined };
   }, [today, searchParams]);
   const [filters, setFilters] = useState(defaults);
   const change = <K extends keyof OperationsFilters>(key: K, value: OperationsFilters[K]) => setFilters(previous => ({ ...previous, [key]: value }));

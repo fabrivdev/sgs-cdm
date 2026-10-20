@@ -293,7 +293,13 @@ export default function Ventas({ area }: { area: VentasArea }) {
 function VentasContent({ area }: { area: VentasArea }) {
   const mobile = useSalesMobile();
   const now = useMemo(() => new Date(), []);
-  const [desde, setDesde] = useState(`${now.getFullYear()}-01-01`); const [hasta, setHasta] = useState(isoDate(now));
+  const linkedRange = useMemo(() => {
+    const searchParams = new URLSearchParams(window.location.search);
+    const from = searchParams.get('desde'), to = searchParams.get('hasta');
+    const valid = (value: string | null) => value && /^\d{4}-\d{2}-\d{2}$/.test(value) && !Number.isNaN(Date.parse(`${value}T00:00:00Z`)) && new Date(`${value}T00:00:00Z`).toISOString().slice(0, 10) === value;
+    return valid(from) && valid(to) && from! <= to! ? { from: from!, to: to! } : null;
+  }, []);
+  const [desde, setDesde] = useState(() => linkedRange?.from ?? `${now.getFullYear()}-01-01`); const [hasta, setHasta] = useState(() => linkedRange?.to ?? isoDate(now));
   const [sucursal, setSucursal] = useState("TODAS"); const [buscar, setBuscar] = useState("");
   const [periodMode, setPeriodMode] = useState<PeriodMode>("mes");
   const [marca, setMarca] = useState("");

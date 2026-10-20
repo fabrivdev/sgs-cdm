@@ -100,4 +100,12 @@ describe('operational Panorama loaders', () => {
     expect(story.chart?.rows).toEqual([{ label: 'Nuevas', value: 36 }, { label: 'Usadas', value: 51 }]);
     expect(story.breakdown).toEqual([{ label: 'Santa Rita', value: 87, unit: 'count' }]);
   });
+  it('answers ready-to-bill orders and old open OS as separate questions with filtered destinations', async () => {
+    mocks.rpc.mockImplementation(async name => ({ data: name === 'campi_pedidos_con_stock_v1' ? ready() : name === 'campi_pedidos_abastecimiento_v1' ? supply() : name === 'campi_os_abiertas_detalle_v1' ? openDetail() : resolution(), error: null }));
+    const [pending, readyStory, open, old] = await loadOperationsStories(['maquinas_pedidos', 'maquinas_pedidos_stock', 'servicios_abiertas', 'servicios_os_antiguas'], ['parque.operaciones', 'servicios.ordenes'], asOf);
+    expect([pending.primary?.value, readyStory.primary?.value, open.primary?.value, old.primary?.value]).toEqual([7, 2, 76, 46]);
+    expect(readyStory.supporting.find(row => row.label === 'Participación con stock')?.value).toBeCloseTo(2 / 7 * 100);
+    expect(old.route).toContain('antiguedad_min=91');
+    expect(mocks.rpc).toHaveBeenCalledTimes(4);
+  });
 });

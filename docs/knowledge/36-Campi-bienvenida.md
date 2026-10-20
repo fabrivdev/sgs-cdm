@@ -1,5 +1,7 @@
 # Campi: bienvenida inicial de SIG CDM
 
+Actualización de la rama alternativa del 20/10/2026: el catálogo de Panorama conserva sus nueve temas previos y agrega ocho preguntas con fuente y cálculo propios (17 con acceso completo). El usuario descartó la reducción anterior a cinco y el detalle en panel lateral. «Ver detalle» abre la sección de origen filtrada; los temas de ventas consolidadas permiten elegir antes una de las áreas autorizadas. Ver el último apartado de `docs/campi-panorama-alternativa.md`. Sigue fuera de `main` y de la publicación pública.
+
 Panorama de la rama alternativa: la corrección funcional del 20/10/2026 está registrada al inicio de `docs/campi-panorama-alternativa.md`. Esa sección reemplaza allí el catálogo anterior de stock físico y vínculos faltantes. Las funciones de lectura de pedidos y OS se aplicaron en Lovable Cloud y se comprobaron en la app local; la rama no está publicada en `main` ni en Lovable público.
 
 ## Alcance

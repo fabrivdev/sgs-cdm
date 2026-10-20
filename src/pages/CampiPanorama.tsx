@@ -20,12 +20,19 @@ import {
 const topicIcons: Record<PanoramaTopicId, typeof BarChart3> = {
   ventas_evolucion: BarChart3,
   ventas_facturacion: BarChart3,
+  ventas_neto_anual: BarChart3,
+  ventas_nc_impacto: HandCoins,
+  ventas_repuestos: BarChart3,
+  ventas_servicios: BarChart3,
+  ventas_maquinas: BarChart3,
   repuestos_demanda: Activity,
   repuestos_clientes: Activity,
   repuestos_sucursales: Package,
   repuestos_alertas: Package,
   repuestos_concentracion: Package,
+  repuestos_rojo: Package,
   maquinas_pedidos: Truck,
+  maquinas_pedidos_stock: Truck,
   servicios_pendientes: ClipboardList,
   maquinas_stock: Tractor,
   repuestos_stock: Package,
@@ -37,6 +44,7 @@ const topicIcons: Record<PanoramaTopicId, typeof BarChart3> = {
   repuestos_reposicion: ShoppingCart,
   servicios_comisiones: HandCoins,
   servicios_abiertas: ClipboardList,
+  servicios_os_antiguas: ClipboardList,
 };
 const groupTone: Record<PanoramaTopicGroup, string> = {
   Resultados: 'bg-emerald-50 text-emerald-700',

@@ -358,6 +358,7 @@ export interface OperationsData {
 }
 export interface OperationsFilters {
   panoramaCohort?: import('./panoramaCohort').PanoramaCohort;
+  panoramaMinAgeDays?: number;
   dateFrom: string; dateTo: string; periodMode: PeriodMode; q: string;
   fSucursales: string[]; fMarcas: string[]; fTiposTiempo: string[];
   fEstadosTrabajo: string[]; fTécnicos: string[]; fResponsablesOS: string[];
@@ -372,7 +373,7 @@ export const emptyOperationsData: OperationsData = {
  */
 export function useOperationsModel(data: OperationsData, filters: OperationsFilters, matrixMetric: "trabajos" | "horas" = "trabajos", today = new Date(), technicianStatus: TechnicianStatus = "todos") {
   const { servicios, jornadas, trabajos, clientes, profiles, servicioTecnicos, ordenesServicio, disponibilidades, metaHorasMensual, billing } = data;
-  const { dateFrom, dateTo, periodMode, q, fSucursales, fMarcas, fTiposTiempo, fEstadosTrabajo, fTécnicos, fResponsablesOS, fEstadosOS, fOSRubros, panoramaCohort } = filters;
+  const { dateFrom, dateTo, periodMode, q, fSucursales, fMarcas, fTiposTiempo, fEstadosTrabajo, fTécnicos, fResponsablesOS, fEstadosOS, fOSRubros, panoramaCohort, panoramaMinAgeDays } = filters;
   const todayStr = format(today, "yyyy-MM-dd");
 
 const weekStart = useMemo(() => startOfWeek(today, { weekStartsOn: 1 }), [today]);
@@ -630,6 +631,7 @@ const serviciosDashboardData = useMemo<ServiciosDashboardData>(() => {
       ).slice(0, 10);
       if (panoramaCohort && !inPanoramaCohort(row, panoramaCohort, dateFrom, dateTo)) return [];
       if (!fechaAnalisis || (panoramaCohort !== 'open' && !inRange(fechaAnalisis, periodStart, periodEnd))) return [];
+      if (panoramaCohort === 'open' && panoramaMinAgeDays && differenceInCalendarDays(periodEnd, parseISO(fechaAnalisis)) < panoramaMinAgeDays) return [];
 
       const bucketDate = parseISO(fechaAnalisis);
       const rawBucketStart = periodMode === "dia"
@@ -960,7 +962,7 @@ const serviciosDashboardData = useMemo<ServiciosDashboardData>(() => {
       evolucion,
       sucursales: Array.from(sucursalMap.values()).sort((a, b) => b.total - a.total || a.sucursal.localeCompare(b.sucursal)),
     };
-  }, [activeTechnicianIds, allTechnicianProfiles, billing, clienteById, clienteByName, disponibilidades, fEstadosOS, fMarcas, fOSRubros, fResponsablesOS, fSucursales, fTiposTiempo, metaHorasMensual, ordenesServicio, periodEnd, periodMode, periodStart, profileById, query, technicianOptions, technicianStatus, trabajoById, panoramaCohort, dateFrom, dateTo]);
+  }, [activeTechnicianIds, allTechnicianProfiles, billing, clienteById, clienteByName, disponibilidades, fEstadosOS, fMarcas, fOSRubros, fResponsablesOS, fSucursales, fTiposTiempo, metaHorasMensual, ordenesServicio, periodEnd, periodMode, periodStart, profileById, query, technicianOptions, technicianStatus, trabajoById, panoramaCohort, panoramaMinAgeDays, dateFrom, dateTo]);
 
 const jornadasRealizadasPrev = useMemo(
     () =>

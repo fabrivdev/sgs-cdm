@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { parsePartsExposure, partsAlertsStory, partsExposureStory } from './partsExposure';
+import { parsePartsExposure, partsAlertsStory, partsExposureStory, partsRedStory } from './partsExposure';
 
 const payload = () => ({
   fecha_analisis: '2026-10-19', codigos_stock: 30, ubicaciones_stock: 40,
@@ -38,6 +38,12 @@ describe('Panorama stock antiguo', () => {
     expect(story.primary?.note).toContain('sin valor positivo');
     expect(story.notices).toHaveLength(2);
     expect(story.notices?.[0].text).toContain('sin valor positivo acreditado');
+  });
+  it('answers the red-stock question against the same positive-valued universe', () => {
+    const story = partsRedStory(parsePartsExposure(payload()));
+    expect(story.primary?.value).toBe(200);
+    expect(story.supporting.find(item => item.label === 'Participación del valor positivo')?.value).toBe(20);
+    expect(story.route).toContain('color=ROJO');
   });
   it('rejects a concentration that does not reconcile with the old stock total', () => {
     const data = payload();

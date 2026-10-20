@@ -2384,10 +2384,13 @@
       "id": "asistente.panorama",
       "title": "Panorama de Campi",
       "module": "asistente",
-      "description": "Alternativa en rama: seis temas seleccionables, facturación consolidada autorizada y stock antiguo con valor y participación. La nueva RPC de stock antiguo se aplicó en Lovable Cloud y se comprobó en la app local autenticada; el frontend no está publicado.",
+      "description": "Alternativa local: 17 preguntas de negocio disponibles según permisos; conserva las nueve originales y añade ocho con fuente y cálculo. Cada tarjeta responde su pregunta; Ver detalle va a la sección de origen con filtros y, en temas consolidados de Ventas, ofrece primero elegir el área autorizada. No abre un panel de detalle de Panorama. La RPC de stock antiguo se aplicó previamente en Lovable Cloud; esta ampliación de frontend permanece en la rama alternativa y no acredita publicación pública.",
       "sources": [
         "src/pages/CampiPanorama.tsx",
         "src/components/campi/PanoramaDashboard.tsx",
+        "src/components/campi/PanoramaStoryCard.tsx",
+        "src/lib/campi/panoramaPreferences.ts",
+        "src/lib/campi/storyNavigation.ts",
         "docs/knowledge/36-Campi-bienvenida.md"
       ],
       "flows": [

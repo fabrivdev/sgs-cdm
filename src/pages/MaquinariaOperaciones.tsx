@@ -964,6 +964,10 @@ export default function MaquinariaOperaciones() {
   const [selected, setSelected] = useState<string | null>(null);
   const [selectedImport, setSelectedImport] = useState<ImportRow | null>(null);
   const requestedOperationId = useMemo(() => new URLSearchParams(location.search).get("operacion"), [location.search]);
+  const requestedOperationIds = useMemo(() => {
+    const raw = new URLSearchParams(location.search).get("operaciones");
+    return raw ? new Set(raw.split(',').filter(id => /^[0-9a-f-]{36}$/i.test(id))) : null;
+  }, [location.search]);
 
   // Ventas de Máquinas enlaza una factura con su NP por operacion_id. El
   // acceso directo abre el mismo drawer que la tabla, sin depender de que la
@@ -1097,6 +1101,7 @@ export default function MaquinariaOperaciones() {
       if (situacion !== "TODOS" && importSituationState(importRow) !== situacion) return false;
     } else {
       const orderRow = row as OrderRow;
+      if (requestedOperationIds && !requestedOperationIds.has(orderRow.operacion_id)) return false;
       const billingState = orderBillingState(orderRow, entregaByUnitId?.get(orderRow.id)?.estado, confirmedBillingUnitIds?.has(orderRow.id));
       // Si la fuente canonica no respondio, conservar las filas visibles. El
       // warning y la celda "No disponible" evitan presentar el fallo como un
@@ -1112,7 +1117,7 @@ export default function MaquinariaOperaciones() {
     const common = [row.np_numero, formatNpCode(row.np_numero), row.cliente_nombre, row.marca, row.producto, row.modelo, row.modelo_original, row.chasis];
     const importValues = importsView ? [(row as ImportRow).proveedor, (row as ImportRow).oc, (row as ImportRow).po] : [(row as OrderRow).comercial];
     return [...common, ...importValues].some((v) => String(v ?? "").toUpperCase().includes(q));
-  }), [normalizedRows, importsView, search, orderState, marca, modelo, tipoMaquina, vinculoNp, condicion, llegada, situacion, entrega, entregaByUnitId, confirmedBillingUnitIds, estadoByOperacionId, stockChasisSet]);
+  }), [normalizedRows, importsView, search, orderState, marca, modelo, tipoMaquina, vinculoNp, condicion, llegada, situacion, entrega, entregaByUnitId, confirmedBillingUnitIds, estadoByOperacionId, stockChasisSet, requestedOperationIds]);
 
   const activeCount = (marca !== "TODOS" ? 1 : 0)
     + (modelo !== "TODOS" ? 1 : 0) + (tipoMaquina !== "TODOS" ? 1 : 0)

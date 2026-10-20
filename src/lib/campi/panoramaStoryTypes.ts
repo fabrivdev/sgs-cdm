@@ -1,6 +1,6 @@
 import type { SectionKey } from '@/lib/permissions';
 
-export type StoryTopicId = 'ventas_evolucion' | 'ventas_facturacion' | 'repuestos_clientes' | 'repuestos_sucursales' | 'repuestos_stock' | 'repuestos_alertas' | 'repuestos_concentracion' | 'maquinas_pedidos' | 'maquinas_stock' | 'maquinas_proyeccion' | 'servicios_pendientes' | 'servicios_abiertas';
+export type StoryTopicId = 'ventas_evolucion' | 'ventas_facturacion' | 'ventas_neto_anual' | 'ventas_nc_impacto' | 'ventas_repuestos' | 'ventas_servicios' | 'ventas_maquinas' | 'repuestos_clientes' | 'repuestos_sucursales' | 'repuestos_stock' | 'repuestos_alertas' | 'repuestos_concentracion' | 'repuestos_rojo' | 'maquinas_pedidos' | 'maquinas_pedidos_stock' | 'maquinas_stock' | 'maquinas_proyeccion' | 'servicios_pendientes' | 'servicios_abiertas' | 'servicios_os_antiguas';
 export type StoryUnit = 'USD' | 'PYG' | 'count' | 'percent' | 'days';
 export type StoryDatum = { label: string; value: number | null; unit: StoryUnit; note?: string; comparison?: { value: number; label: string } };
 export type StoryChartRow = { label: string; value: number; previous?: number };
@@ -25,6 +25,7 @@ export type PanoramaStory = {
   details: string[];
   source: string;
   route: string;
+  navigationPeriod?: { from: string; to: string };
   attention?: boolean;
   notices?: { text: string; route: string }[];
   machineOrders?: {

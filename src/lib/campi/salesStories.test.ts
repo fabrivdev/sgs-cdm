@@ -175,4 +175,17 @@ describe('sales story source contracts', () => {
     expect(sales.chart?.kind).toBe('trend');
   });
 
+  it('answers annual net, credit impact and sector questions independently from the same reconciled sources', async () => {
+    const stories = await loadSalesStories(['ventas_neto_anual', 'ventas_nc_impacto', 'ventas_repuestos', 'ventas_servicios', 'ventas_maquinas'], ['repuestos.ventas', 'servicios.ventas', 'parque.ventas'], '2026-10-16');
+    expect(stories.map(story => story.status)).toEqual(['ready', 'ready', 'ready', 'ready', 'ready']);
+    expect(stories.map(story => story.primary?.value)).toEqual([2800, 40, 120, 0, 200]);
+    expect(stories[0].chart).toMatchObject({ kind: 'trend', rows: expect.arrayContaining([{ label: 'Oct', value: 280, previous: 150 }]) });
+    expect(stories[0].navigationPeriod).toEqual({ from: '2026-01-01', to: '2026-10-16' });
+    expect(stories[1].supporting.find(row => row.label === 'Participación sobre ventas')?.value).toBe(12.5);
+    expect(stories[2].sections).toEqual(['repuestos.ventas']);
+    expect(stories[3].sections).toEqual(['servicios.ventas']);
+    expect(stories[4].sections).toEqual(['parque.ventas']);
+    expect(rpc).toHaveBeenCalledTimes(9);
+  });
+
 });

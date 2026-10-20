@@ -62,7 +62,7 @@ describe("orders workspace", () => {
     setup();
     const quickPeriod = screen.getByRole("combobox", { name: "Período rápido" });
     const dates = document.querySelectorAll<HTMLInputElement>('input[type="date"]');
-    expect(mocks.query).toHaveBeenLastCalledWith("2026-07-01", "2026-09-25");
+    expect(mocks.query).toHaveBeenLastCalledWith("2026-07-01", "2026-09-25", false);
     expect(dates[0]).toHaveValue("2026-07-01");
     expect(dates[1]).toHaveValue("2026-09-25");
     expect(quickPeriod).toHaveValue("");
@@ -116,7 +116,7 @@ describe("orders workspace", () => {
     fireEvent.click(panel.getByRole("button", { name: "Limpiar (1)" }));
     expect(dates[0]).toHaveValue("2026-07-01");
     expect(dates[1]).toHaveValue("2026-09-25");
-    expect(mocks.query).toHaveBeenLastCalledWith("2026-07-01", "2026-09-25");
+    expect(mocks.query).toHaveBeenLastCalledWith("2026-07-01", "2026-09-25", false);
     expect(panel.getByRole("button", { name: "Limpiar" })).toBeDisabled();
   });
   it.each([390, 1280])("clears a quick period back to Paraguay's default day at %i px", width => {
@@ -138,7 +138,7 @@ describe("orders workspace", () => {
     expect(dates[0]).toHaveValue("2026-07-01");
     expect(dates[1]).toHaveValue("2026-09-30");
     expect(quickPeriod).toHaveValue("");
-    expect(mocks.query).toHaveBeenLastCalledWith("2026-07-01", "2026-09-30");
+    expect(mocks.query).toHaveBeenLastCalledWith("2026-07-01", "2026-09-30", false);
     expect(mocks.set).toHaveBeenLastCalledWith(expect.objectContaining({ agrupacion: "mes", busqueda: "" }));
     expect(panel.getByRole("button", { name: "Limpiar" })).toBeDisabled();
   });
@@ -199,7 +199,7 @@ describe("orders workspace", () => {
     expect(mocks.billing).toHaveBeenLastCalledWith(["01-00000001"], "2026-09-25", true);
     fireEvent.click(screen.getByRole("button", { name: "Histórico en Órdenes" }));
     expect(screen.getByRole("tab", { name: "Órdenes" })).toHaveAttribute("aria-selected", "true");
-    expect(mocks.query).toHaveBeenLastCalledWith("2026-01-01", "2026-09-25");
+    expect(mocks.query).toHaveBeenLastCalledWith("2026-01-01", "2026-09-25", false);
     expect(screen.queryByText(/Productividad ·/)).not.toBeInTheDocument();
   });
   it("shows legacy-only productivity as unavailable, not zero, pending or missing work", () => {
@@ -216,7 +216,7 @@ describe("orders workspace", () => {
     expect(screen.queryByRole("table", { name: "Productividad por técnico" })).not.toBeInTheDocument();
     expect(mocks.work).toHaveBeenLastCalledWith("2026-01-01", "2026-06-30", false);
     fireEvent.click(screen.getByRole("button", { name: "Ver órdenes" }));
-    expect(mocks.query).toHaveBeenLastCalledWith("2026-01-01", "2026-06-30");
+    expect(mocks.query).toHaveBeenLastCalledWith("2026-01-01", "2026-06-30", false);
   });
   it("does not send pre-July historical OS or open OS to the annual efficiency billing query", () => {
     mocks.width = 1280;

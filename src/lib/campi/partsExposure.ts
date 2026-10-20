@@ -147,8 +147,26 @@ export function partsConcentrationStory(data: Exposure): PanoramaStory {
     primary: { label: 'Participación de tres familias', value: share, unit: 'percent' },
     supporting: [{ label: 'Valor de las tres familias', value: topValue, unit: 'USD' }, { label: 'Valor antiguo total', value: data.valor_antiguo_usd, unit: 'USD' }],
     chart: { kind: 'bars', title: 'Valor antiguo por familia', unit: 'USD', rows: families.slice(0, 5).map(row => ({ label: row.nombre, value: row.valor_antiguo_usd })) },
+    route: '/repuestos/analisis?vista=resumen&agrupacion=familia&color=ANTIGUO&universo=STOCK_POSITIVO_PANORAMA',
     breakdown: original.breakdown.filter(row => row.group === 'Familias' || row.group === 'Sucursales'),
     details: ['El universo es el valor positivo de ubicaciones con stock físico positivo en gris o rojo; no equivale al stock total.', 'La participación divide el valor de las tres familias mayores por el valor antiguo total del mismo universo. Una familia sin valor no se interpreta como cero stock.', ...original.details.slice(2)],
     notices: [],
+  };
+}
+
+export function partsRedStory(data: Exposure): PanoramaStory {
+  const original = partsExposureStory(data);
+  const red = data.colores.find(row => row.color === 'ROJO');
+  const value = red?.valor_usd ?? 0;
+  const share = data.valor_total_usd > 0 ? value / data.valor_total_usd * 100 : null;
+  return {
+    ...original, id: 'repuestos_rojo', visitKey: `repuestos_rojo:v1:${data.fecha_analisis}`,
+    title: 'Stock rojo de repuestos', question: '¿Cuánto valor está en rojo y qué proporción representa?',
+    message: `${red?.codigos ?? 0} códigos en rojo; ${share === null ? 'sin base valorizada para el porcentaje' : `${new Intl.NumberFormat('es-PY', { maximumFractionDigits: 1 }).format(share)}% del valor positivo`}.`,
+    primary: { label: 'Valor de stock rojo', value, unit: 'USD' },
+    supporting: [{ label: 'Valor positivo valorizado', value: data.valor_total_usd, unit: 'USD' }, { label: 'Participación del valor positivo', value: share, unit: 'percent' }, { label: 'Códigos en rojo', value: red?.codigos ?? 0, unit: 'count' }],
+    chart: { kind: 'bars', title: 'Rojo y resto del stock positivo', unit: 'USD', rows: [{ label: 'Rojo', value }, { label: 'Resto', value: data.valor_total_usd - value }] },
+    breakdown: original.breakdown.filter(row => row.group === 'Colores' || row.group === 'Familias'),
+    route: '/repuestos/analisis?color=ROJO&vista=detalle&universo=STOCK_POSITIVO_PANORAMA', notices: [],
   };
 }

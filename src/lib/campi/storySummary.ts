@@ -17,6 +17,18 @@ export function storySummaryPercentage(story: PanoramaStory): StorySummaryPercen
       ? { value: ready / primary.value * 100, label: 'con stock para facturar', kind: 'composition' }
       : null;
   }
+  const shares: Partial<Record<PanoramaStory['id'], { denominator: string; label: string }>> = {
+    maquinas_pedidos_stock: { denominator: 'Pedidos pendientes', label: 'de pedidos pendientes' },
+    servicios_os_antiguas: { denominator: 'OS abiertas', label: 'de OS abiertas' },
+    repuestos_rojo: { denominator: 'Valor positivo valorizado', label: 'del stock positivo' },
+    ventas_nc_impacto: { denominator: 'Ventas antes de NC', label: 'de ventas' },
+  };
+  const share = shares[story.id];
+  if (share) {
+    const denominator = story.supporting.find(datum => datum.label === share.denominator)?.value;
+    return typeof denominator === 'number' && Number.isFinite(denominator) && denominator > 0 && primary.value >= 0 && primary.value <= denominator
+      ? { value: primary.value / denominator * 100, label: share.label, kind: 'composition' } : null;
+  }
   const previous = primary.comparison?.value;
   if (previous !== undefined && Number.isFinite(previous) && previous > 0) {
     return { value: (primary.value - previous) / previous * 100, label: `vs. ${primary.comparison!.label.toLowerCase()}`, kind: 'variation' };

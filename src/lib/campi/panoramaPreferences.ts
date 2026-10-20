@@ -9,24 +9,25 @@ export type PanoramaTopic = { id: StoryTopicId; label: string; title: string; qu
 export const MAX_PANORAMA_TOPICS = 4;
 
 const TOPIC_LABELS: readonly (Omit<PanoramaTopic, 'id' | 'contract'> & { id: EnabledTopicId })[] = [
-  { id: 'ventas_facturacion', label: 'Facturación y NC', title: 'Facturación y NC', question: '¿Cuánto facturamos y cómo cambió frente al año anterior?', preview: 'Neto, ventas antes de NC, NC y evolución anual comparables.', group: 'Resultados', sections: ['servicios.ventas', 'parque.ventas', 'repuestos.ventas'], definitionVersion: 'ventas-netas-nc-separadas-v3' },
-  { id: 'maquinas_pedidos', label: 'Pedidos de máquinas', title: 'Pedidos pendientes', question: '¿Qué parte de los pedidos pendientes tiene stock para facturar?', preview: 'Pedidos, proporción con stock y abastecimiento de las unidades.', group: 'Compromisos', sections: ['parque.operaciones'], definitionVersion: 'pedidos-abastecimiento-v2' },
-  { id: 'servicios_pendientes', label: 'Tiempo de resolución de OS', title: 'Resolución de OS', question: '¿Cuánto tardamos en cerrar las OS?', preview: 'Mediana de cierre frente al mes anterior y volumen resuelto.', group: 'Operación', sections: ['servicios.ordenes'], definitionVersion: 'resolucion-v1' },
-  { id: 'servicios_abiertas', label: 'OS abiertas', title: 'OS abiertas', question: '¿Cómo se distribuye el trabajo que sigue abierto?', preview: 'OS abiertas, antigüedad, marca y evolución entre cortes.', group: 'Operación', sections: ['servicios.ordenes'], definitionVersion: 'cola-abierta-v1' },
-  { id: 'repuestos_stock', label: 'Stock antiguo de repuestos', title: 'Stock antiguo de repuestos', question: '¿Qué valor y proporción del stock está en gris o rojo?', preview: 'USD, porcentaje, familias, sucursales y cambios próximos de color.', group: 'Disponibilidad', sections: ['repuestos.analisis'], definitionVersion: 'exposicion-valor-positivo-v1' },
+  { id: 'ventas_evolucion', label: 'Evolución de ventas', title: 'Evolución de ventas', question: '¿Estamos vendiendo más o menos?', preview: 'Ventas antes de NC, mes y acumulado comparables.', group: 'Resultados', sections: ['servicios.ventas', 'parque.ventas', 'repuestos.ventas'], definitionVersion: 'ventas-antes-nc-v1' },
+  { id: 'ventas_facturacion', label: 'Facturación y notas de crédito', title: 'Facturación neta', question: '¿Cuánto quedó facturado después de las NC?', preview: 'Neto, ventas y NC por área autorizada.', group: 'Resultados', sections: ['servicios.ventas', 'parque.ventas', 'repuestos.ventas'], definitionVersion: 'ventas-netas-nc-separadas-v3' },
+  { id: 'ventas_neto_anual', label: 'Facturación acumulada', title: 'Facturación acumulada', question: '¿Cómo va el neto anual frente al mismo corte del año anterior?', preview: 'Neto acumulado y evolución mensual comparable.', group: 'Resultados', sections: ['servicios.ventas', 'parque.ventas', 'repuestos.ventas'], definitionVersion: 'neto-anual-v1' },
+  { id: 'ventas_nc_impacto', label: 'Impacto de notas de crédito', title: 'Impacto de NC', question: '¿Cuánto redujeron las NC las ventas del mes?', preview: 'Valor de NC y proporción de ventas antes de NC.', group: 'Resultados', sections: ['servicios.ventas', 'parque.ventas', 'repuestos.ventas'], definitionVersion: 'impacto-nc-v1' },
+  { id: 'ventas_repuestos', label: 'Ventas de repuestos', title: 'Ventas de repuestos', question: '¿Cómo evolucionan las ventas de repuestos?', preview: 'Ventas antes de NC y comparación equivalente.', group: 'Resultados', sections: ['repuestos.ventas'], definitionVersion: 'ventas-sector-v1' },
+  { id: 'ventas_servicios', label: 'Ventas de servicios', title: 'Ventas de servicios', question: '¿Cómo evolucionan las ventas de servicios?', preview: 'Ventas antes de NC y comparación equivalente.', group: 'Resultados', sections: ['servicios.ventas'], definitionVersion: 'ventas-sector-v1' },
+  { id: 'ventas_maquinas', label: 'Ventas de máquinas', title: 'Ventas de máquinas', question: '¿Cómo evolucionan las ventas de máquinas?', preview: 'Ventas antes de NC y comparación equivalente.', group: 'Resultados', sections: ['parque.ventas'], definitionVersion: 'ventas-sector-v1' },
+  { id: 'maquinas_pedidos', label: 'Pedidos pendientes', title: 'Pedidos pendientes', question: '¿Cuántos pedidos tienen stock para facturar y cómo se abastece el resto?', preview: 'Total pendiente, proporción con stock, importaciones y unidades sin vínculo.', group: 'Compromisos', sections: ['parque.operaciones'], definitionVersion: 'pedidos-abastecimiento-v2' },
+  { id: 'maquinas_pedidos_stock', label: 'Pedidos con stock para facturar', title: 'Pedidos con stock', question: '¿Qué parte de los pedidos pendientes ya tiene stock?', preview: 'Pedidos con stock, porcentaje del total y unidades listas.', group: 'Compromisos', sections: ['parque.operaciones'], definitionVersion: 'pedidos-stock-v1' },
+  { id: 'servicios_pendientes', label: 'Resolución de órdenes de servicio', title: 'Resolución de órdenes de servicio', question: '¿Cuánto tardaron en resolverse las OS cerradas?', preview: 'Mediana de cierres y resguardo de abiertas.', group: 'Operación', sections: ['servicios.ordenes'], definitionVersion: 'resolucion-v1' },
+  { id: 'servicios_abiertas', label: 'Órdenes de servicio abiertas', title: 'Órdenes de servicio abiertas', question: '¿Cuántas OS siguen abiertas y qué edad tienen?', preview: 'Volumen abierto y edad del 90% de las OS.', group: 'Operación', sections: ['servicios.ordenes'], definitionVersion: 'cola-abierta-v1' },
+  { id: 'servicios_os_antiguas', label: 'OS abiertas de más de 90 días', title: 'OS abiertas de más de 90 días', question: '¿Cuántas OS abiertas llevan más de 90 días?', preview: 'Cantidad y proporción de la cartera abierta según reporte TOTVS.', group: 'Operación', sections: ['servicios.ordenes'], definitionVersion: 'cola-mas-90-v1' },
+  { id: 'repuestos_stock', label: 'Stock antiguo de repuestos', title: 'Stock antiguo de repuestos', question: '¿Qué valor de repuestos está en gris o rojo?', preview: 'Valor, proporción y cambios próximos de color.', group: 'Disponibilidad', sections: ['repuestos.analisis'], definitionVersion: 'exposicion-valor-positivo-v1' },
+  { id: 'repuestos_alertas', label: 'Cambios próximos de clasificación', title: 'Cambios próximos de clasificación', question: '¿Qué valor podría pasar a gris o rojo en 30 días?', preview: 'Importe y códigos, si no hay movimientos nuevos.', group: 'Disponibilidad', sections: ['repuestos.analisis'], definitionVersion: 'transicion-30d-v1' },
+  { id: 'repuestos_concentracion', label: 'Concentración del stock antiguo', title: 'Concentración del stock antiguo', question: '¿Qué familias concentran el valor antiguo?', preview: 'Participación de las tres familias principales.', group: 'Disponibilidad', sections: ['repuestos.analisis'], definitionVersion: 'familias-top3-v1' },
+  { id: 'repuestos_rojo', label: 'Stock rojo de repuestos', title: 'Stock rojo de repuestos', question: '¿Cuánto valor está en rojo y qué proporción representa?', preview: 'Valor rojo y participación del stock positivo.', group: 'Disponibilidad', sections: ['repuestos.analisis'], definitionVersion: 'stock-rojo-v1' },
+  { id: 'repuestos_sucursales', label: 'Antigüedad de compra por sucursal', title: 'Antigüedad de repuestos por sucursal', question: '¿Cuánto tiempo hace desde la última compra por sucursal?', preview: 'Días ponderados por valor con compra fechada.', group: 'Disponibilidad', sections: ['repuestos.analisis'], definitionVersion: 'antiguedad-ponderada-v3' },
 ];
 export const PANORAMA_TOPICS: readonly PanoramaTopic[] = TOPIC_LABELS.map(topic => ({ ...topic, contract: PANORAMA_CONTRACTS[topic.id] }));
-/** Candidates stay out of the selector until their denominators, dates and grants are verified. */
-export const PANORAMA_PENDING_TOPICS = [
-  { id: 'clientes_actividad', question: '¿Qué clientes compran, regresan o dejan de comprar?', module: 'Ventas / Clientes',
-    kpi: 'Compradores activos y recurrentes de una cohorte comparable',
-    comparison: 'Mismo período del año anterior y cohorte base definida',
-    missing: 'Identidad canónica entre áreas, ventas positivas netas de anulaciones, historia suficiente y permisos por módulo.' },
-  { id: 'maquinas_parque', question: '¿Cómo evoluciona el parque instalado en clientes?', module: 'Parque',
-    kpi: 'Altas y bajas netas de máquinas instaladas por período efectivo',
-    comparison: 'Altas y bajas del mismo período del año anterior',
-    missing: 'Fechas efectivas completas de altas y bajas; transferencias y refacturaciones no pueden contar como altas.' },
-] as const;
 export const panoramaTopicDefinition = (id: StoryTopicId) => PANORAMA_TOPICS.find(topic => topic.id === id);
 
 export const panoramaStorageKey = (userId: string) => `sig-cdm:panorama:alternativa:v1:${userId}`;
@@ -44,12 +45,7 @@ export function availablePanoramaTopics(
 
 export function reconcilePanoramaOrder(saved: readonly string[] | null, available: readonly PanoramaTopic[]) {
   const permitted = new Set<string>(available.map(topic => topic.id));
-  const migrated = (saved ?? []).map(id => {
-    if (id === 'ventas_evolucion' || id === 'repuestos_clientes') return 'ventas_facturacion';
-    if (id === 'repuestos_alertas' || id === 'repuestos_concentracion' || id === 'repuestos_sucursales') return 'repuestos_stock';
-    if (id === 'maquinas_proyeccion' || id === 'maquinas_stock') return 'maquinas_pedidos';
-    return id;
-  });
+  const migrated = (saved ?? []).map(id => id === 'repuestos_clientes' ? 'ventas_facturacion' : id === 'maquinas_proyeccion' || id === 'maquinas_stock' ? 'maquinas_pedidos' : id);
   return migrated.filter((id, index, all): id is StoryTopicId =>
     permitted.has(id) && all.indexOf(id) === index,
   ).slice(0, MAX_PANORAMA_TOPICS);

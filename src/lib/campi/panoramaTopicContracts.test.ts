@@ -9,9 +9,10 @@ describe('reviewed topic registry', () => {
       expect(topic.contract).toBe(topicContract(topic.id));
       expect(topic.sections.length).toBeGreaterThan(0);
       expect(topic.contract?.formula).toBeTruthy();
-      expect(topic.contract?.kpi).toBeTruthy();
-      expect(topic.contract?.origin).toBeTruthy();
       expect(topic.contract?.population).toBeTruthy();
+      expect(topic.contract?.period).toBeTruthy();
+      expect(topic.contract?.comparison).toBeTruthy();
+      expect(topic.contract?.chart).toBeTruthy();
       expect(topic.contract?.evidence.length).toBeGreaterThan(0);
       expect(topic.contract?.tests.length).toBeGreaterThan(0);
       expect(topic.title.trim()).toBeTruthy();
@@ -20,15 +21,15 @@ describe('reviewed topic registry', () => {
       expect(panoramaTopicDefinition(topic.id)).toBe(topic);
     }
   });
-  it('groups shared sources without grouping distinct accounting and inventory populations', () => {
-    expect(topicContract('ventas_evolucion')).toBeUndefined();
-    expect(topicContract('repuestos_alertas')).toBeUndefined();
-    expect(topicContract('repuestos_concentracion')).toBeUndefined();
-    expect(topicContract('repuestos_sucursales')).toBeUndefined();
-    expect(topicContract('maquinas_proyeccion')).toBeUndefined();
+  it('keeps distinct business questions even when they share a source', () => {
+    expect(topicContract('ventas_evolucion')?.queryGroup).toBe('sales');
+    expect(topicContract('ventas_facturacion')?.queryGroup).toBe('sales');
+    expect(topicContract('ventas_evolucion')?.formula).not.toBe(topicContract('ventas_facturacion')?.formula);
+    expect(topicContract('repuestos_alertas')?.queryGroup).toBe('parts-exposure');
+    expect(topicContract('repuestos_concentracion')?.queryGroup).toBe('parts-exposure');
   });
   it('preserves selected order independently of catalog order', () => {
     const ids = ['repuestos_alertas', 'ventas_facturacion', 'maquinas_pedidos', 'servicios_abiertas'];
-    expect(reconcilePanoramaOrder(ids, [...PANORAMA_TOPICS].reverse())).toEqual(['repuestos_stock', 'ventas_facturacion', 'maquinas_pedidos', 'servicios_abiertas']);
+    expect(reconcilePanoramaOrder(ids, [...PANORAMA_TOPICS].reverse())).toEqual(ids);
   });
 });
