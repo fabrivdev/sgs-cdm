@@ -40,6 +40,12 @@ export type PanoramaStory = {
     ready: { id: string; units: number }[];
     unresolved: { id: string; units: number }[];
   };
+  openOrders?: {
+    asOf: string;
+    count: number;
+    brands: { name: string; count: number }[];
+    ages: { label: string; count: number }[];
+  };
 };
 
 export type StoryLoader = (topics: readonly StoryTopicId[], granted: readonly SectionKey[], asOf: string) => Promise<PanoramaStory[]>;

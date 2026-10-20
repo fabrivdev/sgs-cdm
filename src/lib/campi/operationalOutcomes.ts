@@ -210,5 +210,8 @@ export function serviceOpenStory(data: Resolution, detail?: OpenDetail): Panoram
     ] : [],
     details: ['La edad se calcula desde la apertura operativa hasta la fecha de análisis. El percentil 90 indica que nueve de cada diez OS abiertas tienen esa edad o menos.',
       'La fecha de análisis no acredita por sí sola que la fuente esté completa hasta hoy. La edad de una OS no acredita atraso sin una fecha comprometida verificable. Las aperturas inválidas bloquean el indicador en lugar de contarse como cero.'],
-    source: 'campi_resolucion_os_v1 · estado y fechas operativas de OS', route: '/servicios/ordenes' };
+    source: 'campi_resolucion_os_v1 · estado y fechas operativas de OS', route: '/servicios/ordenes',
+    openOrders: detail ? { asOf: detail.fecha_analisis, count: detail.abiertas,
+      brands: detail.marcas.map(row => ({ name: row.nombre, count: row.cantidad })),
+      ages: detail.edades.map(row => ({ label: row.rango, count: row.cantidad })) } : undefined };
 }

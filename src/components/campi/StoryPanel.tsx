@@ -8,6 +8,7 @@ import { ResponsiveDrawer, ResponsiveDrawerBody, ResponsiveDrawerFooter, Respons
 import { storySummaryPercentage } from '@/lib/campi/storySummary';
 import type { PanoramaStory, StoryDatum, StoryUnit } from '@/lib/campi/panoramaStoryTypes';
 import { MachineOrdersDetail } from './MachineOrdersDetail';
+import { ServiceOpenOrdersDetail } from './ServiceOpenOrdersDetail';
 
 const numbers = new Intl.NumberFormat('es-PY', { maximumFractionDigits: 2 });
 const compact = new Intl.NumberFormat('es-PY', { notation: 'compact', maximumFractionDigits: 1 });
@@ -183,8 +184,9 @@ export function StoryPanel({ story, index, onRetry, retrying, visitChange = null
           <h2 className="text-[16px] font-semibold">{story.title}</h2>
           <div className="mt-1 text-xs text-muted-foreground">{story.periodLabel}{story.cutoff ? ` · ${dateLabel(story.cutoff)}` : ''}</div>
         </ResponsiveDrawerHeader>
-        <ResponsiveDrawerBody className={story.id === 'maquinas_pedidos' ? 'panorama-story-dialog panorama-orders-dialog' : 'panorama-story-dialog space-y-4'}>
+        <ResponsiveDrawerBody className={story.id === 'maquinas_pedidos' || story.id === 'servicios_abiertas' ? 'panorama-story-dialog panorama-orders-dialog' : 'panorama-story-dialog space-y-4'}>
           {story.id === 'maquinas_pedidos' && story.machineOrders ? <MachineOrdersDetail story={story} open={open} /> : <>
+          {story.id === 'servicios_abiertas' && story.openOrders ? <ServiceOpenOrdersDetail story={story} open={open} /> : <>
           {story.status === 'empty' && <p className="text-sm text-muted-foreground">{story.message}</p>}
           {visitChange !== null && visitChange !== 0 && story.primary && <p className="story-visit-change">El total visible cambió {visitChange > 0 ? '+' : ''}{storyValue(visitChange, story.primary.unit)} desde tu última visita en este navegador.</p>}
           {story.id === 'ventas_facturacion' && story.status === 'ready' && story.primary?.value !== null
@@ -194,6 +196,7 @@ export function StoryPanel({ story, index, onRetry, retrying, visitChange = null
           {story.secondaryCharts?.map(chart => <StoryChart key={chart.title} chart={chart} />)}
           {story.chart && story.chart.rows.length > 0 && <StoryChart chart={story.chart} />}
           {breakdownGroups.length > 1 ? <Tabs defaultValue={breakdownGroups[0]}><TabsList className="flex h-auto flex-wrap">{breakdownGroups.map(group => <TabsTrigger key={group} value={group}>{group}</TabsTrigger>)}</TabsList>{breakdownGroups.map(group => <TabsContent key={group} value={group}>{breakdown(group)}</TabsContent>)}</Tabs> : breakdownGroups.length === 1 && breakdown(breakdownGroups[0])}
+          </>}
           </>}
         </ResponsiveDrawerBody>
         {story.route && <ResponsiveDrawerFooter><Button asChild variant="outline"><Link to={story.route}>Abrir sección de origen<ArrowUpRight className="ml-2 h-4 w-4" /></Link></Button></ResponsiveDrawerFooter>}

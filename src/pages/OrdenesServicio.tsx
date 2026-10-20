@@ -65,7 +65,7 @@ export function OrdersWorkspace() {
     const linkedPeriod = from && to && validOperationsRange(from, to) ? { dateFrom: from, dateTo: to } : null;
     const openHistory = state === "abierta" && !linkedPeriod;
     return { ...(linkedPeriod ?? (openHistory ? { dateFrom: "2000-01-01", dateTo: period.dateTo } : period)),
-      periodMode: openHistory ? "anio" : "mes", q: "", fSucursales: [], fMarcas: [], fTiposTiempo: [], fEstadosTrabajo: [], fTécnicos: [], fResponsablesOS: [],
+      periodMode: openHistory ? "anio" : "mes", q: searchParams.get("q") ?? "", fSucursales: [], fMarcas: [], fTiposTiempo: [], fEstadosTrabajo: [], fTécnicos: [], fResponsablesOS: [],
       fEstadosOS: state === "abierta" || state === "cerrada" ? [state] : [], fOSRubros: [],
       panoramaCohort: cohort === "resolution" || cohort === "open" ? cohort : undefined };
   }, [today, searchParams]);
