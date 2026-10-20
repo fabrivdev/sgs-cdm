@@ -125,8 +125,8 @@ export const loadOperationsStories: StoryLoader = async (topics, granted, asOf) 
   if (!day(asOf)) throw new Error('Fecha de análisis inválida.');
   const selected = [...new Set(topics)].filter(id => definitions[id] && granted.includes(definitions[id]!.section));
   let partsRequest: Promise<SemaforoResultado> | undefined;
-  let exposureRequest: ReturnType<typeof supabase.rpc> | undefined;
-  let serviceRequest: ReturnType<typeof supabase.rpc> | undefined;
+  let exposureRequest: PromiseLike<{ data: unknown; error: unknown }> | undefined;
+  let serviceRequest: PromiseLike<{ data: unknown; error: unknown }> | undefined;
   return Promise.all(selected.map(async id => {
     try {
       if (id === 'repuestos_stock' || id === 'repuestos_alertas' || id === 'repuestos_concentracion') {

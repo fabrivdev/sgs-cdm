@@ -15,7 +15,44 @@ Este seguimiento reemplaza los planes anteriores. Las secciones posteriores son 
 - Registrar por tarea: estado, cambio, evidencia, resultado y pendiente concreto. Estados: pendiente, en curso, bloqueada, verificada. Un bloqueo no cierra la tarea.
 - Conservar por separado pruebas aprobadas, fallidas, bloqueadas y no realizadas.
 
-**Foco siguiente:** cerrar E1.3 (universos de OS/stock, comparación contra origen y cortes) y E2.6 (revisión exhaustiva de detalles). No ampliar el catálogo antes de resolver estos contratos.
+**Foco vigente:** cerrar E1.3 (universos de OS/stock, comparación contra origen y cortes) y E2.6 (revisión exhaustiva de detalles). El registro de contratos y la reparación independiente de movimiento avanzan sin habilitar candidatos todavía no conciliados.
+
+### Avance adicional del 20/10
+
+- Se separó `.campi-panorama-fit` (escala de encaje) de `.campi-sprite` (gesto). Se retiró la regla de portada que anulaba los pasos e inclinaciones. Pausa de detalle/visibilidad ahora llega al rostro y consume reacciones recibidas mientras está pausado. Pruebas unitarias aprobadas; la observación continua y video siguen pendientes.
+- Se separaron hover y foco de teclado de Campi: el foco residual de un clic ya no debe congelar indefinidamente los comentarios. Pendiente prueba específica con teclado y navegador.
+- Registro `panoramaTopicContracts.ts`: diez contratos con cálculo, universo, unidad, comparación, presentación, límites, fuentes y pruebas. La agrupación de consultas de portada lo consume; no se declara aún centralización completa de portada/detalle/comentarios.
+- Las fotos diarias pueden compararse entre lecturas conservando definición, fuente, alcance y permisos. Meses de ventas y cohortes de cierre siguen requiriendo período compatible. Se versiona la comparación para no reutilizar referencias de significado distinto. El texto reconoce correcciones y paso del tiempo.
+- Los enlaces de OS incorporan una cohorte explícita: cierre operativo real y fechas válidas, o estado explícitamente abierto sin límite inferior histórico. La vista habitual conserva su definición; el selector Universo hace visible el criterio y permite volver al habitual. Validación real pendiente.
+- Lectura actual en pantalla: abastecimiento 19 unidades, 8 sin vínculo (7 stock, 1 tránsito, 3 arribadas). La observación anterior 7/17 no se usa como constante de prueba productiva.
+
+### Inventario de candidatos E3 — evidencia de código, no certificación productiva
+
+| Candidato | Estado | Condición para integrar |
+|---|---|---|
+| Productividad técnica | Reutilizable; pendiente conciliación | `workedProductivity`: horas-persona válidas / disponibles. Conservar incidencias, indisponibilidades y técnicos sin actividad; capacidad cero no produce 0% válido. |
+| Eficiencia de OS cerradas | Reutilizable; pendiente conciliación | `billing.ts`: facturadas/trabajadas de OS conciliadas. Exige `servicios.ordenes` **y** `servicios.ventas`; no representa todos los técnicos. |
+| Rendimiento | Pendiente datos/definición | Necesita facturadas, trabajadas y disponibles del mismo período/personas. No multiplicar eficiencia por productividad actuales. |
+| Cumplimiento | Reutilizable; pendiente conciliación | Resultados realizados/(realizados + no realizados); futuro y pausas separados. Validar contra matriz operativa, no usar toda agenda como denominador. |
+| Carga futura/capacidad | Pendiente datos/definición | Jornadas programadas no acreditan horas requeridas; meta operativa no acredita presencia real. |
+| Cobertura de clientes en Servicios/Repuestos | Pendiente conciliación y permisos | `contacto-utils`/`ParqueTab`: clientes con actividad / clientes filtrados con máquinas. Servicios incluye OS por chasis; no equivale a cobertura por máquina. Revisar grants y autorización legacy de RPC antes de reutilizar. |
+| Compradores activos/nuevos/recurrentes | Pendiente definición | Identidad canónica, ventas positivas frente a NC, ventana, historia suficiente; primera observada no equivale a primera real. |
+| Retención/reactivación/inactividad | Pendiente evidencia | El tipo generado de RPC no demuestra implementación ni semántica. Faltan cohortes, ventanas e historia acreditada. |
+| Composición parque instalado | Reutilizable; pendiente conciliación | `parque_maquinas`, permiso `parque.maquinas`; definir inactivas, plataformas y sin cliente; separado de stock para venta. |
+| Evolución parque | Pendiente datos/definición | Historia registra eventos, pero registro no acredita fecha efectiva/completitud. Transferencias/refacturaciones no deben incrementar parque. |
+| Compras/proyección | Pendiente conciliación | Stock, recepciones, compras y reservas deben identificarse por unidad; no sumar compras ya ingresadas. |
+
+La conciliación de repuestos filtra ubicaciones con stock positivo **antes** de agrupar y separa USD positivo elegible de Kardex bruto. `usd_min=0` posterior a agrupación no resuelve el problema. Conserva códigos sin valor para cobertura y avisos.
+
+**Migración autorizada y ejecutada el 20/10:** `20261020120000_parts_panorama_valuation_scope.sql`. Antes de ejecutarla se comparó `md5(prosrc)` de la función productiva con la base local: ambos `d0d7b05c3116f4ce16b43ea49b0a71c8`. Lovable devolvió `Query succeeded`. No se modificaron inventario ni facturas. La app autenticada abrió el detalle con Universo «Stock positivo · Panorama» y color «Gris y rojo»: **4.043 códigos y USD 1.128.981,69**. Consulta independiente contra las vistas de origen: **gris 653 códigos / USD 283.057,02; rojo 3.390 / USD 845.924,67**, coincidentes con el detalle. Evidencias: `panorama-migracion-stock-aplicada.png` y `panorama-stock-antiguo-conciliado.png` en la carpeta de visualizaciones de este chat. Falta completar la conciliación de avisos y agrupaciones, sin dar por cerrada toda E1.3.
+
+La comprobación real de OS por la nueva cohorte mostró **84 cerradas en septiembre** y **81 abiertas**. Esto concilia cantidades; todavía no certifica una recomputación independiente de la mediana.
+
+**Avisos conciliados en pantalla:** 24 códigos / USD 6.247,89 próximos a rojo; 11 / USD 4.116,84 próximos a gris. Los enlaces del lateral abrieron exactamente esas cantidades e importes en Análisis, con el universo positivo explícito. Panorama confirmó USD 1.128.981,69 / USD 4.721.360,17 = 23,91% de stock antiguo. El corte físico sigue sin acreditarse.
+
+**Validación adicional:** 242 pruebas aprobadas en 29 archivos; `tsc -p tsconfig.app.json --noEmit` aprobado (el comando raíz sin proyecto no comprueba la aplicación); lint de los archivos de implementación afectados y build aprobados. Dos expectativas de textos/enlaces anteriores fallaron inicialmente y se actualizaron tras comprobar el nuevo contrato; no quedan fallos en ese conjunto. No equivale a ejecutar toda la suite del repositorio.
+
+**Captura real:** 133 segundos observando el navegador sin clics, 565 capturas con marcas de tiempo, codificadas a 10 fps con duración original; hay intervalos breves entre tramos en los que se conserva la última captura, no se sintetiza movimiento. Archivo `campi-real-20261020/campi-observacion-real.mp4`. Se observaron reposo, inclinación, mano levantada, cambio de rostro y ciclo completo de cuatro comentarios con retorno. Portada final verificada a 1366×768 y 1440×900; ancho documental 1440 sin desbordamiento a 1440. Capturas `panorama-final-1366.png` y `panorama-final-1440.png`. Faltan revisión real de movimiento reducido y todos los detalles, por lo que E5/E7 no se cierran íntegramente.
 
 | Etapa | Estado | Condición para cerrar |
 | --- | --- | --- |
@@ -101,7 +138,7 @@ Pendientes de evidencia/corrección, no cerrados:
 
 ### Etapa 3 · Inventariar y ampliar con respaldo
 
-- [ ] **E3.1** Inventariar indicadores existentes y clasificar cada candidato: reutilizable, pendiente de conciliación o pendiente de datos/definición.
+- [x] **E3.1** Inventariar indicadores existentes y clasificar cada candidato: reutilizable, pendiente de conciliación o pendiente de datos/definición. Inventario de código del 20/10 arriba; no equivale a habilitación ni conciliación productiva.
 - [ ] **E3.2** Servicios: productividad, eficiencia, rendimiento, cumplimiento, carga/capacidad, resolución y edad de OS.
 - [ ] **E3.3** Clientes: cobertura por clientes del parque en Servicios/Repuestos; activos, nuevos, recurrentes, retenidos, reactivados e inactivos.
 - [ ] **E3.4** Parque instalado: evolución, altas, bajas, crecimiento neto y composición respaldada; separado del stock para venta.
@@ -114,7 +151,7 @@ Pendientes de evidencia/corrección, no cerrados:
 
 ### Etapa 4 · Registro común ampliable
 
-- [ ] **E4.1** Definir contrato: identificador, módulo, nombre/pregunta, permisos/alcance, cálculo/unidad/período/comparación.
+- [x] **E4.1** Definir contrato: identificador, módulo, nombre/pregunta, permisos/alcance, cálculo/unidad/período/comparación. Catálogo tipado enlazado a `panoramaTopicContracts.ts`; prueba de cobertura de los diez identificadores.
 - [ ] **E4.2** Incluir presentación portada/detalle, estados vacíos/error/limitaciones, comentarios respaldados, pruebas y criterio de habilitación.
 - [ ] **E4.3** Centralizar el registro para alimentar selector, portada, detalle y Campi; eliminar listas sectoriales y reglas dispersas.
 - [ ] **E4.4** Comprobar incorporación de un tema validado sin rehacer Panorama ni cambiar prioridades persistidas; conservar máximo cuatro.
@@ -122,25 +159,25 @@ Pendientes de evidencia/corrección, no cerrados:
 
 ### Etapa 5 · Movimiento y expresividad
 
-- [ ] **E5.1** Reproducir conflicto de transformaciones entre los tres CSS y separar encaje/escala del movimiento; verificar que `scale(1.08)` no anule pasos/inclinaciones.
+- [x] **E5.1** Reproducir conflicto de transformaciones entre los tres CSS y separar encaje/escala del movimiento; verificar que `scale(1.08)` no anule pasos/inclinaciones. Escala en capa independiente; movimientos observados en captura real.
 - [ ] **E5.2** Recuperar desplazamientos y duración propios de cada gesto.
 - [ ] **E5.3** Crear secuencias con preparación, movimiento, pausa y regreso; variar apoyo, cabeza, mirada y brazos.
 - [ ] **E5.4** Coordinar expresión y gesto con evidencia/comentario/interacción; identificar recursos visuales faltantes.
 - [ ] **E5.5** Verificar base estable, pausas naturales, lectura sin distracción, movimiento reducido y pestaña oculta.
-- [ ] **E5.6** Observar personaje real durante dos minutos a tamaño normal sin clics: posturas distintas, reacciones comprensibles, sin tapar controles.
+- [x] **E5.6** Observar personaje real durante dos minutos a tamaño normal sin clics: posturas distintas, reacciones comprensibles, sin tapar controles. Captura real de 133 segundos a 1366×768.
 
 ### Etapa 6 · Comentarios y primera experiencia
 
-- [ ] **E6.1** Revalidar ciclo completo con retorno al primero, sin repetición consecutiva ni monopolio de un tema.
+- [x] **E6.1** Revalidar ciclo completo con retorno al primero, sin repetición consecutiva ni monopolio de un tema. Cuatro comentarios en captura real y regresión automatizada.
 - [ ] **E6.2** Corregir pausas por mouse/foco residual y reanudación al cerrar detalles/volver de pestaña, sin ráfaga de cambios acumulados.
 - [ ] **E6.3** Actualizar comentarios ante cambios de datos/período/selección/permisos; mantener texto, gesto y evidencia coherentes.
-- [ ] **E6.4** Probar primera experiencia con cuenta nueva autorizada; no borrar preferencias ni inferirla desde cuenta configurada.
+- [ ] **E6.4** Probar primera experiencia con cuenta nueva autorizada; no borrar preferencias ni inferirla desde cuenta configurada. **Bloqueado:** usuario confirmó el 20/10 que no dispone de cuentas de prueba; no reemplazar esta evidencia con mocks.
 - [ ] **E6.5** Verificar presentación breve, selección, orden, reemplazo, abandono, error de guardado y regreso; completar solo tras guardar.
 - [ ] **E6.6** Verificar «Ver mi Panorama», continuidad de Campi y edición posterior rápida sin repetir bienvenida.
 
 ### Etapa 7 · Validación final y entrega
 
-- [ ] **E7.1** Probar cuentas autorizadas limitadas y de varias áreas; cubrir consultas, comentarios, respuestas, detalles y resultados reutilizados.
+- [ ] **E7.1** Probar cuentas autorizadas limitadas y de varias áreas; cubrir consultas, comentarios, respuestas, detalles y resultados reutilizados. **Bloqueado en cuentas reales:** no hay cuentas de prueba disponibles, confirmado por usuario; pruebas aisladas siguen separadas.
 - [ ] **E7.2** Revalidar 7/17 y envío por botón/Enter sin cerrar conversación.
 - [ ] **E7.3** Verificar todos los temas habilitados contra origen y corte en versión final.
 - [ ] **E7.4** Añadir pruebas de navegador con personaje real; una simulación del avatar no acredita movimiento.
@@ -157,7 +194,7 @@ Pendientes de evidencia/corrección, no cerrados:
 | 20/10/2026 | E1 auditoría | Diez contratos examinados y temas leídos en app; contraste mensual visible de tres áreas. Correcciones y límites consignados arriba | E1-P1 a E1-P6; no marcar etapa conciliada |
 | 20/10/2026 | E2 implementación | Encabezado visible, métricas secundarias reducidas, desglose tabulado y grupos en pestañas; facturación con ventas/NC/neto por área; sin metodología técnica en vista habitual | Completar recorrido de los demás detalles en ambas resoluciones |
 
-Validación de este avance:
+Validación del avance anterior (`b483ecd`; la actualización posterior consta arriba):
 - **Aprobadas:** 152 pruebas Campi/contratos en 20 archivos; TypeScript; lint de implementación modificada; build Vite; `git diff --check`. Advertencias preexistentes de Browserslist y tamaño de chunks, sin fallo de build.
 - **Pantalla aprobada dentro de este alcance:** portada con cuatro prioridades a 1366×768 y 1440×900; detalle de facturación a 1366 y de resolución a 1440; cierre devuelve foco. Dimensiones efectivas comprobadas en navegador, sin desbordamiento horizontal de portada (scrollWidth1440 para viewport1440). No se alteraron prioridades guardadas.
 - **Fallidas pendientes:** ninguna prueba automatizada ejecutada quedó fallando. Esto no elimina los errores de contrato E1-P1/E1-P2.

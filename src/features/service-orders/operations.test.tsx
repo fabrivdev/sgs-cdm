@@ -6,6 +6,17 @@ import { useOperationsModel, technicianGoalForRange } from "./useOperationsModel
 afterEach(cleanup);
 const today = new Date("2026-09-25T12:00:00");
 describe("operational extraction", () => {
+  it("isolates Panorama closure cohorts without changing the default operational population", () => {
+    const data = operationsFixture();
+    data.ordenesServicio = [
+      demoOrder({ os_numero: "valid", situacion_os: "Cerrada", fecha_abierta_os: "2026-09-01", fecha_cierre_os: "2026-09-10" }),
+      demoOrder({ os_numero: "missing", situacion_os: "Cerrada", fecha_abierta_os: "2026-09-02", fecha_cierre_os: null }),
+    ];
+    const { result, rerender } = renderHook(({ strict }: { strict: boolean }) => useOperationsModel(data, { ...operationsFilters, panoramaCohort: strict ? "resolution" : undefined }, "trabajos", today), { initialProps: { strict: true } });
+    expect(result.current.serviciosDashboardData.ordenes.map(row => row.key)).toEqual(["valid"]);
+    rerender({ strict: false });
+    expect(result.current.serviciosDashboardData.ordenes).toHaveLength(2);
+  });
   it("includes unmatched technicians with inactive participants in the financial OS cohort", () => {
     const data = operationsFixture();
     data.ordenesServicio.push(demoOrder({ os_numero: "01-00000003", responsable: "TECNICO EXTERNO", servicios_cantidad: 7 }));

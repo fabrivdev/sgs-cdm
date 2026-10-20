@@ -1,7 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { ArrowRight, ChevronRight } from 'lucide-react';
 import { Button } from '@/components/ui/button';
-import { Panel } from '@/components/layout/AppPrimitives';
 import { ResponsiveDrawer, ResponsiveDrawerBody, ResponsiveDrawerHeader } from '@/components/ui/responsive-drawer';
 import { answerCampi, interpretCampi, matchCampiTopic } from '@/lib/campi/campiInterpretation';
 import { buildCampiComments } from '@/lib/campi/campiComments';
@@ -24,7 +23,9 @@ export function CampiInterpreter({ stories, loading, previous = null, onOpenStor
   const [questionToken, setQuestionToken] = useState(0);
   const [commentIndex, setCommentIndex] = useState(0);
   const [commentToken, setCommentToken] = useState(0);
-  const [reading, setReading] = useState(false);
+  const [hovering, setHovering] = useState(false);
+  const [keyboardFocus, setKeyboardFocus] = useState(false);
+  const reading = hovering || keyboardFocus;
   const [visible, setVisible] = useState(() => !document.hidden);
   const [showFirstTip, setShowFirstTip] = useState(() => {
     if (!userId) return false;
@@ -84,9 +85,12 @@ export function CampiInterpreter({ stories, loading, previous = null, onOpenStor
     }
     return text.split(/(?<=[.!?])\s+/)[0];
   };
-  return <Panel className={`panorama-hero panorama-hero--${tone} panorama-hero--${mood}`}
-    onPointerEnter={() => setReading(true)} onPointerLeave={() => setReading(false)}
-    onFocusCapture={() => setReading(true)} onBlurCapture={event => { if (!event.currentTarget.contains(event.relatedTarget)) setReading(false); }}>
+  return <section className={`min-w-0 rounded-xl border bg-card p-3.5 panorama-hero panorama-hero--${tone} panorama-hero--${mood}`}
+    onPointerEnter={() => setHovering(true)} onPointerLeave={() => setHovering(false)}
+    onPointerDown={() => setKeyboardFocus(false)}
+    onKeyDownCapture={() => setKeyboardFocus(true)}
+    onFocusCapture={event => setKeyboardFocus(event.target.matches(':focus-visible'))}
+    onBlurCapture={event => { if (!event.currentTarget.contains(event.relatedTarget)) setKeyboardFocus(false); }}>
     <div className="panorama-hero-avatar"><CampiPanoramaAvatar mood={questionsOpen ? 'pensativo' : mood} quiet={questionsOpen || detailOpen} reaction={questionsOpen && questionToken ? { kind: 'ask', token: questionToken } : commentToken ? { kind: 'comment', token: commentToken } : null} greetingKey={userId} /></div>
     <div className="panorama-hero-message">
       <div className="panorama-hero-context"><span className="panorama-hero-kicker">{tone === 'attention' ? 'Para revisar' : tone === 'change' ? visit ? 'Desde tu última visita' : 'Cambio observado' : 'Campi · panorama'}</span>{!loading && comments.length > 1 && <span className="campi-comment-count">{commentIndex + 1} de {comments.length}</span>}</div>
@@ -95,7 +99,7 @@ export function CampiInterpreter({ stories, loading, previous = null, onOpenStor
       {!loading && visit && <div className="campi-visit-snapshot" aria-label={`Comparación de ${visit.story.title} desde tu última visita en este navegador`}>
         <span>Desde tu última visita del {visitDate(visit.comparison.at)} · {visit.story.title}</span>
         <strong>{valueLabel(visit.comparison.before, visit.comparison.unit)} <span aria-hidden="true">→</span> {valueLabel(visit.comparison.current, visit.comparison.unit)}</strong>
-        <small>{lead?.kind === 'attention' && <>Cambio {signedValue(visit.comparison.change, visit.comparison.unit)} · </>}mismo tema y alcance</small>
+        <small>{lead?.kind === 'attention' && <>Cambio {signedValue(visit.comparison.change, visit.comparison.unit)} · </>}Entre lecturas del mismo alcance; puede incluir correcciones y paso del tiempo.</small>
       </div>}
       {!loading && <div className="campi-hero-actions">{actions.map((story, i) => <Button key={story.id} variant={i === 0 ? 'default' : 'outline'} onClick={() => onOpenStory ? onOpenStory(story.id) : ask(story.question)}>Ver datos de {story.title.toLowerCase()}<ArrowRight className="h-4 w-4" /></Button>)}{result.findings.length > 0 && <Button ref={askButtonRef} variant="outline" onClick={() => { setQuestionsOpen(true); setQuestionToken(current => current + 1); }}>Preguntale a Campi</Button>}{comments.length > 1 && <Button type="button" variant="outline" aria-label="Siguiente comentario de Campi" onClick={nextComment}>Siguiente <ChevronRight className="h-4 w-4" /></Button>}</div>}
     </div>
@@ -113,5 +117,5 @@ export function CampiInterpreter({ stories, loading, previous = null, onOpenStor
       {asked && matchCampiTopic(asked, stories) && <Button variant="outline" onClick={() => { const id = matchCampiTopic(asked, stories)?.id; setQuestionsOpen(false); if (id) onOpenStory?.(id); }}>Ver datos de {matchCampiTopic(asked, stories)?.title.toLowerCase()}<ArrowRight className="h-4 w-4" /></Button>}
       </ResponsiveDrawerBody>
     </ResponsiveDrawer>
-  </Panel>;
+  </section>;
 }

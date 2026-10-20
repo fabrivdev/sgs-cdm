@@ -20,8 +20,13 @@ describe('Panorama stock antiguo', () => {
     expect(story.supporting.find(item => item.label === 'Participación de stock antiguo')?.value).toBe(30);
     expect(story.supporting.find(item => item.label === 'Valor en categoría Sin datos')?.value).toBe(50);
     expect(story.cutoff).toBeNull();
-    expect(story.notices?.[0].route).toBe('/repuestos/analisis?color=GRIS&compra_dias_min=971&compra_dias_max=1000&vista=detalle');
-    expect(story.notices?.[1].route).toBe('/repuestos/analisis?color=LILA&compra_dias_min=336&compra_dias_max=365&vista=detalle');
+    expect(story.notices?.[0].route).toBe('/repuestos/analisis?color=GRIS&compra_dias_min=971&compra_dias_max=1000&vista=detalle&universo=STOCK_POSITIVO_PANORAMA');
+    expect(story.notices?.[1].route).toBe('/repuestos/analisis?color=LILA&compra_dias_min=336&compra_dias_max=365&vista=detalle&universo=STOCK_POSITIVO_PANORAMA');
+    for (const row of story.breakdown.filter(row => row.group === 'Sucursales' || row.group === 'Familias')) {
+      const query = new URL(row.route!, 'http://localhost').searchParams;
+      expect(query.get('color')).toBe('ANTIGUO');
+      expect(query.get('universo')).toBe('STOCK_POSITIVO_PANORAMA');
+    }
     expect(story.breakdown.find(row => row.label.startsWith('Santa Rita'))?.value).toBe(250);
   });
   it('keeps exposed codes when they have no positive valuation', () => {

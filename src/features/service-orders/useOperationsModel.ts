@@ -1,5 +1,6 @@
 import { useCallback, useMemo } from "react";
 import { importedOrderModel } from "./orderMetrics";
+import { inPanoramaCohort } from "./panoramaCohort";
 import { billingKey, type OrderBilling } from "./billing";
 import { matchesTechnicianStatus, type TechnicianStatus } from "./productivityStatus";
 import { addDays, addMonths, addWeeks, addYears, differenceInCalendarDays, endOfMonth, endOfWeek, endOfYear, format, getDay, getISOWeek, getISOWeekYear, parseISO, startOfMonth, startOfWeek, startOfYear, subYears } from "date-fns";
@@ -356,6 +357,7 @@ export interface OperationsData {
   disponibilidades: DisponibilidadTecnico[]; metaHorasMensual: number;
 }
 export interface OperationsFilters {
+  panoramaCohort?: import('./panoramaCohort').PanoramaCohort;
   dateFrom: string; dateTo: string; periodMode: PeriodMode; q: string;
   fSucursales: string[]; fMarcas: string[]; fTiposTiempo: string[];
   fEstadosTrabajo: string[]; fTécnicos: string[]; fResponsablesOS: string[];
@@ -370,7 +372,7 @@ export const emptyOperationsData: OperationsData = {
  */
 export function useOperationsModel(data: OperationsData, filters: OperationsFilters, matrixMetric: "trabajos" | "horas" = "trabajos", today = new Date(), technicianStatus: TechnicianStatus = "todos") {
   const { servicios, jornadas, trabajos, clientes, profiles, servicioTecnicos, ordenesServicio, disponibilidades, metaHorasMensual, billing } = data;
-  const { dateFrom, dateTo, periodMode, q, fSucursales, fMarcas, fTiposTiempo, fEstadosTrabajo, fTécnicos, fResponsablesOS, fEstadosOS, fOSRubros } = filters;
+  const { dateFrom, dateTo, periodMode, q, fSucursales, fMarcas, fTiposTiempo, fEstadosTrabajo, fTécnicos, fResponsablesOS, fEstadosOS, fOSRubros, panoramaCohort } = filters;
   const todayStr = format(today, "yyyy-MM-dd");
 
 const weekStart = useMemo(() => startOfWeek(today, { weekStartsOn: 1 }), [today]);
@@ -626,7 +628,8 @@ const serviciosDashboardData = useMemo<ServiciosDashboardData>(() => {
           ? row.fecha_cierre_os ?? row.fecha_abierta_os ?? ""
           : row.fecha_abierta_os ?? row.fecha_cierre_os ?? "",
       ).slice(0, 10);
-      if (!fechaAnalisis || !inRange(fechaAnalisis, periodStart, periodEnd)) return [];
+      if (panoramaCohort && !inPanoramaCohort(row, panoramaCohort, dateFrom, dateTo)) return [];
+      if (!fechaAnalisis || (panoramaCohort !== 'open' && !inRange(fechaAnalisis, periodStart, periodEnd))) return [];
 
       const bucketDate = parseISO(fechaAnalisis);
       const rawBucketStart = periodMode === "dia"
@@ -957,7 +960,7 @@ const serviciosDashboardData = useMemo<ServiciosDashboardData>(() => {
       evolucion,
       sucursales: Array.from(sucursalMap.values()).sort((a, b) => b.total - a.total || a.sucursal.localeCompare(b.sucursal)),
     };
-  }, [activeTechnicianIds, allTechnicianProfiles, billing, clienteById, clienteByName, disponibilidades, fEstadosOS, fMarcas, fOSRubros, fResponsablesOS, fSucursales, fTiposTiempo, metaHorasMensual, ordenesServicio, periodEnd, periodMode, periodStart, profileById, query, technicianOptions, technicianStatus, trabajoById]);
+  }, [activeTechnicianIds, allTechnicianProfiles, billing, clienteById, clienteByName, disponibilidades, fEstadosOS, fMarcas, fOSRubros, fResponsablesOS, fSucursales, fTiposTiempo, metaHorasMensual, ordenesServicio, periodEnd, periodMode, periodStart, profileById, query, technicianOptions, technicianStatus, trabajoById, panoramaCohort, dateFrom, dateTo]);
 
 const jornadasRealizadasPrev = useMemo(
     () =>

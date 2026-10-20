@@ -7,6 +7,7 @@ import type { SectionKey } from '@/lib/permissions';
 import { loadPanoramaStories, storySectionsForTopics } from '@/lib/campi/panoramaStories';
 import type { PanoramaTopic, PanoramaTopicId } from '@/lib/campi/panoramaPreferences';
 import type { PanoramaStory, StoryTopicId } from '@/lib/campi/panoramaStoryTypes';
+import { topicContract } from '@/lib/campi/panoramaTopicContracts';
 import { CampiInterpreter } from './CampiInterpreter';
 import { StoryPanel } from './StoryPanel';
 import { readStoryVisit, saveStoryVisit, storyVisitChange } from '@/lib/campi/panoramaStoryVisits';
@@ -33,11 +34,9 @@ export function PanoramaDashboard({ userId, topics, available, hasAccess, onEdit
   const reviewing = import.meta.env.DEV && reviewTopic !== null;
   const selected = (reviewing ? [reviewTopic] : topics).filter(id => reviewable.some(topic => topic.id === id)) as StoryTopicId[];
   const granted = storySectionsForTopics(selected, hasAccess);
-  const salesIds = selected.filter(id => id === 'ventas_evolucion' || id === 'ventas_facturacion');
-  const partsIds = selected.filter(id => id === 'repuestos_stock' || id === 'repuestos_alertas' || id === 'repuestos_concentracion');
-  const serviceIds = selected.filter(id => id === 'servicios_pendientes' || id === 'servicios_abiertas');
   const groups = selected.reduce<StoryTopicId[][]>((result, id) => {
-    const ids = salesIds.includes(id) ? salesIds : partsIds.includes(id) ? partsIds : serviceIds.includes(id) ? serviceIds : [id];
+    const key = topicContract(id)?.queryGroup ?? id;
+    const ids = selected.filter(candidate => (topicContract(candidate)?.queryGroup ?? candidate) === key);
     if (!result.some(group => group[0] === ids[0])) result.push(ids);
     return result;
   }, []);

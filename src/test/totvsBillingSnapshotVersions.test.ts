@@ -93,7 +93,7 @@ describe("versionado de cortes completos de facturacion TOTVS", () => {
     expect(start).toBeGreaterThan(0);
     expect(end).toBeGreaterThan(start);
     const updateSql = migration.slice(start, end)
-      .replaceAll("v_importacion_id", "'00000000-0000-0000-0000-000000000002'::uuid");
+      .replace(/v_importacion_id/g, "'00000000-0000-0000-0000-000000000002'::uuid");
     await db.exec(updateSql);
     const result = await db.query<{ total_venta: number; versions: number; old_amount: number; new_amount: number; commercial: boolean; unchanged: boolean; actual_state: unknown; expected_state: unknown }>(`
       SELECT f.total_venta::float8 AS total_venta,

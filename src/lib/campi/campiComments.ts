@@ -31,7 +31,7 @@ export function buildCampiComments(stories: readonly PanoramaStory[], previous: 
       text: `${story.title}: ${value(comparison.before, comparison.unit)} → ${value(comparison.current, comparison.unit)} desde la última referencia comparable en este navegador.`,
       period: story.periodLabel, evidence: { value: comparison.current, unit: comparison.unit } } satisfies CampiComment];
   });
-  const result = comments.some(comment => comment.urgency === 'confirmed')
+  const result: CampiComment[] = comments.some(comment => comment.urgency === 'confirmed')
     ? [...comments.filter(comment => comment.urgency === 'confirmed'), ...visits, ...comments.filter(comment => comment.urgency !== 'confirmed')]
     : [...visits, ...comments];
   if (stories.some(story => story.status === 'error') && result.length) result.push({

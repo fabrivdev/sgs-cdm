@@ -4,6 +4,15 @@ import { readStoryVisit, saveStoryVisit, storyVisitChange, storyVisitComparison 
 const story: PanoramaStory = { id: 'ventas_facturacion', title: 'Facturación', question: '¿Cómo va?', status: 'ready', message: '', scope: 'Repuestos', sections: ['repuestos.ventas'], cutoff: null, periodLabel: 'Octubre 1–16', visitKey: '2026-10:v1', primary: { label: 'Mes', value: 10, unit: 'USD' }, supporting: [], chart: null, breakdown: [], details: [], source: 'ventas:v1', route: '/repuestos/ventas' };
 beforeEach(() => { localStorage.clear(); sessionStorage.clear(); });
 describe('local visit reference', () => {
+  it('compares daily snapshots across dates while preserving definition and authorized scope', () => {
+    const snapshot: PanoramaStory = { ...story, id: 'servicios_abiertas', visitKey: 'servicios_abiertas:cola-v1:2026-10-19', primary: { label: 'OS abiertas', value: 76, unit: 'count' }, sections: ['servicios.ordenes'] };
+    saveStoryVisit('a', [snapshot]);
+    sessionStorage.clear();
+    const next = { ...snapshot, visitKey: 'servicios_abiertas:cola-v1:2026-10-20', periodLabel: 'Lectura 20/10', primary: { ...snapshot.primary!, value: 81 } };
+    expect(storyVisitChange(next, readStoryVisit('a'))).toBe(5);
+    expect(storyVisitChange({ ...next, scope: 'Solo Santa Rita' }, readStoryVisit('a'))).toBeNull();
+    expect(storyVisitChange({ ...next, visitKey: 'servicios_abiertas:cola-v2:2026-10-20' }, readStoryVisit('a'))).toBeNull();
+  });
   it('isolates users and compares the same month even when requested end date advances', () => {
     saveStoryVisit('a', [story]);
     expect(readStoryVisit('b')).toBeNull();

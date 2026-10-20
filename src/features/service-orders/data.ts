@@ -13,7 +13,7 @@ export function validOperationsRange(from: string, to: string) {
 
 // Supabase imported tables have not all been regenerated in the database types.
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
-export async function loadOperationsData(client: any, from: string, to: string, signal?: AbortSignal): Promise<{ data: OperationsData; capacityWarning: string | null }> {
+export async function loadOperationsData(client: any, from: string, to: string, signal?: AbortSignal, openSnapshot = false): Promise<{ data: OperationsData; capacityWarning: string | null }> {
   if (!validOperationsRange(from, to)) throw new Error("Seleccioná un rango de fechas válido.");
   const start = format(subYears(parseISO(from), 1), "yyyy-MM-dd");
   const end = format(addDays(parseISO(to), 90), "yyyy-MM-dd");
@@ -49,6 +49,8 @@ export async function loadOperationsData(client: any, from: string, to: string, 
     "repuesto_valor", "km_cantidad", "kilometro_valor", "terceros_valor", "situacion_os", "situacion_facturacion", "raw_data",
   ] as const satisfies readonly (keyof Tables<"ordenes_servicio_importadas">)[];
   const orders = async () => {
+    if (openSnapshot) return all<OperationsData["ordenesServicio"][number]>(client.from("ordenes_servicio_importadas")
+      .select(orderColumns.join(",")).ilike("situacion_os", "%abiert%").order("os_numero"));
     const parts = await Promise.all(["fecha_abierta_os", "fecha_cierre_os"].map(date =>
       all<OperationsData["ordenesServicio"][number]>(client.from("ordenes_servicio_importadas").select(orderColumns.join(",")).gte(date, start).lte(date, `${to}T23:59:59`).order("os_numero"))));
     // The table primary key is the full OS number, including branch prefix and leading zeros.

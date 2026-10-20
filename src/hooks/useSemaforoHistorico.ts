@@ -17,6 +17,7 @@ export const SEMAFORO_COLORES = [
 export type SemaforoColor = typeof SEMAFORO_COLORES[number]["id"];
 
 export interface SemaforoFiltros {
+  universo?: string;
   busqueda: string;
   marca: string;
   color: string;
@@ -36,6 +37,7 @@ export interface SemaforoFiltros {
 }
 
 export interface SemaforoFila {
+  valor_bruto_usd?: number | null;
   codigo_interno: string;
   codigo_fabricante: string | null;
   descripcion: string;
@@ -125,7 +127,19 @@ export async function fetchSemaforoHistorico(filtros: SemaforoFiltros, page: num
     throw new Error("El informe del semáforo devolvió un formato inválido");
   }
   if (!("base_antiguedad" in data) || data.base_antiguedad !== "ULTIMA_COMPRA_V1") throw new Error("Falta aplicar la actualización de antigüedad por última compra.");
-  return data as unknown as SemaforoResultado;
+  const result = data as unknown as SemaforoResultado;
+  if (filtros.universo !== "STOCK_POSITIVO_PANORAMA") return result;
+  if (!("universo" in data) || data.universo !== "STOCK_POSITIVO_PANORAMA") {
+    throw new Error("Falta aplicar la conciliación de stock positivo de Panorama.");
+  }
+  // Display valuation is explicit in this mode. Preserve raw Kardex for detail/export.
+  const eligible = <T extends { valor_kardex_usd: number | null }>(row: T): T & { valor_bruto_usd: number | null } => {
+    const value = (row as T & { valor_elegible_usd?: number | null }).valor_elegible_usd;
+    if (value === undefined || (value !== null && (!Number.isFinite(value) || value < 0))) throw new Error("Valor positivo de Panorama inválido.");
+    return { ...row, valor_bruto_usd: row.valor_kardex_usd, valor_kardex_usd: value };
+  };
+  return { ...eligible(result), rows: result.rows.map(eligible), grupos: result.grupos.map(eligible),
+    sucursales: result.sucursales.map(eligible), por_color: result.por_color.map(eligible), franjas: result.franjas.map(eligible) };
 }
 
 export function useSemaforoHistorico(filtros: SemaforoFiltros, page: number, agrupacion: SemaforoAgrupacion = "marca") {

@@ -1,13 +1,14 @@
 import type { SectionKey } from '@/lib/permissions';
 import type { StoryTopicId } from './panoramaStoryTypes';
+import { PANORAMA_CONTRACTS, type EnabledTopicId, type TopicContract } from './panoramaTopicContracts';
 
 export type PanoramaTopicGroup = 'Resultados' | 'Compromisos' | 'Disponibilidad' | 'Operación' | 'Abastecimiento';
 
 export type PanoramaTopicId = StoryTopicId | 'repuestos_demanda' | 'servicios_trabajo' | 'servicios_agenda' | 'maquinas_importacion' | 'maquinas_parque' | 'repuestos_reposicion' | 'servicios_comisiones';
-export type PanoramaTopic = { id: StoryTopicId; label: string; question: string; preview: string; group: PanoramaTopicGroup; sections: readonly SectionKey[]; adminOnly?: boolean };
+export type PanoramaTopic = { id: StoryTopicId; label: string; question: string; preview: string; group: PanoramaTopicGroup; sections: readonly SectionKey[]; adminOnly?: boolean; contract?: TopicContract };
 export const MAX_PANORAMA_TOPICS = 4;
 
-export const PANORAMA_TOPICS: readonly PanoramaTopic[] = [
+const TOPIC_LABELS: readonly (Omit<PanoramaTopic, 'id' | 'contract'> & { id: EnabledTopicId })[] = [
   { id: 'ventas_evolucion', label: 'Evolución de ventas', question: '¿Estamos vendiendo más o menos?', preview: 'Ventas antes de NC, mes y acumulado comparables.', group: 'Resultados', sections: ['servicios.ventas', 'parque.ventas', 'repuestos.ventas'] },
   { id: 'ventas_facturacion', label: 'Facturación y notas de crédito', question: '¿Cuánto quedó neto después de las NC?', preview: 'Neto, ventas y NC por área autorizada.', group: 'Resultados', sections: ['servicios.ventas', 'parque.ventas', 'repuestos.ventas'] },
   { id: 'maquinas_pedidos', label: 'Abastecimiento de pedidos activos', question: '¿Qué unidades activas no tienen vínculo único?', preview: 'Vínculos con stock e importaciones; no mide atraso.', group: 'Compromisos', sections: ['parque.operaciones'] },
@@ -19,6 +20,7 @@ export const PANORAMA_TOPICS: readonly PanoramaTopic[] = [
   { id: 'repuestos_sucursales', label: 'Antigüedad de compra por sucursal', question: '¿Dónde se concentra el tiempo desde la última compra?', preview: 'Días ponderados por valor con compra fechada.', group: 'Disponibilidad', sections: ['repuestos.analisis'] },
   { id: 'maquinas_stock', label: 'Composición del stock físico', question: '¿Cuántas máquinas nuevas y usadas hay?', preview: 'Existencias físicas; corte de fuente no acreditado.', group: 'Disponibilidad', sections: ['parque.stock'] },
 ];
+export const PANORAMA_TOPICS: readonly PanoramaTopic[] = TOPIC_LABELS.map(topic => ({ ...topic, contract: PANORAMA_CONTRACTS[topic.id] }));
 
 export const panoramaStorageKey = (userId: string) => `sig-cdm:panorama:alternativa:v1:${userId}`;
 

@@ -1,11 +1,19 @@
 import type { PanoramaStory, StoryTopicId, StoryUnit } from './panoramaStoryTypes';
+import { topicContract } from './panoramaTopicContracts';
 
 export type StoryVisitSnapshot = { at: string; values: { id: StoryTopicId; value: number; unit: StoryUnit; fingerprint: string }[] };
 export type StoryVisitComparison = { before: number; current: number; change: number; at: string; unit: StoryUnit };
 const key = (userId: string) => `sig-cdm:panorama:alternativa:visita:v1:${userId}`;
 const sessionKey = (userId: string) => `sig-cdm:panorama:alternativa:base-sesion:v1:${userId}`;
 const definitionVersion: Partial<Record<StoryTopicId, string>> = { ventas_evolucion: 'ventas-antes-nc-v1', ventas_facturacion: 'ventas-netas-nc-separadas-v3', repuestos_clientes: 'composicion-repuestos-v2', repuestos_stock: 'exposicion-valor-positivo-v1', repuestos_alertas: 'transicion-30d-v1', repuestos_concentracion: 'familias-top3-v1', repuestos_sucursales: 'antiguedad-ponderada-v3', maquinas_pedidos: 'abastecimiento-v1', servicios_pendientes: 'resolucion-v1', servicios_abiertas: 'cola-abierta-v1', maquinas_proyeccion: 'saldo-proyectado-v3' };
-const fingerprint = (story: PanoramaStory) => JSON.stringify([story.sections.slice().sort(), story.scope, story.visitKey ?? story.periodLabel, story.source, ...(definitionVersion[story.id] ? [definitionVersion[story.id]] : [])]);
+const fingerprint = (story: PanoramaStory) => {
+  const period = topicContract(story.id)?.comparison === 'snapshot'
+    // A daily reading is a changing snapshot, not a new incompatible period.
+    // Keep the explicit definition prefix; never strip dates from sales/cohorts.
+    ? (story.visitKey?.replace(/:\d{4}-\d{2}-\d{2}$/, '') ?? 'snapshot') + ':readings-v2'
+    : story.visitKey ?? story.periodLabel;
+  return JSON.stringify([story.sections.slice().sort(), story.scope, period, story.source, ...(definitionVersion[story.id] ? [definitionVersion[story.id]] : [])]);
+};
 export function readStoryVisit(userId: string): StoryVisitSnapshot | null {
   if (!userId) return null;
   let sessionBaseline: string | null = null;

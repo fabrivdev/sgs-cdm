@@ -46,7 +46,7 @@ export function parsePartsExposure(input: unknown): Exposure {
     return { color: String(row.color), codigos: integer(row.codigos), valor_usd: numeric(row.valor_usd) };
   });
   if (new Set(colors.map(row => row.color)).size !== colors.length) throw new Error('Colores históricos repetidos.');
-  const alerts = data.avisos.map(item => {
+  const alerts: Alert[] = data.avisos.map(item => {
     const row = record(item);
     if (row.destino !== 'GRIS' && row.destino !== 'ROJO') throw new Error('Aviso de color desconocido.');
     return { destino: row.destino, umbral_dias: integer(row.umbral_dias), codigos: integer(row.codigos), valor_usd: numeric(row.valor_usd) };
@@ -79,8 +79,8 @@ export function partsExposureStory(data: Exposure): PanoramaStory {
   const labels = new Map(SEMAFORO_COLORES.map(color => [color.id, color.label]));
   const activeAlerts = data.avisos.filter(row => row.codigos > 0).sort((a, b) => a.destino === 'ROJO' ? -1 : b.destino === 'ROJO' ? 1 : 0);
   const link = (row: Alert) => row.destino === 'ROJO'
-    ? '/repuestos/analisis?color=GRIS&compra_dias_min=971&compra_dias_max=1000&vista=detalle'
-    : '/repuestos/analisis?color=LILA&compra_dias_min=336&compra_dias_max=365&vista=detalle';
+    ? '/repuestos/analisis?color=GRIS&compra_dias_min=971&compra_dias_max=1000&vista=detalle&universo=STOCK_POSITIVO_PANORAMA'
+    : '/repuestos/analisis?color=LILA&compra_dias_min=336&compra_dias_max=365&vista=detalle&universo=STOCK_POSITIVO_PANORAMA';
   return {
     id: 'repuestos_stock', visitKey: `repuestos_stock:exposicion-v1:${data.fecha_analisis}`,
     title: 'Stock antiguo de repuestos', question: '¿Qué valor de repuestos está en gris o rojo?',
@@ -99,9 +99,9 @@ export function partsExposureStory(data: Exposure): PanoramaStory {
     chart: { kind: 'bars', title: 'Valor de stock antiguo por color', unit: 'USD', rows: ['ROJO', 'GRIS'].map(color => ({ label: labels.get(color as typeof SEMAFORO_COLORES[number]['id']) ?? color, value: data.colores.find(row => row.color === color)?.valor_usd ?? 0 })) },
     breakdown: [
       ...activeAlerts.map(row => ({ label: `Próximo a ${row.destino.toLowerCase()} · ${row.codigos} códigos`, value: row.valor_usd, unit: 'USD' as const, group: 'Avisos', route: link(row), note: 'Cambio posible en 1–30 días si no hay nuevas compras ni ventas.' })),
-      ...data.colores.filter(row => row.valor_usd > 0).map(row => ({ label: `${labels.get(row.color as typeof SEMAFORO_COLORES[number]['id']) ?? row.color} · ${row.codigos} códigos`, value: row.valor_usd, unit: 'USD' as const, group: 'Colores', route: `/repuestos/analisis?color=${row.color}&vista=detalle` })),
-      ...data.sucursales.filter(row => row.valor_antiguo_usd > 0).map(row => ({ label: `${row.nombre} · stock antiguo`, value: row.valor_antiguo_usd, unit: 'USD' as const, group: 'Sucursales', route: `/repuestos/analisis?sucursal=${encodeURIComponent(row.nombre)}&vista=detalle`, note: `${new Intl.NumberFormat('es-PY', { maximumFractionDigits: 1 }).format(row.valor_antiguo_usd / row.valor_total_usd * 100)}% del valor positivo de la sucursal; filtrá gris y rojo en el análisis` })),
-      ...data.familias.filter(row => row.valor_antiguo_usd > 0).map(row => ({ label: `${row.nombre} · stock antiguo`, value: row.valor_antiguo_usd, unit: 'USD' as const, group: 'Familias', route: `/repuestos/analisis?familia=${encodeURIComponent(row.nombre)}&vista=detalle`, note: `${new Intl.NumberFormat('es-PY', { maximumFractionDigits: 1 }).format(row.valor_antiguo_usd / row.valor_total_usd * 100)}% del valor positivo de la familia; filtrá gris y rojo en el análisis` })),
+      ...data.colores.filter(row => row.valor_usd > 0).map(row => ({ label: `${labels.get(row.color as typeof SEMAFORO_COLORES[number]['id']) ?? row.color} · ${row.codigos} códigos`, value: row.valor_usd, unit: 'USD' as const, group: 'Colores', route: `/repuestos/analisis?color=${row.color}&vista=detalle&universo=STOCK_POSITIVO_PANORAMA` })),
+      ...data.sucursales.filter(row => row.valor_antiguo_usd > 0).map(row => ({ label: `${row.nombre} · stock antiguo`, value: row.valor_antiguo_usd, unit: 'USD' as const, group: 'Sucursales', route: `/repuestos/analisis?sucursal=${encodeURIComponent(row.nombre)}&color=ANTIGUO&vista=detalle&universo=STOCK_POSITIVO_PANORAMA`, note: `${new Intl.NumberFormat('es-PY', { maximumFractionDigits: 1 }).format(row.valor_antiguo_usd / row.valor_total_usd * 100)}% del valor positivo de la sucursal` })),
+      ...data.familias.filter(row => row.valor_antiguo_usd > 0).map(row => ({ label: `${row.nombre} · stock antiguo`, value: row.valor_antiguo_usd, unit: 'USD' as const, group: 'Familias', route: `/repuestos/analisis?familia=${encodeURIComponent(row.nombre)}&color=ANTIGUO&vista=detalle&universo=STOCK_POSITIVO_PANORAMA`, note: `${new Intl.NumberFormat('es-PY', { maximumFractionDigits: 1 }).format(row.valor_antiguo_usd / row.valor_total_usd * 100)}% del valor positivo de la familia` })),
     ],
     details: [
       'Gris: sin ventas en los tres años evaluados y última compra hace 366–1.000 días. Rojo: misma ausencia de ventas y última compra hace más de 1.000 días.',
@@ -109,7 +109,7 @@ export function partsExposureStory(data: Exposure): PanoramaStory {
       `Cobertura: ${data.ubicaciones_stock} ubicaciones con stock; ${data.ubicaciones_sin_valor} sin valor, ${data.ubicaciones_valor_no_positivo} con valor no positivo, ${data.ubicaciones_sin_saldo_kardex} sin saldo Kardex y ${data.ubicaciones_saldo_distinto} con saldo distinto. Valor positivo en ubicaciones sin stock: $ ${new Intl.NumberFormat('es-PY', { maximumFractionDigits: 2 }).format(data.valor_residual_sin_stock_usd)}; excluido.`,
       'La fecha de clasificación no acredita el corte del inventario. Los avisos se recalculan al abrir Panorama y solo proyectan el paso de color si no hay nuevos movimientos.',
     ],
-    source: 'campi_repuestos_exposicion_v1 · semáforo histórico, stock y Kardex', route: '/repuestos/analisis',
+    source: 'campi_repuestos_exposicion_v1 · semáforo histórico, stock y Kardex', route: '/repuestos/analisis?color=ANTIGUO&universo=STOCK_POSITIVO_PANORAMA&vista=detalle',
     notices: activeAlerts.map(row => ({ text: `${row.codigos} códigos, ${row.valor_usd > 0 ? `$ ${new Intl.NumberFormat('es-PY', { maximumFractionDigits: 2 }).format(row.valor_usd)}` : 'sin valor positivo acreditado'}, podrían pasar a ${row.destino.toLowerCase()} en 1–30 días`, route: link(row) })),
   };
 }
@@ -121,6 +121,7 @@ export function partsAlertsStory(data: Exposure): PanoramaStory {
   const codes = alerts.reduce((sum, row) => sum + row.codigos, 0);
   return {
     ...original, id: 'repuestos_alertas', visitKey: `repuestos_alertas:30d-v1:${data.fecha_analisis}`,
+    route: '/repuestos/analisis?universo=STOCK_POSITIVO_PANORAMA&vista=detalle',
     title: 'Cambios próximos de clasificación', question: '¿Qué valor podría pasar a gris o rojo en 30 días?',
     status: data.codigos_stock ? 'ready' : 'empty',
     message: codes ? `${codes} códigos podrían pasar a gris o rojo en 30 días si no hay compras ni ventas nuevas.` : 'No hay códigos próximos a gris o rojo dentro de 30 días.',

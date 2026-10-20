@@ -3,7 +3,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { CampiPanoramaAvatar } from './CampiPanoramaAvatar';
 
 vi.mock('./CampiSprite', () => ({
-  CampiSprite: ({ state, action }: { state: string; action: string }) => <span data-testid="campi-pose" data-action={action}>{state}</span>,
+  CampiSprite: ({ state, action, active }: { state: string; action: string; active: boolean }) => <span data-testid="campi-pose" data-action={action} data-active={active}>{state}</span>,
 }));
 
 beforeEach(() => {
@@ -14,6 +14,20 @@ beforeEach(() => {
 afterEach(() => { cleanup(); vi.useRealTimers(); vi.unstubAllGlobals(); });
 
 describe('Campi in Panorama', () => {
+  it('pauses face and action playback in a detail and consumes intervening cues', () => {
+    const view = render(<CampiPanoramaAvatar />);
+    view.rerender(<CampiPanoramaAvatar quiet reaction={{ kind: 'select', token: 1 }} />);
+    expect(screen.getByTestId('campi-pose')).toHaveAttribute('data-active', 'false');
+    expect(screen.getByTestId('campi-pose')).toHaveAttribute('data-action', 'neutral');
+    act(() => vi.advanceTimersByTime(20000));
+    view.rerender(<CampiPanoramaAvatar reaction={{ kind: 'select', token: 1 }} />);
+    expect(screen.getByTestId('campi-pose')).toHaveAttribute('data-action', 'neutral');
+    expect(screen.getByTestId('campi-pose')).toHaveAttribute('data-active', 'true');
+  });
+  it('does not start mood gestures while reading a detail', () => {
+    render(<CampiPanoramaAvatar quiet mood="contento" />);
+    expect(screen.getByTestId('campi-pose')).toHaveAttribute('data-action', 'neutral');
+  });
   it('greets once, then rests without repeating a fixed gesture', () => {
     render(<CampiPanoramaAvatar />);
     expect(screen.getByTestId('campi-pose')).toHaveTextContent('welcome');
@@ -46,6 +60,13 @@ describe('Campi in Panorama', () => {
     act(() => vi.advanceTimersByTime(1300));
     fireEvent.click(campi);
     expect(screen.getByTestId('campi-pose')).toHaveAttribute('data-action', 'consider');
+  });
+  it('does not replay a mood gesture on returning from a quiet detail', () => {
+    const view = render(<CampiPanoramaAvatar mood="contento" />);
+    expect(screen.getByTestId('campi-pose')).toHaveAttribute('data-action', 'approve');
+    view.rerender(<CampiPanoramaAvatar mood="contento" quiet />);
+    view.rerender(<CampiPanoramaAvatar mood="contento" />);
+    expect(screen.getByTestId('campi-pose')).toHaveAttribute('data-action', 'neutral');
   });
   it('does not repeat the entrance for the same user during the browser session', () => {
     const view = render(<CampiPanoramaAvatar greetingKey="user-a" />);

@@ -32,6 +32,7 @@ export function CampiPanoramaAvatar({ reaction, attention = false, change = fals
   const interactionIndex = useRef(0);
   const postureIndex = useRef(0);
   const lastReaction = useRef('');
+  const lastMood = useRef<CampiMood | null>(null);
 
   const play = useCallback((next: CampiAction) => {
     window.clearTimeout(actionTimeout.current);
@@ -55,7 +56,12 @@ export function CampiPanoramaAvatar({ reaction, attention = false, change = fals
     };
   }, [greetingKey]);
 
-  useEffect(() => { if (quiet) { window.clearTimeout(actionTimeout.current); setAction('neutral'); } }, [quiet]);
+  useEffect(() => {
+    if (quiet || !visible || reduced) {
+      window.clearTimeout(actionTimeout.current);
+      setAction('neutral');
+    }
+  }, [quiet, visible, reduced]);
 
   useEffect(() => {
     if (!visible || reduced || quiet || action !== 'neutral') return;
@@ -75,18 +81,25 @@ export function CampiPanoramaAvatar({ reaction, attention = false, change = fals
   }, [greetingKey, reduced, play]);
 
   useEffect(() => {
-    if (reduced) { window.clearTimeout(actionTimeout.current); setAction('neutral'); return; }
+    if (reduced || quiet || !visible) {
+      // Consume cues while paused; returning to the page must not replay a backlog.
+      if (reaction) lastReaction.current = `${reaction.kind}:${reaction.token}`;
+      return;
+    }
     if (reaction && lastReaction.current !== `${reaction.kind}:${reaction.token}`) {
       lastReaction.current = `${reaction.kind}:${reaction.token}`;
       play(reaction.kind === 'comment' && currentMood === 'contento' ? 'approve' : REACTION_ACTION[reaction.kind]);
     }
-  }, [reaction, reduced, play, currentMood]);
+  }, [reaction, reduced, quiet, visible, play, currentMood]);
 
   useEffect(() => {
-    if (currentMood === 'atento' && visible && !reduced) play('consider');
-    else if (currentMood === 'contento' && visible && !reduced) play('approve');
-    else if (currentMood === 'preocupado' && visible && !reduced) play('consider');
-  }, [currentMood, visible, reduced, play]);
+    if (lastMood.current === currentMood) return;
+    lastMood.current = currentMood;
+    if (quiet || !visible || reduced) return;
+    if (currentMood === 'atento') play('consider');
+    else if (currentMood === 'contento') play('approve');
+    else if (currentMood === 'preocupado') play('consider');
+  }, [currentMood, visible, reduced, quiet, play]);
 
   const interact = () => {
     if (!visible || reduced || quiet) return;
@@ -97,6 +110,8 @@ export function CampiPanoramaAvatar({ reaction, attention = false, change = fals
   return <button type="button" className="campi-panorama-avatar" data-paused={!visible || reduced || quiet} data-posture={posture}
     onPointerEnter={() => setCurious(true)} onPointerLeave={() => setCurious(false)}
     onClick={interact} aria-label="Saludar a Campi">
-    <CampiSprite state={state} active={visible} reduced={reduced} curious={curious} action={action} mood={currentMood} posture={posture} />
+    <span className="campi-panorama-fit">
+      <CampiSprite state={state} active={visible && !quiet} reduced={reduced} curious={curious} action={action} mood={currentMood} posture={posture} />
+    </span>
   </button>;
 }

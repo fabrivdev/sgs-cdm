@@ -33,7 +33,6 @@
 .panorama-hero::before { content: ''; position: absolute; inset: 6px 6px 6px 132px; background: hsl(var(--card) / .8); border-radius: 12px; z-index: -1; }
 .panorama-hero-avatar { position: relative; width: 122px; height: 122px; align-self: end; }
 .panorama-hero-avatar .campi-panorama-avatar { position: relative; width: 100%; height: 100%; }
-.panorama-hero-avatar .campi-panorama-avatar .campi-sprite { transform: scale(1.08); transform-origin: center bottom; }
 .panorama-hero-message, .campi-questions { min-width: 0; }
 .panorama-hero-context { display: flex; align-items: baseline; flex-wrap: wrap; gap: 4px 12px; margin-bottom: 3px; color: #667083; font-size: 11px; line-height: 16px; }
 .panorama-hero-kicker { display: block; color: #146846; font-size: 16px; line-height: 21px; font-weight: 700; margin-bottom: 6px; }
@@ -109,7 +108,8 @@
 .story-chart-mini { grid-column: 2; grid-row: 2; align-self: center; }
 .story-comparison-columns { display: flex; justify-content: center; gap: 22px; height: 74px; padding: 3px 8px 0; }
 .story-comparison-columns > div { display: flex; flex-direction: column; align-items: center; justify-content: flex-end; width: 64px; min-width: 0; height: 100%; }
-.story-comparison-bar { display: block; width: 100%; min-height: 2px; max-height: calc(100% - 20px); border-radius: 5px 5px 0 0; }
+.story-comparison-bar { display: block; width: 100%; flex-shrink: 0; border-radius: 5px 5px 0 0; }
+.story-comparison-bar[data-negative="true"] { background-image: repeating-linear-gradient(45deg, transparent, transparent 3px, #ffffff80 3px, #ffffff80 5px); }
 .story-comparison-bar--previous { background: #b7c2cd; }
 .story-comparison-bar--current { background: var(--story-accent); }
 .story-comparison-columns small { width: 100%; padding-top: 3px; color: #687181; font-size: 11px; text-align: center; }

@@ -59,20 +59,25 @@ export function OrdersWorkspace() {
   const defaults = useMemo<OperationsFilters>(() => {
     const period = defaultServiceOrdersPeriod(today);
     const state = searchParams.get("estado");
+    const cohort = searchParams.get("cohorte");
     const from = searchParams.get("desde");
     const to = searchParams.get("hasta");
     const linkedPeriod = from && to && validOperationsRange(from, to) ? { dateFrom: from, dateTo: to } : null;
     const openHistory = state === "abierta" && !linkedPeriod;
     return { ...(linkedPeriod ?? (openHistory ? { dateFrom: "2000-01-01", dateTo: period.dateTo } : period)),
       periodMode: openHistory ? "anio" : "mes", q: "", fSucursales: [], fMarcas: [], fTiposTiempo: [], fEstadosTrabajo: [], fTécnicos: [], fResponsablesOS: [],
-      fEstadosOS: state === "abierta" || state === "cerrada" ? [state] : [], fOSRubros: [] };
+      fEstadosOS: state === "abierta" || state === "cerrada" ? [state] : [], fOSRubros: [],
+      panoramaCohort: cohort === "resolution" || cohort === "open" ? cohort : undefined };
   }, [today, searchParams]);
   const [filters, setFilters] = useState(defaults);
   const change = <K extends keyof OperationsFilters>(key: K, value: OperationsFilters[K]) => setFilters(previous => ({ ...previous, [key]: value }));
   const valid = validOperationsRange(filters.dateFrom, filters.dateTo);
   const complianceMode = compliancePeriodMode(filters.dateFrom, filters.dateTo, today);
-  const modelFilters = useMemo(() => tab === "cumplimiento" ? { ...filters, periodMode: complianceMode } : filters, [tab, filters, complianceMode]);
-  const query = useServiceOrders(filters.dateFrom, filters.dateTo);
+  const modelFilters = useMemo(() => ({ ...filters,
+    panoramaCohort: tab === "ordenes" ? filters.panoramaCohort : undefined,
+    periodMode: tab === "cumplimiento" ? complianceMode : filters.periodMode,
+  }), [tab, filters, complianceMode]);
+  const query = useServiceOrders(filters.dateFrom, filters.dateTo, modelFilters.panoramaCohort === "open");
   // Never render cached figures/exports while refreshing or when a required source failed.
   const blocked = !valid || query.isPending || query.isFetching || query.isError;
   const model = useOperationsModel(blocked ? emptyOperationsData : query.data?.data ?? emptyOperationsData,
@@ -133,7 +138,7 @@ export function OrdersWorkspace() {
   }, [filters, modelFilters.periodMode, tab, technicianStatus, workPeriod.from, workPeriod.to, setPageFilters, clearPageFilters]);
   const selectTechnician = (name: string) => setSelectedTechnician(name);
   const clearFilters = () => {
-    setFilters(defaults);
+    setFilters({ ...defaults, panoramaCohort: undefined });
     setTechnicianStatus("activos");
     setMatrixMetric("trabajos");
     setComplianceBucket("");
@@ -173,6 +178,7 @@ export function OrdersWorkspace() {
         </div>}
         <FilterMultiSelect label="Marca" values={filters.fMarcas} onChange={v => change("fMarcas", v)} options={MARCAS.map(value => ({ value, label: value }))} />
         {tab !== "cumplimiento" && <FilterSelect label="Agrupar" placeholder="Período" value={filters.periodMode} onChange={v => change("periodMode", v as OperationsFilters["periodMode"])} options={[{ value: "dia", label: "Día" }, { value: "semana", label: "Semana" }, { value: "mes", label: "Mes" }, { value: "anio", label: "Año" }]} />}
+        {tab === "ordenes" && filters.panoramaCohort && <FilterSelect label="Universo" placeholder="Operativo habitual" value={filters.panoramaCohort} onChange={v => change("panoramaCohort", v === "open" || v === "resolution" ? v : undefined)} options={[{ value: "standard", label: "Operativo habitual" }, { value: "resolution", label: "Cierres válidos de Panorama" }, { value: "open", label: "Abiertas al corte · toda la historia" }]} />}
         {tab === "cumplimiento" ? <>
           <FilterMultiSelect label="Estado del trabajo" values={filters.fEstadosTrabajo} onChange={v => change("fEstadosTrabajo", v)} options={ESTADOS_TRABAJO.map(e => ({ value: e.key, label: e.label }))} />
           <FilterMultiSelect label="Técnico" values={filters.fTécnicos} onChange={v => change("fTécnicos", v)} options={(query.data?.data.profiles ?? []).map(p => ({ value: p.id, label: p.nombre }))} />

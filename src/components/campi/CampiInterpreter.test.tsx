@@ -98,6 +98,27 @@ describe('Campi questions', () => {
     expect(screen.getByRole('dialog')).toContainElement(input);
     expect(screen.getByRole('button', { name: 'Cerrar' })).toBeInTheDocument();
   });
+  it('resumes comments after pointer exit even when a clicked button retains focus', () => {
+    vi.useFakeTimers();
+    try {
+      const orders: PanoramaStory = { ...billing, id: 'servicios_abiertas', title: 'OS abiertas', sections: ['servicios.ordenes'], primary: { label: 'OS abiertas', value: 76, unit: 'count' } };
+      render(<CampiInterpreter stories={[billing, orders]} loading={false} />);
+      const next = screen.getByRole('button', { name: 'Siguiente comentario de Campi' });
+      const hero = next.closest('.panorama-hero')!;
+      fireEvent.pointerEnter(hero);
+      act(() => vi.advanceTimersByTime(26000));
+      expect(screen.getByText('1 de 2')).toBeInTheDocument();
+      fireEvent.keyDown(next, { key: 'Tab' });
+      fireEvent.pointerLeave(hero);
+      act(() => vi.advanceTimersByTime(26000));
+      expect(screen.getByText('1 de 2')).toBeInTheDocument();
+      fireEvent.pointerDown(next);
+      fireEvent.click(next);
+      expect(screen.getByText('2 de 2')).toBeInTheDocument();
+      act(() => vi.advanceTimersByTime(25000));
+      expect(screen.getByText('1 de 2')).toBeInTheDocument();
+    } finally { vi.useRealTimers(); }
+  });
   it('does not offer a question box when no verified story is available', () => {
     render(<CampiInterpreter stories={[]} loading={false} />);
     expect(screen.getByRole('heading', { name: /Todavía no tengo cifras verificadas/ })).toBeInTheDocument();

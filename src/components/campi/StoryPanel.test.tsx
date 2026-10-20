@@ -78,7 +78,7 @@ describe('compact overview panel', () => {
     render(<MemoryRouter><StoryPanel story={{ ...story, id: 'repuestos_stock', title: 'Stock antiguo de repuestos', primary: { label: 'Valor de stock gris y rojo', value: 30, unit: 'USD' }, supporting: [{ label: 'Valor positivo valorizado', value: 100, unit: 'USD' }], notices: [{ text: 'Un código podría pasar a rojo', route: '/repuestos/analisis?color=GRIS&compra_dias_min=971&compra_dias_max=1000&vista=detalle' }], chart: null }} index={0} retrying={false} onRetry={vi.fn()} /></MemoryRouter>);
     expect(screen.getByText('30%')).toBeInTheDocument();
     fireEvent.click(screen.getByRole('button', { name: 'Ver detalle de Stock antiguo de repuestos' }));
-    expect(screen.getByText('Valor positivo de ubicaciones con stock; la sección de origen incluye otros saldos.')).toBeInTheDocument();
+    expect(screen.getByText('Valor positivo de ubicaciones con stock. El detalle conserva este universo.')).toBeInTheDocument();
   });
   it('shows service closure volume and open queue without treating shorter resolution as a verified improvement', () => {
     render(<MemoryRouter><StoryPanel story={{ ...story, id: 'servicios_pendientes', title: 'Resolución de órdenes de servicio', primary: { label: 'Mediana de resolución', value: 14, unit: 'days', comparison: { label: 'agosto de 2026', value: 16.5 } }, supporting: [{ label: 'OS cerradas en septiembre de 2026', value: 84, unit: 'count' }, { label: 'OS abiertas registradas', value: 76, unit: 'count' }], chart: null }} index={0} retrying={false} onRetry={vi.fn()} /></MemoryRouter>);

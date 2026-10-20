@@ -62,12 +62,12 @@ function StoryChart({ chart, mini = false }: { mini?: boolean; chart: NonNullabl
 }
 
 function StoryComparisonChart({ current, previous, label, unit }: { current: number; previous: number; label: string; unit: StoryUnit }) {
-  const maximum = Math.max(current, previous, 1);
+  const maximum = Math.max(Math.abs(current), Math.abs(previous), 1);
   return <figure className="story-chart story-chart-mini story-comparison-chart" aria-label={`Comparación de ${label}`}>
     <figcaption className="sr-only">Anterior: {storyValue(previous, unit)}; actual: {storyValue(current, unit)}</figcaption>
     <div className="story-comparison-columns" aria-hidden="true">
-      <div><span className="story-comparison-bar story-comparison-bar--previous" style={{ height: `${Math.max(previous / maximum * 80, 2)}px` }} /><small>Anterior</small></div>
-      <div><span className="story-comparison-bar story-comparison-bar--current" style={{ height: `${Math.max(current / maximum * 80, 2)}px` }} /><small>Actual</small></div>
+      <div title={`Anterior: ${storyValue(previous, unit)}`}><span data-negative={previous < 0} className="story-comparison-bar story-comparison-bar--previous" style={{ height: `${Math.abs(previous) / maximum * 44}px` }} /><small>{previous < 0 ? '− Anterior' : 'Anterior'}</small></div>
+      <div title={`Actual: ${storyValue(current, unit)}`}><span data-negative={current < 0} className="story-comparison-bar story-comparison-bar--current" style={{ height: `${Math.abs(current) / maximum * 44}px` }} /><small>{current < 0 ? '− Actual' : 'Actual'}</small></div>
     </div>
   </figure>;
 }
@@ -156,7 +156,7 @@ export function StoryPanel({ story, index, onRetry, retrying, visitChange = null
           {typeof excludedClosures === 'number' && excludedClosures > 0 && <p className="text-xs text-muted-foreground">{numbers.format(excludedClosures)} OS históricas sin cierre fechado, excluidas.</p>}
           {story.id === 'repuestos_alertas' && <p className="text-xs text-muted-foreground">Cambio condicionado a que no haya compras ni ventas nuevas.</p>}
           {story.id === 'maquinas_pedidos' && <p className="text-xs text-muted-foreground">El vínculo de abastecimiento no acredita atraso ni entrega.</p>}
-          {['repuestos_stock', 'repuestos_concentracion'].includes(story.id) && <p className="text-xs text-muted-foreground">Valor positivo de ubicaciones con stock; la sección de origen incluye otros saldos.</p>}
+          {['repuestos_stock', 'repuestos_concentracion'].includes(story.id) && <p className="text-xs text-muted-foreground">Valor positivo de ubicaciones con stock. El detalle conserva este universo.</p>}
           {visitChange !== null && visitChange !== 0 && story.primary && <p className="story-visit-change">El total visible cambió {visitChange > 0 ? '+' : ''}{storyValue(visitChange, story.primary.unit)} desde tu última visita en este navegador.</p>}
           <dl className="story-detail-metrics">{story.primary && <Datum datum={story.primary} primary />}{secondary.map((datum, i) => <Datum key={i} datum={datum} />)}</dl>
           {story.chart && story.chart.rows.length > 0 && <StoryChart chart={story.chart} />}

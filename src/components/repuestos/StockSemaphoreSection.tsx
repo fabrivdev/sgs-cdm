@@ -34,7 +34,8 @@ const deepLinkFilters = (params: URLSearchParams): SemaforoFiltros => {
   const pendingGrey = color === "LILA" && min === "336" && max === "365";
   const pendingRed = color === "GRIS" && min === "971" && max === "1000";
   return { ...INITIAL_FILTERS,
-    color: SEMAFORO_COLORES.some(item => item.id === color) ? color : "",
+    color: color === "ANTIGUO" || SEMAFORO_COLORES.some(item => item.id === color) ? color : "",
+    universo: params.get("universo") === "STOCK_POSITIVO_PANORAMA" ? "STOCK_POSITIVO_PANORAMA" : "",
     sucursal: params.get("sucursal") ?? "", familia: params.get("familia") ?? "",
     ...(pendingGrey || pendingRed ? { compra_dias_min: min, compra_dias_max: max } : {}),
   };
@@ -67,7 +68,8 @@ function exportRow(row: SemaforoFila) {
     "Ventas año anterior": Number(row.unidades_anio_anterior),
     "Ventas hace dos años": Number(row.unidades_hace_dos_anios),
     "Saldo último Kardex": row.saldo_kardex == null ? "" : Number(row.saldo_kardex),
-    "Valor último Kardex USD": row.valor_kardex_usd == null ? "" : Number(row.valor_kardex_usd),
+    "Valor último Kardex USD": row.valor_bruto_usd !== undefined ? row.valor_bruto_usd ?? "" : row.valor_kardex_usd ?? "",
+    ...(row.valor_bruto_usd !== undefined ? { "Valor positivo USD (ubicaciones con stock positivo)": row.valor_kardex_usd ?? "" } : {}),
     "Saldo Kardex coincide": row.saldo_kardex == null ? "Sin Kardex" : row.saldo_coincide ? "Sí" : "No",
     "Archivo Kardex": row.kardex_archivo ?? "",
     "Carga Kardex": row.kardex_cargado_en ?? "",
@@ -103,6 +105,7 @@ function DetailFields({ row }: { row: SemaforoFila }) {
     ["Fabricante", row.codigo_fabricante], ["Familia", row.familia],
     ["Código anterior", row.codigo_anterior_ejemplo], ["Equivalencias", quantity(row.codigos_anteriores)],
     ["Stock", quantity(row.stock_total)], ["Última venta global", fecha(row.ultima_venta)],
+    ...(row.valor_bruto_usd !== undefined ? [["Kardex bruto USD", usd(row.valor_bruto_usd)], ["Valor positivo USD", usd(row.valor_kardex_usd)]] : []),
     ["Última compra", fecha(row.ultima_compra)], ["Días en stock", quantity(row.dias_ultima_compra)], ["Fuente de compra", row.fuente_compra],
     ["Días sin venta", quantity(row.dias_ultima_venta)], ["Ventas 365d", quantity(row.unidades_365d)],
     [String(year), quantity(row.unidades_anio_actual)], [String(year - 1), quantity(row.unidades_anio_anterior)],
@@ -147,6 +150,7 @@ export function StockSemaphoreSection({ canExport }: { canExport: boolean }) {
   const listing = useSemaforoListado(detailFilters, agrupacion);
   const report = { ...listing, data: listing.data?.pages[0] };
   const data = overview.data;
+  const positiveScope = filtros.universo === "STOCK_POSITIVO_PANORAMA";
   const rows = listing.data?.pages.flatMap(page => page.rows) ?? [];
   const byColor = new Map(data?.por_color.map(item => [item.color, item]) ?? []);
   const update = (key: keyof SemaforoFiltros, value: string) => setFiltros(current => ({ ...current, [key]: value === "all" ? "" : value }));
@@ -191,7 +195,7 @@ export function StockSemaphoreSection({ canExport }: { canExport: boolean }) {
     { key: "descripcion", label: "Descripción", kind: "text", width: "w-auto", value: row => row.descripcion },
     { key: "marca", label: "Marca", kind: "text", width: "w-[110px]", hiddenBelow: "xl", value: row => row.marca, render: row => <MarcaBadge marca={row.marca} className="px-1.5 py-0 text-[10px]" /> },
     { key: "stock", label: "Stock", kind: "number", align: "center", width: "w-[100px]", hiddenBelow: "lg", value: row => row.stock_total, render: row => quantity(row.stock_total) },
-    { key: "usd", label: "Valor USD", kind: "number", align: "right", width: "w-[150px]", value: row => row.valor_kardex_usd, render: row => usd(row.valor_kardex_usd) },
+    { key: "usd", label: positiveScope ? "USD positivo" : "Valor USD", kind: "number", align: "right", width: "w-[150px]", value: row => row.valor_kardex_usd, render: row => usd(row.valor_kardex_usd) },
     { key: "dias", label: "Días venta", kind: "number", align: "center", width: "w-[100px]", hiddenBelow: "lg", value: row => row.dias_ultima_venta, render: row => quantity(row.dias_ultima_venta) },
     { key: "ventas", label: "Unid. 365d", kind: "number", align: "center", width: "w-[100px]", hiddenBelow: "xl", value: row => row.unidades_365d, render: row => quantity(row.unidades_365d) },
     { key: "color", label: "Color", kind: "text", width: "w-[115px]", hiddenBelow: "lg", value: row => row.color, render: row => <ColorLabel color={row.color} compact /> },
@@ -206,7 +210,7 @@ export function StockSemaphoreSection({ canExport }: { canExport: boolean }) {
     { key: "nombre", label: GROUP_LABELS[agrupacion], kind: "text", width: "w-auto", value: row => row.nombre, render: row => <button onClick={event => { event.stopPropagation(); drill(row); }} className="flex min-h-11 w-full min-w-0 items-center gap-1 text-left focus-visible:ring-2 focus-visible:ring-ring sm:min-h-0" aria-label={`Desglosar ${row.nombre}`}><ChevronRight className="h-3 w-3 shrink-0" /><span className="truncate">{row.nombre}</span></button> },
     { key: "lineas", label: "Códigos", kind: "number", align: "center", width: "w-[90px]", hiddenBelow: "lg", value: row => row.lineas, render: row => quantity(row.lineas) },
     { key: "unidades", label: "Unidades", kind: "number", align: "center", width: "w-[130px]", hiddenBelow: "lg", value: row => row.unidades, render: row => quantity(row.unidades) },
-    { key: "valor", label: "Valor USD", kind: "number", align: "right", width: "w-[160px]", value: row => row.valor_kardex_usd, render: row => usd(row.valor_kardex_usd) },
+    { key: "valor", label: positiveScope ? "USD positivo" : "Valor USD", kind: "number", align: "right", width: "w-[160px]", value: row => row.valor_kardex_usd, render: row => usd(row.valor_kardex_usd) },
     { key: "porcentaje", label: "% USD", kind: "number", align: "right", width: "w-[80px]", hiddenBelow: "md", value: row => row.valor_kardex_usd, render: row => percent(row.valor_kardex_usd, report.data?.valor_kardex_usd) },
   ];
   groupColumns.push(
@@ -223,7 +227,8 @@ export function StockSemaphoreSection({ canExport }: { canExport: boolean }) {
     <FiltersBar search={{ value: search, onChange: setSearch, placeholder: "Código, fabricante, descripción o código anterior…", label: "Buscar", width: "w-[min(390px,32vw)]" }} activeCount={Number(Boolean(search.trim())) + Object.values(filtros).filter(Boolean).length} onClear={() => { setSearch(""); setFiltros(INITIAL_FILTERS); }}
       secondaryActions={canExport ? <SectionActionsMenu busy={exporting} options={[{ id: "exportar-semaforo", label: "Exportar análisis", disabled: exporting || report.isLoading || report.isError || !report.data?.lineas, onSelect: () => void exportar() }]} /> : undefined}
       expanded={<>{facet("familia", "Familia", data?.facetas.familias ?? [])}{facet("deposito", "Depósito", data?.facetas.depositos ?? [])}{filter("franja", "Antigüedad del stock", STOCK_BANDS.map(item => ({ value: item.id, label: item.label })))}{filter("valorizacion", "Valorización", [{ value: "COMPLETA", label: "Completa" }, { value: "INCOMPLETA", label: "Incompleta" }])}</>}>
-      {facet("marca", "Marca", [...MARCAS])}{facet("sucursal", "Sucursal", data?.facetas.sucursales ?? SUCURSALES)}{filter("color", "Color histórico", SEMAFORO_COLORES.map(item => ({ value: item.id, label: item.label })))}
+      {facet("marca", "Marca", [...MARCAS])}{facet("sucursal", "Sucursal", data?.facetas.sucursales ?? SUCURSALES)}{filter("color", "Color histórico", [...SEMAFORO_COLORES.map(item => ({ value: item.id, label: item.label })), { value: "ANTIGUO", label: "Gris y rojo" }])}
+      {positiveScope && <FilterSelect label="Universo" placeholder="Inventario habitual" value="STOCK_POSITIVO_PANORAMA" onChange={value => update("universo", value)} options={[{value:"all",label:"Inventario habitual"},{value:"STOCK_POSITIVO_PANORAMA",label:"Stock positivo · Panorama"}]} />}
     </FiltersBar>
     {overview.isLoading && <div role="status" className="rounded-xl border p-4 text-sm">Cargando análisis…</div>}
     {overview.isError && <div role="alert" className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-destructive/40 p-3 text-sm text-destructive"><span><AlertTriangle className="mr-2 inline h-4 w-4" />{overview.error instanceof Error ? overview.error.message : "No se pudo cargar el análisis."}</span><Button variant="outline" onClick={() => void overview.refetch()}>Reintentar</Button></div>}
@@ -231,7 +236,7 @@ export function StockSemaphoreSection({ canExport }: { canExport: boolean }) {
       <KpiStrip className="max-sm:grid-cols-2 max-sm:[&>div:last-child]:col-span-2">
         <KpiItem label="Repuestos en stock" value={quantity(data.lineas)} icon={<Package />} />
         <KpiItem label="Existencias totales" value={quantity(data.unidades_stock)} icon={<Boxes />} className={quantity(data.unidades_stock).length > 12 ? "[&>div:nth-child(2)]:text-[14px]" : undefined} />
-        <KpiItem label="Valor del inventario" value={<span title={`USD. ${data.lineas_valorizadas} códigos con valor; ${data.ubicaciones_sin_valor} ubicaciones de stock sin valor. La fecha de carga no es la fecha de corte.`}>{usd(data.valor_kardex_usd)}</span>} icon={<Coins />} className="[&>div:nth-child(2)]:whitespace-nowrap [&>div:nth-child(2)]:text-[clamp(14px,1.6vw,20px)]" />
+        <KpiItem label={positiveScope ? "Valor positivo USD" : "Valor del inventario"} value={<span title={`USD. ${data.lineas_valorizadas} códigos con valor; ${data.ubicaciones_sin_valor} ubicaciones de stock sin valor. La fecha de carga no es la fecha de corte.`}>{usd(data.valor_kardex_usd)}</span>} icon={<Coins />} className="[&>div:nth-child(2)]:whitespace-nowrap [&>div:nth-child(2)]:text-[clamp(14px,1.6vw,20px)]" />
       </KpiStrip>
       <div className="grid min-w-0 gap-3 [grid-template-columns:repeat(auto-fit,minmax(min(100%,520px),1fr))]">
         <Card className="min-w-0"><CardHeader className="px-3 py-3"><div className="flex items-center justify-between gap-2"><CardTitle className={sectionTitle}>Clasificación histórica de ventas</CardTitle><Popover><PopoverTrigger asChild><button className="flex h-8 w-8 shrink-0 items-center justify-center rounded text-muted-foreground focus-visible:ring-2 focus-visible:ring-ring" aria-label="Criterios de los colores"><Info className="h-4 w-4" /></button></PopoverTrigger><PopoverContent className="w-80 max-h-[70vh] overflow-y-auto max-w-[calc(100vw-2rem)] text-xs" align="end"><div className="space-y-3">{SEMAFORO_COLORES.map(color => <div key={color.id}><ColorLabel color={color.id} /><p className="mt-1 text-muted-foreground">{color.descripcion}</p></div>)}</div></PopoverContent></Popover></div></CardHeader><CardContent className="grid min-w-0 items-center gap-3 px-3 pb-3 sm:grid-cols-[minmax(200px,0.9fr)_minmax(0,1fr)]">
