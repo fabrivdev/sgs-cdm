@@ -73,6 +73,22 @@ describe('sales story source contracts', () => {
     expect(salesChange(10, 0)).toBeNull();
     expect(salesChange(0, -10)).toBe(100);
   });
+  it('keeps the sales question visible without inventing a percentage when LY gross sales are zero', async () => {
+    rpc.mockImplementation(async (name, args) => {
+      const result = response(name, args);
+      if (args.p_desde.startsWith('2025')) {
+        result.data.resumen = Object.fromEntries(Object.keys(result.data.resumen).map(key => [key, 0]));
+        result.data.periodos.forEach(row => {
+          for (const key of Object.keys(row)) if (key !== 'periodo') row[key] = 0;
+        });
+      }
+      return result;
+    });
+    const [sales] = await loadSalesStories(['ventas_evolucion'], ['repuestos.ventas'], '2026-10-16');
+    expect(sales.status).toBe('ready');
+    expect(sales.primary).toMatchObject({ value: null, unit: 'percent', note: 'Sin base comparable de ventas antes de NC.' });
+    expect(sales.supporting[0]).toMatchObject({ value: 120, comparison: { value: 0 } });
+  });
   it('uses an explicit December query in January and clamps leap-day LY', async () => {
     expect(salesRanges('2024-02-29').previousTo).toBe('2023-02-28');
     expect(() => salesRanges('2026-02-30')).toThrow();
@@ -170,7 +186,8 @@ describe('sales story source contracts', () => {
     expect(rpc).toHaveBeenCalledTimes(2);
     expect(sales.status).toBe('ready');
     expect(net.status).toBe('ready');
-    expect(sales.primary?.value).toBe(220);
+    expect(sales.primary).toMatchObject({ value: (220 - 70) / 70 * 100, unit: 'percent' });
+    expect(sales.supporting[0]).toMatchObject({ value: 220, unit: 'USD', comparison: { value: 70 } });
     expect(net.primary?.value).toBe(200);
     expect(sales.chart?.kind).toBe('trend');
   });

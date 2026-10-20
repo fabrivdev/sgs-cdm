@@ -11,7 +11,7 @@ describe('deterministic Campi interpretation', () => {
       supporting: [{ label: 'Pedidos con stock', value: 3, unit: 'count' }],
     });
     const text = interpretCampi([supply]).findings[0].text;
-    expect(text).toContain('De 12 pedidos pendientes, 3 tienen stock para facturar');
+    expect(text).toContain('De 12 pedidos pendientes, 3 tienen stock vinculado');
   });
   it('does not turn raw counts or an attention flag into alerts', () => {
     const result = interpretCampi([story({ attention: true }), { ...orders, supporting: [] }]);
@@ -39,6 +39,20 @@ describe('deterministic Campi interpretation', () => {
     expect(text).toContain('Mayor diferencia entre áreas: Máquinas ($ 389.500 → $ 0)');
     expect(text).toContain('NC');
     expect(interpretCampi([{ ...input, chart: { ...input.chart!, rows: [{ label: 'Máquinas', value: 0, previous: 389500 }] } }]).sentences[0]).not.toContain('Mayor diferencia');
+  });
+  it('explains the monthly sales variation with gross amounts and a reconciled sector difference', () => {
+    const sales = story({
+      id: 'ventas_evolucion', title: 'Evolución de ventas',
+      primary: { label: 'Variación de ventas vs LY', value: -25, unit: 'percent' },
+      supporting: [{ label: 'Ventas antes de NC del mes', value: 150, unit: 'USD', comparison: { value: 200, label: 'Mismo tramo LY' } }],
+      breakdown: [{ label: 'Repuestos', value: 100, previous: 180, unit: 'USD' }, { label: 'Servicios', value: 50, previous: 20, unit: 'USD' }],
+    });
+    const interpretation = interpretCampi([sales]);
+    expect(interpretation.findings[0].kind).toBe('change');
+    expect(interpretation.sentences[0]).toContain('bajaron 25%');
+    expect(interpretation.sentences[0]).toContain('diferencia $ 50');
+    expect(interpretation.sentences[0]).toContain('Mayor diferencia entre áreas: Repuestos');
+    expect(interpretCampi([{ ...sales, breakdown: sales.breakdown.slice(0, 1) }]).sentences[0]).not.toContain('Mayor diferencia');
   });
   it('rejects absent, nonfinite or zero comparison bases', () => {
     for (const value of [0, -5, Infinity, NaN]) {

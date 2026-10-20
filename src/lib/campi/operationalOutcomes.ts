@@ -100,14 +100,14 @@ export function readyOrdersStory(data: ReadyOrders, supply: Supply): PanoramaSto
   if (data.fecha_analisis !== supply.fecha_analisis || data.pedidos_con_stock > supply.pedidos ||
       data.unidades_con_stock > supply.stock || data.unidades_con_stock > supply.unidades) throw new Error('Los pedidos pendientes y su abastecimiento no concilian.');
   return { id: 'maquinas_pedidos', visitKey: `maquinas_pedidos:abastecimiento-v2:${data.fecha_analisis}`,
-    title: 'Pedidos pendientes', question: '¿Cuántos pedidos pendientes tienen stock para facturar y cómo se abastece el resto?',
-    status: 'ready', message: `${data.pedidos_con_stock} de ${supply.pedidos} pedidos pendientes tienen al menos una unidad con stock para facturar.`,
+    title: 'Pedidos pendientes', question: '¿Cuántos pedidos pendientes tienen stock vinculado y cómo se abastece el resto?',
+    status: 'ready', message: `${data.pedidos_con_stock} de ${supply.pedidos} pedidos pendientes tienen al menos una unidad con stock vinculado.`,
     scope: 'Pedidos activos y su abastecimiento por unidad',
     sections: ['parque.operaciones'], cutoff: null, periodLabel: formatDay(data.fecha_analisis),
     primary: { label: 'Pedidos pendientes', value: supply.pedidos, unit: 'count' },
     supporting: [{ label: 'Pedidos con stock', value: data.pedidos_con_stock, unit: 'count', note: `${supply.pedidos ? new Intl.NumberFormat('es-PY', { maximumFractionDigits: 1 }).format(data.pedidos_con_stock / supply.pedidos * 100) : 0}% · ${data.unidades_con_stock} unidades` },
       { label: 'Unidades pendientes', value: supply.unidades, unit: 'count' },
-      { label: 'Unidades con stock para facturar', value: data.unidades_con_stock, unit: 'count' }],
+      { label: 'Unidades con stock vinculado', value: data.unidades_con_stock, unit: 'count' }],
     chart: { kind: 'bars', title: 'Abastecimiento de unidades pendientes', unit: 'count', rows: [
       { label: 'Stock', value: supply.stock },
       { label: 'Importación arribada', value: supply.importacion_arribada },
@@ -116,7 +116,7 @@ export function readyOrdersStory(data: ReadyOrders, supply: Supply): PanoramaSto
     ] },
     breakdown: [
       ...data.pedidos.map(order => ({ label: order.np_numero?.trim() || 'Pedido sin NP', value: order.unidades_con_stock,
-        unit: 'count' as const, group: 'Con stock para facturar', route: `/parque-operaciones?operacion=${encodeURIComponent(order.operacion_id)}` })),
+        unit: 'count' as const, group: 'Con stock vinculado', route: `/parque-operaciones?operacion=${encodeURIComponent(order.operacion_id)}` })),
       ...supply.pendientes.map(order => ({ label: order.np_numero?.trim() || 'Pedido sin NP', value: order.unidades,
         unit: 'count' as const, group: 'Sin vínculo', route: `/parque-operaciones?operacion=${encodeURIComponent(order.operacion_id)}` })),
     ],
@@ -139,7 +139,7 @@ export function readyOrdersOpportunityStory(data: ReadyOrders, supply: Supply): 
     primary: { label: 'Pedidos con stock', value: data.pedidos_con_stock, unit: 'count' },
     supporting: [{ label: 'Pedidos pendientes', value: supply.pedidos, unit: 'count' }, { label: 'Participación con stock', value: share, unit: 'percent' }, { label: 'Unidades con stock', value: data.unidades_con_stock, unit: 'count' }],
     chart: { kind: 'bars', title: 'Pedidos con y sin stock asignado', unit: 'count', rows: [{ label: 'Con stock', value: data.pedidos_con_stock }, { label: 'Sin stock', value: supply.pedidos - data.pedidos_con_stock }] },
-    breakdown: original.breakdown.filter(row => row.group === 'Con stock para facturar'), notices: [],
+    breakdown: original.breakdown.filter(row => row.group === 'Con stock vinculado'), notices: [],
   };
 }
 

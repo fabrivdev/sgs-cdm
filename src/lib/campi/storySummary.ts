@@ -14,7 +14,7 @@ export function storySummaryPercentage(story: PanoramaStory): StorySummaryPercen
   if (story.id === 'maquinas_pedidos') {
     const ready = story.supporting.find(datum => datum.label === 'Pedidos con stock')?.value;
     return typeof ready === 'number' && Number.isFinite(ready) && primary.value > 0 && ready >= 0 && ready <= primary.value
-      ? { value: ready / primary.value * 100, label: 'con stock para facturar', kind: 'composition' }
+      ? { value: ready / primary.value * 100, label: 'con stock vinculado', kind: 'composition' }
       : null;
   }
   const shares: Partial<Record<PanoramaStory['id'], { denominator: string; label: string }>> = {

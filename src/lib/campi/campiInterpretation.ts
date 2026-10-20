@@ -2,20 +2,22 @@ import type { PanoramaStory, StoryDatum, StoryTopicId } from './panoramaStoryTyp
 
 export type CampiFinding = { topic: StoryTopicId; kind: 'change' | 'attention' | 'neutral'; text: string; urgency: 'confirmed' | 'review' | 'none' };
 const number = new Intl.NumberFormat('es-PY', { maximumFractionDigits: 1 });
-const money = new Intl.NumberFormat('es-PY', { maximumFractionDigits: 2 });
+const money = new Intl.NumberFormat('es-PY', { maximumFractionDigits: 0 });
 const valid = (n: number | null | undefined): n is number => typeof n === 'number' && Number.isFinite(n);
 const amount = (d: StoryDatum) => `${d.unit === 'USD' ? '$ ' : d.unit === 'PYG' ? '₲ ' : ''}${(d.unit === 'USD' || d.unit === 'PYG' ? money : number).format(d.value!)}${d.unit === 'percent' ? '%' : d.unit === 'days' ? ' días' : ''}`;
 const lowercaseFirst = (text: string) => text.charAt(0).toLowerCase() + text.slice(1);
 
 function billingAreaContext(story: PanoramaStory, current: number, previous: number): string {
-  if (story.id !== 'ventas_facturacion' || story.chart?.kind !== 'bars') return '';
-  const rows = story.chart.rows;
+  if (story.id !== 'ventas_facturacion' && story.id !== 'ventas_evolucion') return '';
+  const rows = story.id === 'ventas_evolucion'
+    ? story.breakdown.filter(row => valid(row.previous)).map(row => ({ label: row.label, value: row.value!, previous: row.previous! }))
+    : story.chart?.kind === 'bars' ? story.chart.rows : [];
   if (rows.length < 2 || rows.some(row => !valid(row.value) || !valid(row.previous) || row.value < 0 || row.previous < 0)) return '';
   const total = (key: 'value' | 'previous') => rows.reduce((sum, row) => sum + row[key]!, 0);
   if (Math.abs(total('value') - current) > 0.02 || Math.abs(total('previous') - previous) > 0.02) return '';
   const largest = [...rows].sort((a, b) => Math.abs(b.value - b.previous!) - Math.abs(a.value - a.previous!))[0];
   if (largest.value === largest.previous) return '';
-  return ` Mayor diferencia entre áreas: ${largest.label} (${amount({ ...story.primary!, value: largest.previous! })} → ${amount({ ...story.primary!, value: largest.value })}).`;
+  return ` Mayor diferencia entre áreas: ${largest.label} (${amount({ value: largest.previous!, unit: 'USD', label: largest.label })} → ${amount({ value: largest.value, unit: 'USD', label: largest.label })}).`;
 }
 
 /** Interprets already-authorized stories only. No network, model, causal inference or implicit deadlines. */
@@ -31,12 +33,20 @@ export function interpretCampi(stories: readonly PanoramaStory[]) {
         return finding('attention', `Facturación: las NC restaron ${amount({ ...p, value: -credit })} de ${amount({ ...p, value: gross })} en ventas; el neto quedó en ${amount(p)}. Revisá la composición por área.`, 'confirmed');
       }
     }
+    if (s.id === 'ventas_evolucion' && p.unit === 'percent') {
+      const gross = s.supporting.find(d => d.label === 'Ventas antes de NC del mes');
+      const previous = gross?.comparison?.value;
+      if (valid(gross?.value) && valid(previous) && previous > 0 && Math.abs((gross.value - previous) / previous * 100 - p.value!) < 0.1) {
+        const difference = gross.value - previous;
+        if (difference !== 0) return finding('change', `Ventas antes de NC ${difference > 0 ? 'subieron' : 'bajaron'} ${number.format(Math.abs(p.value!))}% frente al mismo tramo LY (${amount({ ...gross, value: previous })} → ${amount(gross)}; diferencia ${amount({ ...gross, value: Math.abs(difference) })}).${billingAreaContext(s, gross.value, previous)}`);
+      }
+    }
     if (s.id === 'repuestos_stock' && s.notices?.length) {
       return finding('attention', `Stock antiguo de repuestos: ${s.notices[0].text}. Podés abrir los códigos incluidos en el detalle.`, 'review');
     }
     if (s.id === 'maquinas_pedidos' && p.value! > 0) {
       const ready = s.supporting.find(d => d.label === 'Pedidos con stock')?.value;
-      if (valid(ready) && ready <= p.value!) return finding('neutral', `De ${number.format(p.value!)} pedidos pendientes, ${number.format(ready)} tienen stock para facturar. Abrí el detalle para ver las NP y el resto del abastecimiento.`);
+      if (valid(ready) && ready <= p.value!) return finding('neutral', `De ${number.format(p.value!)} pedidos pendientes, ${number.format(ready)} tienen stock vinculado. Abrí el detalle para ver las NP y el resto del abastecimiento.`);
     }
     if (s.id === 'servicios_pendientes' && valid(p.comparison?.value) && p.comparison.value > 0) {
       const difference = p.value! - p.comparison.value;

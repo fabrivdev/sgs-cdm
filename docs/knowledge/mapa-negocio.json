@@ -1718,13 +1718,13 @@
       "id": "configurar-y-leer-panorama",
       "title": "Priorizar temas y leer Panorama",
       "module": "asistente",
-      "description": "El usuario autorizado ordena temas específicos y abre un panel variable sin cifras ficticias.",
+      "description": "El usuario autorizado ordena hasta cuatro preguntas con historia implementada; el catálogo objetivo de veinte preguntas no se expone como opciones vacías. Cada tarjeta responde una pregunta y lleva a su sección de origen con filtros; los consolidados dejan elegir el sector autorizado.",
       "steps": [
         "Filtrar temas específicos por permisos de su fuente real.",
         "Guardar orden en navegador con namespace independiente.",
         "Consultar y conciliar agregados completos autorizados.",
-        "Mostrar todos los temas elegidos con métricas, gráficos y contexto.",
-        "Abrir detalle modal con composición y fuentes.",
+        "Mostrar las cuatro prioridades seleccionadas, manteniendo su lugar durante carga o error.",
+        "Abrir la sección de origen filtrada; en ventas consolidadas, elegir primero el sector autorizado.",
         "Guardar referencia local solo con respuestas completas sin errores, conservando cero válido."
       ],
       "entities": [
@@ -1739,6 +1739,7 @@
         "src/components/campi/PanoramaDashboard.tsx",
         "src/components/campi/StoryPanel.tsx",
         "src/lib/campi/panoramaStories.ts",
+        "src/lib/campi/panoramaCatalogTargets.ts",
         "src/lib/campi/panoramaStoryVisits.ts"
       ]
     },

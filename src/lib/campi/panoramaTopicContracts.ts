@@ -17,7 +17,7 @@ export type TopicContract = {
 export type EnabledTopicId = Exclude<StoryTopicId, 'repuestos_clientes' | 'maquinas_proyeccion' | 'maquinas_stock'>;
 export const PANORAMA_CONTRACTS = {
   ventas_evolucion: {
-    queryGroup: 'sales', unit: 'USD', formula: 'Suma de ventas antes de NC de todas las áreas autorizadas.',
+    queryGroup: 'sales', unit: 'percent', formula: '(Ventas antes de NC del mes hasta el corte / ventas antes de NC del mismo tramo LY − 1) × 100; sin porcentaje si LY no es positivo.',
     population: 'Movimientos de venta de cada sección autorizada, sin consolidado parcial.',
     period: 'Mes y acumulado anual hasta fecha de análisis.',
     comparison: 'equivalent-period', chart: 'trend',
