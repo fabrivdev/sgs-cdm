@@ -13,7 +13,6 @@ vi.mock("@/hooks/useAuth", () => ({ useAuth: () => auth }));
 vi.mock("@/hooks/useUnseen", () => ({ useUnseen: () => 12 }));
 vi.mock("@/hooks/use-mobile", () => ({ useIsMobile: () => true }));
 vi.mock("@/components/assistant/AIAssistant", () => ({ AIAssistant: () => null }));
-vi.mock("@/components/campi/CampiDesktopSlot", () => ({ CampiDesktopSlot: ({ userId }: { userId: string }) => <div data-testid="campi-slot">{userId}</div> }));
 vi.mock("@/components/parque/MachineSaleNotificationDialog", () => ({ MachineSaleNotificationDialog: () => null }));
 vi.mock("@/components/parque/MachineStockReturnNotificationDialog", () => ({ MachineStockReturnNotificationDialog: () => null }));
 vi.mock("@/integrations/supabase/client", () => ({ supabase: {} }));
@@ -33,7 +32,7 @@ function setup(path = "/parque-ventas") {
 }
 
 describe("shared mobile header", () => {
-  it("shows Campi and its account action only to Gerencia or Administración", async () => {
+  it("does not show the Campi welcome on main", async () => {
     auth.user = { id: "user-1" };
     auth.isAdmin = false;
     setup();
@@ -45,17 +44,19 @@ describe("shared mobile header", () => {
 
     auth.isGerencia = true;
     setup();
-    expect(screen.getByTestId("campi-slot")).toHaveTextContent("user-1");
+    expect(screen.queryByTestId("campi-slot")).not.toBeInTheDocument();
     fireEvent.keyDown(screen.getByRole("button", { name: "Abrir menú de cuenta" }), { key: "Enter" });
-    expect(await screen.findByText("Conocer a Campi")).toBeInTheDocument();
+    await screen.findByRole("menuitem", { name: "Cerrar sesión" });
+    expect(screen.queryByText("Conocer a Campi")).not.toBeInTheDocument();
     cleanup();
 
     auth.isGerencia = false;
     auth.isAdmin = true;
     setup();
-    expect(screen.getByTestId("campi-slot")).toHaveTextContent("user-1");
+    expect(screen.queryByTestId("campi-slot")).not.toBeInTheDocument();
     fireEvent.keyDown(screen.getByRole("button", { name: "Abrir menú de cuenta" }), { key: "Enter" });
-    expect(await screen.findByText("Conocer a Campi")).toBeInTheDocument();
+    await screen.findByRole("menuitem", { name: "Cerrar sesión" });
+    expect(screen.queryByText("Conocer a Campi")).not.toBeInTheDocument();
   });
   it.each(["/parque-ventas", "/servicios/ventas", "/repuestos/ventas", "/parque-stock"])("groups the logo and name on %s with named icon controls", path => {
     setup(path);
@@ -105,3 +106,4 @@ describe("shared mobile header", () => {
     expect(screen.queryByRole("menuitem", { name: "Administración" })).not.toBeInTheDocument();
   });
 });
+

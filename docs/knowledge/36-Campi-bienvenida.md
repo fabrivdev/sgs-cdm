@@ -1,5 +1,7 @@
 # Campi: bienvenida inicial de SIG CDM
 
+> Estado en `main` desde el 20/10/2026: bienvenida retirada del layout autenticado y del menú de cuenta por pedido del usuario. El comportamiento descrito abajo corresponde al prototipo histórico y a la rama alternativa de Panorama; no debe interpretarse como una función activa de `main`. Los recursos de Campi se conservan para continuar ese desarrollo en la rama alternativa.
+
 ## Alcance
 
 Campi se presenta únicamente a usuarios autenticados de Gerencia o Administración, en escritorio con «Soy Campi» y «Muy pronto». Explica que podrá ayudar a encontrar información importante, entender cambios y abrir el detalle, siempre con datos verificados y según los permisos del usuario. El saludo y las expresiones ocurren por sí solos, sin botones de respuesta prefijada. No consulta datos, no responde preguntas de negocio y no activa el asistente analítico ni el futuro Panorama. No hay migraciones ni cambios de permisos. La publicación pública en Lovable queda a cargo del usuario.
@@ -21,3 +23,4 @@ El aspecto 3D se logra con poses transparentes y CSS, sin modelo 3D. `CampiDeskt
 Fuente: `src/components/campi/CampiWelcome.tsx`, `CampiSprite.tsx`, `CampiActionSprite.tsx`, `campiState.ts`, `campi.css`, `src/components/AppLayout.tsx` y sus pruebas. El paquete recibido es la revisión V3. El asomo mostrado en el video V5 se retiró por decisión posterior del usuario. No se encontró el objeto local `b99ccea` en el repositorio accesible, por lo que la implementación se preparó en rama aislada desde `95e2779`, sin sobrescribir otros trabajos.
 
 La integración inicial se revisó en el navegador local autenticado, con sesión del perfil correcto. Se comprobaron cierre, foco, recuperación y prioridad de modal. Los ajustes posteriores se revisaron en la vista aislada local y se grabaron en video; queda pendiente volver a filmarlos dentro de una sesión autenticada. La versión sin asomo se comprobó en esa vista: apareció con una clave de usuario nueva, no reapareció al cerrar y recargar, y volvió solo desde el menú. Las 38 pruebas específicas verifican también que un diálogo abierto no marque la bienvenida como vista. TypeScript, lint de los archivos tocados y build pasaron. La suite completa y el lint global informaron fallos fuera de Campi durante la integración inicial; se documentaron por separado de las comprobaciones específicas. Estas comprobaciones locales no acreditan la publicación pública.
+

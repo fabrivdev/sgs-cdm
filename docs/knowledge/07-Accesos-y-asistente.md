@@ -57,4 +57,5 @@ Migración ejecutada en Lovable Cloud el 15/10: consulta final exitosa. Pruebas 
 
 ## Campi: bienvenida local
 
-Ver [[36-Campi-bienvenida]]. La introducción de Campi usa una capa de presentación de escritorio para usuarios autenticados y no reactiva el asistente IA ni cambia acceso a datos. Persistencia de visibilidad por usuario/navegador, sin sincronización remota. Rama local de revisión; no publicación acreditada.
+Ver [[36-Campi-bienvenida]]. La bienvenida de Campi se retiró de `main` el 20/10/2026: `AppLayout` ya no la monta ni ofrece «Conocer a Campi». El prototipo y sus recursos permanecen para el desarrollo de Panorama en la rama alternativa; esta nota no acredita su publicación en Lovable.
+
