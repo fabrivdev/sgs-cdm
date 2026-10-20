@@ -27,7 +27,7 @@ describe('catalog to source contract', () => {
       supporting: [], chart: null, breakdown: [], details: [], source: 'test', route: '',
     }]);
     const [story] = await loadPanoramaStories(['ventas_facturacion'], ['servicios.ventas'], '2026-10-16');
-    expect(story.title).toBe('Facturación neta');
+    expect(story.title).toBe('Facturación y NC');
     expect(story.question).toBe(PANORAMA_TOPICS.find(topic => topic.id === story.id)?.question);
   });
 });

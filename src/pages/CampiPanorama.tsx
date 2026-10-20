@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import type { StoryTopicId } from '@/lib/campi/panoramaStoryTypes';
-import { Activity, ArrowDown, ArrowUp, BarChart3, Boxes, CalendarDays, Check, ClipboardList, GripVertical, HandCoins, Package, Plus, Search, Ship, ShoppingCart, Tractor, Truck, Wrench, X } from 'lucide-react';
+import { Activity, ArrowDown, ArrowUp, BarChart3, Boxes, CalendarDays, Check, ClipboardList, GripVertical, HandCoins, Package, Plus, Ship, ShoppingCart, Tractor, Truck, Wrench, X } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { PageHeader, PageShell, Panel } from '@/components/layout/AppPrimitives';
 import { CampiPanoramaAvatar, type CampiPanoramaReaction } from '@/components/campi/CampiPanoramaAvatar';
@@ -17,7 +17,6 @@ import {
   type PanoramaTopicId,
 } from '@/lib/campi/panoramaPreferences';
 
-const GROUPS: readonly PanoramaTopicGroup[] = ['Resultados', 'Compromisos', 'Disponibilidad', 'Operación', 'Abastecimiento'];
 const topicIcons: Record<PanoramaTopicId, typeof BarChart3> = {
   ventas_evolucion: BarChart3,
   ventas_facturacion: BarChart3,
@@ -59,8 +58,6 @@ export default function CampiPanorama() {
   const [dragged, setDragged] = useState<StoryTopicId | null>(null);
   const [reaction, setReaction] = useState<CampiPanoramaReaction | null>(null);
   const [replacing, setReplacing] = useState<StoryTopicId | null>(null);
-  const [search, setSearch] = useState('');
-  const [area, setArea] = useState<'todas' | 'repuestos' | 'servicios' | 'parque'>('todas');
   const [saveError, setSaveError] = useState(false);
   const firstTime = saved === null;
   const activeUserId = useRef(userId);
@@ -79,8 +76,6 @@ export default function CampiPanorama() {
   const changed = saved === null || selected.join('|') !== persisted.join('|');
   const topicById = new Map(available.map(topic => [topic.id, topic]));
   const unselected = available.filter(topic => !selected.includes(topic.id));
-  const shown = unselected.filter(topic => (area === 'todas' || topic.sections.some(section => section.startsWith(`${area}.`)))
-    && `${topic.label} ${topic.question} ${topic.preview}`.normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase().includes(search.normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase().trim()));
   const react = (kind: CampiPanoramaReaction['kind']) => setReaction(current => ({ kind, token: (current?.token ?? 0) + 1 }));
 
   const add = (id: StoryTopicId) => {
@@ -137,28 +132,17 @@ export default function CampiPanorama() {
           <h2 className="text-[15px] font-semibold">Temas de interés</h2>
           <span className="text-[12px] tabular-nums text-muted-foreground">{available.length} disponibles · {selected.length} seleccionados · {unselected.length} alternativas</span>
         </div>
-        <div className="flex flex-wrap items-center gap-2">
-          <label className="relative min-w-[180px] flex-1"><Search aria-hidden="true" className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" /><span className="sr-only">Buscar temas</span><input type="search" value={search} onChange={event => setSearch(event.target.value)} placeholder="Buscar temas" className="h-9 w-full rounded-md border bg-background pl-9 pr-3 text-sm" /></label>
-          <select aria-label="Área" value={area} onChange={event => setArea(event.target.value as typeof area)} className="h-9 rounded-md border bg-background px-2 text-sm"><option value="todas">Todas las áreas</option>{(['repuestos', 'servicios', 'parque'] as const).filter(module => available.some(topic => topic.sections.some(section => section.startsWith(`${module}.`)))).map(module => <option key={module} value={module}>{module === 'parque' ? 'Máquinas' : module[0].toUpperCase() + module.slice(1)}</option>)}</select>
-        </div>
-        <div className="max-h-[430px] space-y-3 overflow-y-auto pr-1" aria-label="Temas disponibles">
-          {GROUPS.map(group => {
-            const topics = shown.filter(topic => topic.group === group);
-            if (!topics.length) return null;
-            return <section key={group} aria-label={group} className="space-y-1.5">
-              <h3 className="px-1 text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">{group}</h3>
-              {topics.map(topic => {
+        <div className="max-h-[430px] space-y-1.5 overflow-y-auto pr-1" aria-label="Temas disponibles">
+          {unselected.map(topic => {
                 const Icon = topicIcons[topic.id];
                 return <button key={topic.id} type="button" onClick={() => add(topic.id)} aria-label={topic.label}
                   className="flex min-h-[54px] w-full items-center gap-3 rounded-lg border bg-card px-3 text-left transition-colors hover:bg-accent focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring">
-                  <span className={cn('flex h-8 w-8 shrink-0 items-center justify-center rounded-full', groupTone[group])}><Icon className="h-4 w-4" /></span>
+                  <span className={cn('flex h-8 w-8 shrink-0 items-center justify-center rounded-full', groupTone[topic.group])}><Icon className="h-4 w-4" /></span>
                   <span className="min-w-0 flex-1"><strong className="block text-[13px] font-semibold">{topic.question}</strong><span className="block text-[12px] text-muted-foreground">{topic.label}</span></span>
                   <Plus className="h-4 w-4 shrink-0 text-muted-foreground" />
                 </button>;
-              })}
-            </section>;
           })}
-          {!shown.length && <div className="px-2 py-6 text-center text-[13px] text-muted-foreground">{unselected.length ? 'No hay temas para este filtro.' : 'Todos los temas están priorizados.'}</div>}
+          {!unselected.length && <div className="px-2 py-6 text-center text-[13px] text-muted-foreground">Todos los temas están priorizados.</div>}
         </div>
       </Panel>
       <Panel className="space-y-3 lg:sticky lg:top-3">

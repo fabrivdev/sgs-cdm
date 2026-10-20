@@ -40,7 +40,7 @@ describe('Campi alternative story dashboard', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Revisar temas' }));
     const select = screen.getByRole('combobox', { name: 'Tema a revisar' });
     expect(within(select).getAllByRole('option')).toHaveLength(2);
-    expect(within(select).queryByText('Composición del stock físico')).not.toBeInTheDocument();
+    expect(within(select).queryByText('Pedidos de máquinas')).not.toBeInTheDocument();
     fireEvent.change(select, { target: { value: 'servicios_abiertas' } });
     expect(await screen.findByRole('heading', { name: 'Tema servicios_abiertas' })).toBeInTheDocument();
     expect(localStorage.getItem('sig-cdm:panorama:alternativa:v1:manager-a')).toBe('["ventas_facturacion"]');
@@ -49,19 +49,19 @@ describe('Campi alternative story dashboard', () => {
     expect(screen.queryByRole('combobox')).not.toBeInTheDocument();
     expect(screen.queryByRole('heading', { name: 'Tema servicios_abiertas' })).not.toBeInTheDocument();
   });
-  it('shares one authorized sales query between Ventas and Facturación', async () => {
-    load.mockResolvedValue([story('ventas_evolucion', { sections: ['servicios.ventas'] }), story('ventas_facturacion', { sections: ['servicios.ventas'] })]);
-    show(['ventas_evolucion', 'ventas_facturacion'], section => section === 'servicios.ventas');
-    await screen.findByRole('heading', { name: 'Tema ventas_evolucion' });
-    expect(screen.getAllByRole('article')).toHaveLength(2);
+  it('loads the consolidated sales topic once for its authorized section', async () => {
+    load.mockResolvedValue([story('ventas_facturacion', { sections: ['servicios.ventas'] })]);
+    show(['ventas_facturacion'], section => section === 'servicios.ventas');
+    await screen.findByRole('heading', { name: 'Tema ventas_facturacion' });
+    expect(screen.getAllByRole('article')).toHaveLength(1);
     expect(load).toHaveBeenCalledTimes(1);
-    expect(load).toHaveBeenCalledWith(['ventas_evolucion', 'ventas_facturacion'], ['servicios.ventas'], expect.any(String));
+    expect(load).toHaveBeenCalledWith(['ventas_facturacion'], ['servicios.ventas'], expect.any(String));
   });
   it('renders every selected topic and chart in the chosen order, including the fourth', async () => {
-    const ids: StoryTopicId[] = ['maquinas_pedidos', 'ventas_facturacion', 'repuestos_stock', 'repuestos_sucursales'];
+    const ids: StoryTopicId[] = ['maquinas_pedidos', 'ventas_facturacion', 'repuestos_stock', 'servicios_abiertas'];
     load.mockResolvedValue([...ids].reverse().map(id => story(id)));
     show(ids);
-    await screen.findByRole('heading', { name: 'Tema repuestos_sucursales' });
+    await screen.findByRole('heading', { name: 'Tema servicios_abiertas' });
     expect(screen.getAllByRole('article').map(item => item.getAttribute('data-story'))).toEqual(ids);
     ids.forEach(id => expect(screen.getByRole('figure', { name: `Evolución ${id}` })).toBeInTheDocument());
     expect(screen.queryByText(/Datos al/)).not.toBeInTheDocument();
@@ -79,7 +79,7 @@ describe('Campi alternative story dashboard', () => {
     const ids: StoryTopicId[] = ['servicios_pendientes', 'repuestos_stock'];
     show(ids);
     expect(screen.getAllByRole('status', { name: /Consultando/ })).toHaveLength(ids.length);
-    expect(screen.getByRole('heading', { name: 'Resolución de órdenes de servicio' })).toBeInTheDocument();
+    expect(screen.getByRole('heading', { name: 'Tiempo de resolución de OS' })).toBeInTheDocument();
     expect(screen.getByRole('heading', { name: 'Stock antiguo de repuestos' })).toBeInTheDocument();
     expect(screen.queryByText('0')).not.toBeInTheDocument();
   });
