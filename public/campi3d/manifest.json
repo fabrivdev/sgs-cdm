@@ -1,0 +1,124 @@
+{
+  "title": "Campi | Prueba 3D articulada",
+  "reconstruction": true,
+  "source_asset": "2D reference only; card.glb is an unrelated card/clip/clamp mesh",
+  "fps": 24,
+  "duration_seconds": 53.0,
+  "frames": 1272,
+  "hierarchy": "pelvis -> torso -> shoulders -> upper arms -> elbows -> forearms -> wrists -> hands -> finger segments; pelvis -> hips -> thighs -> knees -> shins -> ankles -> feet",
+  "motion": "Action-driven timing, gaze lead and body follow, planted-foot IK only during support, ballistic jump with anticipation and impact recovery",
+  "gestures": [
+    {
+      "name": "Señalar con intención",
+      "start_seconds": 0,
+      "end_seconds": 4.5
+    },
+    {
+      "name": "Salto con carga, vuelo y recuperación",
+      "start_seconds": 5.12,
+      "end_seconds": 8.3
+    },
+    {
+      "name": "Giro atento",
+      "start_seconds": 9.22,
+      "end_seconds": 11.56
+    },
+    {
+      "name": "Pensar y comprender",
+      "start_seconds": 10.65,
+      "end_seconds": 13.85
+    },
+    {
+      "name": "Saludar",
+      "start_seconds": 13.67,
+      "end_seconds": 17.3
+    },
+    {
+      "name": "Reverencia",
+      "start_seconds": 17.25,
+      "end_seconds": 19.82
+    }
+  ],
+  "mesh_objects": 110,
+  "control_nodes": 48,
+  "limitations": [
+    "Procedural reconstruction of the reference, not its original topology or production mesh",
+    "Rigid jointed robot, not a skin-deformed organic rig",
+    "Six-action artistic motion study, not the full animation library"
+  ],
+  "study": {
+    "start_frame": 1,
+    "end_frame": 492,
+    "duration_seconds": 20.5
+  },
+  "states": {
+    "sereno": {
+      "id": "sereno",
+      "start_frame": 493,
+      "end_frame": 589,
+      "duration_seconds": 4.0
+    },
+    "contento": {
+      "id": "contento",
+      "start_frame": 590,
+      "end_frame": 686,
+      "duration_seconds": 4.0
+    },
+    "atento": {
+      "id": "atento",
+      "start_frame": 687,
+      "end_frame": 783,
+      "duration_seconds": 4.0
+    },
+    "preocupado": {
+      "id": "preocupado",
+      "start_frame": 784,
+      "end_frame": 880,
+      "duration_seconds": 4.0
+    },
+    "pensativo": {
+      "id": "pensativo",
+      "start_frame": 881,
+      "end_frame": 977,
+      "duration_seconds": 4.0
+    },
+    "sorprendido": {
+      "id": "sorprendido",
+      "start_frame": 978,
+      "end_frame": 1074,
+      "duration_seconds": 4.0
+    },
+    "explicativo": {
+      "id": "explicativo",
+      "start_frame": 1075,
+      "end_frame": 1171,
+      "duration_seconds": 4.0
+    },
+    "alivio": {
+      "id": "alivio",
+      "start_frame": 1172,
+      "end_frame": 1268,
+      "duration_seconds": 4.0
+    }
+  },
+  "postures": [
+    {
+      "id": "centrado_suelto",
+      "sample_frame": 1269
+    },
+    {
+      "id": "peso_izquierdo",
+      "sample_frame": 1270
+    },
+    {
+      "id": "peso_derecho",
+      "sample_frame": 1271
+    },
+    {
+      "id": "manos_bajas_juntas",
+      "sample_frame": 1272
+    }
+  ],
+  "status": "Eight authored state loops and four authored support poses; runtime transitions are verified separately",
+  "catalog_variants_accepted": 0
+}

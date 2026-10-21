@@ -5,6 +5,12 @@ import { CampiPanoramaAvatar } from './CampiPanoramaAvatar';
 vi.mock('./CampiSprite', () => ({
   CampiSprite: ({ state, action, active }: { state: string; action: string; active: boolean }) => <span data-testid="campi-pose" data-action={action} data-active={active}>{state}</span>,
 }));
+vi.mock('./CampiThreeCanvas', () => ({
+  CampiThreeCanvas: ({ mood, reaction, paused, reduced, onReady }: {
+    mood: string; reaction: { id: string } | null; paused: boolean; reduced: boolean; onReady: () => void;
+  }) => <span data-testid="campi-3d" data-mood={mood} data-recipe={reaction?.id ?? ''}
+    data-paused={paused} data-reduced={reduced} onClick={event => { event.stopPropagation(); onReady(); }} />,
+}));
 
 beforeEach(() => {
   sessionStorage.clear();
@@ -14,6 +20,17 @@ beforeEach(() => {
 afterEach(() => { cleanup(); vi.useRealTimers(); vi.unstubAllGlobals(); });
 
 describe('Campi in Panorama', () => {
+  it('shows the 3D model when ready, pauses the sprite backup, and sends a contextual gesture', async () => {
+    render(<CampiPanoramaAvatar mood="atento" />);
+    await act(async () => {});
+    const model = screen.getByTestId('campi-3d');
+    expect(model).toHaveAttribute('data-mood', 'atento');
+    fireEvent.click(model);
+    expect(screen.getByRole('button', { name: 'Saludar a Campi' })).toHaveAttribute('data-three-ready', 'true');
+    expect(screen.getByTestId('campi-pose')).toHaveAttribute('data-active', 'false');
+    fireEvent.click(screen.getByRole('button', { name: 'Saludar a Campi' }));
+    expect(model).toHaveAttribute('data-recipe', 'atento-01');
+  });
   it('pauses face and action playback in a detail and consumes intervening cues', () => {
     const view = render(<CampiPanoramaAvatar />);
     view.rerender(<CampiPanoramaAvatar quiet reaction={{ kind: 'select', token: 1 }} />);
