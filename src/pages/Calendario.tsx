@@ -1,5 +1,6 @@
 import { SectionActionsMenu } from "@/components/exports/SectionActionsMenu";
 import { useEffect, useMemo, useState } from "react";
+import { useSearchParams } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
 import { useServicioTecnicos } from "@/hooks/useServicioTecnicos";
@@ -108,11 +109,16 @@ async function cargarTodosLosClientes() {
 }
 
 export default function Calendario() {
+  const [searchParams] = useSearchParams();
   const { isAdmin, isCabecilla } = useAuth();
   const { setPageFilters, clearPageFilters } = useAssistantPageContext();
   const [vista, setVista] = useState<"mes" | "semana" | "tecnicos">("mes");
   const isPhone = useIsMobile(640);
-  const [cursor, setCursor] = useState(new Date());
+  const [cursor, setCursor] = useState(() => {
+    const date = searchParams.get("fecha");
+    return date && /^\d{4}-\d{2}-\d{2}$/.test(date) && Number.isFinite(Date.parse(`${date}T12:00:00`))
+      ? parseISO(date) : new Date();
+  });
   const [servicios, setServicios] = useState<Servicio[]>([]);
   const [profiles, setProfiles] = useState<Profile[]>([]);
   const { data: tecnicosSolo = [] } = useServicioTecnicos();

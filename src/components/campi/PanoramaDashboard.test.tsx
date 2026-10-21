@@ -39,15 +39,15 @@ describe('Campi alternative story dashboard', () => {
     show(['ventas_facturacion'], section => section === 'servicios.ordenes');
     fireEvent.click(screen.getByRole('button', { name: 'Revisar temas' }));
     const select = screen.getByRole('combobox', { name: 'Tema a revisar' });
-    expect(within(select).getAllByRole('option')).toHaveLength(3);
+    expect(within(select).getAllByRole('option')).toHaveLength(4);
     expect(within(select).queryByText('Pedidos de máquinas')).not.toBeInTheDocument();
-    fireEvent.change(select, { target: { value: 'servicios_abiertas' } });
-    expect(await screen.findByRole('heading', { name: 'Tema servicios_abiertas' })).toBeInTheDocument();
+    fireEvent.change(select, { target: { value: 'servicios_os_antiguas' } });
+    expect(await screen.findByRole('heading', { name: 'Tema servicios_os_antiguas' })).toBeInTheDocument();
     expect(localStorage.getItem('sig-cdm:panorama:alternativa:v1:manager-a')).toBe('["ventas_facturacion"]');
     expect(localStorage.getItem('sig-cdm:panorama:alternativa:visita:v1:manager-a')).toBeNull();
     fireEvent.click(screen.getByRole('button', { name: 'Volver a mis prioridades' }));
     expect(screen.queryByRole('combobox')).not.toBeInTheDocument();
-    expect(screen.queryByRole('heading', { name: 'Tema servicios_abiertas' })).not.toBeInTheDocument();
+    expect(screen.queryByRole('heading', { name: 'Tema servicios_os_antiguas' })).not.toBeInTheDocument();
   });
   it('loads the consolidated sales topic once for its authorized section', async () => {
     load.mockResolvedValue([story('ventas_facturacion', { sections: ['servicios.ventas'] })]);
@@ -58,14 +58,14 @@ describe('Campi alternative story dashboard', () => {
     expect(load).toHaveBeenCalledWith(['ventas_facturacion'], ['servicios.ventas'], expect.any(String));
   });
   it('renders every selected topic and chart in the chosen order, including the fourth', async () => {
-    const ids: StoryTopicId[] = ['maquinas_pedidos', 'ventas_facturacion', 'repuestos_stock', 'servicios_abiertas'];
+    const ids: StoryTopicId[] = ['maquinas_pedidos', 'ventas_facturacion', 'repuestos_stock', 'servicios_os_antiguas'];
     load.mockResolvedValue([...ids].reverse().map(id => story(id)));
     show(ids);
-    await screen.findByRole('heading', { name: 'Tema servicios_abiertas' });
+    await screen.findByRole('heading', { name: 'Tema servicios_os_antiguas' });
     expect(screen.getAllByRole('article').map(item => item.getAttribute('data-story'))).toEqual(ids);
     ids.forEach(id => expect(screen.getByRole('figure', { name: `Evolución ${id}` })).toBeInTheDocument());
     expect(screen.queryByText(/Datos al/)).not.toBeInTheDocument();
-    expect(screen.getAllByRole('link', { name: /Ver detalle de Tema/ })).toHaveLength(3);
+    expect(screen.getAllByRole('link', { name: /Ver detalle de Tema/ })).toHaveLength(4);
   });
   it('keeps all selected topics without adding an explanatory line', async () => {
     const ids = PANORAMA_TOPICS.map(topic => topic.id);

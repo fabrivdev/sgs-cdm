@@ -17,7 +17,7 @@ export interface OrderBilling {
 }
 export const billingKey = (os: string) => os.trim().toUpperCase();
 /** Historical OS have no verifiable billed-hour tariff; never fetch them for efficiency. */
-export function efficiencyBillingOrders(rows: readonly ServicioOSRow[], firstDetailedDay: string) {
+export function efficiencyBillingOrders<T extends Pick<ServicioOSRow, 'estadoOS' | 'fechaApertura' | 'fechaCierre' | 'fechaFacturacion'>>(rows: readonly T[], firstDetailedDay: string): T[] {
   return rows.filter(row => row.estadoOS === "Cerrada" &&
     [row.fechaApertura, row.fechaCierre, row.fechaFacturacion].some(date => date && date >= firstDetailedDay));
 }
@@ -26,7 +26,7 @@ function checkAborted(signal?: AbortSignal) {
 }
 
 /** Compare complete, billed, closed orders, not technicians or invoice rows. */
-export function billingEfficiency(rows: ServicioOSRow[]) {
+export function billingEfficiency(rows: Pick<ServicioOSRow, 'os' | 'estadoOS' | 'horas' | 'billing'>[]) {
   let billedHours = 0, workedHours = 0, orders = 0, incomplete = 0;
   const seen = new Set<string>();
   for (const row of rows) {

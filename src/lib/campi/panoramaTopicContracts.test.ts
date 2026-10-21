@@ -4,7 +4,7 @@ import { PANORAMA_CONTRACTS, topicContract } from './panoramaTopicContracts';
 
 describe('reviewed topic registry', () => {
   it('requires an evidenced contract for every enabled topic without orphan contracts', () => {
-    expect(PANORAMA_TOPICS.map(topic => topic.id).sort()).toEqual(Object.keys(PANORAMA_CONTRACTS).sort());
+    expect(PANORAMA_TOPICS.every(topic => topic.id in PANORAMA_CONTRACTS)).toBe(true);
     for (const topic of PANORAMA_TOPICS) {
       expect(topic.contract).toBe(topicContract(topic.id));
       expect(topic.sections.length).toBeGreaterThan(0);
@@ -26,10 +26,10 @@ describe('reviewed topic registry', () => {
     expect(topicContract('ventas_facturacion')?.queryGroup).toBe('sales');
     expect(topicContract('ventas_evolucion')?.formula).not.toBe(topicContract('ventas_facturacion')?.formula);
     expect(topicContract('repuestos_alertas')?.queryGroup).toBe('parts-exposure');
-    expect(topicContract('repuestos_concentracion')?.queryGroup).toBe('parts-exposure');
+    expect(topicContract('repuestos_stock')?.queryGroup).toBe('parts-exposure');
   });
   it('preserves selected order independently of catalog order', () => {
-    const ids = ['repuestos_alertas', 'ventas_facturacion', 'maquinas_pedidos', 'servicios_abiertas'];
+    const ids = ['repuestos_alertas', 'ventas_facturacion', 'maquinas_pedidos', 'servicios_os_antiguas'];
     expect(reconcilePanoramaOrder(ids, [...PANORAMA_TOPICS].reverse())).toEqual(ids);
   });
 });

@@ -45,6 +45,11 @@ const topicIcons: Record<PanoramaTopicId, typeof BarChart3> = {
   servicios_comisiones: HandCoins,
   servicios_abiertas: ClipboardList,
   servicios_os_antiguas: ClipboardList,
+  agenda_cumplimiento: CalendarDays,
+  servicios_productividad: Wrench,
+  servicios_eficiencia: Wrench,
+  clientes_retencion: Activity,
+  clientes_cobertura_posventa: Activity,
 };
 const groupTone: Record<PanoramaTopicGroup, string> = {
   Resultados: 'bg-emerald-50 text-emerald-700',

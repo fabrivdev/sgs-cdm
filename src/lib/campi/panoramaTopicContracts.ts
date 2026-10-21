@@ -14,7 +14,7 @@ export type TopicContract = {
   evidence: readonly string[];
   tests: readonly string[];
 };
-export type EnabledTopicId = Exclude<StoryTopicId, 'repuestos_clientes' | 'maquinas_proyeccion' | 'maquinas_stock'>;
+export type EnabledTopicId = Exclude<StoryTopicId, 'repuestos_clientes' | 'maquinas_proyeccion' | 'maquinas_stock' | 'repuestos_demanda' | 'servicios_trabajo' | 'servicios_agenda' | 'maquinas_importacion' | 'maquinas_parque' | 'repuestos_reposicion' | 'servicios_comisiones'>;
 export const PANORAMA_CONTRACTS = {
   ventas_evolucion: {
     queryGroup: 'sales', unit: 'percent', formula: '(Ventas antes de NC del mes hasta el corte / ventas antes de NC del mismo tramo LY − 1) × 100; sin porcentaje si LY no es positivo.',
@@ -118,6 +118,41 @@ export const PANORAMA_CONTRACTS = {
     period: 'Edad al día de análisis.', comparison: 'snapshot', chart: 'concentration',
     limitations: ['No es rotación.', 'Sin fecha excluido del promedio.', 'Corte físico no acreditado.'],
     evidence: ['operationsStories.ts'], tests: ['operationsStories.test.ts'],
+  },
+  agenda_cumplimiento: {
+    queryGroup: 'planning', unit: 'percent', formula: 'Jornadas completadas / jornadas evaluables hasta el corte × 100.',
+    population: 'Jornadas del período con estado válido; las futuras se excluyen.',
+    period: 'Mes hasta el corte.', comparison: 'snapshot', chart: 'composition',
+    limitations: ['Una jornada completada no acredita una OS cerrada.', 'Las reprogramaciones históricas no están reconstruidas.'],
+    evidence: ['servicio_jornadas'], tests: ['managerialStories.test.ts'],
+  },
+  servicios_productividad: {
+    queryGroup: 'work-productivity', unit: 'percent', formula: 'Horas-persona trabajadas / horas-persona disponibles × 100.',
+    population: 'Técnicos elegibles del libro de trabajo de Servicios desde julio de 2026.',
+    period: 'Mes hasta el corte.', comparison: 'snapshot', chart: 'composition',
+    limitations: ['Registros de tiempo inválidos o superpuestos no son horas trabajadas.', 'Sin capacidad positiva el porcentaje no es medible.'],
+    evidence: ['workedProductivity.ts', 'service_orders_work_log_v1'], tests: ['managerialStories.test.ts'],
+  },
+  servicios_eficiencia: {
+    queryGroup: 'service-billing-efficiency', unit: 'percent', formula: 'Horas facturadas / horas trabajadas de la misma cohorte de OS cerradas × 100.',
+    population: 'OS cerradas en el mes desde julio de 2026 con facturación y horas conciliadas.',
+    period: 'Mes hasta el corte.', comparison: 'snapshot', chart: 'composition',
+    limitations: ['Una OS sin horas o con tarifa faltante deja la cohorte no medible.', 'No representa pagos de caja.'],
+    evidence: ['billingEfficiency', 'service_orders_billing_v2'], tests: ['managerialStories.test.ts'],
+  },
+  clientes_retencion: {
+    queryGroup: 'customer-cohorts', unit: 'percent', formula: 'Compradores retenidos / compradores de cohorte base × 100.',
+    population: 'Compradores identificados de posventa de ventanas comparables.',
+    period: 'Mes actual y mes previo equivalente hasta el corte.', comparison: 'equivalent-period', chart: 'composition',
+    limitations: ['Sin recompra no significa cliente perdido.', 'Una cohorte base vacía no produce tasa.'],
+    evidence: ['gerencial_clientes_resumen_v1'], tests: ['managerialStories.test.ts'],
+  },
+  clientes_cobertura_posventa: {
+    queryGroup: 'customer-cohorts', unit: 'percent', formula: 'Propietarios elegibles con compra neta positiva de posventa / propietarios elegibles × 100.',
+    population: 'Clientes únicos con parque activo del mismo corte.',
+    period: 'Mes hasta el corte.', comparison: 'snapshot', chart: 'composition',
+    limitations: ['La ausencia de compra no demuestra abandono.', 'Sin propietarios elegibles no hay tasa.'],
+    evidence: ['gerencial_clientes_resumen_v1'], tests: ['managerialStories.test.ts'],
   },
 } satisfies Record<EnabledTopicId, TopicContract>;
 

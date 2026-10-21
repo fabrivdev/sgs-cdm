@@ -15,7 +15,8 @@ export function storyDestinations(story: PanoramaStory): StoryDestination[] {
     const query = new URLSearchParams({ desde: story.navigationPeriod.from, hasta: story.navigationPeriod.to });
     return story.sections.flatMap(section => section in SALES_SECTIONS
       ? [{ label: SALES_SECTIONS[section as keyof typeof SALES_SECTIONS].label, route: `${SALES_SECTIONS[section as keyof typeof SALES_SECTIONS].route}?${query}` }]
-      : []);
+      : section === 'servicios.ordenes' && story.route === '/servicios/ordenes'
+        ? [{ label: story.title, route: `${story.route}?${query}` }] : []);
   }
   if (story.id === 'repuestos_alertas') return story.breakdown.filter(row => row.group === 'Avisos' && row.route).map(row => ({ label: row.label, route: row.route! }));
   if (story.id === 'servicios_pendientes') {

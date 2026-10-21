@@ -51,7 +51,7 @@ export function OrdersWorkspace() {
   const compact = useIsMobile(1024);
   const { setPageFilters, clearPageFilters } = useAssistantPageContext();
   const [today] = useState(() => new Date());
-  const [tab, setTab] = useState("ordenes");
+  const [tab, setTab] = useState(() => searchParams.get("tab") === "productividad" ? "productividad" : "ordenes");
   const [technicianStatus, setTechnicianStatus] = useState<TechnicianStatus>("activos");
   const [selectedTechnician, setSelectedTechnician] = useState<string | null>(null);
   const [matrixMetric, setMatrixMetric] = useState<"trabajos" | "horas">("trabajos");
