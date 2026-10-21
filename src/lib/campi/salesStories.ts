@@ -98,7 +98,7 @@ function base(id: StoryTopicId, sources: Source[], asOf: string): PanoramaStory 
   return { id, visitKey: `${id}:v3:${asOf.slice(0, 7)}`, title: topic?.title ?? 'Ventas de repuestos', question: topic?.question ?? '¿Cómo se componen las ventas y notas de crédito de repuestos?', status: 'ready', message: '', scope: sources.map(source => source.label).join(' + '), sections: sources.map(source => source.section), cutoff: null, periodLabel: `01/${asOf.slice(5, 7)}–${asOf.slice(8, 10)}/${asOf.slice(5, 7)}/${asOf.slice(0, 4)}`, primary: null, supporting: [], chart: null, breakdown: [], details: ['Fecha de factura. Ventas antes de NC y notas de crédito por separado.', 'La fecha de referencia limita el período; la fuente no informa su fecha real de actualización.'], source: sources.map(source => source.rpc).join(' + '), route: sources.length === 1 ? sources[0].route : '', navigationPeriod: { from: `${asOf.slice(0, 7)}-01`, to: asOf } };
 }
 
-export const loadSalesStories: StoryLoader = async (topics, granted, asOf) => {
+export const loadSalesStories: StoryLoader = async (topics, granted, asOf, period = 'month') => {
   const billingIds = (['ventas_evolucion', 'ventas_facturacion', 'ventas_neto_anual', 'ventas_nc_impacto', 'ventas_repuestos', 'ventas_servicios', 'ventas_maquinas'] as const).filter(id => topics.includes(id));
   const billingSources = billingIds.length ? SOURCES.filter(source => granted.includes(source.section)) : [];
   const sourcesFor = (id: StoryTopicId) => id === 'ventas_repuestos' ? billingSources.filter(source => source.section === 'repuestos.ventas')
@@ -167,7 +167,8 @@ export const loadSalesStories: StoryLoader = async (topics, granted, asOf) => {
         if (Math.abs(gross - credits - net) > Math.max(0.01, Math.abs(net) * 1e-10)) throw new Error('Las ventas y NC consolidadas no concilian con el neto.');
         const unit = 'USD' as const;
         if (id === 'ventas_evolucion' || id === 'ventas_repuestos' || id === 'ventas_servicios' || id === 'ventas_maquinas') {
-          story.visitKey = `${id}:${id === 'ventas_evolucion' ? 'variacion-v2' : 'brutas-v1'}:${asOf.slice(0, 7)}`;
+          story.visitKey = `${id}:${id === 'ventas_evolucion' ? 'variacion-v2' : 'brutas-v1'}:${period}:${asOf.slice(0, 7)}`;
+          if (id === 'ventas_evolucion') { story.periodMode = period; story.periodOptions = ['month', 'ytd']; }
           story.primary = id === 'ventas_evolucion'
             ? { label: 'Variación de ventas vs LY', value: salesChange(gross, grossLY), unit: 'percent', note: grossLY <= 0 ? 'Sin base comparable de ventas antes de NC.' : undefined }
             : { label: 'Ventas antes de NC del mes', value: gross, unit, comparison: { value: grossLY, label: `Mismo tramo de ${ranges.year - 1}` } };
@@ -184,6 +185,14 @@ export const loadSalesStories: StoryLoader = async (topics, granted, asOf) => {
           story.breakdown = monthlyReports.map(item => ({ label: item.source.label, value: numeric(item.month[item.source.gross]), previous: numeric(item.monthLY[item.source.gross]), unit, route: item.source.route }));
           story.message = grossLY > 0 ? `Las ventas antes de NC ${gross >= grossLY ? 'subieron' : 'bajaron'} ${new Intl.NumberFormat('es-PY', { maximumFractionDigits: 1 }).format(Math.abs(salesChange(gross, grossLY)!))}% frente al mismo tramo del año anterior.` : 'No hay base comparable para calcular la variación mensual de ventas.';
           story.details.push(`Ventas positivas de facturas entre ${monthFrom} y ${ranges.to}; comparación con ${monthLYFrom} a ${ranges.previousTo}. Las NC se analizan por separado en Facturación neta.`, 'El acumulado compara fechas equivalentes de ambos años.');
+          if (period === 'ytd' && id === 'ventas_evolucion') {
+            story.periodLabel = `${ranges.from}–${asOf}`;
+            story.navigationPeriod = { from: ranges.from, to: asOf };
+            story.primary = { label: 'Variación acumulada vs LY', value: salesChange(ytdGross, ytdGrossLY), unit: 'percent', note: ytdGrossLY <= 0 ? 'Sin base anual comparable.' : undefined };
+            story.supporting = [{ label: 'Ventas acumuladas antes de NC', value: ytdGross, unit, comparison: { value: ytdGrossLY, label: `Mismo corte de ${ranges.year - 1}` } }];
+            story.breakdown = monthlyReports.map(item => ({ label: item.source.label, value: numeric(item.current[item.source.gross]), previous: numeric(item.previous[item.source.gross]), unit, route: item.source.route }));
+            story.message = ytdGrossLY > 0 ? `Las ventas acumuladas antes de NC ${ytdGross >= ytdGrossLY ? 'subieron' : 'bajaron'} ${new Intl.NumberFormat('es-PY', { maximumFractionDigits: 1 }).format(Math.abs(salesChange(ytdGross, ytdGrossLY)!))}% frente al mismo corte del año anterior.` : 'No hay base anual comparable para calcular la variación.';
+          }
           return story;
         }
         if (id === 'ventas_neto_anual') {
@@ -208,7 +217,8 @@ export const loadSalesStories: StoryLoader = async (topics, granted, asOf) => {
           story.message = gross > 0 ? `Las NC equivalen al ${new Intl.NumberFormat('es-PY', { maximumFractionDigits: 1 }).format(credits / gross * 100)}% de las ventas antes de NC del mes.` : 'Sin ventas positivas para expresar las NC como porcentaje.';
           return story;
         }
-        story.visitKey = `${id}:neto-v3:${asOf.slice(0, 7)}`;
+        story.visitKey = `${id}:neto-v3:${period}:${asOf.slice(0, 7)}`;
+        if (id === 'ventas_facturacion') { story.periodMode = period; story.periodOptions = ['month', 'ytd']; }
         story.primary = { label: 'Facturación neta del mes', value: net, unit, comparison: { value: netLY, label: `Mismo tramo de ${ranges.year - 1}` } };
         story.supporting = [
           { label: 'Ventas antes de NC del mes', value: gross, unit, comparison: { value: grossLY, label: `Mismo tramo de ${ranges.year - 1}` } },
@@ -233,6 +243,15 @@ export const loadSalesStories: StoryLoader = async (topics, granted, asOf) => {
         story.message = `Facturación neta del mes: $ ${new Intl.NumberFormat('es-PY', { maximumFractionDigits: 2 }).format(net)}, después de $ ${new Intl.NumberFormat('es-PY', { maximumFractionDigits: 2 }).format(credits)} en notas de crédito.`;
         story.attention = false;
         story.details.push('Cada área usa su mismo contrato de movimientos en USD. Ventas antes de NC − importe de NC = neto; el signo de NC se normaliza exactamente una vez.', `Comparación del ${monthFrom} al ${ranges.to} con ${monthLYFrom} al ${ranges.previousTo}.`, 'El acumulado neto usa el mismo corte de fechas de ambos años. El mes anterior completo es solo contexto, no un tramo equivalente.');
+        if (period === 'ytd' && id === 'ventas_facturacion') {
+          story.periodLabel = `${ranges.from}–${asOf}`;
+          story.navigationPeriod = { from: ranges.from, to: asOf };
+          story.primary = { label: 'Facturación neta acumulada', value: ytdNet, unit, comparison: { value: ytdNetLY, label: `Mismo corte de ${ranges.year - 1}` } };
+          story.supporting = [{ label: 'Ventas antes de NC acumuladas', value: ytdGross, unit }, { label: 'Notas de crédito acumuladas', value: -ytdCredits, unit }];
+          story.chart = { ...story.detailChart! };
+          story.breakdown = monthlyReports.map(item => ({ label: item.source.label, value: numeric(item.current[item.source.amount]), unit, route: item.source.route, billing: { sales: numeric(item.current[item.source.gross]), credits: numeric(item.current[item.source.gross]) - numeric(item.current[item.source.amount]) } }));
+          story.message = `Facturación neta acumulada: $ ${new Intl.NumberFormat('es-PY', { maximumFractionDigits: 2 }).format(ytdNet)}, después de $ ${new Intl.NumberFormat('es-PY', { maximumFractionDigits: 2 }).format(ytdCredits)} en notas de crédito.`;
+        }
         return story;
       }
       const composition = id === 'repuestos_clientes';

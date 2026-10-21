@@ -1,12 +1,15 @@
 import type { SectionKey } from '@/lib/permissions';
 
-export type StoryTopicId = 'ventas_evolucion' | 'ventas_facturacion' | 'ventas_neto_anual' | 'ventas_nc_impacto' | 'ventas_repuestos' | 'repuestos_sucursales' | 'repuestos_stock' | 'repuestos_alertas' | 'repuestos_concentracion' | 'repuestos_rojo' | 'repuestos_demanda' | 'maquinas_pedidos' | 'maquinas_pedidos_stock' | 'maquinas_stock' | 'maquinas_proyeccion' | 'maquinas_importacion' | 'maquinas_parque' | 'servicios_pendientes' | 'servicios_abiertas' | 'servicios_os_antiguas' | 'servicios_trabajo' | 'servicios_agenda' | 'servicios_comisiones' | 'agenda_cumplimiento' | 'servicios_productividad' | 'servicios_eficiencia' | 'clientes_retencion' | 'clientes_cobertura_posventa' | 'ventas_servicios' | 'ventas_maquinas' | 'repuestos_clientes' | 'repuestos_reposicion';
+export type StoryTopicId = 'ventas_evolucion' | 'ventas_facturacion' | 'ventas_neto_anual' | 'ventas_nc_impacto' | 'ventas_repuestos' | 'repuestos_sucursales' | 'repuestos_stock' | 'repuestos_alertas' | 'repuestos_concentracion' | 'repuestos_rojo' | 'repuestos_demanda' | 'maquinas_pedidos' | 'maquinas_pedidos_stock' | 'maquinas_stock' | 'maquinas_proyeccion' | 'maquinas_importacion' | 'maquinas_parque' | 'servicios_pendientes' | 'servicios_abiertas' | 'servicios_os_antiguas' | 'servicios_os_facturadas' | 'servicios_trabajo' | 'servicios_agenda' | 'servicios_comisiones' | 'agenda_cumplimiento' | 'servicios_productividad' | 'servicios_eficiencia' | 'clientes_retencion' | 'clientes_cobertura_posventa' | 'ventas_servicios' | 'ventas_maquinas' | 'repuestos_clientes' | 'repuestos_reposicion';
+export type StoryPeriod = 'month' | 'ytd';
 export type StoryUnit = 'USD' | 'PYG' | 'count' | 'percent' | 'days';
 export type StoryDatum = { label: string; value: number | null; unit: StoryUnit; note?: string; comparison?: { value: number; label: string } };
 export type StoryChartRow = { label: string; value: number; previous?: number };
 export type StoryBreakdown = { label: string; value: number; unit: StoryUnit; route?: string; note?: string; group?: string; previous?: number; billing?: { sales: number; credits: number } };
 export type PanoramaStory = {
   id: StoryTopicId;
+  periodMode?: StoryPeriod;
+  periodOptions?: readonly StoryPeriod[];
   title: string;
   question: string;
   status: 'ready' | 'empty' | 'error';
@@ -50,4 +53,4 @@ export type PanoramaStory = {
   };
 };
 
-export type StoryLoader = (topics: readonly StoryTopicId[], granted: readonly SectionKey[], asOf: string) => Promise<PanoramaStory[]>;
+export type StoryLoader = (topics: readonly StoryTopicId[], granted: readonly SectionKey[], asOf: string, period?: StoryPeriod) => Promise<PanoramaStory[]>;

@@ -13,7 +13,7 @@ const TOPIC_LABELS: readonly (Omit<PanoramaTopic, 'id' | 'contract'> & { id: Ena
   { id: 'ventas_facturacion', label: 'Facturación y notas de crédito', title: 'Facturación neta', question: '¿Cuánto quedó facturado después de las NC?', preview: 'Neto, ventas y NC por área autorizada.', group: 'Resultados', sections: ['servicios.ventas', 'parque.ventas', 'repuestos.ventas'], definitionVersion: 'ventas-netas-nc-separadas-v3' },
   { id: 'maquinas_pedidos', label: 'Pedidos pendientes', title: 'Pedidos pendientes', question: '¿Cuántos pedidos pendientes tienen stock vinculado y cómo se abastece el resto?', preview: 'Total pendiente, proporción con stock, importaciones y unidades sin vínculo.', group: 'Compromisos', sections: ['parque.operaciones'], definitionVersion: 'pedidos-abastecimiento-v2' },
   { id: 'servicios_pendientes', label: 'Resolución de órdenes de servicio', title: 'Resolución de órdenes de servicio', question: '¿Cuánto tardaron en resolverse las OS cerradas?', preview: 'Mediana de cierres y resguardo de abiertas.', group: 'Operación', sections: ['servicios.ordenes'], definitionVersion: 'resolucion-v1' },
-  { id: 'servicios_os_antiguas', label: 'OS abiertas de más de 90 días', title: 'OS abiertas de más de 90 días', question: '¿Cuántas OS abiertas llevan más de 90 días?', preview: 'Cantidad y proporción de la cartera abierta según reporte TOTVS.', group: 'Operación', sections: ['servicios.ordenes'], definitionVersion: 'cola-mas-90-v1' },
+  { id: 'servicios_os_facturadas', label: 'OS facturadas a clientes', title: 'OS facturadas a clientes', question: '¿Qué porcentaje de las OS cerradas se facturó a clientes?', preview: 'OS cerradas con tipo Cliente y factura positiva vinculada.', group: 'Operación', sections: ['servicios.ordenes', 'servicios.ventas'], requiresAllSections: true, definitionVersion: 'os-facturadas-cliente-v1' },
   { id: 'repuestos_stock', label: 'Stock antiguo de repuestos', title: 'Stock antiguo de repuestos', question: '¿Qué valor de repuestos está en gris o rojo?', preview: 'Valor, proporción y cambios próximos de color.', group: 'Disponibilidad', sections: ['repuestos.analisis'], definitionVersion: 'exposicion-valor-positivo-v1' },
   { id: 'repuestos_alertas', label: 'Cambios próximos de clasificación', title: 'Cambios próximos de clasificación', question: '¿Qué valor podría pasar a gris o rojo en 30 días?', preview: 'Importe y códigos, si no hay movimientos nuevos.', group: 'Disponibilidad', sections: ['repuestos.analisis'], definitionVersion: 'transicion-30d-v1' },
   { id: 'agenda_cumplimiento', label: 'Cumplimiento de agenda', title: 'Cumplimiento de agenda', question: '¿Estamos cumpliendo la agenda de trabajos?', preview: 'Compromisos evaluables completados en el período.', group: 'Operación', sections: ['servicios.planificador'], definitionVersion: 'agenda-cumplimiento-v1' },
@@ -41,7 +41,7 @@ export function availablePanoramaTopics(
 
 export function reconcilePanoramaOrder(saved: readonly string[] | null, available: readonly PanoramaTopic[]) {
   const permitted = new Set<string>(available.map(topic => topic.id));
-  const migrated = saved ?? [];
+  const migrated = (saved ?? []).map(id => id === 'servicios_os_antiguas' ? 'servicios_os_facturadas' : id);
   return migrated.filter((id, index, all): id is StoryTopicId =>
     permitted.has(id) && all.indexOf(id) === index,
   ).slice(0, MAX_PANORAMA_TOPICS);

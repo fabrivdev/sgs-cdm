@@ -86,6 +86,13 @@ export const PANORAMA_CONTRACTS = {
     population: 'Solo OS abiertas del reporte TOTVS completo.', period: 'Foto de OS abiertas.', comparison: 'snapshot', chart: 'composition',
     limitations: ['Más de 90 días no prueba incumplimiento sin fecha comprometida.'], evidence: ['campi_os_abiertas_detalle_v1'], tests: ['operationsStories.test.ts'],
   },
+  servicios_os_facturadas: {
+    queryGroup: 'service-client-billing', unit: 'percent', formula: 'OS cerradas con tipo de tiempo Cliente y documento positivo vinculado / OS cerradas del período × 100.',
+    population: 'OS del reporte TOTVS con estado cerrado y fecha de cierre en el período; identidad única para conciliar factura.',
+    period: 'Mes o acumulado anual hasta el corte.', comparison: 'snapshot', chart: 'composition',
+    limitations: ['Una OS interna, de garantía o sin factura comprobada no cuenta como facturada al cliente.', 'La tasa describe la cohorte de cierres, no la facturación emitida en el período.'],
+    evidence: ['ordenes_servicio_importadas', 'service_orders_billing_v2'], tests: ['managerialStories.test.ts'],
+  },
   repuestos_stock: {
     queryGroup: 'parts-exposure', unit: 'USD', formula: 'Valor positivo de ubicaciones con stock positivo de códigos en gris o rojo.',
     population: 'REP con saldo global positivo y ubicación física positiva.',

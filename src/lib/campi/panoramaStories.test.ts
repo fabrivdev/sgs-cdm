@@ -18,16 +18,16 @@ describe('catalog to source contract', () => {
   });
   it('does not load billed-hours efficiency without both service permissions', async () => {
     await loadPanoramaStories(['servicios_eficiencia'], ['servicios.ordenes'], '2026-10-16');
-    expect(loadManagerialStories).toHaveBeenLastCalledWith([], ['servicios.ordenes'], '2026-10-16');
+    expect(loadManagerialStories).toHaveBeenLastCalledWith([], ['servicios.ordenes'], '2026-10-16', 'month');
     await loadPanoramaStories(['servicios_eficiencia'], ['servicios.ordenes', 'servicios.ventas'], '2026-10-16');
-    expect(loadManagerialStories).toHaveBeenLastCalledWith(['servicios_eficiencia'], ['servicios.ordenes', 'servicios.ventas'], '2026-10-16');
+    expect(loadManagerialStories).toHaveBeenLastCalledWith(['servicios_eficiencia'], ['servicios.ordenes', 'servicios.ventas'], '2026-10-16', 'month');
   });
   it('passes all selected topics without capping the fourth', async () => {
     const ids = PANORAMA_TOPICS.map(topic => topic.id);
     await loadPanoramaStories(ids, storySectionsForTopics(ids, () => true), '2026-10-16');
-    expect(loadSalesStories).toHaveBeenLastCalledWith(ids, expect.any(Array), '2026-10-16');
-    expect(loadOperationsStories).toHaveBeenLastCalledWith(ids, expect.any(Array), '2026-10-16');
-    expect(loadManagerialStories).toHaveBeenLastCalledWith(ids, expect.any(Array), '2026-10-16');
+    expect(loadSalesStories).toHaveBeenLastCalledWith(ids, expect.any(Array), '2026-10-16', 'month');
+    expect(loadOperationsStories).toHaveBeenLastCalledWith(ids, expect.any(Array), '2026-10-16', 'month');
+    expect(loadManagerialStories).toHaveBeenLastCalledWith(ids, expect.any(Array), '2026-10-16', 'month');
   });
   it('uses the shared topic title and question in the returned story', async () => {
     vi.mocked(loadSalesStories).mockResolvedValueOnce([{

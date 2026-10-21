@@ -29,7 +29,7 @@ describe('reviewed topic registry', () => {
     expect(topicContract('repuestos_stock')?.queryGroup).toBe('parts-exposure');
   });
   it('preserves selected order independently of catalog order', () => {
-    const ids = ['repuestos_alertas', 'ventas_facturacion', 'maquinas_pedidos', 'servicios_os_antiguas'];
+    const ids = ['repuestos_alertas', 'ventas_facturacion', 'maquinas_pedidos', 'servicios_os_facturadas'];
     expect(reconcilePanoramaOrder(ids, [...PANORAMA_TOPICS].reverse())).toEqual(ids);
   });
 });

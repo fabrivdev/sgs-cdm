@@ -45,6 +45,7 @@ const topicIcons: Record<PanoramaTopicId, typeof BarChart3> = {
   servicios_comisiones: HandCoins,
   servicios_abiertas: ClipboardList,
   servicios_os_antiguas: ClipboardList,
+  servicios_os_facturadas: ClipboardList,
   agenda_cumplimiento: CalendarDays,
   servicios_productividad: Wrench,
   servicios_eficiencia: Wrench,
