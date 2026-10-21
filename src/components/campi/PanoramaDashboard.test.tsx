@@ -148,7 +148,7 @@ describe('Campi alternative story dashboard', () => {
     sessionStorage.clear();
     load.mockResolvedValue([story('ventas_facturacion', { primary: { label: 'Principal', value: 1234.56, unit: 'USD', comparison: { value: 1000, label: 'Mismo tramo LY' } } })]); show();
     expect(await screen.findByRole('heading', { name: /Tema ventas_facturacion: principal subió 23,5%/ })).toBeInTheDocument();
-    expect(screen.getByLabelText(/Comparación de Tema ventas_facturacion desde tu última visita/)).toHaveTextContent('$ 1.000 → $ 1.234,56');
+    expect(screen.getByLabelText(/Comparación de Tema ventas_facturacion desde tu última visita/)).toHaveTextContent('$ 1.000 → $ 1.235');
     expect(await screen.findByRole('link', { name: 'Explorar ventas: Tema ventas_facturacion' })).toHaveAttribute('href', '/repuestos/ventas');
     await waitFor(() => expect(JSON.parse(localStorage.getItem('sig-cdm:panorama:alternativa:visita:v1:manager-a')!).values[0].value).toBe(1234.56));
     expect(readStoryVisit('manager-a')?.values[0].value).toBe(1000);

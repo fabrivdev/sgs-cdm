@@ -12,8 +12,7 @@ export type CampiComment = {
   evidence: { value: number; unit: StoryUnit } | null;
 };
 
-const number = new Intl.NumberFormat('es-PY', { maximumFractionDigits: 2 });
-const value = (n: number, unit: StoryUnit) => `${unit === 'USD' ? '$ ' : unit === 'PYG' ? '₲ ' : ''}${number.format(n)}${unit === 'days' ? ' días' : unit === 'percent' ? '%' : ''}`;
+const value = (n: number, unit: StoryUnit) => `${unit === 'USD' ? '$ ' : unit === 'PYG' ? '₲ ' : ''}${new Intl.NumberFormat('es-PY', { maximumFractionDigits: unit === 'USD' || unit === 'PYG' ? 0 : 2 }).format(n)}${unit === 'days' ? ' días' : unit === 'percent' ? '%' : ''}`;
 
 /** Only speak when a verified relationship or actionable change adds to the card. */
 export function buildCampiComments(stories: readonly PanoramaStory[], previous: StoryVisitSnapshot | null): CampiComment[] {

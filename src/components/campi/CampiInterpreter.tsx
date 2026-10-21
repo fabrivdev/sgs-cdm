@@ -9,7 +9,7 @@ import type { StoryTopicId } from '@/lib/campi/panoramaStoryTypes';
 import { CampiPanoramaAvatar } from './CampiPanoramaAvatar';
 import type { CampiMood } from './CampiSprite';
 
-const valueLabel = (value: number, unit: string) => `${unit === 'USD' ? '$ ' : unit === 'PYG' ? '₲ ' : ''}${new Intl.NumberFormat('es-PY', { maximumFractionDigits: 2 }).format(value)}${unit === 'percent' ? '%' : unit === 'days' ? ' días' : ''}`;
+const valueLabel = (value: number, unit: string) => `${unit === 'USD' ? '$ ' : unit === 'PYG' ? '₲ ' : ''}${new Intl.NumberFormat('es-PY', { maximumFractionDigits: unit === 'USD' || unit === 'PYG' ? 0 : 2 }).format(value)}${unit === 'percent' ? '%' : unit === 'days' ? ' días' : ''}`;
 const signedValue = (value: number, unit: string) => `${value > 0 ? '+' : value < 0 ? '−' : ''}${valueLabel(Math.abs(value), unit)}`;
 const visitDate = (at: string) => new Intl.DateTimeFormat('es-PY', { day: '2-digit', month: '2-digit', year: 'numeric' }).format(new Date(at));
 
@@ -83,7 +83,7 @@ export function CampiInterpreter({ stories, loading, previous = null, onOpenStor
     <div className="panorama-hero-message">
       <div className="panorama-hero-context"><span className="panorama-hero-kicker">{tone === 'attention' ? 'Para revisar' : tone === 'change' ? visit ? 'Desde tu última visita' : 'Cambio observado' : 'Campi · panorama'}</span>{!loading && comments.length > 1 && <span className="campi-comment-count">{commentIndex + 1} de {comments.length}</span>}</div>
       <div className="campi-synthesis" aria-live="off"><h2>{brief(headline, true)}</h2></div>
-      {showFirstTip && <p className="campi-first-tip">Abrí «Ver detalle» en cualquier tema para explorar sus datos.</p>}
+      {showFirstTip && <p className="campi-first-tip">Abrí la sección de origen desde la tarjeta que quieras explorar.</p>}
       {!loading && visit && <div className="campi-visit-snapshot" aria-label={`Comparación de ${visit.story.title} desde tu última visita en este navegador`}>
         <span>Desde tu última visita del {visitDate(visit.comparison.at)} · {visit.story.title}</span>
         <strong>{valueLabel(visit.comparison.before, visit.comparison.unit)} <span aria-hidden="true">→</span> {valueLabel(visit.comparison.current, visit.comparison.unit)}</strong>
