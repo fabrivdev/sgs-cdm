@@ -40,7 +40,7 @@ describe('operational Panorama loaders', () => {
     expect(stories[0].breakdown[0].route).toBe('/parque-operaciones?operacion=abc');
     expect(stories[0].supporting.find(item => item.label === 'Pedidos con stock')?.value).toBe(2);
     expect(stories[0].supporting.find(item => item.label === 'Pedidos con stock completo')?.value).toBe(0);
-    expect(stories[0].chart?.rows.map(row => row.value)).toEqual([6, 4, 3, 4]);
+    expect(stories[0].chart).toBeNull();
     expect(stories[1].primary?.comparison?.value).toBe(16.5);
     expect(stories[1].chart).toMatchObject({ unit: 'days', rows: [{ value: 16.5 }, { value: 14 }] });
     expect(stories[1].details.join(' ')).toContain('1301');

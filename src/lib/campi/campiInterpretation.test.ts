@@ -18,18 +18,18 @@ describe('deterministic Campi interpretation', () => {
     expect(result.findings.every(f => f.kind === 'neutral')).toBe(true);
     expect(result.attention).toBe(false);
   });
-  it('describes comparable sales movement without promoting age buckets to alerts', () => {
+  it('does not narrate a percentage already visible in the card without added evidence', () => {
     const a = interpretCampi([story(), orders, billing]);
     const b = interpretCampi([billing, story(), orders]);
-    expect(a.sentences[0]).toContain('12%');
-    expect(b.sentences[0]).toContain('12%');
+    expect(a.sentences[0]).toContain('No encontré novedades');
+    expect(b.sentences[0]).toContain('No encontré novedades');
     expect(a.attention).toBe(false);
-    expect(a.findings.find(f => f.topic === 'ventas_facturacion')?.kind).toBe('change');
+    expect(a.findings.find(f => f.topic === 'ventas_facturacion')?.kind).toBe('neutral');
   });
   it('uses the selected topic order instead of the largest percentage', () => {
     const clients = { ...billing, id: 'repuestos_clientes' as const, title: 'Ventas de repuestos', primary: { ...billing.primary!, value: 408000 } };
     expect(interpretCampi([clients, billing]).findings.map(f => f.topic)).toEqual(['repuestos_clientes', 'ventas_facturacion']);
-    expect(interpretCampi([clients, billing]).findings.find(f => f.topic === 'repuestos_clientes')?.kind).toBe('change');
+    expect(interpretCampi([clients, billing]).findings.find(f => f.topic === 'repuestos_clientes')?.kind).toBe('neutral');
     const stock = story({ id: 'repuestos_stock', supporting: [{ label: 'Rojo · valor Kardex', value: 120, unit: 'USD' }] });
     expect(interpretCampi([billing, stock, orders]).findings.map(f => f.topic)).toEqual(['ventas_facturacion', 'repuestos_stock', 'servicios_pendientes']);
   });
@@ -37,7 +37,7 @@ describe('deterministic Campi interpretation', () => {
     const input = story({ id: 'ventas_facturacion', title: 'Facturación', primary: { label: 'Ventas antes de NC del mes', value: 215150.25, unit: 'USD', comparison: { value: 793694.64, label: 'Mismo tramo de 2025' } }, chart: { kind: 'bars', title: 'Ventas por área', unit: 'USD', rows: [{ label: 'Repuestos', value: 182886.19, previous: 398983.19 }, { label: 'Servicios', value: 32264.06, previous: 5211.45 }, { label: 'Máquinas', value: 0, previous: 389500 }] } });
     const text = interpretCampi([input]).sentences[0];
     expect(text).toContain('Mayor diferencia entre áreas: Máquinas ($ 389.500 → $ 0)');
-    expect(text).toContain('NC');
+    expect(text).toContain('Mayor diferencia');
     expect(interpretCampi([{ ...input, chart: { ...input.chart!, rows: [{ label: 'Máquinas', value: 0, previous: 389500 }] } }]).sentences[0]).not.toContain('Mayor diferencia');
   });
   it('explains the monthly sales variation with gross amounts and a reconciled sector difference', () => {
@@ -50,9 +50,8 @@ describe('deterministic Campi interpretation', () => {
     const interpretation = interpretCampi([sales]);
     expect(interpretation.findings[0].kind).toBe('change');
     expect(interpretation.sentences[0]).toContain('bajaron 25%');
-    expect(interpretation.sentences[0]).toContain('diferencia $ 50');
     expect(interpretation.sentences[0]).toContain('Mayor diferencia entre áreas: Repuestos');
-    expect(interpretCampi([{ ...sales, breakdown: sales.breakdown.slice(0, 1) }]).sentences[0]).not.toContain('Mayor diferencia');
+    expect(interpretCampi([{ ...sales, breakdown: sales.breakdown.slice(0, 1) }]).findings[0].kind).toBe('neutral');
   });
   it('rejects absent, nonfinite or zero comparison bases', () => {
     for (const value of [0, -5, Infinity, NaN]) {

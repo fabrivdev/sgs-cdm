@@ -17,7 +17,7 @@ export type TopicContract = {
 export type EnabledTopicId = Exclude<StoryTopicId, 'repuestos_clientes' | 'maquinas_proyeccion' | 'maquinas_stock' | 'repuestos_demanda' | 'servicios_trabajo' | 'servicios_agenda' | 'maquinas_importacion' | 'maquinas_parque' | 'repuestos_reposicion' | 'servicios_comisiones'>;
 export const PANORAMA_CONTRACTS = {
   ventas_evolucion: {
-    queryGroup: 'sales', unit: 'percent', formula: '(Ventas antes de NC del mes hasta el corte / ventas antes de NC del mismo tramo LY − 1) × 100; sin porcentaje si LY no es positivo.',
+    queryGroup: 'sales', unit: 'USD', formula: 'Ventas antes de NC del período; variación = (actual / mismo tramo LY − 1) × 100 solo con base LY positiva.',
     population: 'Movimientos de venta de cada sección autorizada, sin consolidado parcial.',
     period: 'Mes y acumulado anual hasta fecha de análisis.',
     comparison: 'equivalent-period', chart: 'trend',
@@ -56,10 +56,10 @@ export const PANORAMA_CONTRACTS = {
     period: 'Mes y acumulado hasta el corte.', comparison: 'equivalent-period', chart: 'trend', limitations: [], evidence: ['salesStories.ts'], tests: ['salesStories.test.ts'],
   },
   maquinas_pedidos: {
-    queryGroup: 'orders-supply', unit: 'count', formula: 'Pedidos activos pendientes; porcentaje con al menos una unidad de stock positivo vinculada y sin venta positiva confirmada.',
+    queryGroup: 'orders-supply', unit: 'count', formula: 'Pedidos activos pendientes; cobertura completa solo si todas sus unidades pendientes tienen stock único acreditado y no facturado.',
     population: 'Excluye operaciones cerradas, facturadas y canceladas. Clasifica unidades por stock, importación arribada, tránsito y falta de vínculo.',
     period: 'Lectura de pedidos y abastecimiento.', comparison: 'snapshot', chart: 'composition',
-    limitations: ['Tener stock no reemplaza la revisión comercial para emitir factura.', 'Un pedido puede tener abastecimiento parcial.'],
+    limitations: ['Tener stock no reemplaza la revisión comercial para emitir factura.', 'La fuente aún no clasifica exhaustivamente pedidos completos, parciales, sin cobertura y no clasificables.'],
     evidence: ['campi_pedidos_abastecimiento_v1', 'campi_pedidos_con_stock_v1'], tests: ['operationsStories.test.ts'],
   },
   maquinas_pedidos_stock: {
@@ -70,8 +70,8 @@ export const PANORAMA_CONTRACTS = {
   servicios_pendientes: {
     queryGroup: 'service-outcomes', unit: 'days', formula: 'Mediana de fecha de cierre operativo menos fecha de apertura.',
     population: 'OS cerradas en el mes con ambas fechas válidas.',
-    period: 'Último mes calendario completo.', comparison: 'closed-month', chart: 'comparison',
-    limitations: ['No reconstruye reaperturas.', 'Cierres históricos sin fecha se informan aparte.'],
+    period: 'Último mes calendario completo.', comparison: 'closed-month', chart: 'trend',
+    limitations: ['No reconstruye reaperturas.', 'Solo hay dos medianas mensuales acreditadas; faltan otras cuatro para una serie de seis.'],
     evidence: ['campi_resolucion_os_v1'], tests: ['operationsStories.test.ts'],
   },
   servicios_abiertas: {
@@ -89,15 +89,15 @@ export const PANORAMA_CONTRACTS = {
   servicios_os_facturadas: {
     queryGroup: 'service-client-billing', unit: 'percent', formula: 'OS cerradas con tipo de tiempo Cliente y documento positivo vinculado / OS cerradas del período × 100.',
     population: 'OS del reporte TOTVS con estado cerrado y fecha de cierre en el período; identidad única para conciliar factura.',
-    period: 'Mes o acumulado anual hasta el corte.', comparison: 'snapshot', chart: 'composition',
-    limitations: ['Una OS interna, de garantía o sin factura comprobada no cuenta como facturada al cliente.', 'La tasa describe la cohorte de cierres, no la facturación emitida en el período.'],
+    period: 'Mes o acumulado anual hasta el corte.', comparison: 'snapshot', chart: 'trend',
+    limitations: ['La tasa describe la cohorte de cierres, no la facturación emitida en el período.', 'No hay agregación por mes de cierre con corte documental común; la tarjeta presenta solo KPI y cohorte.'],
     evidence: ['ordenes_servicio_importadas', 'service_orders_billing_v2'], tests: ['managerialStories.test.ts'],
   },
   repuestos_stock: {
     queryGroup: 'parts-exposure', unit: 'USD', formula: 'Valor positivo de ubicaciones con stock positivo de códigos en gris o rojo.',
     population: 'REP con saldo global positivo y ubicación física positiva.',
     period: 'Clasificación al día de análisis.', comparison: 'snapshot', chart: 'composition',
-    limitations: ['Fecha de clasificación no es corte de inventario.', 'Sin historia no equivale a inmóvil.'],
+    limitations: ['Fecha de clasificación no es corte de inventario.', 'Sin historia no equivale a inmóvil.', 'Falta valor por tramos aprobados de días desde última compra; gris/rojo es composición provisional.'],
     evidence: ['campi_repuestos_exposicion_v1'], tests: ['partsExposure.test.ts'],
   },
   repuestos_alertas: {
@@ -129,22 +129,22 @@ export const PANORAMA_CONTRACTS = {
   agenda_cumplimiento: {
     queryGroup: 'planning', unit: 'percent', formula: 'Jornadas completadas / jornadas evaluables hasta el corte × 100.',
     population: 'Jornadas del período con estado válido; las futuras se excluyen.',
-    period: 'Mes hasta el corte.', comparison: 'snapshot', chart: 'composition',
+    period: 'Mes o año hasta el corte.', comparison: 'snapshot', chart: 'trend',
     limitations: ['Una jornada completada no acredita una OS cerrada.', 'Las reprogramaciones históricas no están reconstruidas.'],
     evidence: ['servicio_jornadas'], tests: ['managerialStories.test.ts'],
   },
   servicios_productividad: {
     queryGroup: 'work-productivity', unit: 'percent', formula: 'Horas-persona trabajadas / horas-persona disponibles × 100.',
     population: 'Técnicos elegibles del libro de trabajo de Servicios desde julio de 2026.',
-    period: 'Mes hasta el corte.', comparison: 'snapshot', chart: 'composition',
-    limitations: ['Registros de tiempo inválidos o superpuestos no son horas trabajadas.', 'Sin capacidad positiva el porcentaje no es medible.'],
+    period: 'Mes hasta el corte.', comparison: 'snapshot', chart: 'comparison',
+    limitations: ['Registros de tiempo inválidos o superpuestos no son horas trabajadas.', 'Sin capacidad histórica comparable no se dibuja evolución de productividad.'],
     evidence: ['workedProductivity.ts', 'service_orders_work_log_v1'], tests: ['managerialStories.test.ts'],
   },
   servicios_eficiencia: {
     queryGroup: 'service-billing-efficiency', unit: 'percent', formula: 'Horas facturadas / horas trabajadas de la misma cohorte de OS cerradas × 100.',
     population: 'OS cerradas en el mes desde julio de 2026 con facturación y horas conciliadas.',
-    period: 'Mes hasta el corte.', comparison: 'snapshot', chart: 'composition',
-    limitations: ['Una OS sin horas o con tarifa faltante deja la cohorte no medible.', 'No representa pagos de caja.'],
+    period: 'Mes hasta el corte.', comparison: 'snapshot', chart: 'trend',
+    limitations: ['Una OS sin horas o con tarifa faltante deja la cohorte no medible.', 'Falta serie mensual de cohortes conciliadas; no representa pagos de caja.'],
     evidence: ['billingEfficiency', 'service_orders_billing_v2'], tests: ['managerialStories.test.ts'],
   },
   clientes_retencion: {
@@ -157,8 +157,8 @@ export const PANORAMA_CONTRACTS = {
   clientes_cobertura_posventa: {
     queryGroup: 'customer-cohorts', unit: 'percent', formula: 'Propietarios elegibles con compra neta positiva de posventa / propietarios elegibles × 100.',
     population: 'Clientes únicos con parque activo del mismo corte.',
-    period: 'Mes hasta el corte.', comparison: 'snapshot', chart: 'composition',
-    limitations: ['La ausencia de compra no demuestra abandono.', 'Sin propietarios elegibles no hay tasa.'],
+    period: 'Mes o año hasta el corte.', comparison: 'snapshot', chart: 'comparison',
+    limitations: ['La ausencia de compra no demuestra abandono.', 'El agregado no separa cobertura de Servicios y Repuestos sobre la misma base de propietarios.'],
     evidence: ['gerencial_clientes_resumen_v1'], tests: ['managerialStories.test.ts'],
   },
 } satisfies Record<EnabledTopicId, TopicContract>;

@@ -58,3 +58,5 @@ Migración ejecutada en Lovable Cloud el 15/10: consulta final exitosa. Pruebas 
 ## Campi: bienvenida local
 
 Ver [[36-Campi-bienvenida]]. La introducción de Campi usa una capa de presentación de escritorio para usuarios autenticados y no reactiva el asistente IA ni cambia acceso a datos. Persistencia de visibilidad por usuario/navegador, sin sincronización remota. Rama local de revisión; no publicación acreditada.
+
+**Panorama local, revisión 21/10/2026.** El catálogo de doce temas se mantiene en `feat/campi-panorama-alternativa`; la auditoría de fuentes y los gráficos provisionales constan en `docs/campi-panorama-alternativa.md`. Campi distingue un cambio entre visitas del navegador de una comparación interanual: solo rotula «Desde tu última visita» cuando el comentario actual proviene de una diferencia real guardada. Una proporción alta de NC no activa por sí sola una alerta fija. Estas reglas son de presentación y selección de comentarios, no modifican permisos ni datos de negocio. No acredita `main` ni publicación Lovable.

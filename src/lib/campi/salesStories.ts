@@ -177,13 +177,18 @@ export const loadSalesStories: StoryLoader = async (topics, granted, asOf, perio
             { label: 'Ventas acumuladas del año', value: ytdGross, unit, comparison: { value: ytdGrossLY, label: `Mismo corte de ${ranges.year - 1}` } },
             { label: 'Variación acumulada', value: salesChange(ytdGross, ytdGrossLY), unit: 'percent' as const, note: ytdGrossLY === 0 ? 'Sin base comparable.' : undefined },
           ];
-          const fullMonths = loaded.every(({ current, previous }) => current.monthlyComponents && previous.monthlyComponents);
-          story.chart = id === 'ventas_evolucion' && period === 'month'
-            ? { kind: 'bars', title: grossLY > 0 ? 'Ventas del mismo tramo' : 'Ventas del mes', unit, rows: grossLY > 0 ? [{ label: String(ranges.year), value: gross }, { label: String(ranges.year - 1), value: grossLY }] : [{ label: String(ranges.year), value: gross }] }
-            : fullMonths ? { kind: 'trend', title: 'Ventas antes de NC por mes', unit, currentLabel: String(ranges.year), previousLabel: String(ranges.year - 1), rows: Array.from({ length: ranges.month }, (_, index) => {
-            const month = String(index + 1).padStart(2, '0');
-            return { label: ['Ene', 'Feb', 'Mar', 'Abr', 'May', 'Jun', 'Jul', 'Ago', 'Sep', 'Oct', 'Nov', 'Dic'][index], value: loaded.reduce((total, item) => total + (item.current.periods.get(`${ranges.year}-${month}`)?.[item.source.gross] as number ?? 0), 0), previous: loaded.reduce((total, item) => total + (item.previous.periods.get(`${ranges.year - 1}-${month}`)?.[item.source.gross] as number ?? 0), 0) };
-          }) } : { kind: 'bars', title: 'Ventas por área autorizada', unit, rows: monthlyReports.map(item => ({ label: item.source.label, value: numeric(item.month[item.source.gross]), previous: numeric(item.monthLY[item.source.gross]) })), currentLabel: String(ranges.year), previousLabel: String(ranges.year - 1) };
+          const months = Array.from({ length: ranges.month }, (_, index) => String(index + 1).padStart(2, '0'));
+          const partialMonth = Number(asOf.slice(8)) < new Date(Date.UTC(ranges.year, ranges.month, 0)).getUTCDate();
+          const completeSeries = loaded.every(({ current, previous }) => current.monthlyComponents && previous.monthlyComponents) && months.every(month =>
+            loaded.every(({ current, previous }) =>
+              (current.periods.has(`${ranges.year}-${month}`) || current.sparse) &&
+              (previous.periods.has(`${ranges.year - 1}-${month}`) || previous.sparse)));
+          story.chart = completeSeries ? { kind: 'trend', title: 'Ventas mensuales antes de NC', unit, currentLabel: String(ranges.year), previousLabel: String(ranges.year - 1), rows: months.map((month, index) => ({
+            label: `${['Ene', 'Feb', 'Mar', 'Abr', 'May', 'Jun', 'Jul', 'Ago', 'Sep', 'Oct', 'Nov', 'Dic'][index]}${partialMonth && index === ranges.month - 1 ? '*' : ''}`,
+            value: loaded.reduce((total, item) => total + (item.current.periods.has(`${ranges.year}-${month}`) ? numeric(item.current.periods.get(`${ranges.year}-${month}`)![item.source.gross]) : 0), 0),
+            previous: loaded.reduce((total, item) => total + (item.previous.periods.has(`${ranges.year - 1}-${month}`) ? numeric(item.previous.periods.get(`${ranges.year - 1}-${month}`)![item.source.gross]) : 0), 0),
+          })) } : { kind: 'bars', title: grossLY > 0 ? 'Ventas del mismo tramo' : 'Ventas del período', unit,
+            rows: grossLY > 0 ? [{ label: String(ranges.year), value: period === 'ytd' ? ytdGross : gross }, { label: String(ranges.year - 1), value: period === 'ytd' ? ytdGrossLY : grossLY }] : [{ label: String(ranges.year), value: period === 'ytd' ? ytdGross : gross }] };
           story.breakdown = monthlyReports.map(item => ({ label: item.source.label, value: numeric(item.month[item.source.gross]), previous: numeric(item.monthLY[item.source.gross]), unit, route: item.source.route }));
           story.message = grossLY > 0 ? `Las ventas antes de NC ${gross >= grossLY ? 'subieron' : 'bajaron'} ${new Intl.NumberFormat('es-PY', { maximumFractionDigits: 1 }).format(Math.abs(salesChange(gross, grossLY)!))}% frente al mismo tramo del año anterior.` : 'No hay base comparable para calcular la variación mensual de ventas.';
           story.details.push(`Ventas positivas de facturas entre ${monthFrom} y ${ranges.to}; comparación con ${monthLYFrom} a ${ranges.previousTo}. Las NC se analizan por separado en Facturación neta.`, 'El acumulado compara fechas equivalentes de ambos años.');

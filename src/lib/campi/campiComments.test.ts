@@ -12,6 +12,7 @@ describe('Campi comment cycle', () => {
   it('speaks about verified changes but does not read unchanged card totals aloud', () => {
     const billing = story('ventas_facturacion', 80);
     billing.primary!.comparison = { value: 100, label: 'Mismo tramo LY' };
+    billing.chart = { kind: 'bars', title: 'Áreas', unit: 'USD', rows: [{ label: 'Repuestos', value: 50, previous: 70 }, { label: 'Servicios', value: 30, previous: 30 }] };
     const comments = buildCampiComments([story('ventas_evolucion', 100), billing, story('maquinas_stock', 0, 'error')], null);
     expect(comments.map(comment => comment.topic)).toEqual(['ventas_facturacion', null]);
     expect(comments[0].evidence?.value).toBe(80);

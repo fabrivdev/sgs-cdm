@@ -143,12 +143,12 @@ describe('Campi alternative story dashboard', () => {
     expect(screen.getByRole('button', { name: 'Elegir temas para Panorama' })).toBeInTheDocument();
     expect(load).not.toHaveBeenCalled();
   });
-  it('compares a local baseline without rebasing the displayed change or claiming new sales', async () => {
+  it('keeps a local baseline without labeling an interannual comparison as a visit change', async () => {
     saveStoryVisit('manager-a', [story('ventas_facturacion', { primary: { label: 'Principal', value: 1000, unit: 'USD' } })], '2026-10-15T10:00:00Z');
     sessionStorage.clear();
     load.mockResolvedValue([story('ventas_facturacion', { primary: { label: 'Principal', value: 1234.56, unit: 'USD', comparison: { value: 1000, label: 'Mismo tramo LY' } } })]); show();
-    expect(await screen.findByRole('heading', { name: /Tema ventas_facturacion: principal subió 23,5%/ })).toBeInTheDocument();
-    expect(screen.getByLabelText(/Comparación de Tema ventas_facturacion desde tu última visita/)).toHaveTextContent('$ 1.000 → $ 1.235');
+    expect(await screen.findByRole('heading', { name: /No encontré cambios relevantes comprobados/ })).toBeInTheDocument();
+    expect(screen.queryByLabelText(/Comparación de Tema ventas_facturacion desde tu última visita/)).not.toBeInTheDocument();
     expect(await screen.findByRole('link', { name: 'Explorar ventas: Tema ventas_facturacion' })).toHaveAttribute('href', '/repuestos/ventas');
     await waitFor(() => expect(JSON.parse(localStorage.getItem('sig-cdm:panorama:alternativa:visita:v1:manager-a')!).values[0].value).toBe(1234.56));
     expect(readStoryVisit('manager-a')?.values[0].value).toBe(1000);

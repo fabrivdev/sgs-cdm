@@ -45,17 +45,33 @@ export function planningStory(rows: readonly PlanningRow[], asOf: string, period
   }
   const eligible = [...unique.values()].filter(row => row.fecha >= from && row.fecha <= asOf);
   const count = (status: string) => eligible.filter(row => row.estado === status).length;
-  const completed = count('Completado'), pending = count('Pendiente'), started = count('Iniciado'), cancelled = count('Cancelada');
+  const completed = count('Completado');
   const story = base('agenda_cumplimiento', 'servicios.planificador', `/?desde=${from}&hasta=${asOf}`, 'servicio_jornadas', asOf);
   story.periodMode = period; story.periodOptions = ['month', 'ytd']; story.visitKey = `agenda_cumplimiento:${period}:${asOf}`;
   story.periodLabel = `${from}–${asOf}`;
   story.status = eligible.length ? 'ready' : 'empty';
   story.primary = { label: 'Agenda cumplida', value: eligible.length ? completed / eligible.length * 100 : null, unit: 'percent' };
   story.supporting = [{ label: 'Completadas', value: completed, unit: 'count' }, { label: 'Evaluables', value: eligible.length, unit: 'count' }];
-  story.chart = { kind: 'bars', title: 'Estado de compromisos', unit: 'count', rows: [
-    { label: 'Completadas', value: completed }, { label: 'Pendientes', value: pending },
-    { label: 'Iniciadas', value: started }, { label: 'Canceladas', value: cancelled },
-  ] };
+  const groups = new Map<string, { label: string; done: number; total: number }>();
+  for (const row of eligible) {
+    const start = new Date(`${row.fecha}T00:00:00Z`);
+    if (period === 'month') start.setUTCDate(start.getUTCDate() - (start.getUTCDay() + 6) % 7);
+    else start.setUTCDate(1);
+    const key = start.toISOString().slice(0, 10);
+    const weekEnd = new Date(start);
+    weekEnd.setUTCDate(weekEnd.getUTCDate() + 6);
+    const actualStart = key < from ? from : key;
+    const actualEnd = weekEnd.toISOString().slice(0, 10) > asOf ? asOf : weekEnd.toISOString().slice(0, 10);
+    const shortDay = (value: string) => `${value.slice(8)}/${value.slice(5, 7)}`;
+    const label = period === 'month' ? `${shortDay(actualStart)}–${shortDay(actualEnd)}`
+      : new Intl.DateTimeFormat('es-PY', { month: 'short', timeZone: 'UTC' }).format(start);
+    const group = groups.get(key) ?? { label, done: 0, total: 0 };
+    group.total++;
+    if (row.estado === 'Completado') group.done++;
+    groups.set(key, group);
+  }
+  story.chart = { kind: 'bars', title: period === 'month' ? 'Cumplimiento semanal' : 'Cumplimiento mensual', unit: 'percent',
+    rows: [...groups.entries()].sort(([a], [b]) => a.localeCompare(b)).map(([, group]) => ({ label: group.label, value: group.done / group.total * 100 })) };
   story.message = eligible.length ? `${completed} de ${eligible.length} jornadas evaluables están completadas.` : 'No hay jornadas evaluables en este período.';
   story.details = ['Las fechas futuras no entran en el denominador. Una jornada completada no equivale a una OS cerrada.'];
   return story;
@@ -85,10 +101,9 @@ export function customerStories(row: CustomerRow, asOf: string, period: StoryPer
   coverage.status = row.propietarios_elegibles ? 'ready' : 'empty';
   coverage.primary = { label: 'Cobertura posventa', value: row.propietarios_elegibles ? row.propietarios_con_compra_actual / row.propietarios_elegibles * 100 : null, unit: 'percent' };
   coverage.supporting = [{ label: 'Con compra', value: row.propietarios_con_compra_actual, unit: 'count' }, { label: 'Propietarios', value: row.propietarios_elegibles, unit: 'count' }];
-  coverage.chart = { kind: 'bars', title: 'Propietarios del parque', unit: 'count', rows: [
-    { label: 'Con actividad de posventa', value: row.propietarios_con_compra_actual },
-    { label: 'Sin compra en la ventana', value: row.propietarios_elegibles - row.propietarios_con_compra_actual },
-  ] };
+  // This aggregate reports a deduplicated union, not separate Services and
+  // Parts coverage over the same owner population.
+  coverage.chart = null;
   coverage.message = row.propietarios_elegibles ? `${row.propietarios_con_compra_actual} de ${row.propietarios_elegibles} propietarios compraron servicios o repuestos.` : 'No hay propietarios elegibles medibles.';
   return [retention, coverage];
 }
@@ -133,9 +148,8 @@ async function loadProductivity(asOf: string) {
   story.status = available > 0 ? 'ready' : 'empty';
   story.primary = { label: 'Productividad', value: available > 0 ? result.horasPersona / available * 100 : null, unit: 'percent' };
   story.supporting = [{ label: 'Horas trabajadas', value: result.horasPersona, unit: 'count' }, { label: 'Horas disponibles', value: available, unit: 'count' }];
-  story.chart = { kind: 'bars', title: 'Horas-persona', unit: 'count', rows: [
-    { label: 'Trabajadas', value: result.horasPersona }, { label: 'Disponibles', value: available },
-  ] };
+  // No comparable historical capacity is available for a productivity trend.
+  story.chart = null;
   story.message = available > 0 ? `${Math.round(result.horasPersona)} de ${Math.round(available)} horas-persona disponibles trabajadas.` : 'No hay capacidad positiva comparable para calcular productividad.';
   story.details = result.issues.length ? [`${result.issues.length} registros requieren revisión y no se cuentan como horas trabajadas.`] : [];
   return story;
@@ -167,9 +181,8 @@ async function loadEfficiency(asOf: string) {
   story.supporting = [{ label: 'Horas facturadas', value: result.billedHours, unit: 'count' },
     { label: 'Horas trabajadas', value: result.workedHours, unit: 'count' },
     { label: 'OS conciliadas', value: result.orders, unit: 'count' }];
-  story.chart = { kind: 'bars', title: 'Horas de OS cerradas', unit: 'count', rows: [
-    { label: 'Facturadas', value: result.billedHours }, { label: 'Trabajadas', value: result.workedHours },
-  ] };
+  // An aggregate cohort cannot establish a month-by-month efficiency trend.
+  story.chart = null;
   story.message = result.percentage !== null ? `${result.orders} OS cerradas con horas facturadas y trabajadas conciliadas.`
     : result.incomplete ? `${result.incomplete} OS cerradas tienen horas o tarifas incompletas; la eficiencia no es medible.`
       : 'No hay OS cerradas conciliadas en este período.';
@@ -206,9 +219,9 @@ export function billedOrdersStory(rows: readonly ClosedOrderRow[], bills: Readon
   story.primary = { label: 'OS facturadas a cliente', value: closed.size ? billed / closed.size * 100 : null, unit: 'percent' };
   story.supporting = [{ label: 'Facturadas a cliente', value: billed, unit: 'count' }, { label: 'OS cerradas', value: closed.size, unit: 'count' },
     { label: 'Tipo Cliente', value: clientType, unit: 'count' }, { label: 'Otros tipos', value: otherType, unit: 'count' }];
-  story.chart = closed.size ? { kind: 'bars', title: 'OS cerradas según factura a cliente', unit: 'count', rows: [
-    { label: 'Cliente facturada', value: billed }, { label: 'Cliente sin factura', value: clientType - billed }, { label: 'Garantía, interno u otra', value: otherType },
-  ] } : null;
+  // The source does not return monthly closing cohorts. Keep the validated
+  // aggregate without inventing a series or a discarded commercial category.
+  story.chart = null;
   story.message = closed.size ? `${billed} de ${closed.size} OS cerradas tienen una factura positiva de cliente vinculada.` : 'No hay OS cerradas en este período.';
   return story;
 }

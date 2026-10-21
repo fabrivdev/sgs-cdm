@@ -22,4 +22,11 @@ describe('Panorama card navigation', () => {
     fireEvent.click(screen.getByRole('link', { name: 'Explorar ventas: Facturación neta' }));
     expect(screen.getByTestId('route')).toHaveTextContent('/servicios/ventas?desde=2026-10-01&hasta=2026-10-20');
   });
+  it('draws signed NC as a reconciliation from sales to net', () => {
+    const billing = { ...story, primary: { label: 'Neto', value: 75, unit: 'USD' as const },
+      supporting: [{ label: 'Ventas antes de NC del mes', value: 100, unit: 'USD' as const },
+        { label: 'Notas de crédito del mes', value: -25, unit: 'USD' as const }] };
+    render(<MemoryRouter><PanoramaStoryCard story={billing} index={0} retrying={false} onRetry={vi.fn()} /></MemoryRouter>);
+    expect(screen.getByLabelText('Ventas más notas de crédito igual a neto')).toHaveTextContent('NC −$ 25');
+  });
 });

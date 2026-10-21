@@ -26,17 +26,11 @@ export function interpretCampi(stories: readonly PanoramaStory[]) {
   const findings: CampiFinding[] = usable.map(s => {
     const p = s.primary!;
     const finding = (kind: CampiFinding['kind'], text: string, urgency: CampiFinding['urgency'] = 'none'): CampiFinding => ({ topic: s.id, kind, text, urgency });
-    if (s.id === 'ventas_facturacion') {
-      const gross = s.supporting.find(d => d.label === 'Ventas antes de NC del mes')?.value;
-      const credit = s.supporting.find(d => d.label === 'Notas de crédito del mes')?.value;
-      if (valid(gross) && gross > 0 && valid(credit) && credit <= 0 && Math.abs(gross + credit - p.value!) <= 0.02 && -credit / gross >= 0.5) {
-        return finding('attention', `Facturación: las NC restaron ${amount({ ...p, value: -credit })} de ${amount({ ...p, value: gross })} en ventas; el neto quedó en ${amount(p)}. Revisá la composición por área.`, 'confirmed');
-      }
-    }
     if (s.id === 'ventas_evolucion' && p.unit === 'USD' && valid(p.comparison?.value) && p.comparison.value > 0) {
       const previous = p.comparison.value;
       const difference = p.value! - previous;
-      if (difference !== 0) return finding('change', `Ventas antes de NC ${difference > 0 ? 'subieron' : 'bajaron'} ${number.format(Math.abs(difference / previous * 100))}% frente al período comparable (${amount({ ...p, value: previous })} → ${amount(p)}; diferencia ${amount({ ...p, value: Math.abs(difference) })}).${billingAreaContext(s, p.value!, previous)}`);
+      const context = billingAreaContext(s, p.value!, previous);
+      if (difference !== 0 && context) return finding('change', `Ventas antes de NC ${difference > 0 ? 'subieron' : 'bajaron'} ${number.format(Math.abs(difference / previous * 100))}% frente al período comparable.${context}`);
     }
     if (s.id === 'repuestos_stock' && s.notices?.length) {
       return finding('attention', `Stock antiguo de repuestos: ${s.notices[0].text}. Podés abrir los códigos incluidos en el detalle.`, 'review');
@@ -47,18 +41,20 @@ export function interpretCampi(stories: readonly PanoramaStory[]) {
     }
     if (s.id === 'servicios_pendientes' && valid(p.comparison?.value) && p.comparison.value > 0) {
       const difference = p.value! - p.comparison.value;
-      if (difference !== 0) return finding('change', `${s.title}: la mediana ${difference > 0 ? 'aumentó' : 'bajó'} ${number.format(Math.abs(difference))} días frente al mes anterior (${amount({ ...p, value: p.comparison.value })} → ${amount(p)}). Compará también cierres y OS abiertas.`);
+      const closures = s.supporting.filter(d => d.label.startsWith('OS cerradas en ') && valid(d.value));
+      if (difference !== 0 && closures.length === 2) return finding('change', `${s.title}: la mediana ${difference > 0 ? 'aumentó' : 'bajó'} ${number.format(Math.abs(difference))} días; se cerraron ${amount(closures[0])} OS frente a ${amount(closures[1])} el mes anterior.`);
     }
     // An age bucket, a static color and a negative projected model are not
     // evidence of improvement, breach or a business alert.
     if (['ventas_facturacion', 'repuestos_clientes'].includes(s.id) && valid(p.comparison?.value) && p.comparison.value > 0) {
       const delta = (p.value! - p.comparison.value) / p.comparison.value * 100;
-      if (delta !== 0) return finding('change', `${s.title}: ${lowercaseFirst(p.label)} ${delta > 0 ? 'subió' : 'bajó'} ${number.format(Math.abs(delta))}% frente a ${lowercaseFirst(p.comparison.label)} (${amount({ ...p, value: p.comparison.value })} → ${amount(p)}).${billingAreaContext(s, p.value!, p.comparison.value)}`);
+      const context = billingAreaContext(s, p.value!, p.comparison.value);
+      if (delta !== 0 && context) return finding('change', `${s.title}: ${lowercaseFirst(p.label)} ${delta > 0 ? 'subió' : 'bajó'} ${number.format(Math.abs(delta))}% frente a ${lowercaseFirst(p.comparison.label)}.${context}`);
     }
     return finding('neutral', `${s.title}: ${amount(p)} en ${lowercaseFirst(p.label)}.`);
   });
-  // Only a reconciled majority of sales reversed by NC overrides the user's order.
-  // Other observations follow the chosen topic order; no cross-unit score is computed.
+  // Evidence-backed observations follow the chosen topic order; no cross-unit
+  // score or static NC threshold turns a ratio into an automatic alarm.
   const ordered = [...findings.filter(f => f.urgency === 'confirmed'), ...findings.filter(f => f.urgency !== 'confirmed' && f.kind !== 'neutral'), ...findings.filter(f => f.kind === 'neutral')];
   const selected = ordered.filter(f => f.kind !== 'neutral').slice(0, 2);
   const sentences = selected.length ? selected.map(f => f.text) : [stories.some(s => s.status === 'error') ? 'Hay fuentes que no pude verificar; revisá los temas señalados.' : usable.length ? 'No encontré novedades relevantes comprobadas en estos temas.' : 'Todavía no tengo cifras verificadas para interpretar estos temas.'];

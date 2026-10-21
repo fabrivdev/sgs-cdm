@@ -55,24 +55,16 @@ export function CampiInterpreter({ stories, loading, previous = null, onOpenStor
   const lead = result.findings.find(finding => finding.topic === current.topic);
   const presentedStory = stories.find(story => story.id === current.topic);
   const visitComparison = presentedStory ? storyVisitComparison(presentedStory, previous) : null;
-  const visit = presentedStory && visitComparison ? { story: presentedStory, comparison: visitComparison } : null;
+  const visit = current.kind === 'visit' && presentedStory && visitComparison?.change
+    ? { story: presentedStory, comparison: visitComparison } : null;
   const tone = loading || current.kind === 'limit' ? 'unknown' : current.kind === 'attention' ? 'attention' : current.kind === 'change' || current.kind === 'visit' ? 'change' : 'serene';
   const billing = stories.find(story => story.id === 'ventas_facturacion' && story.status === 'ready');
   const gross = billing?.supporting.find(item => item.label === 'Ventas antes de NC del mes')?.value;
   const credit = billing?.supporting.find(item => item.label === 'Notas de crédito del mes')?.value;
   const billingDelta = billing?.primary?.comparison?.value && billing.primary.value != null ? (billing.primary.value - billing.primary.comparison.value) / Math.abs(billing.primary.comparison.value) : null;
   const mood: CampiMood = loading || current.kind === 'limit' ? 'pensativo' : current.kind === 'visit' ? 'sereno' : lead?.urgency === 'confirmed' ? 'preocupado' : lead?.kind === 'attention' ? 'atento' : lead?.topic === 'ventas_facturacion' && billingDelta !== null && billingDelta >= 0.1 && gross != null && gross > 0 && credit != null && -credit / gross < 0.2 ? 'contento' : lead?.topic === 'ventas_facturacion' && billingDelta !== null && billingDelta <= -0.5 ? 'triste' : lead?.topic === 'ventas_facturacion' && billingDelta !== null && billingDelta <= -0.25 ? 'preocupado' : 'sereno';
-  const headline = loading ? 'Estoy revisando tus temas.' : visit ? lead?.text ?? current.text : current.text;
+  const headline = loading ? 'Estoy revisando tus temas.' : current.text;
   const actions = presentedStory ? [presentedStory] : [];
-  const brief = (text: string | undefined, billing = false) => {
-    if (!text) return '';
-    if (billing && current.topic === 'ventas_facturacion' && current.kind === 'attention' && presentedStory?.primary?.value != null) {
-      const gross = presentedStory.supporting.find(item => item.label === 'Ventas antes de NC del mes')?.value;
-      const credit = presentedStory.supporting.find(item => item.label === 'Notas de crédito del mes')?.value;
-      if (gross != null && gross > 0 && credit != null) return `Las NC representan ${new Intl.NumberFormat('es-PY', { maximumFractionDigits: 1 }).format(-credit / gross * 100)}% de las ventas antes de NC; neto ${valueLabel(presentedStory.primary.value, 'USD')}.`;
-    }
-    return text.split(/(?<=[.!?])\s+/)[0];
-  };
   return <section className={`min-w-0 rounded-xl border bg-card p-3.5 panorama-hero panorama-hero--${tone} panorama-hero--${mood}`}
     onPointerEnter={() => setHovering(true)} onPointerLeave={() => setHovering(false)}
     onPointerDown={() => setKeyboardFocus(false)}
@@ -82,7 +74,7 @@ export function CampiInterpreter({ stories, loading, previous = null, onOpenStor
     <div className="panorama-hero-avatar"><CampiPanoramaAvatar mood={mood} quiet={detailOpen} reaction={commentToken ? { kind: 'comment', token: commentToken } : null} greetingKey={userId} /></div>
     <div className="panorama-hero-message">
       <div className="panorama-hero-context"><span className="panorama-hero-kicker">{tone === 'attention' ? 'Para revisar' : tone === 'change' ? visit ? 'Desde tu última visita' : 'Cambio observado' : 'Campi · panorama'}</span>{!loading && comments.length > 1 && <span className="campi-comment-count">{commentIndex + 1} de {comments.length}</span>}</div>
-      <div className="campi-synthesis" aria-live="off"><h2>{brief(headline, true)}</h2></div>
+      <div className="campi-synthesis" aria-live="off"><h2>{headline}</h2></div>
       {showFirstTip && <p className="campi-first-tip">Abrí la sección de origen desde la tarjeta que quieras explorar.</p>}
       {!loading && visit && <div className="campi-visit-snapshot" aria-label={`Comparación de ${visit.story.title} desde tu última visita en este navegador`}>
         <span>Desde tu última visita del {visitDate(visit.comparison.at)} · {visit.story.title}</span>

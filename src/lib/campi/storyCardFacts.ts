@@ -10,9 +10,7 @@ export function storyCardFacts(story: PanoramaStory): StoryCardFact[] {
       ? { label: shortLabel, value: datum.value, unit: datum.unit } : null;
   };
   const primary = story.primary;
-  if (story.id === 'ventas_evolucion' && primary?.value !== null && primary?.value !== undefined && primary.comparison) {
-    return [{ label: 'Δ vs LY', value: primary.value - primary.comparison.value, unit: primary.unit }];
-  }
+  if (story.id === 'ventas_evolucion') return [];
   if (story.id === 'servicios_pendientes') {
     const delta = primary?.value !== null && primary?.value !== undefined && primary.comparison
       ? [{ label: 'Δ mes ant.', value: primary.value - primary.comparison.value, unit: 'days' as const }] : [];
@@ -25,7 +23,7 @@ export function storyCardFacts(story: PanoramaStory): StoryCardFact[] {
     agenda_cumplimiento: [['Completadas', 'Completadas'], ['Evaluables', 'Evaluables']],
     servicios_productividad: [['Horas trabajadas', 'Trabajadas h'], ['Horas disponibles', 'Disponibles h']],
     servicios_eficiencia: [['OS conciliadas', 'OS conciliadas']],
-    repuestos_stock: [['Valor positivo valorizado', 'Base'], ['Códigos en gris y rojo', 'Códigos']],
+    repuestos_stock: [['Códigos en gris y rojo', 'Códigos']],
     repuestos_alertas: [['Códigos expuestos', 'Códigos']],
     clientes_retencion: [['Retenidos', 'Retenidos'], ['Cohorte base', 'Cohorte']],
     clientes_cobertura_posventa: [['Con compra', 'Con compra'], ['Propietarios', 'Propietarios']],

@@ -96,9 +96,10 @@ export function partsExposureStory(data: Exposure): PanoramaStory {
       { label: 'Valor en categoría Sin datos', value: data.valor_sin_fecha_usd, unit: 'USD', note: 'Sin ventas trianuales ni compra fechada; no incluye todos los códigos sin fecha de compra.' },
       { label: 'Ubicaciones sin valor', value: data.ubicaciones_sin_valor, unit: 'count' },
     ],
-    chart: { kind: 'bars', title: 'Composición del valor de stock', unit: 'USD', rows: [
-      ...['ROJO', 'GRIS'].map(color => ({ label: labels.get(color as typeof SEMAFORO_COLORES[number]['id']) ?? color, value: data.colores.find(row => row.color === color)?.valor_usd ?? 0 })),
-      { label: 'Resto', value: Math.max(0, data.valor_total_usd - data.valor_antiguo_usd) },
+    // Until the source reports age buckets, show only the two classified
+    // components that reconcile with the KPI. Do not imply an age profile.
+    chart: { kind: 'bars', title: 'Valor antiguo por clasificación', unit: 'USD', rows: [
+      ...['GRIS', 'ROJO'].map(color => ({ label: labels.get(color as typeof SEMAFORO_COLORES[number]['id']) ?? color, value: data.colores.find(row => row.color === color)?.valor_usd ?? 0 })),
     ] },
     breakdown: [
       ...activeAlerts.map(row => ({ label: `Próximo a ${row.destino.toLowerCase()} · ${row.codigos} códigos`, value: row.valor_usd, unit: 'USD' as const, group: 'Avisos', route: link(row), note: 'Cambio posible en 1–30 días si no cambian fechas ni criterios de clasificación.' })),

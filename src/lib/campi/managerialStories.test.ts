@@ -9,7 +9,7 @@ const invoice = (os: string, overrides: Partial<OrderBilling> = {}): OrderBillin
 });
 
 describe('Panorama themes reused from managerial measures', () => {
-  it('keeps future agenda items outside the denominator and exposes the components', () => {
+  it('keeps future agenda items outside the denominator and charts weekly rates', () => {
     const story = planningStory([
       { id: 'a', fecha: '2026-10-02', estado: 'Completado' },
       { id: 'b', fecha: '2026-10-10', estado: 'Pendiente' },
@@ -17,7 +17,7 @@ describe('Panorama themes reused from managerial measures', () => {
     ], '2026-10-21');
     expect(story.primary?.value).toBe(50);
     expect(story.supporting).toEqual(expect.arrayContaining([{ label: 'Evaluables', value: 2, unit: 'count' }]));
-    expect(story.chart?.rows).toContainEqual({ label: 'Pendientes', value: 1 });
+    expect(story.chart?.rows.map(row => row.value)).toEqual([100, 0]);
   });
 
   it('keeps cancelled past jornadas in the agenda denominator as agreed', () => {
@@ -26,8 +26,23 @@ describe('Panorama themes reused from managerial measures', () => {
       { id: 'b', fecha: '2026-10-10', estado: 'Cancelada' },
     ], '2026-10-21');
     expect(story.primary?.value).toBe(50);
-    expect(story.chart?.rows).toContainEqual({ label: 'Canceladas', value: 1 });
+    expect(story.chart?.rows.map(row => row.value)).toEqual([100, 0]);
     expect(story.route).toBe('/?desde=2026-10-01&hasta=2026-10-21');
+  });
+
+  it('weights the agenda KPI by evaluable jornadas instead of averaging weekly percentages', () => {
+    const rows = [
+      { id: 'a', fecha: '2026-10-02', estado: 'Completado' },
+      { id: 'b', fecha: '2026-10-12', estado: 'Cancelada' },
+      { id: 'c', fecha: '2026-10-13', estado: 'Pendiente' },
+      { id: 'd', fecha: '2026-10-14', estado: 'Iniciado' },
+    ];
+    const month = planningStory(rows, '2026-10-21');
+    expect(month.primary?.value).toBe(25);
+    expect(month.chart?.rows.map(row => row.value)).toEqual([100, 0]);
+    const annual = planningStory(rows, '2026-10-21', 'ytd');
+    expect(annual.primary?.value).toBe(25);
+    expect(annual.chart?.rows).toEqual([{ label: 'oct.', value: 25 }]);
   });
 
   it('does not invent a compliance rate without evaluable commitments', () => {
@@ -44,6 +59,7 @@ describe('Panorama themes reused from managerial measures', () => {
     expect(retention.route).toBe('/parque-clientes?desde=2026-10-01&hasta=2026-10-21');
     expect(coverage.route).toBe(retention.route);
     expect(coverage.primary?.value).toBe(25);
+    expect(coverage.chart).toBeNull();
     expect(retention.chart?.rows[1].value).toBe(12);
     expect(() => customerStories({ compradores_base: 2, compradores_retenidos: 3,
       propietarios_elegibles: 5, propietarios_con_compra_actual: 1 }, '2026-10-21')).toThrow();
@@ -60,11 +76,8 @@ describe('Panorama themes reused from managerial measures', () => {
     const month = billedOrdersStory(rows, bills, '2026-10-21');
     expect(month.primary?.value).toBeCloseTo(100 / 3);
     expect(month.supporting).toContainEqual({ label: 'OS cerradas', value: 3, unit: 'count' });
-    expect(month.chart?.rows).toEqual([
-      { label: 'Cliente facturada', value: 1 },
-      { label: 'Cliente sin factura', value: 1 },
-      { label: 'Garantía, interno u otra', value: 1 },
-    ]);
+    expect(month.chart).toBeNull();
+    expect(JSON.stringify(month)).not.toContain('Cliente sin factura');
     const annual = billedOrdersStory(rows, { ...bills, 'OS-4': invoice('OS-4') }, '2026-10-21', 'ytd');
     expect(annual.primary?.value).toBe(50);
   });

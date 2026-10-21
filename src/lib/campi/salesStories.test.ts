@@ -189,7 +189,7 @@ describe('sales story source contracts', () => {
     expect(sales.primary).toMatchObject({ value: 220, unit: 'USD', comparison: { value: 70 } });
     expect(sales.supporting[0]).toMatchObject({ value: 220, unit: 'USD', comparison: { value: 70 } });
     expect(net.primary?.value).toBe(200);
-    expect(sales.chart?.kind).toBe('bars');
+    expect(sales.chart?.kind).toBe('trend');
   });
 
   it('answers annual net, credit impact and sector questions independently from the same reconciled sources', async () => {

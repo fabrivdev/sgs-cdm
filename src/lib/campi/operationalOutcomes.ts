@@ -110,12 +110,9 @@ export function readyOrdersStory(data: ReadyOrders, supply: Supply): PanoramaSto
       { label: 'Pedidos con stock', value: data.pedidos_con_stock, unit: 'count', note: 'Al menos una unidad con stock; no implica cobertura completa.' },
       { label: 'Unidades pendientes', value: supply.unidades, unit: 'count' },
       { label: 'Unidades con stock vinculado', value: data.unidades_con_stock, unit: 'count' }],
-    chart: { kind: 'bars', title: 'Abastecimiento de unidades pendientes', unit: 'count', rows: [
-      { label: 'Stock', value: supply.stock },
-      { label: 'Importación arribada', value: supply.importacion_arribada },
-      { label: 'Importación en tránsito', value: supply.importacion_transito },
-      { label: 'Sin vínculo', value: unlinked },
-    ] },
+    // The source groups units but omits some pending order identities. It cannot
+    // support an exhaustive, mutually exclusive composition of orders.
+    chart: null,
     breakdown: [
       ...data.pedidos.map(order => ({ label: order.np_numero?.trim() || 'Pedido sin NP', value: order.unidades_con_stock,
         unit: 'count' as const, group: 'Con stock vinculado', route: `/parque-operaciones?operacion=${encodeURIComponent(order.operacion_id)}` })),
@@ -194,7 +191,7 @@ export function serviceResolutionStory(data: Resolution): PanoramaStory {
       { label: 'OS abiertas registradas', value: data.abiertas, unit: 'count' },
       { label: 'Percentil 90 de edad abierta', value: data.apertura_invalida ? null : data.p90_edad_abiertas, unit: 'days', note: data.apertura_invalida ? 'Edad no disponible: hay aperturas inválidas.' : undefined },
       { label: 'Cerradas históricas sin fecha', value: data.historicas_sin_cierre, unit: 'count' }],
-    chart: data.mediana_ultimo_mes === null ? null : { kind: 'bars', title: 'Mediana de resolución por mes', unit: 'days', rows: [
+    chart: data.mediana_ultimo_mes === null ? null : { kind: 'trend', title: 'Mediana de resolución por mes', unit: 'days', rows: [
       ...(data.mediana_mes_anterior === null ? [] : [{ label: previous, value: data.mediana_mes_anterior }]),
       { label: period, value: data.mediana_ultimo_mes },
     ] },
