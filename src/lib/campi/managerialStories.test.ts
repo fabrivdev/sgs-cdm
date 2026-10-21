@@ -20,6 +20,16 @@ describe('Panorama themes reused from managerial measures', () => {
     expect(story.chart?.rows).toContainEqual({ label: 'Pendientes', value: 1 });
   });
 
+  it('keeps cancelled past jornadas in the agenda denominator as agreed', () => {
+    const story = planningStory([
+      { id: 'a', fecha: '2026-10-02', estado: 'Completado' },
+      { id: 'b', fecha: '2026-10-10', estado: 'Cancelada' },
+    ], '2026-10-21');
+    expect(story.primary?.value).toBe(50);
+    expect(story.chart?.rows).toContainEqual({ label: 'Canceladas', value: 1 });
+    expect(story.route).toBe('/?desde=2026-10-01&hasta=2026-10-21');
+  });
+
   it('does not invent a compliance rate without evaluable commitments', () => {
     const story = planningStory([{ id: 'future', fecha: '2026-10-25', estado: 'Pendiente' }], '2026-10-21');
     expect(story.status).toBe('empty');
@@ -30,6 +40,9 @@ describe('Panorama themes reused from managerial measures', () => {
     const [retention, coverage] = customerStories({ compradores_base: 20, compradores_retenidos: 8,
       propietarios_elegibles: 100, propietarios_con_compra_actual: 25 }, '2026-10-21');
     expect(retention.primary?.value).toBe(40);
+    expect(retention.periodLabel).toBe('2026-09-01–2026-09-21 → 2026-10-01–2026-10-21');
+    expect(retention.route).toBe('/parque-clientes?desde=2026-10-01&hasta=2026-10-21');
+    expect(coverage.route).toBe(retention.route);
     expect(coverage.primary?.value).toBe(25);
     expect(retention.chart?.rows[1].value).toBe(12);
     expect(() => customerStories({ compradores_base: 2, compradores_retenidos: 3,

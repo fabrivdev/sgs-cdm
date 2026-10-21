@@ -12,11 +12,12 @@ export function storySummaryPercentage(story: PanoramaStory): StorySummaryPercen
       : null;
   }
   if (story.id === 'maquinas_pedidos') {
-    const ready = story.supporting.find(datum => datum.label === 'Pedidos con stock')?.value;
+    const ready = story.supporting.find(datum => datum.label === 'Pedidos con stock completo')?.value;
     return typeof ready === 'number' && Number.isFinite(ready) && primary.value > 0 && ready >= 0 && ready <= primary.value
-      ? { value: ready / primary.value * 100, label: 'con stock vinculado', kind: 'composition' }
+      ? { value: ready / primary.value * 100, label: 'con stock completo', kind: 'composition' }
       : null;
   }
+  if (story.id === 'servicios_pendientes') return null;
   const shares: Partial<Record<PanoramaStory['id'], { denominator: string; label: string }>> = {
     maquinas_pedidos_stock: { denominator: 'Pedidos pendientes', label: 'de pedidos pendientes' },
     servicios_os_antiguas: { denominator: 'OS abiertas', label: 'de OS abiertas' },

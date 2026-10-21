@@ -11,15 +11,15 @@ describe('Panorama card navigation', () => {
   it('asks for the source area only for a consolidated story, then navigates with dates', () => {
     render(<MemoryRouter><PanoramaStoryCard story={story} index={0} retrying={false} onRetry={vi.fn()} /><Location /></MemoryRouter>);
     expect(screen.getByText('$ 100')).toBeInTheDocument();
-    fireEvent.keyDown(screen.getByRole('button', { name: 'Ver detalle de Facturación neta' }), { key: 'Enter' });
+    fireEvent.keyDown(screen.getByRole('button', { name: 'Explorar ventas: Facturación neta' }), { key: 'Enter' });
     expect(screen.getByRole('menu')).toBeInTheDocument();
-    fireEvent.click(screen.getByRole('menuitem', { name: 'Ventas de servicios' }));
+    fireEvent.click(screen.getByRole('menuitem', { name: /Ventas de servicios/ }));
     expect(screen.getByTestId('route')).toHaveTextContent('/servicios/ventas?desde=2026-10-01&hasta=2026-10-20');
     expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
   });
   it('goes straight to the filtered source for a single-area story', () => {
     render(<MemoryRouter><PanoramaStoryCard story={{ ...story, id: 'ventas_servicios', sections: ['servicios.ventas'] }} index={0} retrying={false} onRetry={vi.fn()} /><Location /></MemoryRouter>);
-    fireEvent.click(screen.getByRole('link', { name: 'Ver detalle de Facturación neta' }));
+    fireEvent.click(screen.getByRole('link', { name: 'Explorar ventas: Facturación neta' }));
     expect(screen.getByTestId('route')).toHaveTextContent('/servicios/ventas?desde=2026-10-01&hasta=2026-10-20');
   });
 });

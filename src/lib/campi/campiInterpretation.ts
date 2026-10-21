@@ -33,20 +33,17 @@ export function interpretCampi(stories: readonly PanoramaStory[]) {
         return finding('attention', `Facturación: las NC restaron ${amount({ ...p, value: -credit })} de ${amount({ ...p, value: gross })} en ventas; el neto quedó en ${amount(p)}. Revisá la composición por área.`, 'confirmed');
       }
     }
-    if (s.id === 'ventas_evolucion' && p.unit === 'percent') {
-      const gross = s.supporting.find(d => d.label === 'Ventas antes de NC del mes');
-      const previous = gross?.comparison?.value;
-      if (valid(gross?.value) && valid(previous) && previous > 0 && Math.abs((gross.value - previous) / previous * 100 - p.value!) < 0.1) {
-        const difference = gross.value - previous;
-        if (difference !== 0) return finding('change', `Ventas antes de NC ${difference > 0 ? 'subieron' : 'bajaron'} ${number.format(Math.abs(p.value!))}% frente al mismo tramo LY (${amount({ ...gross, value: previous })} → ${amount(gross)}; diferencia ${amount({ ...gross, value: Math.abs(difference) })}).${billingAreaContext(s, gross.value, previous)}`);
-      }
+    if (s.id === 'ventas_evolucion' && p.unit === 'USD' && valid(p.comparison?.value) && p.comparison.value > 0) {
+      const previous = p.comparison.value;
+      const difference = p.value! - previous;
+      if (difference !== 0) return finding('change', `Ventas antes de NC ${difference > 0 ? 'subieron' : 'bajaron'} ${number.format(Math.abs(difference / previous * 100))}% frente al período comparable (${amount({ ...p, value: previous })} → ${amount(p)}; diferencia ${amount({ ...p, value: Math.abs(difference) })}).${billingAreaContext(s, p.value!, previous)}`);
     }
     if (s.id === 'repuestos_stock' && s.notices?.length) {
       return finding('attention', `Stock antiguo de repuestos: ${s.notices[0].text}. Podés abrir los códigos incluidos en el detalle.`, 'review');
     }
     if (s.id === 'maquinas_pedidos' && p.value! > 0) {
-      const ready = s.supporting.find(d => d.label === 'Pedidos con stock')?.value;
-      if (valid(ready) && ready <= p.value!) return finding('neutral', `De ${number.format(p.value!)} pedidos pendientes, ${number.format(ready)} tienen stock vinculado. Abrí el detalle para ver las NP y el resto del abastecimiento.`);
+      const complete = s.supporting.find(d => d.label === 'Pedidos con stock completo')?.value;
+      if (valid(complete) && complete <= p.value!) return finding('neutral', `De ${number.format(p.value!)} pedidos pendientes, ${number.format(complete)} tienen stock vinculado para todas sus unidades. La facturación requiere verificar los demás requisitos comerciales.`);
     }
     if (s.id === 'servicios_pendientes' && valid(p.comparison?.value) && p.comparison.value > 0) {
       const difference = p.value! - p.comparison.value;
@@ -54,7 +51,7 @@ export function interpretCampi(stories: readonly PanoramaStory[]) {
     }
     // An age bucket, a static color and a negative projected model are not
     // evidence of improvement, breach or a business alert.
-    if (['ventas_evolucion', 'ventas_facturacion', 'repuestos_clientes'].includes(s.id) && valid(p.comparison?.value) && p.comparison.value > 0) {
+    if (['ventas_facturacion', 'repuestos_clientes'].includes(s.id) && valid(p.comparison?.value) && p.comparison.value > 0) {
       const delta = (p.value! - p.comparison.value) / p.comparison.value * 100;
       if (delta !== 0) return finding('change', `${s.title}: ${lowercaseFirst(p.label)} ${delta > 0 ? 'subió' : 'bajó'} ${number.format(Math.abs(delta))}% frente a ${lowercaseFirst(p.comparison.label)} (${amount({ ...p, value: p.comparison.value })} → ${amount(p)}).${billingAreaContext(s, p.value!, p.comparison.value)}`);
     }

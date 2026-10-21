@@ -5,6 +5,7 @@ import type { PanoramaStory } from '@/lib/campi/panoramaStoryTypes';
 vi.mock('./CampiPanoramaAvatar', () => ({ CampiPanoramaAvatar: ({ mood }: { mood?: string }) => <div data-mood={mood}>Mascota</div> }));
 afterEach(cleanup);
 const billing: PanoramaStory = { id: 'ventas_facturacion', title: 'Facturación', question: '¿Cómo viene la facturación?', status: 'ready', message: '', scope: 'Repuestos', sections: ['repuestos.ventas'], cutoff: null, periodLabel: 'Octubre', primary: { label: 'Facturación del mes', value: 448000, unit: 'USD', comparison: { value: 400000, label: 'Mismo tramo de 2025' } }, supporting: [], chart: null, breakdown: [], details: [], source: 'Prueba', route: '' };
+const resolution: PanoramaStory = { ...billing, id: 'servicios_pendientes', title: 'Resolución de OS', sections: ['servicios.ordenes'], primary: { label: 'Mediana', value: 14, unit: 'days', comparison: { value: 16, label: 'Mes anterior' } } };
 describe('Campi synthesis', () => {
   it('keeps the verified summary and direct data action without a question panel', () => {
     const openStory = vi.fn();
@@ -25,10 +26,10 @@ describe('Campi synthesis', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Ver datos de facturación' }));
     expect(openStory).toHaveBeenCalledWith('ventas_facturacion');
   });
-  it('shows a verified neutral total without claiming growth when comparison is missing', () => {
+  it('does not turn an unchanged total into a Campi comment', () => {
     render(<CampiInterpreter stories={[{ ...billing, primary: { ...billing.primary!, comparison: undefined } }]} loading={false} onOpenStory={vi.fn()} />);
-    expect(screen.getByRole('heading', { name: /Facturación: \$ 448.000 en facturación del mes/ })).toBeInTheDocument();
-    expect(screen.getByRole('button', { name: 'Ver datos de facturación' })).toBeInTheDocument();
+    expect(screen.getByRole('heading', { name: /No encontré cambios relevantes comprobados/ })).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Ver datos de facturación' })).not.toBeInTheDocument();
     expect(screen.queryByText(/subió/)).not.toBeInTheDocument();
   });
   it('keeps a red stock share neutral and aligns the visit headline, scope and action', () => {
@@ -36,7 +37,8 @@ describe('Campi synthesis', () => {
     const parts: PanoramaStory = { ...billing, id: 'repuestos_clientes', title: 'Ventas de repuestos', primary: { ...billing.primary!, value: 420000 } };
     const openStory = vi.fn();
     render(<CampiInterpreter stories={[parts, billing, stock]} loading={false} onOpenStory={openStory} previous={{ at: '2026-10-15T10:00:00Z', values: [{ id: 'ventas_facturacion', value: 400000, unit: 'USD', fingerprint: JSON.stringify([['repuestos.ventas'], 'Repuestos', 'Octubre', 'Prueba', 'ventas-netas-nc-separadas-v3']) }] }} />);
-    expect(screen.getByRole('heading', { name: /Facturación: \+\$ 48.000 desde tu última visita/ })).toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: 'Siguiente comentario de Campi' }));
+    expect(screen.getByRole('heading', { name: /Facturación: facturación del mes subió 12%/ })).toBeInTheDocument();
     expect(screen.getByText('Mascota')).toHaveAttribute('data-mood', 'sereno');
     expect(screen.getByLabelText(/Comparación de Facturación desde tu última visita/)).toHaveTextContent('$ 400.000 → $ 448.000');
     expect(screen.queryByText('Repuestos · Octubre')).not.toBeInTheDocument();
@@ -45,11 +47,10 @@ describe('Campi synthesis', () => {
     expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
   });
   it('cycles through distinct verified topics and returns to the first without announcing every change', () => {
-    const orders: PanoramaStory = { ...billing, id: 'servicios_abiertas', title: 'OS abiertas', sections: ['servicios.ordenes'], primary: { label: 'OS abiertas', value: 76, unit: 'count' } };
-    render(<CampiInterpreter stories={[billing, orders]} loading={false} />);
+    render(<CampiInterpreter stories={[billing, resolution]} loading={false} />);
     expect(screen.getByRole('heading', { name: /Facturación.*subió/ })).toBeInTheDocument();
     fireEvent.click(screen.getByRole('button', { name: 'Siguiente comentario de Campi' }));
-    expect(screen.getByRole('heading', { name: /OS abiertas: 76/ })).toBeInTheDocument();
+    expect(screen.getByRole('heading', { name: /Resolución de OS: la mediana bajó 2 días/ })).toBeInTheDocument();
     fireEvent.click(screen.getByRole('button', { name: 'Siguiente comentario de Campi' }));
     expect(screen.getByRole('heading', { name: /Facturación.*subió/ })).toBeInTheDocument();
     expect(screen.getByText('1 de 2')).toBeInTheDocument();
@@ -58,20 +59,18 @@ describe('Campi synthesis', () => {
   it('pauses automatic comments while a detail is open', () => {
     vi.useFakeTimers();
     try {
-      const orders: PanoramaStory = { ...billing, id: 'servicios_abiertas', title: 'OS abiertas', sections: ['servicios.ordenes'], primary: { label: 'OS abiertas', value: 76, unit: 'count' } };
-      const view = render(<CampiInterpreter stories={[billing, orders]} loading={false} detailOpen />);
+      const view = render(<CampiInterpreter stories={[billing, resolution]} loading={false} detailOpen />);
       act(() => vi.advanceTimersByTime(26000));
       expect(screen.getByRole('heading', { name: /Facturación.*subió/ })).toBeInTheDocument();
-      view.rerender(<CampiInterpreter stories={[billing, orders]} loading={false} />);
+      view.rerender(<CampiInterpreter stories={[billing, resolution]} loading={false} />);
       act(() => vi.advanceTimersByTime(25000));
-      expect(screen.getByRole('heading', { name: /OS abiertas: 76/ })).toBeInTheDocument();
+      expect(screen.getByRole('heading', { name: /Resolución de OS: la mediana bajó 2 días/ })).toBeInTheDocument();
     } finally { vi.useRealTimers(); }
   });
   it('resumes comments after pointer exit even when a clicked button retains focus', () => {
     vi.useFakeTimers();
     try {
-      const orders: PanoramaStory = { ...billing, id: 'servicios_abiertas', title: 'OS abiertas', sections: ['servicios.ordenes'], primary: { label: 'OS abiertas', value: 76, unit: 'count' } };
-      render(<CampiInterpreter stories={[billing, orders]} loading={false} />);
+      render(<CampiInterpreter stories={[billing, resolution]} loading={false} />);
       const next = screen.getByRole('button', { name: 'Siguiente comentario de Campi' });
       const hero = next.closest('.panorama-hero')!;
       fireEvent.pointerEnter(hero);

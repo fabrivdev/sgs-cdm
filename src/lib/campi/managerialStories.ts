@@ -46,7 +46,7 @@ export function planningStory(rows: readonly PlanningRow[], asOf: string, period
   const eligible = [...unique.values()].filter(row => row.fecha >= from && row.fecha <= asOf);
   const count = (status: string) => eligible.filter(row => row.estado === status).length;
   const completed = count('Completado'), pending = count('Pendiente'), started = count('Iniciado'), cancelled = count('Cancelada');
-  const story = base('agenda_cumplimiento', 'servicios.planificador', `/calendario?fecha=${asOf}`, 'servicio_jornadas', asOf);
+  const story = base('agenda_cumplimiento', 'servicios.planificador', `/?desde=${from}&hasta=${asOf}`, 'servicio_jornadas', asOf);
   story.periodMode = period; story.periodOptions = ['month', 'ytd']; story.visitKey = `agenda_cumplimiento:${period}:${asOf}`;
   story.periodLabel = `${from}–${asOf}`;
   story.status = eligible.length ? 'ready' : 'empty';
@@ -65,9 +65,12 @@ export function customerStories(row: CustomerRow, asOf: string, period: StoryPer
   if (![row.compradores_base, row.compradores_retenidos, row.propietarios_elegibles, row.propietarios_con_compra_actual].every(integer)
     || row.compradores_retenidos > row.compradores_base || row.propietarios_con_compra_actual > row.propietarios_elegibles)
     throw new Error('La cohorte de clientes no concilia.');
-  const retention = base('clientes_retencion', 'parque.maquinas', '/parque-clientes', 'gerencial_clientes_resumen_v1', asOf);
+  const customerWindow = periodRanges(asOf, period);
+  const customerRoute = `/parque-clientes?desde=${customerWindow.from}&hasta=${asOf}`;
+  const retention = base('clientes_retencion', 'parque.maquinas', customerRoute, 'gerencial_clientes_resumen_v1', asOf);
   retention.periodMode = period; retention.periodOptions = ['month', 'ytd']; retention.visitKey = `clientes_retencion:${period}:${asOf}`;
-  retention.periodLabel = `${periodRanges(asOf, period).from}–${asOf}`;
+  const retentionRanges = periodRanges(asOf, period);
+  retention.periodLabel = `${retentionRanges.previousFrom}–${retentionRanges.previousTo} → ${retentionRanges.from}–${asOf}`;
   retention.status = row.compradores_base ? 'ready' : 'empty';
   retention.primary = { label: 'Retención', value: row.compradores_base ? row.compradores_retenidos / row.compradores_base * 100 : null, unit: 'percent' };
   retention.supporting = [{ label: 'Retenidos', value: row.compradores_retenidos, unit: 'count' }, { label: 'Cohorte base', value: row.compradores_base, unit: 'count' }];
@@ -76,7 +79,7 @@ export function customerStories(row: CustomerRow, asOf: string, period: StoryPer
     { label: 'Sin recompra en la ventana', value: row.compradores_base - row.compradores_retenidos },
   ] };
   retention.message = row.compradores_base ? `${row.compradores_retenidos} de ${row.compradores_base} compradores de la cohorte volvieron a comprar.` : 'No hay cohorte base medible.';
-  const coverage = base('clientes_cobertura_posventa', 'parque.maquinas', '/parque-clientes', 'gerencial_clientes_resumen_v1', asOf);
+  const coverage = base('clientes_cobertura_posventa', 'parque.maquinas', customerRoute, 'gerencial_clientes_resumen_v1', asOf);
   coverage.periodMode = period; coverage.periodOptions = ['month', 'ytd']; coverage.visitKey = `clientes_cobertura_posventa:${period}:${asOf}`;
   coverage.periodLabel = `${periodRanges(asOf, period).from}–${asOf}`;
   coverage.status = row.propietarios_elegibles ? 'ready' : 'empty';

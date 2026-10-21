@@ -54,14 +54,15 @@ export function CampiInterpreter({ stories, loading, previous = null, onOpenStor
   const current = comments[Math.min(commentIndex, comments.length - 1)];
   const lead = result.findings.find(finding => finding.topic === current.topic);
   const presentedStory = stories.find(story => story.id === current.topic);
-  const visit = current.kind === 'visit' && presentedStory ? { story: presentedStory, comparison: storyVisitComparison(presentedStory, previous)! } : null;
+  const visitComparison = presentedStory ? storyVisitComparison(presentedStory, previous) : null;
+  const visit = presentedStory && visitComparison ? { story: presentedStory, comparison: visitComparison } : null;
   const tone = loading || current.kind === 'limit' ? 'unknown' : current.kind === 'attention' ? 'attention' : current.kind === 'change' || current.kind === 'visit' ? 'change' : 'serene';
   const billing = stories.find(story => story.id === 'ventas_facturacion' && story.status === 'ready');
   const gross = billing?.supporting.find(item => item.label === 'Ventas antes de NC del mes')?.value;
   const credit = billing?.supporting.find(item => item.label === 'Notas de crédito del mes')?.value;
   const billingDelta = billing?.primary?.comparison?.value && billing.primary.value != null ? (billing.primary.value - billing.primary.comparison.value) / Math.abs(billing.primary.comparison.value) : null;
   const mood: CampiMood = loading || current.kind === 'limit' ? 'pensativo' : current.kind === 'visit' ? 'sereno' : lead?.urgency === 'confirmed' ? 'preocupado' : lead?.kind === 'attention' ? 'atento' : lead?.topic === 'ventas_facturacion' && billingDelta !== null && billingDelta >= 0.1 && gross != null && gross > 0 && credit != null && -credit / gross < 0.2 ? 'contento' : lead?.topic === 'ventas_facturacion' && billingDelta !== null && billingDelta <= -0.5 ? 'triste' : lead?.topic === 'ventas_facturacion' && billingDelta !== null && billingDelta <= -0.25 ? 'preocupado' : 'sereno';
-  const headline = loading ? 'Estoy revisando tus temas.' : visit ? `${visit.story.title}: ${signedValue(visit.comparison.change, visit.comparison.unit)} desde tu última visita.` : current.text;
+  const headline = loading ? 'Estoy revisando tus temas.' : visit ? lead?.text ?? current.text : current.text;
   const actions = presentedStory ? [presentedStory] : [];
   const brief = (text: string | undefined, billing = false) => {
     if (!text) return '';

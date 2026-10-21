@@ -15,18 +15,19 @@ export type CampiComment = {
 const number = new Intl.NumberFormat('es-PY', { maximumFractionDigits: 2 });
 const value = (n: number, unit: StoryUnit) => `${unit === 'USD' ? '$ ' : unit === 'PYG' ? '₲ ' : ''}${number.format(n)}${unit === 'days' ? ' días' : unit === 'percent' ? '%' : ''}`;
 
-/** One comment per verified topic, plus an independently comparable visit observation. */
+/** Only speak when a verified relationship or actionable change adds to the card. */
 export function buildCampiComments(stories: readonly PanoramaStory[], previous: StoryVisitSnapshot | null): CampiComment[] {
   const findings = interpretCampi(stories).findings;
-  const comments = findings.flatMap(finding => {
+  const comments = findings.filter(finding => finding.kind !== 'neutral').flatMap(finding => {
     const story = stories.find(item => item.id === finding.topic && item.status === 'ready' && item.primary?.value !== null);
     if (!story || !story.primary || story.primary.value === null) return [];
     return [{ key: `topic:${story.id}`, topic: story.id, kind: finding.kind, urgency: finding.urgency,
       text: finding.text, period: story.periodLabel, evidence: { value: story.primary.value, unit: story.primary.unit } } satisfies CampiComment];
   });
-  const visits = stories.flatMap(story => {
+  const visits = stories.filter(story => story.id === 'maquinas_pedidos').flatMap(story => {
     const comparison = storyVisitComparison(story, previous);
-    if (!comparison?.change || !story.primary || story.status !== 'ready') return [];
+    const complete = story.supporting.find(datum => datum.label === 'Pedidos con stock completo')?.value;
+    if (!comparison?.change || !story.primary || story.status !== 'ready' || typeof complete !== 'number') return [];
     return [{ key: `visit:${story.id}`, topic: story.id, kind: 'visit' as const, urgency: 'none' as const,
       text: `${story.title}: ${value(comparison.before, comparison.unit)} → ${value(comparison.current, comparison.unit)} desde la última referencia comparable en este navegador.`,
       period: story.periodLabel, evidence: { value: comparison.current, unit: comparison.unit } } satisfies CampiComment];
@@ -40,7 +41,9 @@ export function buildCampiComments(stories: readonly PanoramaStory[], previous: 
   });
   if (result.length) return result;
   const failed = stories.some(story => story.status === 'error');
-  return [{ key: failed ? 'source-error' : 'no-evidence', topic: null, kind: 'limit', urgency: 'none',
-    text: failed ? 'Hay una fuente que no pude verificar. Abrí el tema afectado para reintentar.' : 'Todavía no tengo cifras verificadas para interpretar estos temas.',
+  const verified = stories.some(story => story.status === 'ready' && story.primary?.value !== null && story.primary?.value !== undefined);
+  return [{ key: failed ? 'source-error' : 'no-evidence', topic: null, kind: verified && !failed ? 'neutral' : 'limit', urgency: 'none',
+    text: failed ? 'Hay una fuente que no pude verificar. Abrí el tema afectado para reintentar.'
+      : verified ? 'No encontré cambios relevantes comprobados en tus temas.' : 'Todavía no tengo cifras verificadas para interpretar estos temas.',
     period: '', evidence: null }];
 }

@@ -167,10 +167,10 @@ export const loadSalesStories: StoryLoader = async (topics, granted, asOf, perio
         if (Math.abs(gross - credits - net) > Math.max(0.01, Math.abs(net) * 1e-10)) throw new Error('Las ventas y NC consolidadas no concilian con el neto.');
         const unit = 'USD' as const;
         if (id === 'ventas_evolucion' || id === 'ventas_repuestos' || id === 'ventas_servicios' || id === 'ventas_maquinas') {
-          story.visitKey = `${id}:${id === 'ventas_evolucion' ? 'variacion-v2' : 'brutas-v1'}:${period}:${asOf.slice(0, 7)}`;
+          story.visitKey = `${id}:${id === 'ventas_evolucion' ? 'brutas-v3' : 'brutas-v1'}:${period}:${asOf.slice(0, 7)}`;
           if (id === 'ventas_evolucion') { story.periodMode = period; story.periodOptions = ['month', 'ytd']; }
           story.primary = id === 'ventas_evolucion'
-            ? { label: 'Variación de ventas vs LY', value: salesChange(gross, grossLY), unit: 'percent', note: grossLY <= 0 ? 'Sin base comparable de ventas antes de NC.' : undefined }
+            ? { label: 'Ventas antes de NC', value: gross, unit, comparison: { value: grossLY, label: `Mismo tramo de ${ranges.year - 1}` }, note: grossLY <= 0 ? 'Sin base comparable de ventas antes de NC.' : undefined }
             : { label: 'Ventas antes de NC del mes', value: gross, unit, comparison: { value: grossLY, label: `Mismo tramo de ${ranges.year - 1}` } };
           story.supporting = [
             ...(id === 'ventas_evolucion' ? [{ label: 'Ventas antes de NC del mes', value: gross, unit, comparison: { value: grossLY, label: `Mismo tramo de ${ranges.year - 1}` } }] : []),
@@ -178,7 +178,9 @@ export const loadSalesStories: StoryLoader = async (topics, granted, asOf, perio
             { label: 'Variación acumulada', value: salesChange(ytdGross, ytdGrossLY), unit: 'percent' as const, note: ytdGrossLY === 0 ? 'Sin base comparable.' : undefined },
           ];
           const fullMonths = loaded.every(({ current, previous }) => current.monthlyComponents && previous.monthlyComponents);
-          story.chart = fullMonths ? { kind: 'trend', title: 'Ventas antes de NC por mes', unit, currentLabel: String(ranges.year), previousLabel: String(ranges.year - 1), rows: Array.from({ length: ranges.month }, (_, index) => {
+          story.chart = id === 'ventas_evolucion' && period === 'month'
+            ? { kind: 'bars', title: grossLY > 0 ? 'Ventas del mismo tramo' : 'Ventas del mes', unit, rows: grossLY > 0 ? [{ label: String(ranges.year), value: gross }, { label: String(ranges.year - 1), value: grossLY }] : [{ label: String(ranges.year), value: gross }] }
+            : fullMonths ? { kind: 'trend', title: 'Ventas antes de NC por mes', unit, currentLabel: String(ranges.year), previousLabel: String(ranges.year - 1), rows: Array.from({ length: ranges.month }, (_, index) => {
             const month = String(index + 1).padStart(2, '0');
             return { label: ['Ene', 'Feb', 'Mar', 'Abr', 'May', 'Jun', 'Jul', 'Ago', 'Sep', 'Oct', 'Nov', 'Dic'][index], value: loaded.reduce((total, item) => total + (item.current.periods.get(`${ranges.year}-${month}`)?.[item.source.gross] as number ?? 0), 0), previous: loaded.reduce((total, item) => total + (item.previous.periods.get(`${ranges.year - 1}-${month}`)?.[item.source.gross] as number ?? 0), 0) };
           }) } : { kind: 'bars', title: 'Ventas por área autorizada', unit, rows: monthlyReports.map(item => ({ label: item.source.label, value: numeric(item.month[item.source.gross]), previous: numeric(item.monthLY[item.source.gross]) })), currentLabel: String(ranges.year), previousLabel: String(ranges.year - 1) };
@@ -188,7 +190,7 @@ export const loadSalesStories: StoryLoader = async (topics, granted, asOf, perio
           if (period === 'ytd' && id === 'ventas_evolucion') {
             story.periodLabel = `${ranges.from}–${asOf}`;
             story.navigationPeriod = { from: ranges.from, to: asOf };
-            story.primary = { label: 'Variación acumulada vs LY', value: salesChange(ytdGross, ytdGrossLY), unit: 'percent', note: ytdGrossLY <= 0 ? 'Sin base anual comparable.' : undefined };
+            story.primary = { label: 'Ventas acumuladas antes de NC', value: ytdGross, unit, comparison: { value: ytdGrossLY, label: `Mismo corte de ${ranges.year - 1}` }, note: ytdGrossLY <= 0 ? 'Sin base anual comparable.' : undefined };
             story.supporting = [{ label: 'Ventas acumuladas antes de NC', value: ytdGross, unit, comparison: { value: ytdGrossLY, label: `Mismo corte de ${ranges.year - 1}` } }];
             story.breakdown = monthlyReports.map(item => ({ label: item.source.label, value: numeric(item.current[item.source.gross]), previous: numeric(item.previous[item.source.gross]), unit, route: item.source.route }));
             story.message = ytdGrossLY > 0 ? `Las ventas acumuladas antes de NC ${ytdGross >= ytdGrossLY ? 'subieron' : 'bajaron'} ${new Intl.NumberFormat('es-PY', { maximumFractionDigits: 1 }).format(Math.abs(salesChange(ytdGross, ytdGrossLY)!))}% frente al mismo corte del año anterior.` : 'No hay base anual comparable para calcular la variación.';

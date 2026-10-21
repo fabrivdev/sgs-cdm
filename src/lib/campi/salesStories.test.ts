@@ -86,7 +86,7 @@ describe('sales story source contracts', () => {
     });
     const [sales] = await loadSalesStories(['ventas_evolucion'], ['repuestos.ventas'], '2026-10-16');
     expect(sales.status).toBe('ready');
-    expect(sales.primary).toMatchObject({ value: null, unit: 'percent', note: 'Sin base comparable de ventas antes de NC.' });
+    expect(sales.primary).toMatchObject({ value: 120, unit: 'USD', comparison: { value: 0 }, note: 'Sin base comparable de ventas antes de NC.' });
     expect(sales.supporting[0]).toMatchObject({ value: 120, comparison: { value: 0 } });
   });
   it('uses an explicit December query in January and clamps leap-day LY', async () => {
@@ -186,10 +186,10 @@ describe('sales story source contracts', () => {
     expect(rpc).toHaveBeenCalledTimes(2);
     expect(sales.status).toBe('ready');
     expect(net.status).toBe('ready');
-    expect(sales.primary).toMatchObject({ value: (220 - 70) / 70 * 100, unit: 'percent' });
+    expect(sales.primary).toMatchObject({ value: 220, unit: 'USD', comparison: { value: 70 } });
     expect(sales.supporting[0]).toMatchObject({ value: 220, unit: 'USD', comparison: { value: 70 } });
     expect(net.primary?.value).toBe(200);
-    expect(sales.chart?.kind).toBe('trend');
+    expect(sales.chart?.kind).toBe('bars');
   });
 
   it('answers annual net, credit impact and sector questions independently from the same reconciled sources', async () => {

@@ -8,10 +8,10 @@ describe('deterministic Campi interpretation', () => {
   it('links orders with assigned stock to an operational action', () => {
     const supply = story({ id: 'maquinas_pedidos', title: 'Pedidos pendientes',
       primary: { label: 'Pedidos pendientes', value: 12, unit: 'count' },
-      supporting: [{ label: 'Pedidos con stock', value: 3, unit: 'count' }],
+      supporting: [{ label: 'Pedidos con stock completo', value: 3, unit: 'count' }],
     });
     const text = interpretCampi([supply]).findings[0].text;
-    expect(text).toContain('De 12 pedidos pendientes, 3 tienen stock vinculado');
+    expect(text).toContain('De 12 pedidos pendientes, 3 tienen stock vinculado para todas sus unidades');
   });
   it('does not turn raw counts or an attention flag into alerts', () => {
     const result = interpretCampi([story({ attention: true }), { ...orders, supporting: [] }]);
@@ -43,7 +43,7 @@ describe('deterministic Campi interpretation', () => {
   it('explains the monthly sales variation with gross amounts and a reconciled sector difference', () => {
     const sales = story({
       id: 'ventas_evolucion', title: 'Evolución de ventas',
-      primary: { label: 'Variación de ventas vs LY', value: -25, unit: 'percent' },
+      primary: { label: 'Ventas antes de NC', value: 150, unit: 'USD', comparison: { value: 200, label: 'Mismo tramo LY' } },
       supporting: [{ label: 'Ventas antes de NC del mes', value: 150, unit: 'USD', comparison: { value: 200, label: 'Mismo tramo LY' } }],
       breakdown: [{ label: 'Repuestos', value: 100, previous: 180, unit: 'USD' }, { label: 'Servicios', value: 50, previous: 20, unit: 'USD' }],
     });

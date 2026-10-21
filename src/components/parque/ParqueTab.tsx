@@ -1,6 +1,7 @@
 import { sortSalesRows, type SalesColumn } from "@/components/ventas/salesTableInteraction";
 import { SectionActionsMenu } from "@/components/exports/SectionActionsMenu";
 import { useEffect, useMemo, useState } from "react";
+import { useLocation } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
@@ -204,6 +205,18 @@ export function ParqueTab({
   onMetricasChange?: (m: KpiResult) => void;
   onFacturacionEstadoChange?: (estado: ParqueFacturacionEstado) => void;
 }) {
+  const location = useLocation();
+  const panoramaDates = useMemo(() => {
+    const query = new URLSearchParams(location.search);
+    const from = query.get("desde"), to = query.get("hasta");
+    const valid = (date: string | null) => {
+      if (!date || !/^\d{4}-\d{2}-\d{2}$/.test(date)) return false;
+      const parsed = new Date(`${date}T12:00:00`);
+      return !Number.isNaN(parsed.getTime()) && format(parsed, "yyyy-MM-dd") === date;
+    };
+    return valid(from) && valid(to) && from! <= to!
+      ? { from: new Date(`${from}T12:00:00`), to: new Date(`${to}T12:00:00`) } : null;
+  }, [location.search]);
   const { can } = useAuth();
   const [loading, setLoading] = useState(true);
   const [loadError, setLoadError] = useState(false);
@@ -222,9 +235,9 @@ export function ParqueTab({
   const [fMarca, setFMarca] = useState<string>("all");
   const [fRubro, setFRubro] = useState<string>("all");
   const [fSubgrupo, setFSubgrupo] = useState<string>("all");
-  const [rango, setRango] = useState<RangoPreset>("365d");
-  const [customDesde, setCustomDesde] = useState<Date | undefined>();
-  const [customHasta, setCustomHasta] = useState<Date | undefined>();
+  const [rango, setRango] = useState<RangoPreset>(panoramaDates ? "custom" : "365d");
+  const [customDesde, setCustomDesde] = useState<Date | undefined>(panoramaDates?.from);
+  const [customHasta, setCustomHasta] = useState<Date | undefined>(panoramaDates?.to);
 
   const [sortKey, setSortKey] = useState<SortKey>("cantTotal");
   const [sortDir, setSortDir] = useState<"asc" | "desc">("desc");

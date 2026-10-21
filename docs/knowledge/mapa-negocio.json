@@ -1737,7 +1737,8 @@
       "sources": [
         "src/pages/CampiPanorama.tsx",
         "src/components/campi/PanoramaDashboard.tsx",
-        "src/components/campi/StoryPanel.tsx",
+        "src/components/campi/PanoramaStoryCard.tsx",
+        "src/lib/campi/storyCardFacts.ts",
         "src/lib/campi/panoramaStories.ts",
         "src/lib/campi/panoramaCatalogTargets.ts",
         "src/lib/campi/panoramaStoryVisits.ts"
@@ -2385,11 +2386,12 @@
       "id": "asistente.panorama",
       "title": "Panorama de Campi",
       "module": "asistente",
-      "description": "Alternativa local: 17 preguntas de negocio disponibles según permisos; conserva las nueve originales y añade ocho con fuente y cálculo. Cada tarjeta responde su pregunta; Ver detalle va a la sección de origen con filtros y, en temas consolidados de Ventas, ofrece primero elegir el área autorizada. Campi presenta síntesis y comentarios, sin el antiguo panel de preguntas por reglas. La RPC de stock antiguo se aplicó previamente en Lovable Cloud; esta ampliación de frontend permanece en la rama alternativa y no acredita publicación pública.",
+      "description": "Alternativa local: doce temas vigentes con fuente y permiso, hasta cuatro prioridades visibles; el catálogo objetivo contiene veinte preguntas y no ofrece opciones vacías. Cada tarjeta muestra KPI, hasta dos apoyos y un gráfico; las acciones van a su módulo. Ventas consolidadas elige antes el área autorizada. Campi sintetiza hallazgos comprobados. La rama no está publicada en Lovable público ni integrada a main.",
       "sources": [
         "src/pages/CampiPanorama.tsx",
         "src/components/campi/PanoramaDashboard.tsx",
         "src/components/campi/PanoramaStoryCard.tsx",
+        "src/lib/campi/storyCardFacts.ts",
         "src/lib/campi/panoramaPreferences.ts",
         "src/lib/campi/storyNavigation.ts",
         "docs/knowledge/36-Campi-bienvenida.md"

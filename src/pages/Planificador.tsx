@@ -107,6 +107,13 @@ export default function Planificador() {
   const { user, profile, isAdmin, isCabecilla, can } = useAuth();
   const { setPageFilters, clearPageFilters } = useAssistantPageContext();
   const [searchParams] = useSearchParams();
+  const panoramaRange = useMemo(() => {
+    const from = searchParams.get("desde"), to = searchParams.get("hasta");
+    const valid = (date: string | null) => !!date && /^\d{4}-\d{2}-\d{2}$/.test(date)
+      && !Number.isNaN(Date.parse(`${date}T00:00:00Z`))
+      && new Date(`${date}T00:00:00Z`).toISOString().slice(0, 10) === date;
+    return valid(from) && valid(to) && from! <= to! ? { from: from!, to: to! } : null;
+  }, [searchParams]);
   const [servicios, setServicios] = useState<Servicio[]>([]);
   const [profiles, setProfiles] = useState<Profile[]>([]);
   const [clientes, setClientes] = useState<Cliente[]>([]);
@@ -187,8 +194,9 @@ export default function Planificador() {
       setFEstados(["Completado"]);
       setFSemana("all");
     }
-    if (semana) setFSemana(semana);
-  }, [searchParams]);
+    if (panoramaRange) setFSemana("all");
+    else if (semana) setFSemana(semana);
+  }, [searchParams, panoramaRange]);
 
   const load = async () => {
     setLoading(true);
@@ -348,6 +356,7 @@ export default function Planificador() {
     const q = fCliente.trim().toLowerCase();
     return servicios.filter((s) => {
       if (fSemana !== "all" && s.semana !== Number(fSemana)) return false;
+      if (fSemana === "all" && panoramaRange && (s.fecha_programada < panoramaRange.from || s.fecha_programada > panoramaRange.to)) return false;
       if (!matchesMulti(fSucursales, s.sucursal)) return false;
       if (fTecnicos.length > 0 && !fTecnicos.some((id) => s.tecnico_responsable_id === id || s.auxiliares.includes(id))) return false;
       if (!matchesMulti(fMarcas, s.marca)) return false;
@@ -375,7 +384,7 @@ export default function Planificador() {
       }
       return true;
     });
-  }, [servicios, fSemana, fSucursales, fTecnicos, fMarcas, fEstados, fDatos, fVencidas, fCliente, cliById, refByServicio]);
+  }, [servicios, fSemana, panoramaRange, fSucursales, fTecnicos, fMarcas, fEstados, fDatos, fVencidas, fCliente, cliById, refByServicio]);
 
   const displayedSource = useMemo(() => {
     if (!soloPrincipalesSemana || fSemana === "all") return filtered;

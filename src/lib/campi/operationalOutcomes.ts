@@ -97,6 +97,7 @@ export function parseReadyOrders(input: unknown): ReadyOrders {
 }
 export function readyOrdersStory(data: ReadyOrders, supply: Supply): PanoramaStory {
   const unlinked = supply.sin_vinculo + supply.sin_unidad + supply.conflicto;
+  const fullyCovered = data.pedidos.filter(order => order.unidades_con_stock === order.unidades_activas).length;
   if (data.fecha_analisis !== supply.fecha_analisis || data.pedidos_con_stock > supply.pedidos ||
       data.unidades_con_stock > supply.stock || data.unidades_con_stock > supply.unidades) throw new Error('Los pedidos pendientes y su abastecimiento no concilian.');
   return { id: 'maquinas_pedidos', visitKey: `maquinas_pedidos:abastecimiento-v2:${data.fecha_analisis}`,
@@ -105,7 +106,8 @@ export function readyOrdersStory(data: ReadyOrders, supply: Supply): PanoramaSto
     scope: 'Pedidos activos y su abastecimiento por unidad',
     sections: ['parque.operaciones'], cutoff: null, periodLabel: formatDay(data.fecha_analisis),
     primary: { label: 'Pedidos pendientes', value: supply.pedidos, unit: 'count' },
-    supporting: [{ label: 'Pedidos con stock', value: data.pedidos_con_stock, unit: 'count', note: `${supply.pedidos ? new Intl.NumberFormat('es-PY', { maximumFractionDigits: 1 }).format(data.pedidos_con_stock / supply.pedidos * 100) : 0}% · ${data.unidades_con_stock} unidades` },
+    supporting: [{ label: 'Pedidos con stock completo', value: fullyCovered, unit: 'count' },
+      { label: 'Pedidos con stock', value: data.pedidos_con_stock, unit: 'count', note: 'Al menos una unidad con stock; no implica cobertura completa.' },
       { label: 'Unidades pendientes', value: supply.unidades, unit: 'count' },
       { label: 'Unidades con stock vinculado', value: data.unidades_con_stock, unit: 'count' }],
     chart: { kind: 'bars', title: 'Abastecimiento de unidades pendientes', unit: 'count', rows: [

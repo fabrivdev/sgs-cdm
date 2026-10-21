@@ -222,6 +222,11 @@ describe("Parque and imports compact lists",()=>{
     await waitFor(()=>expect(state).toHaveBeenLastCalledWith("ready"));expect(screen.queryByText(/57014/)).not.toBeInTheDocument();
     await exportTable("Exportar clientes");expect(mocks.json.mock.calls[0][0][0]["Fact. YTD"]).toBe(12.55);
   });
+  it("preserves the Panorama customer window when opening the clients module",async()=>{
+    setup(<ParqueTab/>,"/parque-clientes?desde=2026-10-01&hasta=2026-10-21");
+    await waitFor(()=>expect(mocks.rpc).toHaveBeenCalledWith("parque_resumen_facturacion",expect.objectContaining({p_desde:"2026-10-01",p_hasta:"2026-10-21"})));
+    expect(screen.getAllByText(/Período:.*01\/10.*21\/10/).length).toBeGreaterThan(0);
+  });
   it("the real clients page marks failed coverage unavailable but keeps machine/client counts",async()=>{
     vi.spyOn(console,"error").mockImplementation(()=>undefined);
     mocks.rpc.mockResolvedValue({data:null,error:{code:"57014",message:"statement timeout"}});

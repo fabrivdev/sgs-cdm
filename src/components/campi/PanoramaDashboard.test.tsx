@@ -81,7 +81,7 @@ describe('Campi alternative story dashboard', () => {
     expect(screen.getAllByRole('article').map(item => item.getAttribute('data-story'))).toEqual(ids);
     ids.forEach(id => expect(screen.getByRole('figure', { name: `Evolución ${id}` })).toBeInTheDocument());
     expect(screen.queryByText(/Datos al/)).not.toBeInTheDocument();
-    expect(screen.getAllByRole('link', { name: /Ver detalle de Tema/ })).toHaveLength(4);
+    expect(screen.getAllByRole('link', { name: /: Tema/ })).toHaveLength(4);
   });
   it('keeps all selected topics without adding an explanatory line', async () => {
     const ids = PANORAMA_TOPICS.map(topic => topic.id);
@@ -109,10 +109,10 @@ describe('Campi alternative story dashboard', () => {
   });
   it('offers an area selector only for consolidated sales, without opening a detail panel', async () => {
     load.mockResolvedValue([story('ventas_facturacion', { sections: ['repuestos.ventas', 'servicios.ventas'], navigationPeriod: { from: '2026-10-01', to: '2026-10-20' } })]); show();
-    fireEvent.keyDown(await screen.findByRole('button', { name: 'Ver detalle de Tema ventas_facturacion' }), { key: 'Enter' });
+    fireEvent.keyDown(await screen.findByRole('button', { name: 'Explorar ventas: Tema ventas_facturacion' }), { key: 'Enter' });
     const menu = screen.getByRole('menu');
-    expect(within(menu).getByRole('menuitem', { name: 'Ventas de repuestos' })).toHaveAttribute('href', '/repuestos/ventas?desde=2026-10-01&hasta=2026-10-20');
-    expect(within(menu).getByRole('menuitem', { name: 'Ventas de servicios' })).toHaveAttribute('href', '/servicios/ventas?desde=2026-10-01&hasta=2026-10-20');
+    expect(within(menu).getByRole('menuitem', { name: /Ventas de repuestos/ })).toHaveAttribute('href', '/repuestos/ventas?desde=2026-10-01&hasta=2026-10-20');
+    expect(within(menu).getByRole('menuitem', { name: /Ventas de servicios/ })).toHaveAttribute('href', '/servicios/ventas?desde=2026-10-01&hasta=2026-10-20');
     expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
   });
   it('passes only granted sources and suppresses aggregates containing denied sources', async () => {
@@ -146,10 +146,10 @@ describe('Campi alternative story dashboard', () => {
   it('compares a local baseline without rebasing the displayed change or claiming new sales', async () => {
     saveStoryVisit('manager-a', [story('ventas_facturacion', { primary: { label: 'Principal', value: 1000, unit: 'USD' } })], '2026-10-15T10:00:00Z');
     sessionStorage.clear();
-    load.mockResolvedValue([story('ventas_facturacion')]); show();
-    expect(await screen.findByRole('heading', { name: 'Tema ventas_facturacion: +$ 234,56 desde tu última visita.' })).toBeInTheDocument();
+    load.mockResolvedValue([story('ventas_facturacion', { primary: { label: 'Principal', value: 1234.56, unit: 'USD', comparison: { value: 1000, label: 'Mismo tramo LY' } } })]); show();
+    expect(await screen.findByRole('heading', { name: /Tema ventas_facturacion: principal subió 23,5%/ })).toBeInTheDocument();
     expect(screen.getByLabelText(/Comparación de Tema ventas_facturacion desde tu última visita/)).toHaveTextContent('$ 1.000 → $ 1.234,56');
-    expect(await screen.findByRole('link', { name: 'Ver detalle de Tema ventas_facturacion' })).toHaveAttribute('href', '/repuestos/ventas');
+    expect(await screen.findByRole('link', { name: 'Explorar ventas: Tema ventas_facturacion' })).toHaveAttribute('href', '/repuestos/ventas');
     await waitFor(() => expect(JSON.parse(localStorage.getItem('sig-cdm:panorama:alternativa:visita:v1:manager-a')!).values[0].value).toBe(1234.56));
     expect(readStoryVisit('manager-a')?.values[0].value).toBe(1000);
     expect(screen.queryByRole('dialog')).not.toBeInTheDocument();

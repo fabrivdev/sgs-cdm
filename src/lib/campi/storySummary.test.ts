@@ -17,10 +17,10 @@ describe('compact story percentages', () => {
     expect(storySummaryPercentage({ ...s, primary: { ...s.primary!, value: 7 } })).toBeNull();
     expect(storySummaryPercentage({ ...s, primary: { ...s.primary!, unit: 'USD' } })).toBeNull();
   });
-  it('shows the share of pending orders with stock at the same order grain', () => {
+  it('shows only fully covered orders, never partial stock coverage', () => {
     const s = { ...story(12), id: 'maquinas_pedidos', primary: { label: 'Pedidos pendientes', value: 12, unit: 'count' },
-      supporting: [{ label: 'Pedidos con stock', value: 3, unit: 'count' }] } as PanoramaStory;
-    expect(storySummaryPercentage(s)).toEqual({ value: 25, label: 'con stock vinculado', kind: 'composition' });
-    expect(storySummaryPercentage({ ...s, supporting: [{ label: 'Pedidos con stock', value: 13, unit: 'count' }] })).toBeNull();
+      supporting: [{ label: 'Pedidos con stock', value: 3, unit: 'count' }, { label: 'Pedidos con stock completo', value: 2, unit: 'count' }] } as PanoramaStory;
+    expect(storySummaryPercentage(s)).toEqual({ value: 2 / 12 * 100, label: 'con stock completo', kind: 'composition' });
+    expect(storySummaryPercentage({ ...s, supporting: [{ label: 'Pedidos con stock', value: 3, unit: 'count' }] })).toBeNull();
   });
 });
