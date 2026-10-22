@@ -4,6 +4,7 @@ import StockProyectado from "./StockProyectado";
 
 const { rpc, exportSalesTable } = vi.hoisted(() => ({ rpc: vi.fn(), exportSalesTable: vi.fn() }));
 vi.mock("@/integrations/supabase/client", () => ({ supabase: { rpc } }));
+vi.mock("@/lib/projectedStockYtd", () => ({ loadProjectedStockYtd: async (rows: unknown[]) => rows }));
 vi.mock("@/hooks/useAuth", () => ({ useAuth: () => ({ can: (permission: string) => permission === "datos:exportar" }) }));
 vi.mock("@/components/ventas/salesTableExport", () => ({ exportSalesTable }));
 
@@ -44,7 +45,7 @@ describe("Stock proyectado advanced filters", () => {
     fireEvent.click(within(panel).getByRole("button", { name: "Aplicar" }));
     expect(screen.getByRole("button", { name: "Más filtros" })).toHaveTextContent("1");
 
-    const kpis = [...document.querySelectorAll(".kpi-item")];
+    const kpis = [...document.querySelectorAll(".kpi-item")].slice(1);
     expect(kpis[0]).toHaveTextContent("Stock1");
     expect(kpis[1]).toHaveTextContent("Órdenes de compra0");
     expect(kpis[2]).toHaveTextContent("Ventas pendientes3");
@@ -54,6 +55,6 @@ describe("Stock proyectado advanced filters", () => {
     fireEvent.keyDown(actions, { key: "Enter" });
     fireEvent.click(await screen.findByRole("menuitem", { name: "Exportar Stock proyectado" }));
     await waitFor(() => expect(exportSalesTable).toHaveBeenCalledTimes(1));
-    expect(exportSalesTable).toHaveBeenCalledWith(expect.objectContaining({ rows: [rows[0]] }));
+    expect(exportSalesTable).toHaveBeenCalledWith(expect.objectContaining({ rows: [expect.objectContaining(rows[0])] }));
   });
 });

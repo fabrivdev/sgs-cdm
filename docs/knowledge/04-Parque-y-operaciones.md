@@ -51,3 +51,7 @@ Una unidad pendiente permite corregir el valor acordado antes de adjuntar su fac
 ## Ajuste local móvil del 07/10/2026
 
 En Máquinas del parque, `Nueva máquina` pasa de `FiltersBar.actions` al `PageHeader`. Bajo 640 px conserva nombre accesible y objetivo táctil, y desde 640 px mantiene texto visible. El mismo `NuevaMaquinaDialog` responsivo sigue controlando el alta; permisos, carga posterior, filtros, transferencias y datos no cambian. Validación local por prueba de página; revisión visual real pendiente.
+
+## Stock proyectado: catálogo y YTD neto — 22/10/2026
+
+Ver [contrato, conciliaciones y validación](../projected-stock-catalog-ytd.md). Identidad canónica antes de agrupar, ventas netas desde enero hasta corte y modelos vendidos elegibles del catálogo. OC32 conciliada con apertura; alias24 y cuatro referencias acreditadas. Fuentes originales, permisos y saldos preservados. SQL ya aplicado; push no vuelve a aplicarlo ni publica frontend. Arrocera/carro siguen pendientes de catálogo y las bajas de la OC conciliada requieren fecha trazable. Este cambio no incluye Panorama ni Cobertura.

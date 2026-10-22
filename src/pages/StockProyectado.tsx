@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Boxes, ClipboardList, PackageCheck, ShoppingCart } from "lucide-react";
 import { SectionActionsMenu } from "@/components/exports/SectionActionsMenu";
 import { useSectionTable } from "@/components/exports/useSectionTable";
@@ -9,13 +9,17 @@ import type { SalesColumn } from "@/components/ventas/salesTableInteraction";
 import { useAuth } from "@/hooks/useAuth";
 import { supabase } from "@/integrations/supabase/client";
 import { pageShell } from "@/lib/ui-classes";
+import { MarcaBadge } from "@/components/StatusBadges";
 import { MobileRecord } from "@/components/lists/MobileRecord";
 import {
   PROJECTED_STOCK_START,
   parseProjectedMachineStock,
   projectedStockTotals,
+  projectedStockYtdTotal,
   type ProjectedMachineStockRow,
 } from "@/lib/projectedMachineStock";
+
+import { loadProjectedStockYtd } from "@/lib/projectedStockYtd";
 
 type RpcClient = {
   rpc: (name: string, args: Record<string, unknown>) => Promise<{ data: unknown; error: { message?: string } | null }>;
@@ -26,12 +30,14 @@ const today = () => {
   return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}-${String(now.getDate()).padStart(2, "0")}`;
 };
 const units = (value: number) => value.toLocaleString("es-PY", { maximumFractionDigits: 2 });
+const brandTextContrast = (brand: string) => brand === "HORSCH" ? "text-[hsl(18_85%_32%)]" : brand === "CLAAS" ? "text-[hsl(75_46%_28%)]" : "";
 const shortDate = (value: string) => new Date(`${value}T12:00:00`).toLocaleDateString("es-PY");
 
 export default function StockProyectado() {
   const { can } = useAuth();
   const [cutoff, setCutoff] = useState(today);
   const [rows, setRows] = useState<ProjectedMachineStockRow[]>([]);
+  const request = useRef(0);
   const [loading, setLoading] = useState(true);
   const [loadError, setLoadError] = useState<string | null>(null);
   const [q, setQ] = useState("");
@@ -44,15 +50,26 @@ export default function StockProyectado() {
 
   const load = useCallback(async () => {
     setLoading(true);
+    const requestId = ++request.current;
     setLoadError(null);
     const { data, error } = await (supabase as unknown as RpcClient).rpc("parque_stock_proyectado_v1", { p_corte: cutoff });
+    if (requestId !== request.current) return;
     if (error) {
       setRows([]);
       setLoadError(error.message?.includes("schema cache") || error.message?.includes("function")
         ? "Falta aplicar la migración de Stock proyectado."
         : error.message || "No se pudo calcular el stock proyectado.");
     } else {
-      setRows(parseProjectedMachineStock(data).filas);
+      const parsed = parseProjectedMachineStock(data);
+      try {
+        const enriched = await loadProjectedStockYtd(parsed.filas, cutoff);
+        if (requestId !== request.current) return;
+        setRows(enriched);
+      } catch (cause) {
+        if (requestId !== request.current) return;
+        setRows(parsed.filas);
+        setLoadError(cause instanceof Error ? cause.message : "No se pudieron consultar las ventas YTD.");
+      }
     }
     setLoading(false);
   }, [cutoff]);
@@ -84,10 +101,12 @@ export default function StockProyectado() {
   }, [brand, model, pendingSales, projectedState, purchaseOrders, q, rows, type]);
 
   const totals = useMemo(() => projectedStockTotals(filtered), [filtered]);
+  const ytdTotal = projectedStockYtdTotal(filtered, !loading && !loadError);
   const columns: SalesColumn<ProjectedMachineStockRow>[] = [
     { key: "marca", label: "Marca", kind: "text", value: (row) => row.marca },
     { key: "tipo", label: "Tipo", kind: "text", value: (row) => row.tipo },
     { key: "modelo", label: "Modelo", kind: "text", value: (row) => row.modelo },
+    { key: "vendidas_ytd", label: "Vendidas YTD", kind: "number", align: "center", value: (row) => row.vendidas_ytd, exportValue: (row) => row.vendidas_ytd ?? "No disponible" },
     { key: "stock", label: "Stock", kind: "number", align: "center", value: (row) => row.stock },
     { key: "pedidos_compra", label: "OC", kind: "number", align: "center", value: (row) => row.pedidos_compra },
     { key: "disponibilidad", label: "Disponible", kind: "number", align: "center", value: (row) => row.disponibilidad },
@@ -107,6 +126,7 @@ export default function StockProyectado() {
       marca: { width: "md:w-[13%] lg:w-[11%]", hiddenBelow: "md" },
       tipo: { width: "md:w-[19%] lg:w-[17%]", hiddenBelow: "md" },
       modelo: { width: "w-[52%] md:w-[29%] lg:w-[29%]" },
+      vendidas_ytd: { width: "md:w-[11%]" },
       stock: { width: "w-[20%] md:w-[9%] lg:w-[8%]" },
       pedidos_compra: { width: "md:w-[8%]", hiddenBelow: "md" },
       disponibilidad: { width: "lg:w-[9%]", hiddenBelow: "lg" },
@@ -116,14 +136,15 @@ export default function StockProyectado() {
     return {
       ...column,
       ...layout[column.key],
-      render: (row) => column.key === "modelo" ? (
+      render: (row) => column.key === "marca" ? <MarcaBadge marca={row.marca} className={brandTextContrast(row.marca)} /> : column.key === "modelo" ? (
         <CompactListInfo label={row.modelo} fields={[
           ["Marca", row.marca], ["Tipo", row.tipo],
+          ...(row.identidad_estado === "sin_coincidencia_o_ambiguo" ? [["Identidad", "Pendiente de conciliación con catálogo"] as const] : []),
           ["Arribos", units(row.arribos_periodo)], ["Facturas/NC", units(row.ventas_netas_periodo)],
         ]} />
       ) : column.kind === "number" ? (
         <span className={column.key === "stock_proyectado" && row.stock_proyectado < 0 ? "font-semibold text-destructive" : undefined}>
-          {units(Number(column.value(row)))}
+          {column.value(row) == null ? "—" : units(Number(column.value(row)))}
         </span>
       ) : String(column.value(row) ?? "—"),
     };
@@ -139,11 +160,12 @@ export default function StockProyectado() {
   return (
     <div className={pageShell}>
       <PageHeader title="Stock proyectado" meta={<span className="sm:hidden">Corte: {shortDate(cutoff)} · Máquinas nuevas</span>} />
-      <KpiStrip mobilePrimary={[0, 3]} className="sm:grid-cols-2 xl:grid-cols-4">
-        <KpiItem label="Stock" value={units(totals.stock)} tone="positive" icon={<Boxes className="h-4 w-4" />} />
-        <KpiItem label="Órdenes de compra" value={units(totals.pedidosCompra)} tone="info" icon={<ShoppingCart className="h-4 w-4" />} />
-        <KpiItem label="Ventas pendientes" value={units(totals.ventasPendientes)} tone="warning" icon={<ClipboardList className="h-4 w-4" />} />
-        <KpiItem label="Stock proyectado" value={units(totals.stockProyectado)} tone={totals.stockProyectado < 0 ? "danger" : "positive"} icon={<PackageCheck className="h-4 w-4" />} />
+      <KpiStrip mobilePrimary={[0, 4]} className="sm:grid-cols-2 xl:grid-cols-5">
+        <KpiItem label="Vendidas YTD" value={ytdTotal == null ? "-" : units(ytdTotal)} tone="info" icon={<PackageCheck className="h-4 w-4" />} />
+        <KpiItem label="Stock" value={loading || loadError ? "—" : units(totals.stock)} tone="positive" icon={<Boxes className="h-4 w-4" />} />
+        <KpiItem label="Órdenes de compra" value={loading || loadError ? "—" : units(totals.pedidosCompra)} tone="info" icon={<ShoppingCart className="h-4 w-4" />} />
+        <KpiItem label="Ventas pendientes" value={loading || loadError ? "—" : units(totals.ventasPendientes)} tone="warning" icon={<ClipboardList className="h-4 w-4" />} />
+        <KpiItem label="Stock proyectado" value={loading || loadError ? "—" : units(totals.stockProyectado)} tone={totals.stockProyectado < 0 ? "danger" : "positive"} icon={<PackageCheck className="h-4 w-4" />} />
       </KpiStrip>
 
       <div className="space-y-3">
@@ -176,13 +198,14 @@ export default function StockProyectado() {
             rows={table.ordered}
             columns={viewColumns}
             mobileColumns={[
-              { ...viewColumns.find(c => c.key === "modelo")!, width: "w-[56%]", render: row => <CompactListInfo label={row.modelo}
-                summary={<MobileRecord primary={row.modelo} secondary={row.marca} />}
-                fields={[["Marca", row.marca], ["Tipo", row.tipo], ["Stock", units(row.stock)], ["OC", units(row.pedidos_compra)], ["Disponible", units(row.disponibilidad)], ["Ventas pendientes", units(row.ventas_pendientes)], ["Proyectado", units(row.stock_proyectado)], ["Arribos", units(row.arribos_periodo)], ["Facturas/NC", units(row.ventas_netas_periodo)]]} /> },
-              { ...viewColumns.find(c => c.key === "stock")!, width: "w-[22%]", align: "right" },
-              { ...viewColumns.find(c => c.key === "stock_proyectado")!, label: "Proy.", width: "w-[22%]", align: "right" },
+              { ...viewColumns.find(c => c.key === "modelo")!, width: "w-[44%]", render: row => <CompactListInfo label={row.modelo}
+                summary={<MobileRecord primary={row.modelo} secondary={<MarcaBadge marca={row.marca} className={`text-[10px] ${brandTextContrast(row.marca)}`} />} />}
+                fields={[["Marca", row.marca], ["Tipo", row.tipo], ["Vendidas YTD", row.vendidas_ytd == null ? "No disponible" : units(row.vendidas_ytd)], ["Stock", units(row.stock)], ["OC", units(row.pedidos_compra)], ["Disponible", units(row.disponibilidad)], ["Ventas pendientes", units(row.ventas_pendientes)], ["Proyectado", units(row.stock_proyectado)], ["Arribos", units(row.arribos_periodo)], ["Facturas/NC", units(row.ventas_netas_periodo)]]} /> },
+              { ...viewColumns.find(c => c.key === "vendidas_ytd")!, width: "w-[20%]", align: "right" },
+              { ...viewColumns.find(c => c.key === "stock")!, width: "w-[18%]", align: "right" },
+              { ...viewColumns.find(c => c.key === "stock_proyectado")!, label: "Proy.", width: "w-[18%]", align: "right" },
             ]}
-            id={(row) => `${row.programa}:${row.marca}:${row.modelo}`}
+            id={(row) => row.clave_fila ?? row.modelo_catalogo_id ?? `${row.programa}:${row.marca}:${row.tipo}:${row.modelo}`}
             label="Stock proyectado de máquinas nuevas"
             sort={table.sort}
             onSort={table.toggleSort}
