@@ -1,3 +1,4 @@
+import { describeImportError, type ImportProgressEvent } from "./importProgress";
 import { File as NodeFile } from "node:buffer";
 import { describe, expect, it } from "vitest";
 import { persistReceivablesFile, type ReceivablesRpcClient } from "./receivablesPersist";
@@ -93,4 +94,34 @@ it("rechaza un archivo distinto al revisado antes de escribir", async () => {
   const client: ReceivablesRpcClient = { rpc: async () => { called = true; return { data: null, error: null }; } };
   await expect(persistReceivablesFile({ file: xmlFile(), client, cutoffDate: "2026-10-15", expectedSha256: "different" })).rejects.toThrow(/cambió después del preflight/);
   expect(called).toBe(false);
+});
+
+
+describe("diagnostico cxc sin backend", () => {
+  it.each(["start", "validate", "persist", "finalize"])("preserva el fallo en %s aunque cancelar tambien falle", async (stage) => {
+    const events: ImportProgressEvent[] = [];
+    const calls: string[] = [];
+    const remote = { code: "57014", message: "timeout original", details: "detalle original", hint: "pista original" };
+    const client: ReceivablesRpcClient = { rpc: async (name, params) => {
+      calls.push(name);
+      const actual = name.includes("iniciar") ? "start" : name.includes("finalizar") ? "finalize"
+        : name.includes("cancelar") ? "cancel" : params.p_modo === "validate" ? "validate" : "persist";
+      if (actual === stage) return { data: null, error: remote, status: 504, statusText: "Gateway Timeout" };
+      if (actual === "cancel") return { data: null, error: { code: "08006", message: "cancelacion fallida" } };
+      if (actual === "start") return { data: { carga_id: "load-test", estado: "VALIDANDO", snapshot_version: 1 }, error: null };
+      return { data: { conflictos: 0, insertadas: 1 }, error: null };
+    } };
+    const failure = await persistReceivablesFile({ file: xmlFile(), client, cutoffDate: "2026-10-07", onProgress: event => events.push(event) }).catch(error => error);
+    expect(failure).toMatchObject({ code: "57014", details: "detalle original", hint: "pista original", status: 504, stage: "cxc." + stage });
+    expect(failure.durationMs).toBeGreaterThanOrEqual(0);
+    if (stage === "validate" || stage === "persist") expect(failure).toMatchObject({ batch: 1, batchRows: 1 });
+    const displayed = describeImportError(failure, "billing.validate");
+    expect(displayed).toContain("Etapa: cxc." + stage);
+    expect(displayed).toContain("timeout original");
+    expect(displayed).toContain("57014");
+    expect(displayed).not.toContain("billing.validate");
+    expect(events.find(event => event.status === "failed")).toMatchObject({ phase: "cxc." + stage });
+    expect(calls.filter(name => name.includes("cancelar"))).toHaveLength(stage === "start" ? 0 : 1);
+    if (stage !== "start") expect(displayed).toContain("cancelacion fallida");
+  });
 });

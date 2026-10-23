@@ -5,7 +5,7 @@ import StockProyectado from "./StockProyectado";
 const { rpc, exportSalesTable } = vi.hoisted(() => ({ rpc: vi.fn(), exportSalesTable: vi.fn() }));
 vi.mock("@/integrations/supabase/client", () => ({ supabase: { rpc } }));
 vi.mock("@/lib/projectedStockYtd", () => ({ loadProjectedStockYtd: async (rows: unknown[]) => rows }));
-vi.mock("@/hooks/useAuth", () => ({ useAuth: () => ({ can: (permission: string) => permission === "datos:exportar" }) }));
+vi.mock("@/hooks/useAuth", () => ({ useAuth: () => ({ user: { id: "test" }, loading: false, hasSectionAccess: () => true, can: (permission: string) => permission === "datos:exportar" }) }));
 vi.mock("@/components/ventas/salesTableExport", () => ({ exportSalesTable }));
 
 const rows = [

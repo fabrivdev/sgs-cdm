@@ -708,6 +708,7 @@ export function ImportarTotvsTab({ onChanged }: { onChanged: () => void }) {
           client: supabase as unknown as ReceivablesRpcClient,
           cutoffDate: preview.receivables.preflight.cutoffDate,
           expectedSha256: preview.receivables.sha256,
+          onProgress: handleImportProgress,
         });
         importedReceivables = result.preflight.documentRows;
         toast.success(`Cuentas por cobrar: ${result.preflight.documentRows.toLocaleString("es-PY")} documentos · corte ${result.preflight.cutoffDate}${result.reusedCompleteSnapshot ? " · ya cargado" : " · actualizado"}`);
@@ -774,6 +775,7 @@ export function ImportarTotvsTab({ onChanged }: { onChanged: () => void }) {
         throw new Error("Los archivos del Mayor cambiaron después del preflight; volvé a leerlos antes de confirmar.");
       }
       for (const file of mayorFiles) {
+        activeImportStage = "mayor.persist";
         mayorResultados.push(await persistMayorFile({
           file,
           client: supabase as unknown as MayorRpcClient,

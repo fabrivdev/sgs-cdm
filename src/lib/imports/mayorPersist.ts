@@ -1,5 +1,7 @@
+import { describeImportError, importErrorFields, type ImportProgressCallback } from "./importProgress";
+import { observeImportRpc } from "./importRpcDiagnostics";
 import { readMayorPreflightFile, type MayorPreflight } from "@/lib/imports/mayorPreflight";
-import type { ImportProgressCallback } from "@/lib/imports/importProgress";
+
 
 export interface MayorRpcError {
   code?: string;
@@ -52,6 +54,7 @@ class MayorRpcFailure extends Error {
   constructor(error: MayorRpcError) {
     super(error.message || "Error sin detalle en el RPC del Libro Mayor");
     this.code = error.code;
+    Object.assign(this, importErrorFields(error));
   }
 }
 
@@ -80,10 +83,12 @@ function explainFailure(error: unknown, cargaId: string | null, cancelError: unk
     message = `El Libro Mayor no concilia con sus controles. ${message}`;
   }
   if (cancelError) {
-    const cancelMessage = cancelError instanceof Error ? cancelError.message : String(cancelError);
+    const cancelMessage = describeImportError(cancelError);
     message += ` No se pudo cancelar automáticamente la carga ${cargaId}: ${cancelMessage}`;
   }
-  return new Error(message);
+  return Object.assign(new Error(message), { stage: "mayor.persist" }, importErrorFields(error), {
+    details: [importErrorFields(error).details, error instanceof Error && !message.includes(error.message) ? error.message : null].filter(Boolean).join(" | ") || undefined,
+  });
 }
 
 export async function persistMayorFile(options: {
@@ -101,7 +106,8 @@ export async function persistMayorFile(options: {
     cambiosTipo: number;
   }) => boolean | Promise<boolean>;
 }): Promise<MayorPersistResult> {
-  const { file, client, confirmAccountingChanges } = options;
+  const { file, confirmAccountingChanges } = options;
+  const client = observeImportRpc(options.client, "mayor", file.name, options.onProgress);
   const fileSha256 = await sha256Hex(file);
   let cargaId: string | null = null;
   let lotes = 0;

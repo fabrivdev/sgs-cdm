@@ -15,6 +15,15 @@ export interface ImportProgressEvent {
 
 export type ImportProgressCallback = (event: ImportProgressEvent) => void;
 
+/** Only diagnostics: never copy request objects, headers or credentials. */
+export function importErrorFields(error: unknown): Record<string, unknown> {
+  if (!error || typeof error !== "object") return {};
+  const source = error as Record<string, unknown>;
+  return Object.fromEntries([
+    "code", "details", "hint", "status", "statusText", "stage", "operation", "batch", "batchRows", "durationMs",
+  ].filter(key => source[key] !== undefined).map(key => [key, source[key]]));
+}
+
 const safeErrorField = (value: unknown): string => {
   if (typeof value === "string") return value.trim();
   if (typeof value === "number" || typeof value === "boolean") return String(value);
@@ -32,13 +41,14 @@ const safeErrorField = (value: unknown): string => {
  */
 export function describeImportError(error: unknown, stage?: string): string {
   const parts: string[] = [];
+  const fields = importErrorFields(error);
+  stage = safeErrorField(fields.stage) || stage;
   if (stage?.trim()) parts.push(`Etapa: ${stage.trim()}`);
 
   if (error instanceof Error) {
     const message = safeErrorField(error.message) || safeErrorField(error.name);
     if (message.startsWith("Etapa: ")) return message;
-    if (message) parts.push(message);
-    return parts.join(" | ") || "Error desconocido";
+    return describeImportError({ ...fields, message }, stage);
   }
   if (typeof error === "string") {
     if (error.trim()) parts.push(error.trim());
@@ -62,6 +72,12 @@ export function describeImportError(error: unknown, stage?: string): string {
   if (details) parts.push(`Detalle: ${details}`);
   if (hint) parts.push(`Sugerencia: ${hint}`);
   if (status || statusText) parts.push(`HTTP: ${[status, statusText].filter(Boolean).join(" ")}`);
+  if (remote.operation) parts.push(`RPC: ${safeErrorField(remote.operation)}`);
+  if (remote.batch != null) parts.push(`Lote: ${safeErrorField(remote.batch)}`);
+  if (remote.batchRows != null) parts.push(`Filas: ${safeErrorField(remote.batchRows)}`);
+  if (typeof remote.durationMs === "number" && Number.isFinite(remote.durationMs)) {
+    parts.push(`Duracion: ${Math.round(remote.durationMs)} ms`);
+  }
 
   if (parts.length === (stage?.trim() ? 1 : 0)) parts.push("Error remoto sin detalle legible");
   return parts.join(" | ");

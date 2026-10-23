@@ -135,3 +135,10 @@ order by tipo_saldo, clasificacion_estado;
 
 No habilitar EBITDA, margen final ni ROA a partir de esta entrega. Primero deben
 aprobarse las versiones de cuentas necesarias y resolverse las dos cuarentenas.
+
+
+## Diagnostico de importacion: parche aislado del 23/10/2026
+
+El parche asigna Mayor antes de iniciar su persistencia y observa los RPC de Mayor/CxC con etapa, operacion, lote, filas y duracion. Conserva codigo, detalle, sugerencia y estado HTTP cuando la respuesta los proporciona; una cancelacion fallida se informa sin sustituir la causa original. No cambia orden, payloads, tamano de lotes, validaciones, confirmaciones ni cancelacion compensatoria. Fuentes: `ImportarTotvsTab.tsx`, `importRpcDiagnostics.ts`, `importProgress.ts`, `mayorPersist.ts` y `receivablesPersist.ts`.
+
+Validacion: typecheck focal sin errores. Se agregaron pruebas aisladas con clientes simulados para errores de inicio, validacion, persistencia y finalizacion, cancelacion fallida, campos seguros, avance y rechazos de red. La integracion aislada ejecuto las cuatro suites: 25 pruebas pasaron con clientes simulados, mediante ejecucion autorizada fuera del sandbox que bloqueo inicialmente realpath. No hubo RPC real, importaciones, SQL ni publicacion. El defecto de rotulacion se confirma; la causa del fallo diario sigue pendiente de la respuesta remota original y este parche no acredita resolverla.

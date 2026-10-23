@@ -105,3 +105,13 @@ describe("runImportProgressStep", () => {
     expect(result).toBe("persistido");
   });
 });
+
+
+it("preserva campos seguros de Error y su etapa sin exponer headers", () => {
+ const failure = Object.assign(new Error("timeout"), { code: "57014", details: "detalle", hint: "pista", status: 504,
+  stage: "mayor.persist", operation: "totvs_importar_mayor_lote_v1", batch: 2, batchRows: 500, durationMs: 123.4,
+  headers: { authorization: "secreto" }, request: { token: "secreto" } });
+ const result = describeImportError(failure, "billing.validate");
+ expect(result).toBe("Etapa: mayor.persist | Codigo: 57014 | timeout | Detalle: detalle | Sugerencia: pista | HTTP: 504 | RPC: totvs_importar_mayor_lote_v1 | Lote: 2 | Filas: 500 | Duracion: 123 ms");
+ expect(result).not.toContain("secreto");
+});

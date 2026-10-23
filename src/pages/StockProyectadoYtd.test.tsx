@@ -2,16 +2,16 @@ import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/re
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import StockProyectado from "./StockProyectado";
 import { parseProjectedMachineStock, projectedStockYtdTotal } from "@/lib/projectedMachineStock";
-const { rpc, exportSalesTable } = vi.hoisted(() => ({ rpc: vi.fn(), exportSalesTable: vi.fn() }));
+const { rpc, ytd, exportSalesTable } = vi.hoisted(() => ({ rpc: vi.fn(), ytd: vi.fn(), exportSalesTable: vi.fn() }));
 vi.mock("@/integrations/supabase/client", () => ({ supabase: { rpc } }));
-vi.mock("@/lib/projectedStockYtd", () => ({ loadProjectedStockYtd: async (rows: unknown[]) => rows }));
-vi.mock("@/hooks/useAuth", () => ({ useAuth: () => ({ can: () => true }) }));
+vi.mock("@/lib/projectedStockYtd", () => ({ loadProjectedStockYtd: ytd }));
+vi.mock("@/hooks/useAuth", () => ({ useAuth: () => ({ user: { id: "test" }, loading: false, hasSectionAccess: () => true, can: () => true }) }));
 vi.mock("@/components/ventas/salesTableExport", () => ({ exportSalesTable }));
 const rows = [
   { modelo_catalogo_id: "one", programa: "HORSCH", marca: "HORSCH", tipo: "SEMBRADORAS", modelo: "MAESTRO EVOLUTION 32", vendidas_ytd: 6, stock: 2, pedidos_compra: 1, ventas_pendientes: 1, stock_proyectado: 2 },
   { modelo_catalogo_id: "two", programa: "CLAAS", marca: "CLAAS", tipo: "COSECHADORAS", modelo: "TRION 740", vendidas_ytd: 3, stock: 1, pedidos_compra: 0, ventas_pendientes: 0, stock_proyectado: 1 },
 ];
-beforeEach(() => {
+beforeEach(() => { ytd.mockImplementation(async (base: typeof rows) => base.map(r => ({ ...r, vendidas_ytd: r.modelo_catalogo_id === "one" ? 6 : 3 })));
   vi.stubGlobal("ResizeObserver", class { observe() {} disconnect() {} });
   rpc.mockResolvedValue({ data: { filas: rows, ytd: { estado: "completo" } }, error: null });
 });
@@ -32,7 +32,7 @@ describe("Vendidas YTD de Stock proyectado", () => {
     expect(exported.rows).toHaveLength(1);
     expect(exported.rows[0].vendidas_ytd).toBe(6);
   });
-  it("does not display a partial observed number as a complete year", async () => {
+  it("does not display unavailable YTD as zero", async () => { ytd.mockImplementation(async (base: typeof rows) => base);
     rpc.mockResolvedValue({ data: { filas: rows, ytd: { estado: "cobertura_no_acreditada" } }, error: null });
     render(<StockProyectado />);
     await screen.findAllByText("MAESTRO EVOLUTION 32");

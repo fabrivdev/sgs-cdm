@@ -55,3 +55,7 @@ En Máquinas del parque, `Nueva máquina` pasa de `FiltersBar.actions` al `PageH
 ## Stock proyectado: catálogo y YTD neto — 22/10/2026
 
 Ver [contrato, conciliaciones y validación](../projected-stock-catalog-ytd.md). Identidad canónica antes de agrupar, ventas netas desde enero hasta corte y modelos vendidos elegibles del catálogo. OC32 conciliada con apertura; alias24 y cuatro referencias acreditadas. Fuentes originales, permisos y saldos preservados. SQL ya aplicado; push no vuelve a aplicarlo ni publica frontend. Arrocera/carro siguen pendientes de catálogo y las bajas de la OC conciliada requieren fecha trazable. Este cambio no incluye Panorama ni Cobertura.
+
+## Aislamiento de YTD y permisos (23/10/2026)
+
+Stock proyectado presenta sus saldos cuando termina su propia consulta. Ventas YTD es un enriquecimiento independiente: requiere acceso a `parque.ventas`; carga, denegación o fallo conservan `null` y Excel indica «No disponible», sin impedir exportar el stock autorizado. Las filas exclusivas de ventas existen solo con una respuesta autorizada vigente. Cambio de usuario, corte o permiso invalida respuestas anteriores y exportaciones en curso; los filtros de catálogo que dejan de existir se limpian. No cambia fórmulas, RPC, RLS ni permisos. Pruebas: `StockProyectadoAccess.test.tsx`, suites YTD y exportación. Validación local con clientes simulados, sin datos reales ni publicación.

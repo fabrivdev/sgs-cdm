@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { Boxes, ClipboardList, PackageCheck, ShoppingCart } from "lucide-react";
 import { SectionActionsMenu } from "@/components/exports/SectionActionsMenu";
 import { useSectionTable } from "@/components/exports/useSectionTable";
@@ -34,12 +34,19 @@ const brandTextContrast = (brand: string) => brand === "HORSCH" ? "text-[hsl(18_
 const shortDate = (value: string) => new Date(`${value}T12:00:00`).toLocaleDateString("es-PY");
 
 export default function StockProyectado() {
-  const { can } = useAuth();
+  const { can, user, loading: authLoading, hasSectionAccess } = useAuth();
   const [cutoff, setCutoff] = useState(today);
-  const [rows, setRows] = useState<ProjectedMachineStockRow[]>([]);
-  const request = useRef(0);
-  const [loading, setLoading] = useState(true);
-  const [loadError, setLoadError] = useState<string | null>(null);
+  const stockAllowed = !authLoading && !!user && hasSectionAccess("parque.stock_proyectado");
+  const salesAllowed = stockAllowed && hasSectionAccess("parque.ventas");
+  const stockKey = JSON.stringify([user?.id, cutoff, stockAllowed]);
+  const ytdKey = JSON.stringify([stockKey, salesAllowed]);
+  const [stock, setStock] = useState<{ key: string; rows: ProjectedMachineStockRow[]; error: string | null } | null>(null);
+  const [ytd, setYtd] = useState<{ key: string; rows: ProjectedMachineStockRow[]; error: string | null } | null>(null);
+  const currentStock = stockAllowed && stock?.key === stockKey ? stock : null;
+  const currentYtd = salesAllowed && ytd?.key === ytdKey ? ytd : null;
+  const loading = authLoading || (stockAllowed && !currentStock);
+  const loadError = currentStock?.error ?? (!authLoading && !stockAllowed ? "No tenés acceso a Stock proyectado." : null);
+  const rows = useMemo(() => currentStock && !currentStock.error ? currentYtd?.rows ?? currentStock.rows : [], [currentStock, currentYtd]);
   const [q, setQ] = useState("");
   const [brand, setBrand] = useState("all");
   const [type, setType] = useState("all");
@@ -48,39 +55,48 @@ export default function StockProyectado() {
   const [purchaseOrders, setPurchaseOrders] = useState("all");
   const [pendingSales, setPendingSales] = useState("all");
 
-  const load = useCallback(async () => {
-    setLoading(true);
-    const requestId = ++request.current;
-    setLoadError(null);
-    const { data, error } = await (supabase as unknown as RpcClient).rpc("parque_stock_proyectado_v1", { p_corte: cutoff });
-    if (requestId !== request.current) return;
-    if (error) {
-      setRows([]);
-      setLoadError(error.message?.includes("schema cache") || error.message?.includes("function")
-        ? "Falta aplicar la migración de Stock proyectado."
-        : error.message || "No se pudo calcular el stock proyectado.");
-    } else {
-      const parsed = parseProjectedMachineStock(data);
+  useEffect(() => {
+    let active = true;
+    setStock(null);
+    if (!stockAllowed) return;
+    void (async () => {
       try {
-        const enriched = await loadProjectedStockYtd(parsed.filas, cutoff);
-        if (requestId !== request.current) return;
-        setRows(enriched);
+        const { data, error } = await (supabase as unknown as RpcClient).rpc("parque_stock_proyectado_v1", { p_corte: cutoff });
+        if (error) throw new Error(error.message?.includes("schema cache") || error.message?.includes("function")
+          ? "Falta aplicar la migración de Stock proyectado."
+          : error.message || "No se pudo calcular el stock proyectado.");
+        const base = parseProjectedMachineStock(data).filas.map(row => ({ ...row, vendidas_ytd: null }));
+        if (active) setStock({ key: stockKey, rows: base, error: null });
       } catch (cause) {
-        if (requestId !== request.current) return;
-        setRows(parsed.filas);
-        setLoadError(cause instanceof Error ? cause.message : "No se pudieron consultar las ventas YTD.");
+        if (active) setStock({ key: stockKey, rows: [], error: cause instanceof Error ? cause.message : "No se pudo calcular el stock proyectado." });
       }
-    }
-    setLoading(false);
-  }, [cutoff]);
+    })();
+    return () => { active = false; };
+  }, [cutoff, stockAllowed, stockKey]);
 
-  useEffect(() => { void load(); }, [load]);
+  useEffect(() => {
+    let active = true;
+    setYtd(null);
+    if (!salesAllowed || !currentStock || currentStock.error) return;
+    void loadProjectedStockYtd(currentStock.rows, cutoff).then(
+      enriched => { if (active) setYtd({ key: ytdKey, rows: enriched, error: null }); },
+      cause => { if (active) setYtd({ key: ytdKey, rows: currentStock.rows, error: cause instanceof Error ? cause.message : "No se pudieron consultar las ventas YTD." }); },
+    );
+    return () => { active = false; };
+  }, [currentStock, cutoff, salesAllowed, ytdKey]);
 
   const options = useMemo(() => ({
     brands: [...new Set(rows.map((row) => row.marca))].sort(),
     types: [...new Set(rows.map((row) => row.tipo))].sort(),
     models: [...new Set(rows.map((row) => row.modelo))].sort(),
   }), [rows]);
+
+  useEffect(() => {
+    if (!currentStock || currentStock.error) return;
+    if (brand !== "all" && !options.brands.includes(brand)) setBrand("all");
+    if (type !== "all" && !options.types.includes(type)) setType("all");
+    if (model !== "all" && !options.models.includes(model)) setModel("all");
+  }, [brand, type, model, options, currentStock]);
 
   const filtered = useMemo(() => {
     const term = q.trim().toLocaleUpperCase("es");
@@ -101,7 +117,9 @@ export default function StockProyectado() {
   }, [brand, model, pendingSales, projectedState, purchaseOrders, q, rows, type]);
 
   const totals = useMemo(() => projectedStockTotals(filtered), [filtered]);
-  const ytdTotal = projectedStockYtdTotal(filtered, !loading && !loadError);
+  const ytdTotal = projectedStockYtdTotal(filtered, !!currentYtd && !currentYtd.error);
+  const exportScope = useRef({ filtered, allowed: false });
+  exportScope.current = { filtered, allowed: !loading && !loadError && can("datos:exportar") };
   const columns: SalesColumn<ProjectedMachineStockRow>[] = [
     { key: "marca", label: "Marca", kind: "text", value: (row) => row.marca },
     { key: "tipo", label: "Tipo", kind: "text", value: (row) => row.tipo },
@@ -120,6 +138,7 @@ export default function StockProyectado() {
     fileName: `stock-proyectado-${cutoff}.xlsx`,
     initialSort: { key: "marca", direction: "asc" },
     disabled: loading || !!loadError,
+    exportGuard: () => exportScope.current.allowed && exportScope.current.filtered === filtered,
   });
   const viewColumns: CompactListColumn<ProjectedMachineStockRow>[] = columns.map((column) => {
     const layout: Record<string, Pick<CompactListColumn<ProjectedMachineStockRow>, "width" | "hiddenBelow">> = {
@@ -143,7 +162,7 @@ export default function StockProyectado() {
           ["Arribos", units(row.arribos_periodo)], ["Facturas/NC", units(row.ventas_netas_periodo)],
         ]} />
       ) : column.kind === "number" ? (
-        <span className={column.key === "stock_proyectado" && row.stock_proyectado < 0 ? "font-semibold text-destructive" : undefined}>
+        <span title={column.key === "vendidas_ytd" ? currentYtd?.error ?? (!salesAllowed ? "Ventas YTD no disponibles para este acceso." : undefined) : undefined} className={column.key === "stock_proyectado" && row.stock_proyectado < 0 ? "font-semibold text-destructive" : undefined}>
           {column.value(row) == null ? "—" : units(Number(column.value(row)))}
         </span>
       ) : String(column.value(row) ?? "—"),
