@@ -44,6 +44,7 @@ describe("selected mobile Sales composition", () => {
     await screen.findByRole("button", { name: /ago.*2026/ });
     expect(nav().getByRole("button", { name: "Períodos" })).toHaveAttribute("aria-pressed", "true");
     expect(screen.getAllByRole("definition")).toHaveLength(3);
+    expect(screen.getAllByRole("term")[0]).toHaveTextContent("Facturación Neta");
     expect(screen.queryByText("Más indicadores")).not.toBeInTheDocument();
     expect(document.querySelector("details")).toBeNull();
     expect(screen.getByRole("table").querySelectorAll("thead th")).toHaveLength(4);

@@ -51,6 +51,7 @@ describe('sales period contracts', () => {
     const rows=[{current:125.75,prior:100.25},{current:10,prior:null},{current:0,prior:0}];
     const columns=comparisonExports<(typeof rows)[number]>('ly','LY',r=>r.prior,r=>r.current);
     const sheet=createSalesWorkbook(rows,columns,'Periods').Sheets.Periods;
+    expect(sheet.A1.v).toBe('Año anterior — Importe');expect(sheet.B1.v).toBe('Año anterior — Variación (%)');
     expect(sheet.A2.v).toBe(100.25);expect(sheet.A2.t).toBe('n');expect(sheet.B2.v).toBeCloseTo(25.5/100.25);
     expect(sheet.A3).toBeUndefined();expect(sheet.B3).toBeUndefined();expect(sheet.A4.v).toBe(0);expect(sheet.B4).toBeUndefined();
     expect(periodMoney(125.75)).toBe('$ 126');expect(periodMoney(null)).toBe('\u2014');

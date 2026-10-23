@@ -1,3 +1,4 @@
+import { SALES_LABELS } from "./salesLabels";
 /* eslint-disable @typescript-eslint/no-explicit-any -- RPC tipada al regenerar tipos. */
 import { useEffect, useMemo, useState } from "react";
 import { serviceFilteredError as serviceSalesError } from "./serviceSalesFilters";
@@ -56,8 +57,8 @@ export function ServiciosClientes({ desde, hasta, sucursal, buscar, tipoTiempo, 
     { key: "cliente", label: perspective === "propietario" ? "Cliente" : "Cliente facturado", kind: "text", value: row => row.cliente, weight: 2.2, className: "font-medium" },
     serviceNumberColumn("os", "OS", row => row.os.size),
     serviceNumberColumn("facturas", "Facturas", row => row.facturas.size),
-    serviceNumberColumn("notas", "Notas de crédito", row => row.notas.size),
-    ...([ ["mo", "Mano de obra"], ["km", "Kilometraje"], ["repuestos", "Repuestos"], ["terceros", "Terceros"], ["total", "Neto"] ] as const)
+    serviceNumberColumn("notas", SALES_LABELS.creditNoteCount, row => row.notas.size),
+    ...([ ["mo", "Mano de obra"], ["km", "Kilometraje"], ["repuestos", "Repuestos"], ["terceros", "Terceros"], ["total", SALES_LABELS.netRevenue] ] as const)
       .map(([key, label]) => serviceMoneyColumn<Summary>(key, label, row => row[key])),
     serviceShareColumn<Summary>(row => totalPeriodo ? row.total / totalPeriodo : null),
   ];

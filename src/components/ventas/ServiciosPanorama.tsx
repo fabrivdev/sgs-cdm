@@ -1,3 +1,4 @@
+import { SALES_LABELS } from "./salesLabels";
 /* eslint-disable @typescript-eslint/no-explicit-any -- RPC tipada al regenerar tipos. */
 import { useEffect, useMemo, useState } from "react";
 import { SalesDataTable, type SalesDisplayColumn } from "./SalesDataTable";
@@ -90,12 +91,12 @@ export function ServiciosPanorama({ desde, hasta, sucursal, buscar, tipoTiempo, 
     {key:"periodo",label:"Período",kind:"text",value:row=>row.periodo,weight:1.3,
       exportValue:row=>row.periodo === "Total del período" ? row.periodo : periodLabel(row.periodo,periodMode),
       render:row=>row.periodo === "Total del período" ? row.periodo : periodLabel(row.periodo,periodMode),className:"font-medium"},
-    ...([ ["total","Facturación neta"], ["mo","Mano de obra"], ["km","Kilometraje"], ["repuestos","Repuestos"], ["terceros","Terceros"] ] as const)
+    ...([ ["total",SALES_LABELS.netRevenue], ["mo","Mano de obra"], ["km","Kilometraje"], ["repuestos","Repuestos"], ["terceros","Terceros"] ] as const)
       .map(([key,label])=>periodMoneyColumn<Row>(key,label,row=>row[key])),
     serviceNumberColumn<Row>("clientes","Clientes",row=>row.clientes),
     serviceNumberColumn<Row>("facturas","Documentos",row=>row.facturas),
     comparisonColumn<Row>("previous", "Período anterior", row => row.previous, row => row.total),
-    comparisonColumn<Row>("ly", "LY", row => row.ly, row => row.total),
+    comparisonColumn<Row>("ly", SALES_LABELS.previousYear, row => row.ly, row => row.total),
     serviceShareColumn<Row>(row=>data?.resumen.total ? row.total/data.resumen.total : null),
   ];
   const footer: Row | undefined = data ? {
@@ -111,7 +112,7 @@ export function ServiciosPanorama({ desde, hasta, sucursal, buscar, tipoTiempo, 
     </div>}
     <div>{loading ? <div className="py-8 text-center text-[12px] text-muted-foreground">Cargando panorama…</div>
       : error ? <div role="alert" className="py-8 text-center text-[12px] text-destructive">{error}</div>
-      : <div className="min-w-0 lg:mt-3"><SalesDataTable mobileEmbedded hideDesktopTitle mobileCountKey={mobile.active ? "facturas" : undefined} mobileCountLabel="Doc." mobilePrimaryLabel={mobile.active && periodMode === "mes" ? "Mes" : undefined} mobileMetricLabel={mobile.active ? "Facturación neta" : undefined} title="Períodos" rows={rows} columns={columns}
+      : <div className="min-w-0 lg:mt-3"><SalesDataTable mobileEmbedded hideDesktopTitle mobileCountKey={mobile.active ? "facturas" : undefined} mobileCountLabel="Doc." mobilePrimaryLabel={mobile.active && periodMode === "mes" ? "Mes" : undefined} mobileMetricLabel={mobile.active ? SALES_LABELS.netRevenue : undefined} title="Períodos" rows={rows} columns={columns}
         exportColumns={columns.flatMap(c => c.key === "previous" || c.key === "ly" ? comparisonExports<Row>(c.key,c.label,row=>row[c.key as "previous" | "ly"],row=>row.total) : [c])} initialSort={{key:"periodo",direction:"asc"}} rowKey={row=>row.periodo} footer={footer}
         fileName={`ventas-servicios-periodos-${desde}-${hasta}.xlsx`}
         onRowClick={row=>{ onSelectPeriod(row.periodo === selectedPeriod ? null : row.periodo); if (mobile.active) mobile.setView("detalle"); }}

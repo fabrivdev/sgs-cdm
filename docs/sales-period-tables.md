@@ -33,3 +33,9 @@ Pruebas de componentes y funciones cubren bruto/NC/neto, NC monetaria sin unidad
 
 Validación de esta entrega: 185 pruebas aprobadas en 24 archivos de Ventas y Stock proyectado; lint focal sin errores; build aprobado. El chequeo estándar de tipos encuentra un error previo en `src/test/totvsBillingSnapshotVersions.test.ts:96` (`String.replaceAll` con lib ES2020), presente también en main antes del cambio. No se altera esa prueba ni tsconfig dentro de este alcance. La primera corrida simultánea con build tuvo dos timeouts; la repetición con dos workers pasó completa.
 La comprobación completa con `--lib es2021,dom,dom.iterable` pasó sin cambiar archivos de configuración; separa ese bloqueo previo de los tipos de esta entrega.
+
+## Nomenclatura posterior
+
+Las etiquetas activas se centralizan en `salesLabels.ts`: Facturación Neta, Facturación Bruta, Nota de crédito y Año anterior. El nombre exacto de conteo documental es Cant. N.C.; las devoluciones físicas son Unidades devueltas. El historial mixto usa Importe. Esta corrección de nombres no modifica el contrato numérico descrito arriba. Excel conserva importe y variación separados, identificados explícitamente, y el nombre Ventas permanece en navegación/contextos generales.
+
+Validación de nomenclatura: 187 pruebas aprobadas en 23 archivos, lint focal y build aprobados; tipos aprobados usando ES2021 solo en el comando. Sigue separada la limitación previa de `replaceAll` con lib ES2020 en una prueba TOTVS ajena a este cambio. No hubo revisión visual general ni consultas productivas.

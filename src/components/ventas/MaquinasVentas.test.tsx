@@ -29,14 +29,18 @@ describe("Ventas de Máquinas", () => {
     expect(row.children[1]).toHaveClass('text-center');
     expect(row.children[6]).toHaveClass('text-right');
     expect(header).toHaveClass('text-left');
+    expect(header).toHaveTextContent('Facturación Neta');
+    expect(header).toHaveTextContent('Unidades devueltas');
+    expect(header.children[2]).toHaveClass('text-center');
+    expect(row.children[2]).toHaveTextContent('1');
   });
   it("matches period and detail heading alignment to their values", () => {
     const panorama = render(<MaquinasPanorama data={{ ...data, periodos: [{ ...data.resumen, periodo: "2026-08-01" }] }}
       loading={false} error={null} periodMode="mes" selectedPeriod={null} onSelectPeriod={() => undefined} />);
     expect(screen.getByText("Período").closest("button")).toHaveClass("justify-start");
     expect(screen.getByText("Clientes").closest("button")).toHaveClass("justify-center");
-    expect(screen.getByText("NC ($)").closest("button")).toHaveClass("justify-end");
-    expect(screen.getByText("Facturación neta").closest("button")).toHaveClass("justify-end");
+    expect(screen.getByText("Nota de crédito").closest("button")).toHaveClass("justify-end");
+    expect(screen.getByText("Facturación Neta").closest("button")).toHaveClass("justify-end");
     const period = screen.getByText("Total del período").parentElement!;
     expect(period.children[4]).toHaveClass("text-center");
     expect(period.children[1]).toHaveClass("text-right");
@@ -44,7 +48,7 @@ describe("Ventas de Máquinas", () => {
     setup();
     fireEvent.click(screen.getByRole("button", { name: "Detalle" }));
     for (const header of screen.getAllByRole("columnheader")) {
-      expect(header).toHaveClass(header.textContent === "Facturado" ? "text-right" : "text-left");
+      expect(header).toHaveClass(header.textContent === "Facturación Neta" ? "text-right" : "text-left");
     }
     const row = screen.getByText("Cliente A").closest("tr")!;
     expect(row.lastElementChild).toHaveClass("text-right");

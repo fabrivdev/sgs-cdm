@@ -1,3 +1,4 @@
+import { SALES_LABELS } from "./salesLabels";
 import { periodMoneyColumn, comparisonColumn, comparisonExports } from "./salesPeriodColumns";
 import type { SalesDisplayColumn } from "./SalesDataTable";
 /* eslint-disable @typescript-eslint/no-explicit-any -- RPCs nuevas, tipadas al regenerar Supabase. */
@@ -110,7 +111,7 @@ function participation<T extends Partial<PartsMetrics>>(total: number): SalesCol
 }
 function listingColumns(view: Exclude<View, "resumen">, total: number): SalesColumn<PartsRow>[] {
   const text = (key: keyof PartsRow, label: string): SalesColumn<PartsRow> => ({ key, label, kind: "text", value: r => r[key] as string | null | undefined });
-  const amount: SalesColumn<PartsRow> = { key: "facturado", label: "Facturación", kind: "number", align: "right", value: r => r.facturado, excelFormat: '"$" #,##0.00' };
+  const amount: SalesColumn<PartsRow> = { key: "facturado", label: SALES_LABELS.netRevenue, kind: "number", align: "right", value: r => r.facturado, excelFormat: '"$" #,##0.00' };
   if (view === "detalle") return [
     { key: "fecha", label: "Fecha", kind: "date", value: r => r.fecha?.slice(0, 10) },
     text("factura", "Factura"), text("sucursal", "Sucursal"), text("cliente", "Cliente"), text("marca", "Marca"),
@@ -125,8 +126,8 @@ function listingColumns(view: Exclude<View, "resumen">, total: number): SalesCol
   return [view === "clientes" ? text("cliente", "Cliente facturado") : { key: "vendedor", label: "Vendedor", kind: "text", value: r => seller(r.vendedor) },
     ...metricColumns<PartsRow>(view === "clientes"),
     ...(view === "clientes" ? [
-      { key: "anterior", label: "Año anterior", kind: "number" as const, align: "right" as const, excelFormat: '"$" #,##0.00', value: (r: PartsRow) => r.anterior },
-      { key: "variacion", label: "Variación LY", kind: "number" as const, align: "right" as const, value: (r: PartsRow) => r.anterior == null ? null : pct(r.facturado, r.anterior) == null ? null : pct(r.facturado, r.anterior)! / 100, excelFormat: "0%" },
+      { key: "anterior", label: SALES_LABELS.previousYear, kind: "number" as const, align: "right" as const, excelFormat: '"$" #,##0.00', value: (r: PartsRow) => r.anterior },
+      { key: "variacion", label: SALES_LABELS.previousYearVariation, kind: "number" as const, align: "right" as const, value: (r: PartsRow) => r.anterior == null ? null : pct(r.facturado, r.anterior) == null ? null : pct(r.facturado, r.anterior)! / 100, excelFormat: "0%" },
       { key: "ultima", label: "Última compra", kind: "date" as const, value: (r: PartsRow) => r.ultima?.slice(0, 10) },
     ] : []), participation(total)];
 }
@@ -163,13 +164,13 @@ function Panorama({ data, loading, error, retry, mode, selected, onSelect }: {
   const ly = (r: PartsPeriod) => r.anio_anterior_lineas === 0 ? null : r.anio_anterior ?? null;
   const columns: SalesDisplayColumn<PartsPeriod>[] = [
     { key: "periodo", label: "Período", kind: "text", value: r => r.periodo, exportValue: r => r.periodo || "Total del período", render: r => r.periodo ? <PeriodLabel value={r.periodo} mode={mode} /> : "Total del período" },
-    periodMoneyColumn("facturado", "Facturación neta", r => r.facturado),
-    periodMoneyColumn("ventas", "Facturación Bruta", r => r.ventas),
-    periodMoneyColumn("notas_credito", "NC ($)", r => r.notas_credito),
+    periodMoneyColumn("facturado", SALES_LABELS.netRevenue, r => r.facturado),
+    periodMoneyColumn("ventas", SALES_LABELS.grossRevenue, r => r.ventas),
+    periodMoneyColumn("notas_credito", SALES_LABELS.creditNote, r => r.notas_credito),
     { key: "clientes", label: "Clientes", kind: "number", align: "center", value: r => r.clientes },
     { key: "documentos", label: "Documentos", kind: "number", align: "center", value: r => r.documentos },
     comparisonColumn("previous", "Período anterior", previous, r => r.facturado),
-    comparisonColumn("ly", "LY", ly, r => r.facturado),
+    comparisonColumn("ly", SALES_LABELS.previousYear, ly, r => r.facturado),
     { ...participation<PartsPeriod>(data?.resumen.facturado ?? 0), render: r => share(r.facturado, data?.resumen.facturado ?? 0) },
   ];
   const footer = data ? { ...data.resumen, periodo: "", desde: "", hasta: "", anterior: data.comparacion.facturado, anterior_lineas: data.comparacion.lineas, anio_anterior: data.comparacion_ly.facturado, anio_anterior_lineas: data.comparacion_ly.lineas } : undefined;
@@ -246,21 +247,21 @@ function Listing({ filters, view }: { filters: Filters; view: "vendedores" | "cl
         if (full.filas.length !== full.total) throw new Error("La exportación está incompleta. No se generó un archivo parcial.");
         const { exportSalesTable } = await import("./salesTableExport");
         if (controller.signal.aborted) throw new Error("La exportación fue cancelada.");
-        exportSalesTable({ rows: full.filas, columns: listingColumns(view, full.total_periodo), fileName: `ventas-repuestos-${view}.xlsx`, sheetName: `Repuestos ${view}` });
+        exportSalesTable({ rows: full.filas, columns: listingColumns(view, full.total_periodo).map(c => c.key === "anterior" ? {...c, label: SALES_LABELS.previousYearAmount} : c), fileName: `ventas-repuestos-${view}.xlsx`, sheetName: `Repuestos ${view}` });
       } finally { if (exportController.current === controller) exportController.current = null; }
     } }, can("datos:exportar"));
   if (query.isLoading || query.error || !query.data) return <State loading={query.isLoading} error={query.error} retry={() => void query.refetch()} />;
   const data = { ...query.data.pages[0], filas: query.data.pages.flatMap(page => page.filas) };
   if (!data.filas.length) return <State />;
   const labels = columns.map(c => c.label);
-  if (isMobile) return <div className="space-y-2"><MobileSalesTable title={`Ventas de Repuestos · ${view}`} rows={data.filas} columns={listingColumns(view,data.total_periodo).map(c=>c.key==="factura"?{...c,render:(r:PartsRow)=>`${r.es_nota_credito?"NC ":""}${r.factura||"—"}`}:c)} primaryKey={view==="detalle"?"cliente":view==="repuestos"?"descripcion":undefined} rowKey={r=>r.id} sort={sort} toggleSort={toggleSort} />
+  if (isMobile) return <div className="space-y-2"><MobileSalesTable title={`Ventas de Repuestos · ${view}`} rows={data.filas} columns={listingColumns(view,data.total_periodo).map(c=>c.key==="factura"?{...c,render:(r:PartsRow)=>`${r.es_nota_credito?`${SALES_LABELS.creditNote} `:""}${r.factura||"—"}`}:c)} primaryKey={view==="detalle"?"cliente":view==="repuestos"?"descripcion":undefined} rowKey={r=>r.id} sort={sort} toggleSort={toggleSort} />
     <RowCount rows={data.total} loaded={data.filas.length} label="registros" />
     {query.hasNextPage && <button type="button" className="min-h-11 w-full rounded-md border text-sm" disabled={query.isFetchingNextPage} onClick={()=>void fetchNextPage()}>{query.isFetchingNextPage?"Cargando…":"Cargar más registros"}</button>}
   </div>;
   return <div className="space-y-2"><Table rows={data.filas.length} footer={<RowCount rows={data.total} loaded={data.filas.length} label="registros" />} minWidth={view === "detalle" ? "min-w-0" : view === "repuestos" ? "min-w-0" : "min-w-0"}>
     <colgroup>{columns.map(c => <col key={c.key} style={{ width: `${100 * (c.key === "descripcion" || c.key === "cliente" || c.key === "vendedor" ? 1.8 : 1) / columns.reduce((n, k) => n + (k.key === "descripcion" || k.key === "cliente" || k.key === "vendedor" ? 1.8 : 1), 0)}%` }} />)}</colgroup>
     <Heads columns={columns} sort={sort} toggle={toggleSort} /><tbody>{data.filas.map(row => <tr key={row.id} className="hover:bg-muted/20">
-      {view === "detalle" ? <><td className="whitespace-nowrap text-muted-foreground">{date(row.fecha)}</td><td className="truncate whitespace-nowrap font-mono text-[11px]" title={row.factura}>{row.factura || "—"}{row.es_nota_credito && <span className="ml-1 rounded bg-muted px-1 font-sans text-[10px]">NC</span>}</td><td className="truncate whitespace-nowrap" title={row.sucursal}>{row.sucursal || "—"}</td><td className="truncate whitespace-nowrap" title={row.cliente}>{row.cliente || "—"}</td><td><MarcaBadge marca={brand(row.marca)} className="px-1.5 py-0 text-[10px]" /></td><td className="truncate whitespace-nowrap font-mono text-[11px]" title={row.codigo}>{row.codigo || "—"}</td><td className="truncate whitespace-nowrap font-mono text-[11px]" title={row.codigo_fabricante}>{row.codigo_fabricante || "—"}</td><td className="truncate whitespace-nowrap" title={row.descripcion}>{row.descripcion || "—"}</td><td className="text-center tabular-nums">{number(row.cantidad)}</td><td className="text-right font-semibold tabular-nums">{money(row.facturado)}</td></>
+      {view === "detalle" ? <><td className="whitespace-nowrap text-muted-foreground">{date(row.fecha)}</td><td className="truncate whitespace-nowrap font-mono text-[11px]" title={row.factura}>{row.factura || "—"}{row.es_nota_credito && <span className="ml-1 rounded bg-muted px-1 font-sans text-[10px]">{SALES_LABELS.creditNote}</span>}</td><td className="truncate whitespace-nowrap" title={row.sucursal}>{row.sucursal || "—"}</td><td className="truncate whitespace-nowrap" title={row.cliente}>{row.cliente || "—"}</td><td><MarcaBadge marca={brand(row.marca)} className="px-1.5 py-0 text-[10px]" /></td><td className="truncate whitespace-nowrap font-mono text-[11px]" title={row.codigo}>{row.codigo || "—"}</td><td className="truncate whitespace-nowrap font-mono text-[11px]" title={row.codigo_fabricante}>{row.codigo_fabricante || "—"}</td><td className="truncate whitespace-nowrap" title={row.descripcion}>{row.descripcion || "—"}</td><td className="text-center tabular-nums">{number(row.cantidad)}</td><td className="text-right font-semibold tabular-nums">{money(row.facturado)}</td></>
         : view === "repuestos" ? <><td className="truncate whitespace-nowrap font-mono text-[11px]" title={row.codigo}>{row.codigo || "—"}</td><td className="truncate whitespace-nowrap font-medium" title={row.descripcion}>{row.descripcion || "—"}</td><td><MarcaBadge marca={brand(row.marca)} className="px-1.5 py-0 text-[10px]" /></td><td className="text-right font-semibold tabular-nums">{money(row.facturado)}</td><td className="text-center tabular-nums">{number(row.unidades_netas)}</td><td className="text-center tabular-nums">{number(row.clientes)}</td><td className="text-center tabular-nums">{number(row.documentos)}</td><td className="text-right tabular-nums">{share(row.facturado, data.total_periodo)}</td><td className="text-center">{row.abc ? <Badge variant="outline" className="min-w-6 justify-center px-1.5 py-0 text-[10px] font-semibold">{row.abc}</Badge> : "—"}</td></>
         : <>{view === "clientes" ? <td className="truncate whitespace-nowrap font-medium" title={row.cliente}>{row.cliente || "—"}</td> : <td className="truncate whitespace-nowrap font-medium" title={seller(row.vendedor)}>{seller(row.vendedor)}</td>}<Metrics row={row} client={view === "clientes"} />
           {view === "clientes" && <><td className="text-right tabular-nums text-muted-foreground">{row.anterior == null ? "—" : money(row.anterior)}</td><td className="text-right"><Delta current={row.facturado} previous={row.anterior} /></td><td className="text-left whitespace-nowrap">{date(row.ultima)}</td></>}
@@ -290,7 +291,7 @@ export function RepuestosVentas({ desde, hasta, sucursal, buscar, marca, vendedo
   const available = metrics && !overview.error;
   return <>
     {mobile.active ? <SalesMobileSummary billing={available ? money(metrics.facturado) : "—"} quantityLabel="Doc." quantityTitle="Documentos" quantity={available ? integer.format(metrics.documentos) : "—"} clients={available ? integer.format(metrics.clientes) : "—"} /> :
-      <KpiStrip><KpiItem label="Facturado" value={available ? money(metrics.facturado) : "—"} icon={<Receipt />} /><KpiItem label="Documentos" value={available ? integer.format(metrics.documentos) : "—"} icon={<FileText />} /><KpiItem label="Clientes facturados" value={available ? integer.format(metrics.clientes) : "—"} icon={<Users />} /><KpiItem label="Ticket Medio" value={available && metrics.documentos ? money(metrics.facturado / metrics.documentos) : "—"} /></KpiStrip>}
+      <KpiStrip><KpiItem label={SALES_LABELS.netRevenue} value={available ? money(metrics.facturado) : "—"} icon={<Receipt />} /><KpiItem label="Documentos" value={available ? integer.format(metrics.documentos) : "—"} icon={<FileText />} /><KpiItem label="Clientes facturados" value={available ? integer.format(metrics.clientes) : "—"} icon={<Users />} /><KpiItem label="Ticket Medio" value={available && metrics.documentos ? money(metrics.facturado / metrics.documentos) : "—"} /></KpiStrip>}
     <SalesMobileAverage label="Ticket Medio" value={available && metrics.documentos ? money(metrics.facturado / metrics.documentos) : "—"} />
     {filters.desde < "2027-07-01" && history.data && (!history.data.cargado || !history.data.notas_credito_verificadas) &&
       <p role="alert" className="rounded-md border border-amber-300 bg-amber-50 p-3 text-[11px] text-amber-900">

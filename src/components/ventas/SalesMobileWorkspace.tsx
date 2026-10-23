@@ -1,3 +1,4 @@
+import { SALES_LABELS } from "./salesLabels";
 import { useState, type ReactNode } from "react";
 import { X } from "lucide-react";
 import { useIsMobile } from "@/hooks/use-mobile";
@@ -36,7 +37,7 @@ export function SalesMobileSummary({ billing, quantity, quantityLabel, quantityT
   billing: string; quantity: string; quantityLabel: string; quantityTitle?: string; clients: string;
 }) {
   return <dl aria-label="Indicadores" className="sales-mobile-summary">
-    <div><dt>Facturación</dt><dd>{billing}</dd></div>
+    <div><dt>{SALES_LABELS.netRevenue}</dt><dd>{billing}</dd></div>
     <div><dt title={quantityTitle}>{quantityLabel}</dt><dd>{quantity}</dd></div>
     <div><dt>Clientes</dt><dd>{clients}</dd></div>
   </dl>;

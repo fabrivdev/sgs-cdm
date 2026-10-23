@@ -57,7 +57,7 @@ describe("Ventas por negocio",()=>{
   expect(await screen.findByText("Dueño B")).toBeInTheDocument();
   fireEvent.change(screen.getByRole("combobox",{name:"Agrupar clientes por"}),{target:{value:"cliente"}});
    expect(await screen.findByText("Ganadera El Fogón S.A.")).toBeInTheDocument();
-   expect(screen.getByText("Notas de crédito")).toBeInTheDocument();
+   expect(screen.getByText("Cant. N.C.")).toBeInTheDocument();
    expect(screen.getByText("Participación")).toBeInTheDocument();
    expect(screen.queryByText(/año ant/i)).not.toBeInTheDocument();
  });

@@ -1,3 +1,4 @@
+import { SALES_LABELS } from "./salesLabels";
 import type { SalesDisplayColumn } from './SalesDataTable';
 import type { SalesColumn } from './salesTableInteraction';
 import { variation } from './salesPeriodComparison';
@@ -14,5 +15,5 @@ export function comparisonColumn<T>(key: string, label: string, amount: (r: T) =
   } };
 }
 export function comparisonExports<T>(key: string, label: string, amount: (r: T) => number | null, current: (r: T) => number): SalesColumn<T>[] {
-  return [periodMoneyColumn(key, label, amount), { key: `${key}_variation`, label: `${label} variación`, kind: 'number', align: 'right', value: r => variation(current(r), amount(r)), excelFormat: '+0%;-0%;0%' }];
+  return [periodMoneyColumn(key, key === "ly" ? SALES_LABELS.previousYearAmount : `${label} — Importe`, amount), { key: `${key}_variation`, label: key === "ly" ? SALES_LABELS.previousYearVariation : `${label} — Variación (%)`, kind: 'number', align: 'right', value: r => variation(current(r), amount(r)), excelFormat: '+0%;-0%;0%' }];
 }

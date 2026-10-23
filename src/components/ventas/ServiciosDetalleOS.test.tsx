@@ -24,10 +24,10 @@ describe('invoice line detail', () => {
     await screen.findByText('3 líneas · 3 documentos');
     const ids=()=>Array.from(container.querySelectorAll('[data-invoice-line]')).map(row=>row.getAttribute('data-invoice-line'));
     expect(ids()).toEqual(['large','small','unknown']);
-    fireEvent.click(screen.getByRole('button',{name:'Ordenar Facturado: menor a mayor'}));
+    fireEvent.click(screen.getByRole('button',{name:'Ordenar Facturación Neta: menor a mayor'}));
     expect(ids()).toEqual(['unknown','small','large']);
-    expect(screen.getByRole('columnheader',{name:'Facturado'})).toHaveAttribute('aria-sort','ascending');
-    fireEvent.click(screen.getByRole('button',{name:'Ordenar Facturado: mayor a menor'}));
+    expect(screen.getByRole('columnheader',{name:'Facturación Neta'})).toHaveAttribute('aria-sort','ascending');
+    fireEvent.click(screen.getByRole('button',{name:'Ordenar Facturación Neta: mayor a menor'}));
     expect(ids()).toEqual(['large','small','unknown']);
     fireEvent.click(screen.getByRole('button',{name:'Ordenar Cant.: menor a mayor'}));
     expect(ids()).toEqual(['small','large','unknown']);
@@ -47,7 +47,7 @@ describe('invoice line detail', () => {
     rpc.mockResolvedValue({error:null,data:[...fixture,{...line,id:'excluded',cliente:'Otro',propietario_os:'Otro'}]});
     const {container}=render(<ServiciosDetalleOS {...props} buscar="Cliente seleccionado" />);
     await screen.findByText('25 líneas · 1 documentos');
-    fireEvent.click(screen.getByRole('button',{name:'Ordenar Facturado: menor a mayor'}));
+    fireEvent.click(screen.getByRole('button',{name:'Ordenar Facturación Neta: menor a mayor'}));
     await selectExport();
     await waitFor(()=>expect(exportSalesTable).toHaveBeenCalledTimes(1));
     const exported=exportSalesTable.mock.calls[0][0];
@@ -55,7 +55,7 @@ describe('invoice line detail', () => {
     expect(exported.rows.map((row:{id:string})=>row.id)).toEqual(Array.from(container.querySelectorAll('[data-invoice-line]')).map(row=>row.getAttribute('data-invoice-line')));
     expect(exported.rows).toHaveLength(25);
     expect(exported.rows.some((row:{id:string})=>row.id==='excluded')).toBe(false);
-    expect(exported.columns.map((column:{label:string})=>column.label)).toEqual(['Fecha','Factura','Sucursal','Cliente facturado','Propietario','OS','Chasis','Tiempo','Código','Descripción','Cant.','Facturado']);
+    expect(exported.columns.map((column:{label:string})=>column.label)).toEqual(['Fecha','Factura','Sucursal','Cliente facturado','Propietario','OS','Chasis','Tiempo','Código','Descripción','Cant.','Facturación Neta']);
     expect(exported.columns[1].exportValue(exported.rows[0])).toBe('000001234');
     expect(exported.columns[10].value(exported.rows[0])).toBeNull();
     expect(exported.columns[11].value(exported.rows[0])).toBe(-2);
@@ -71,7 +71,7 @@ describe('invoice line detail', () => {
     await selectExport();
     await waitFor(()=>expect(exportSalesTable).toHaveBeenCalled());
     const {columns}=exportSalesTable.mock.calls[0][0];
-    expect(columns[1].exportValue(nc)).toBe('NC 000000001');
+    expect(columns[1].exportValue(nc)).toBe('Nota de crédito 000000001');
     expect(columns[9].value(nc)).toBe(nc.descripcion);
     expect(columns[10].value(nc)).toBe(4.25);
     expect(columns[10].value(km)).toBe(0);
@@ -166,7 +166,7 @@ describe('invoice line detail', () => {
     expect(container.querySelectorAll('[data-invoice-line]')).toHaveLength(5);
     expect(screen.getAllByText('001-003-54')).toHaveLength(3);
     expect(screen.getAllByText('5734')).toHaveLength(4);
-    expect(screen.getByTitle('Nota de crédito: NC-54')).toHaveTextContent('NC NC-54');
+    expect(screen.getByTitle('Nota de crédito: NC-54')).toHaveTextContent('Nota de crédito NC-54');
     expect(screen.getByText('Sin OS vinculada')).toBeInTheDocument();
     expect(screen.queryByText(/Total facturado/)).not.toBeInTheDocument();
     expect(screen.getByTitle('$ -50,00')).toHaveTextContent('$ -50,00');

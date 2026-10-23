@@ -228,3 +228,11 @@ Anterior/LY muestran importe y variación en una celda; USD sin decimales en esc
 Servicios y Máquinas consultan las RPC existentes con agrupación diaria y exactamente los mismos filtros para sumar ventanas comparables. Se recortan extremos parciales y se respetan fines de mes/año bisiesto. LY semanal significa las mismas fechas calendario del año anterior. El error de una comparación no elimina la facturación actual. Máquinas obtiene Bruta/NC de importes de sus líneas completas, nunca de unidades, y agrega períodos vacíos dentro del rango exitosamente consultado.
 
 Referencias: `docs/sales-period-tables.md`, `salesPeriodComparison.ts`, `salesPeriodColumns.tsx`, `machinePeriodData.ts`, `ServiciosPanorama.tsx`, `RepuestosVentas.tsx`, `MaquinasVentas.tsx`, `Ventas.tsx`. No requiere SQL nuevo; pruebas locales no certifican publicación ni datos productivos. La revisión visual queda a cargo del usuario.
+
+## Nomenclatura comercial común — 23/10/2026
+
+Las vistas activas de Ventas de Repuestos, Servicios y Máquinas comparten `salesLabels.ts`: **Facturación Neta**, **Facturación Bruta**, **Nota de crédito** y **Año anterior**. El neto monetario antes presentado como Facturado/Facturación/Neto usa el mismo nombre en KPI, resumen, período, detalle, móvil, selectores, ordenación y Excel. Los títulos generales y la navegación Ventas permanecen; no se renombra Última venta.
+
+La cantidad de documentos de nota de crédito se denomina exactamente **Cant. N.C.**. Las cantidades físicas negativas de Máquinas conservan su cálculo y se presentan como **Unidades devueltas**. Los distintivos documentales usan **Nota de crédito** junto al número, sin convertirlos en importe. El historial mixto de máquina usa **Importe**, porque contiene actividad de OS que no acredita necesariamente una factura.
+
+Año anterior conserva importe y variación. Excel los separa en columnas numéricas **Año anterior — Importe** y **Año anterior — Variación (%)**, con los valores originales. Cambian solo nombres y clasificación visual de encabezados, no fórmulas, consultas, cardinalidad, unidades, signos, datos, permisos ni SQL. El código residual sin consumidores no se modifica. Fuentes: `salesLabels.ts`, `salesPeriodColumns.tsx`, `partsSalesFormat.ts` y componentes activos de `src/components/ventas`; `Ventas.tsx` comparte los nombres del KPI y del tipo documental en el filtro.
