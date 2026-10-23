@@ -7,7 +7,7 @@ vi.mock("@/hooks/useAuth", () => ({ useAuth: () => ({ can: () => true }) }));
 afterEach(cleanup);
 
 const data: MaquinasDashboardResponse = {
-  resumen: { total: 280000, facturas: 2, clientes: 2, vendidas: 1, notas_credito: 1, netas: 0, promedio_unidad: 0, nuevas: 1, usadas: 0 },
+  resumen: { venta_bruta: 300000, notas_credito_monto: 20000, total: 280000, facturas: 2, clientes: 2, vendidas: 1, notas_credito: 1, netas: 0, promedio_unidad: 0, nuevas: 1, usadas: 0 },
   periodos: [], por_maquina: [], por_modelo: [], dimensiones: { marcas: ["HORSCH"], tipos: ["SEMBRADORAS"] },
   lineas: [
     { id: "1", fecha: "2026-08-20", factura: "001", cliente_facturado: "Cliente A", sucursal: "Santa Rita", facturado: 300000, es_nota_credito: false, unidades: 1, marca: "HORSCH", tipo_maquina: "SEMBRADORAS", modelo: "MAESTRO 18.50", chasis: "24491421", comercial: "000007 - Carlos Benitez", condicion: "NUEVA", metodologia: "actual" },
@@ -33,12 +33,12 @@ describe("Ventas de Máquinas", () => {
   it("matches period and detail heading alignment to their values", () => {
     const panorama = render(<MaquinasPanorama data={{ ...data, periodos: [{ ...data.resumen, periodo: "2026-08-01" }] }}
       loading={false} error={null} periodMode="mes" selectedPeriod={null} onSelectPeriod={() => undefined} />);
-    expect(screen.getByText("Período").closest("button")!.parentElement).toHaveClass("text-left");
-    expect(screen.getByText("Nuevas").closest("button")!.parentElement).toHaveClass("text-center");
-    expect(screen.getByText("Notas de crédito").closest("button")!.parentElement).toHaveClass("text-center");
-    expect(screen.getByText("Facturado").closest("button")!.parentElement).toHaveClass("text-right");
+    expect(screen.getByText("Período").closest("button")).toHaveClass("justify-start");
+    expect(screen.getByText("Clientes").closest("button")).toHaveClass("justify-center");
+    expect(screen.getByText("NC ($)").closest("button")).toHaveClass("justify-end");
+    expect(screen.getByText("Facturación neta").closest("button")).toHaveClass("justify-end");
     const period = screen.getByText("Total del período").parentElement!;
-    expect(period.children[2]).toHaveClass("text-center");
+    expect(period.children[4]).toHaveClass("text-center");
     expect(period.children[1]).toHaveClass("text-right");
     panorama.unmount();
     setup();
@@ -58,7 +58,7 @@ describe("Ventas de Máquinas", () => {
       selectedPeriod={null} onSelectPeriod={() => undefined} />);
     const total = screen.getByText("Total del período").parentElement!;
     expect(Array.from(total.children).map(cell => cell.textContent)).toEqual([
-      "Total del período", "$ 280.000", "1", "0", "1", "0", "2", "2", "100%",
+      "Total del período", "$ 280.000", "$ 300.000", "$ -20.000", "2", "2", "\u2014", "\u2014", "100%",
     ]);
     expect(total.tagName).not.toBe("BUTTON");
   });

@@ -1,3 +1,5 @@
+import { machinePeriodData } from "@/components/ventas/machinePeriodData";
+import { loadPeriodComparisons } from "@/components/ventas/salesPeriodComparison";
 import { SalesViewSwitcher } from "@/components/ventas/SalesViewSwitcher";
 import { SalesMobileProvider, SalesMobileTabs, SalesMobileSummary, SalesMobileAverage } from "@/components/ventas/SalesMobileWorkspace";
 import { useSalesMobile, useSalesExplorerView } from "@/components/ventas/salesMobileContext";
@@ -355,7 +357,7 @@ function VentasContent({ area }: { area: VentasArea }) {
     if (area === "servicios" || area === "repuestos") { setData(null); setMaquinasData(null); setLoading(false); return; }
     if (area === "maquinas") {
       try {
-        const { data: response, error: rpcError } = await (supabase as any).rpc("ventas_maquinas_dashboard_filtros_v2", {
+        const machineParams = {
           p_desde: desde,
           p_hasta: hasta,
           p_sucursal: sucursal === "TODAS" ? null : sucursal,
@@ -364,10 +366,20 @@ function VentasContent({ area }: { area: VentasArea }) {
           p_tipo_maquina: tipoMaquina || null,
           p_vendedor: machineSeller || null,
           p_agrupacion: periodMode,
-        });
+        };
+        const { data: response, error: rpcError } = await (supabase as any).rpc("ventas_maquinas_dashboard_filtros_v2", machineParams);
         if (request !== loadRequest.current) return;
         if (rpcError) { setError(rpcError.message ?? "No se pudo cargar Ventas de Máquinas."); setMaquinasData(null); }
-        else setMaquinasData(response as MaquinasDashboardResponse);
+        else {
+          const current = machinePeriodData(response as MaquinasDashboardResponse, desde, hasta, periodMode);
+          setMaquinasData(current); setLoading(false);
+          const periodComparisons = await loadPeriodComparisons(desde, hasta, periodMode, async window => {
+            const result = await (supabase as any).rpc("ventas_maquinas_dashboard_filtros_v2", { ...machineParams, p_desde: window.from, p_hasta: window.to, p_agrupacion: "dia" });
+            if (result.error) throw result.error;
+            return result.data?.periodos;
+          });
+          if (request === loadRequest.current) setMaquinasData({ ...current, periodComparisons });
+        }
       } catch (loadError) {
         if (request !== loadRequest.current) return;
         setError(loadError instanceof Error ? loadError.message : "No se pudo cargar Ventas de Máquinas.");

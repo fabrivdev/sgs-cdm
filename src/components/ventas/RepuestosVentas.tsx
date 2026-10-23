@@ -1,3 +1,5 @@
+import { periodMoneyColumn, comparisonColumn, comparisonExports } from "./salesPeriodColumns";
+import type { SalesDisplayColumn } from "./SalesDataTable";
 /* eslint-disable @typescript-eslint/no-explicit-any -- RPCs nuevas, tipadas al regenerar Supabase. */
 import { useEffect, useRef, useState } from "react";
 import { useIsMobile } from "@/hooks/use-mobile";
@@ -157,28 +159,34 @@ function Panorama({ data, loading, error, retry, mode, selected, onSelect }: {
   const mobile = useSalesMobile();
   const [collapsed, setCollapsed] = useMobileDisclosure(!!error);
   const isMobile = useIsMobile(1024);
-  const columns: SalesColumn<PartsPeriod>[] = [
-    { key: "periodo", label: "Período", kind: "text", value: r => r.periodo, exportValue: r => r.periodo || "Total del período" },
-    ...metricColumns<PartsPeriod>(),
-    { key: "lm", label: "Variación LM", kind: "number", align: "right", value: r => r.anterior_lineas === 0 ? null : pct(r.facturado, r.anterior) == null ? null : pct(r.facturado, r.anterior)! / 100, excelFormat: "0%" },
-    { key: "ly", label: "Variación LY", kind: "number", align: "right", value: r => r.anio_anterior_lineas === 0 ? null : pct(r.facturado, r.anio_anterior) == null ? null : pct(r.facturado, r.anio_anterior)! / 100, excelFormat: "0%" },
-    participation(data?.resumen.facturado ?? 0),
+  const previous = (r: PartsPeriod) => r.anterior_lineas === 0 ? null : r.anterior ?? null;
+  const ly = (r: PartsPeriod) => r.anio_anterior_lineas === 0 ? null : r.anio_anterior ?? null;
+  const columns: SalesDisplayColumn<PartsPeriod>[] = [
+    { key: "periodo", label: "Período", kind: "text", value: r => r.periodo, exportValue: r => r.periodo || "Total del período", render: r => r.periodo ? <PeriodLabel value={r.periodo} mode={mode} /> : "Total del período" },
+    periodMoneyColumn("facturado", "Facturación neta", r => r.facturado),
+    periodMoneyColumn("ventas", "Facturación Bruta", r => r.ventas),
+    periodMoneyColumn("notas_credito", "NC ($)", r => r.notas_credito),
+    { key: "clientes", label: "Clientes", kind: "number", align: "center", value: r => r.clientes },
+    { key: "documentos", label: "Documentos", kind: "number", align: "center", value: r => r.documentos },
+    comparisonColumn("previous", "Período anterior", previous, r => r.facturado),
+    comparisonColumn("ly", "LY", ly, r => r.facturado),
+    { ...participation<PartsPeriod>(data?.resumen.facturado ?? 0), render: r => share(r.facturado, data?.resumen.facturado ?? 0) },
   ];
+  const footer = data ? { ...data.resumen, periodo: "", desde: "", hasta: "", anterior: data.comparacion.facturado, anterior_lineas: data.comparacion.lineas, anio_anterior: data.comparacion_ly.facturado, anio_anterior_lineas: data.comparacion_ly.lineas } : undefined;
   const table = useSectionTable({ rows: data?.periodos ?? [], columns, title: "Períodos de Repuestos", fileName: "ventas-repuestos-periodos.xlsx", initialSort: { key: "periodo", direction: "asc" },
-    disabled: loading || !!error, footer: data ? { ...data.resumen, periodo: "", desde: "", hasta: "", anterior: data.comparacion.facturado, anterior_lineas: data.comparacion.lineas, anio_anterior: data.comparacion_ly.facturado, anio_anterior_lineas: data.comparacion_ly.lineas } : undefined });
-  return <Panel className={cn("sales-periods p-0 lg:p-3", mobile.active && mobile.view !== "periodos" && !error && "hidden")}>
+    exportColumns: columns.flatMap(c => c.key === "previous" || c.key === "ly" ? comparisonExports<PartsPeriod>(c.key,c.label,c.key === "previous" ? previous : ly,r=>r.facturado) : [c]),
+    disabled: loading || !!error, footer });
+  const cells = (row: PartsPeriod) => columns.map(c => <td key={c.key} className={c.align === "right" ? "text-right tabular-nums" : c.align === "center" ? "text-center tabular-nums" : "text-left"}>
+    {c.key === "periodo" && row.periodo ? <button type="button" aria-pressed={selected === row.periodo} onClick={() => onSelect(selected === row.periodo ? null : row.periodo)} className="w-full text-left font-medium hover:text-primary"><PeriodLabel value={row.periodo} mode={mode} /></button> : c.render ? c.render(row) : number(c.value(row) as number | null)}
+  </td>);  return <Panel className={cn("sales-periods p-0 lg:p-3", mobile.active && mobile.view !== "periodos" && !error && "hidden")}>
     {!mobile.active && <div className="flex min-h-11 items-center justify-between gap-2 px-3 lg:min-h-0 lg:px-0">
       <button type="button" onClick={() => setCollapsed(!collapsed)} aria-expanded={!collapsed} className="flex flex-1 items-center justify-between text-left text-[13px] font-semibold">Facturación por período{collapsed ? <ChevronDown className="h-4 w-4" /> : <ChevronUp className="h-4 w-4" />}</button>
       {selected && <button type="button" onClick={() => onSelect(null)} className="rounded border px-2 py-1 text-[11px]">Ver período completo</button>}
     </div>}
     {(mobile.active || !collapsed) && <div className="lg:mt-3">{loading || error || !data ? <State loading={loading} error={error} retry={retry} /> : isMobile ? <MobileSalesTable embedded countKey={mobile.active ? "documentos" : undefined} countLabel="Doc." primaryLabel={mobile.active && mode === "mes" ? "Mes" : undefined} title="Períodos de Repuestos" rows={table.ordered} columns={columns.map(c => c.key === "periodo" ? {...c, render:(r:PartsPeriod)=><PeriodLabel value={r.periodo} mode={mode} />} : c)} rowKey={r=>r.periodo} sort={table.sort} toggleSort={table.toggleSort} onRowClick={r=>{ onSelect(selected===r.periodo?null:r.periodo); if (mobile.active) mobile.setView("detalle"); }} selected={r=>selected===r.periodo} footer={{...data.resumen,periodo:"",desde:"",hasta:"",anterior:data.comparacion.facturado,anterior_lineas:data.comparacion.lineas,anio_anterior:data.comparacion_ly.facturado,anio_anterior_lineas:data.comparacion_ly.lineas}} /> : <Table minWidth="min-w-0">
-      <colgroup><col style={{ width: "13%" }} />{PARTS_HEADERS.map(label => <col key={label} style={{ width: "10%" }} />)}<col /><col /><col /></colgroup>
       <Heads columns={columns} sort={table.sort} toggle={table.toggleSort} />
-      <tbody>{table.ordered.map(row => <tr key={row.periodo} className={cn("hover:bg-accent", selected === row.periodo && "bg-primary/5")}>
-        <td><button type="button" aria-pressed={selected === row.periodo} onClick={() => onSelect(selected === row.periodo ? null : row.periodo)} className="w-full text-left font-medium hover:text-primary"><PeriodLabel value={row.periodo} mode={mode} /></button></td>
-        <Metrics row={row} /><td className="text-right"><Delta current={row.facturado} previous={row.anterior} lines={row.anterior_lineas} /></td><td className="text-right"><Delta current={row.facturado} previous={row.anio_anterior} lines={row.anio_anterior_lineas} /></td><td className="text-right text-muted-foreground">{share(row.facturado, data.resumen.facturado)}</td>
-      </tr>)}</tbody>
-      <tfoot className="border-t bg-muted/30 font-semibold"><tr><td>Total del período</td><Metrics row={data.resumen} /><td className="text-right"><Delta current={data.resumen.facturado} previous={data.comparacion.facturado} lines={data.comparacion.lineas} /></td><td className="text-right"><Delta current={data.resumen.facturado} previous={data.comparacion_ly.facturado} lines={data.comparacion_ly.lineas} /></td><td className="text-right">{share(data.resumen.facturado, data.resumen.facturado)}</td></tr></tfoot>
+      <tbody>{table.ordered.map(row => <tr key={row.periodo} className={cn("hover:bg-accent", selected === row.periodo && "bg-primary/5")}>{cells(row)}</tr>)}</tbody>
+      <tfoot className="border-t bg-muted/30 font-semibold"><tr>{footer && cells(footer)}</tr></tfoot>
     </Table>}
     </div>}
   </Panel>;

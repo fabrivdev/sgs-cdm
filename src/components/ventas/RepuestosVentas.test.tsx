@@ -78,7 +78,7 @@ describe("Ventas de Repuestos", () => {
     render(<QueryClientProvider client={client}><Harness /></QueryClientProvider>);
     const total = (await screen.findByText("Total del período")).closest("tr")!;
     expect(within(total).getAllByRole("cell").map(cell => cell.textContent)).toEqual([
-      "Total del período", "$ 125", "$ 150", "$ -25", "1", "2", "2", "+25%", "+150%", "100%",
+      "Total del período", "$ 125", "$ 150", "$ -25", "1", "2", "$ 100 (+25%)", "$ 50 (+150%)", "100%",
     ]);
   });
   it("comparte panorama y resumen sin repetir la consulta", async () => {
@@ -88,9 +88,10 @@ describe("Ventas de Repuestos", () => {
     expect(rpc.mock.calls.filter(([name]) => name === "ventas_repuestos_panorama_v2")).toHaveLength(1);
     expect(rpc).not.toHaveBeenCalledWith("ventas_area_resumen", expect.anything());
     const tables = screen.getAllByRole("table");
-    const periodHeads = within(tables[0]).getAllByRole("columnheader").slice(1, 7).map(node => node.textContent);
+    const periodHeads = within(tables[0]).getAllByRole("columnheader").map(node => node.textContent);
     const summaryHeads = within(tables[1]).getAllByRole("columnheader").slice(1, 7).map(node => node.textContent);
-    expect(summaryHeads).toEqual(periodHeads);
+    expect(periodHeads).toEqual(["Período", "Facturación neta", "Facturación Bruta", "NC ($)", "Clientes", "Documentos", "Período anterior", "LY", "Participación"]);
+    expect(summaryHeads).toHaveLength(6);
     expect(screen.getByText("Total del período")).toBeInTheDocument();
     expect(within(tables[0]).getAllByRole("row")).toHaveLength(3); // Cabecera, período y total.
   });
@@ -147,10 +148,10 @@ describe("Ventas de Repuestos", () => {
     expect(screen.getByText("Rodamiento")).toBeInTheDocument();
     expect(screen.getByRole("columnheader", { name: "Marca" })).toBeInTheDocument();
     expect(screen.getByRole("columnheader", { name: "Facturación" })).toBeInTheDocument();
-    expect(screen.queryByRole("columnheader", { name: "Facturación neta" })).not.toBeInTheDocument();
     expect(screen.getByRole("columnheader", { name: "ABC" })).toBeInTheDocument();
     const partsTable = screen.getByRole("columnheader", { name: "ABC" }).closest("table");
     expect(partsTable).not.toBeNull();
+    expect(within(partsTable as HTMLTableElement).queryByRole("columnheader", { name: "Facturación neta" })).not.toBeInTheDocument();
     expect(within(partsTable as HTMLTableElement).queryByRole("columnheader", { name: "Cód. fabricante" })).not.toBeInTheDocument();
     expect(within(partsTable as HTMLTableElement).queryByRole("columnheader", { name: "Ventas" })).not.toBeInTheDocument();
     expect(within(partsTable as HTMLTableElement).queryByRole("columnheader", { name: "Notas de crédito" })).not.toBeInTheDocument();

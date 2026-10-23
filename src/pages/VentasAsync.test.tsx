@@ -50,8 +50,9 @@ beforeEach(() => {
   vi.stubGlobal("ResizeObserver", class { observe() {} unobserve() {} disconnect() {} });
   requests = [];
   viewport.mobile = true;
-  rpc.mockImplementation((name: string) => {
+  rpc.mockImplementation((name: string, params: {p_agrupacion?:string}) => {
     if (name !== "ventas_maquinas_dashboard_filtros_v2") return Promise.resolve({ data: [], error: null });
+    if (params.p_agrupacion === "dia") return Promise.resolve({data:{periodos:[]},error:null});
     const request = deferred();
     requests.push(request);
     return request.promise;

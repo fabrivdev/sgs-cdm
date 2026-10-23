@@ -73,7 +73,7 @@ describe("selected mobile Sales composition", () => {
     expect(download.rows[0].facturado).toBe(-250.25);
     expect(download.columns.some((c: { key: string }) => c.key === "chasis")).toBe(true);
     fireEvent.click(nav().getByRole("button", { name: "Períodos" }));
-    expect(screen.getByRole("table").querySelector("tfoot")).toHaveTextContent("1.499.749,75");
+    expect(screen.getByRole("table").querySelector("tfoot")).toHaveTextContent("1.499.750");
     fireEvent.click(screen.getByRole("button", { name: "Ver período completo" }));
     expect(screen.queryByText(/01 ago.*31 ago/)).not.toBeInTheDocument();
   });
