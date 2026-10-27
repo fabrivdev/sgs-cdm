@@ -24,6 +24,7 @@
       "description": "Clientes, propiedad de máquinas, stock físico, catálogo y pedidos comerciales. Mantener separadas disponibilidad comercial y llegada logística.",
       "notes": [
         "04-Parque-y-operaciones",
+        "33-Anulacion-pedidos",
         "18-Gerencia-parque",
         "25-Revision-movil-transversal"
       ],
@@ -1428,6 +1429,16 @@
         "src/lib/machineOrderValidation.ts"
       ],
       "evidence": "Memoria reconciliada el 14/10/2026; contrastar código y SQL aplicado antes de operar"
+    },
+    {
+      "id": "np-anulacion-conservadora",
+      "title": "Anular conserva historial y libera reservas propias",
+      "module": "parque",
+      "description": "CANCELADA conserva ficha, líneas y documentos, registra actor/fecha y vínculos anteriores. Bloquea venta, entrega, referencias contradictorias y reactivación silenciosa. No modifica stock físico.",
+      "check": "Verificar permiso y sección, idempotencia, rollback, reservas ajenas y protección de evidencia. Contención se rechaza; dos sesiones reales no ensayadas.",
+      "entities": ["NP", "stock-maquina", "unidad-importacion"],
+      "sources": ["src/components/parque/CancelMachineOrderDialog.tsx", "supabase/migrations/20261027140000_cancel_machine_orders_preserving_history.sql", "scripts/verify-machine-order-cancellation.mjs", "docs/knowledge/33-Anulacion-pedidos.md"],
+      "evidence": "27/10/2026: backend instalado y verificado por metadatos/ACL; no se anuló ningún pedido como prueba."
     },
     {
       "id": "detalle-importacion-compacto",

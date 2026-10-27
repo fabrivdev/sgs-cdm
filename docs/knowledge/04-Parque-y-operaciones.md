@@ -1,5 +1,7 @@
 # Parque y operaciones
 
+Anulación sin borrar historial: [33-Anulacion-pedidos](33-Anulacion-pedidos.md). Backend instalado con aprobación específica; publicar frontend no requiere reaplicar la migración.
+
 ## Catálogo
 
 Cuarto paso visual del 18/09: Clientes, Máquinas, Stock y Operaciones usan `CompactListTable` de presentación, una línea, ejes compartidos y contexto bajo demanda. Revisión posterior de Clientes: Sucursal y Rep./Serv. pasan a filtros, ficha y Excel, sin eliminar datos; mantiene negativos/carga/error de facturación, seis columnas a 768–1279 px y diez desde 1280 px con encabezados completos y espacio para sus flechas. Teléfonos conservan Cliente/Maq./Facturación y los secundarios al pulsar Cliente. Máquinas/Stock consultan secundarios al pulsar Modelo; Stock mantiene aviso de chasis repetido. Transferir/Ver cliente/Ver pedido conserva identidad, permisos y payloads. Exportaciones completas con orden/filtros originales; USD como `$`, sin conversiones. No altera cálculos, consultas, estados, escrituras o Dashboard. Fuentes: `CompactListTable.tsx`, `ParqueListTables.test.tsx`, pestañas de Parque y `MaquinariaOperaciones.tsx`. Historias interiores de ClientePanel quedan fuera de este paso; validación local con fixtures, no productiva ni SQL nuevo.
