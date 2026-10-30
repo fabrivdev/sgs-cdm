@@ -6,8 +6,8 @@ vi.mock('./CampiBadgeActor',()=>({badgeMood:()=> 'neutral',CampiBadgeActor:()=> 
 vi.mock('./CampiPanoramaAvatar',()=>({CampiPanoramaAvatar:()=>null}));
 const row=(id:PanoramaStory['id'],label:string):PanoramaStory=>({id,title:label,question:'',status:'ready',message:'',scope:'',sections:['repuestos.ventas'],cutoff:null,time:{window:{from:'2026-10-01',to:'2026-10-28'}},periodLabel:'octubre',primary:{label,value:100,unit:'USD',comparison:{value:80,label:'mismo tramo anterior'}},supporting:[],chart:null,breakdown:[],details:[],source:'fixture',route:''});
 let show:IntersectionObserverCallback;
-beforeEach(()=>{vi.useFakeTimers();vi.setSystemTime(new Date('2026-10-28T12:00:00Z'));localStorage.clear();globalThis.IntersectionObserver=class {constructor(cb:IntersectionObserverCallback){show=cb;}observe(){}disconnect(){}} as unknown as typeof IntersectionObserver;});
-afterEach(()=>{cleanup();vi.useRealTimers();vi.unstubAllGlobals();});
+beforeEach(()=>{vi.stubEnv('VITE_CAMPI_TOPIC_REQUESTS_ENABLED','false');vi.useFakeTimers();vi.setSystemTime(new Date('2026-10-28T12:00:00Z'));localStorage.clear();globalThis.IntersectionObserver=class {constructor(cb:IntersectionObserverCallback){show=cb;}observe(){}disconnect(){}} as unknown as typeof IntersectionObserver;});
+afterEach(()=>{cleanup();vi.useRealTimers();vi.unstubAllGlobals();vi.unstubAllEnvs();});
 const view=(stories:PanoramaStory[],allowed=true,user='a')=><BusinessCampi userId={user} stories={stories} hasAccess={()=>allowed} loading={false}/>;
 it('permite proponer un tema sin enlaces ni detalle; respeta rondas y vuelve al primero al terminar',()=>{
  render(view([row('ventas_evolucion','Ventas'),row('ventas_facturacion','Neto')]));
@@ -92,3 +92,5 @@ it('distingue carga, error, información insuficiente y comparaciones sin variac
  v.rerender(view([]));expect(screen.getByRole('heading')).toHaveTextContent('Todavía no tengo información suficiente para destacar una novedad.');
  v.rerender(view([a]));expect(screen.getByRole('heading')).toHaveTextContent('Por ahora no hay comparaciones verificadas para comentar.');
 });
+
+it.each([true,false])('keeps proposals visible in DEV=%s without making disabled backend calls',(dev)=>{vi.stubEnv('DEV',dev);render(view([]));expect(screen.getByRole('button',{name:'Proponer un tema'})).toBeInTheDocument();});

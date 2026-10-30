@@ -2,7 +2,7 @@ import type { SupabaseClient } from '@supabase/supabase-js';
 import { supabase } from '@/integrations/supabase/client';
 import { requestStatusLabels, validateQuestion, type RequestStatus, type TopicRequest } from './topicRequests';
 
-export const topicRequestsEnabled = () => import.meta.env.VITE_CAMPI_TOPIC_REQUESTS_ENABLED === 'true';
+export const topicRequestsEnabled = () => import.meta.env.VITE_CAMPI_TOPIC_REQUESTS_ENABLED !== 'false';
 export const REQUESTS_UNAVAILABLE = 'El envío de propuestas todavía no está habilitado.';
 export type TopicRelease = { id: string; title: string };
 export type RequestInbox = { rows: TopicRequest[]; releases: TopicRelease[] };

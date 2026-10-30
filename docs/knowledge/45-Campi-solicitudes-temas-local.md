@@ -1,10 +1,10 @@
-# Solicitudes de temas desde el badge: conexión preparada, no activada
+# Solicitudes de temas desde el badge: habilitación compartida
 
 ## Estado real
 
-El formulario ya usa un adaptador Supabase real, no el almacén de demostración. La bandera VITE_CAMPI_TOPIC_REQUESTS_ENABLED debe ser exactamente true para permitir consultas/envíos; actualmente no se habilitó. Con la bandera ausente se bloquea el envío: «El envío de propuestas todavía no está habilitado.» Los registros de demostración existentes no se importan ni se presentan como solicitudes persistidas.
+El formulario ya usa un adaptador Supabase real, no el almacén de demostración. La conexión se habilita por defecto tanto en desarrollo como en builds normales. Sólo VITE_CAMPI_TOPIC_REQUESTS_ENABLED=false la desactiva explícitamente. Al desactivarla se bloquea el envío: «El envío de propuestas todavía no está habilitado.» Los registros de demostración existentes no se importan ni se presentan como solicitudes persistidas.
 
-No se instaló la migración remota ni se crearon cuentas, roles, solicitudes o avisos reales. El acceso Proponer un tema sigue limitado a DEV mientras se prueba localmente. No modificar bienvenida, actor, cuatro prioridades, métricas ni comentarios.
+El usuario confirmó que aplicó la migración remota; no existe verificación técnica independiente de esa instalación. No se crearon cuentas, roles, solicitudes o avisos de prueba desde este trabajo. Proponer un tema está disponible también en builds normales. Publicar Lovable sigue siendo una acción del usuario. No modificar bienvenida, actor, cuatro prioridades, métricas ni comentarios.
 
 ## Flujo conectado
 
@@ -30,7 +30,7 @@ No se instaló la migración remota ni se crearon cuentas, roles, solicitudes o 
 
 No hay fecha prometida, garantía de implementación ni éxito de demostración.
 
-## Instalación pendiente y alcance exacto
+## Migración autorizada y alcance exacto
 
 Archivo supabase/migrations/20261030200000_campi_topic_requests_local.sql, sin modificaciones por esta conexión:
 SHA256 E0B04D3504AB08EDFDEF92775F4057883C686C66AA909A92F44F4AF69C05CFBC.
@@ -43,8 +43,8 @@ La migración no crea avisos ni marca temas publicados. Registrar un tema public
 
 No se encontró Supabase/PostgreSQL servidor local ni Docker disponible; las configuraciones existentes apuntan al backend compartido. PGlite valida SQL con identidades sintéticas, pero no es un servidor de autenticación de dos usuarios.
 
-Para E2E real: aprobar instalación puntual anterior y registro de UN tema existente efectivamente disponible; designar dos cuentas existentes autorizadas para prueba (solicitante y superadmin), sin crear cuentas ni cambiar roles. Después activar sólo frontend local. Probar envío del solicitante, recepción superadmin, preparación, negativa de disponibilidad sin release/permisos, disponibilidad válida y un único aviso privado; reintentar sin duplicado, acceso cruzado denegado, motivo no viable y elección voluntaria sin alterar automáticamente preferencias. Únicamente esas cuentas pueden recibir avisos de prueba. No seleccionar destinatarios por iniciativa del asistente.
+Para E2E real: el usuario ya autorizó y confirmó la instalación; realizará personalmente la prueba con sus cuentas existentes, sin que el asistente cree cuentas ni cambie roles. Disponible requiere el registro verificado de un tema efectivamente publicado. La conexión ya está habilitada por defecto en el código compartido; la prueba funcional queda reservada al usuario. Probar envío del solicitante, recepción superadmin, preparación, negativa de disponibilidad sin release/permisos, disponibilidad válida y un único aviso privado; reintentar sin duplicado, acceso cruzado denegado, motivo no viable y elección voluntaria sin alterar automáticamente preferencias. Únicamente esas cuentas pueden recibir avisos de prueba. No seleccionar destinatarios por iniciativa del asistente.
 
 Reversión operativa no destructiva: desactivar bandera local, conservando solicitudes y tablas. No borrar datos ni eliminar objetos como parte automática de rollback.
 
-QA visual sigue sin realizarse por bloqueo de Computer Use; no se reintenta por otra vía. Pruebas UI/adaptador con fixtures y SQL sintético no acreditan recepción real entre cuentas ni instalación productiva. La entrega a main no instala el SQL ni publica Lovable; la conexión permanece apagada hasta verificar la instalación.
+QA visual sigue sin realizarse por bloqueo de Computer Use; no se reintenta por otra vía. Pruebas UI/adaptador con fixtures y SQL sintético no acreditan recepción real entre cuentas ni instalación productiva. La entrega a main no instala el SQL ni publica Lovable. Los errores de sesión, fuente o permisos mantienen el envío bloqueado sin simular éxito.
