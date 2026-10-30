@@ -1,0 +1,2 @@
+-- OBSOLETO: NO APLICAR. El candidato original de Clientes no preservaba semántica ni autorización.
+-- Propuestas independientes revisadas en panorama-v2/*.apply.sql; no operativas y sujetas a aprobación específica.

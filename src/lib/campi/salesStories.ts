@@ -1,8 +1,12 @@
+import { combinedSupplemental, SUPPLEMENTAL_RPC } from './supplementalBilling';
+import { formatRange, validDay, formatMonth } from './panoramaDates';
 import { supabase } from '@/integrations/supabase/client';
 import type { SectionKey } from '@/lib/permissions';
-import type { PanoramaStory, StoryLoader, StoryTopicId } from './panoramaStoryTypes';
+import type { PanoramaStory, StoryTopicId, StoryPeriod } from './panoramaStoryTypes';
 import { panoramaTopicDefinition } from './panoramaPreferences';
 
+const OTHER_SECTION: SectionKey = 'servicios.dashboard';
+const OTHER_SOURCE: Source = { section: OTHER_SECTION, label: 'Otros', rpc: SUPPLEMENTAL_RPC, amount: 'facturado', gross: 'ventas', credit: 'notas_credito', creditSigned: true, route: '', extra: {} };
 type Row = Record<string, unknown>;
 type Source = { section: SectionKey; label: string; rpc: string; amount: string; gross: string; credit: string; creditSigned?: boolean; route: string; extra: Row };
 const SOURCES: Source[] = [
@@ -95,15 +99,17 @@ function monthly(report: Report, key: string, field: string): number {
 }
 function base(id: StoryTopicId, sources: Source[], asOf: string): PanoramaStory {
   const topic = panoramaTopicDefinition(id);
-  return { id, visitKey: `${id}:v3:${asOf.slice(0, 7)}`, title: topic?.title ?? 'Ventas de repuestos', question: topic?.question ?? '¿Cómo se componen las ventas y notas de crédito de repuestos?', status: 'ready', message: '', scope: sources.map(source => source.label).join(' + '), sections: sources.map(source => source.section), cutoff: null, periodLabel: `01/${asOf.slice(5, 7)}–${asOf.slice(8, 10)}/${asOf.slice(5, 7)}/${asOf.slice(0, 4)}`, primary: null, supporting: [], chart: null, breakdown: [], details: ['Fecha de factura. Ventas antes de NC y notas de crédito por separado.', 'La fecha de referencia limita el período; la fuente no informa su fecha real de actualización.'], source: sources.map(source => source.rpc).join(' + '), route: sources.length === 1 ? sources[0].route : '', navigationPeriod: { from: `${asOf.slice(0, 7)}-01`, to: asOf } };
+  return { id, visitKey: `${id}:v3:${asOf.slice(0, 7)}`, title: topic?.title ?? 'Ventas de repuestos', question: topic?.question ?? '¿Cómo se componen las ventas y notas de crédito de repuestos?', status: 'ready', message: '', scope: sources.map(source => source.label).join(' + '), sections: sources.map(source => source.section), cutoff: null, periodLabel: validDay(asOf) ? formatRange({ from: `${asOf.slice(0, 7)}-01`, to: asOf }) : 'Período no disponible', primary: null, supporting: [], chart: null, breakdown: [], details: ['Fecha de factura. Ventas antes de NC y notas de crédito por separado.', 'La fecha de referencia limita el período; la fuente no informa su fecha real de actualización.'], source: sources.map(source => source.rpc).join(' + '), route: sources.length === 1 ? sources[0].route : '', navigationPeriod: { from: `${asOf.slice(0, 7)}-01`, to: asOf } };
 }
 
-export const loadSalesStories: StoryLoader = async (topics, granted, asOf, period = 'month') => {
+export const loadSalesStories = async (topics: readonly StoryTopicId[], granted: readonly SectionKey[], asOf: string, period: StoryPeriod = 'month', temporal = false): Promise<PanoramaStory[]> => {
   const billingIds = (['ventas_evolucion', 'ventas_facturacion', 'ventas_neto_anual', 'ventas_nc_impacto', 'ventas_repuestos', 'ventas_servicios', 'ventas_maquinas'] as const).filter(id => topics.includes(id));
   const billingSources = billingIds.length ? SOURCES.filter(source => granted.includes(source.section)) : [];
   const sourcesFor = (id: StoryTopicId) => id === 'ventas_repuestos' ? billingSources.filter(source => source.section === 'repuestos.ventas')
     : id === 'ventas_servicios' ? billingSources.filter(source => source.section === 'servicios.ventas')
     : id === 'ventas_maquinas' ? billingSources.filter(source => source.section === 'parque.ventas') : billingSources;
+  const aggregateIds = ['ventas_evolucion','ventas_facturacion','ventas_neto_anual','ventas_nc_impacto'];
+  let additional: 'available' | 'unavailable' | 'unauthorized' = 'unauthorized';
   const parts = SOURCES[0];
   const wantsComposition = topics.includes('repuestos_clientes') && granted.includes(parts.section);
   if (!billingSources.length && !wantsComposition) return [];
@@ -122,18 +128,56 @@ export const loadSalesStories: StoryLoader = async (topics, granted, asOf, perio
       running++;
       try {
         // Reuse the USD reporting contract consumed by Ventas.tsx (usd.format(summary.total)); no conversion.
-        const args = source.section === 'servicios.ventas' ? { p_desde: from, p_hasta: to } : { p_desde: from, p_hasta: to, p_sucursal: null, p_buscar: null, p_agrupacion: 'mes', ...source.extra };
+        const args = source.section === 'servicios.ventas' || source === OTHER_SOURCE ? { p_desde: from, p_hasta: to } : { p_desde: from, p_hasta: to, p_sucursal: null, p_buscar: null, p_agrupacion: 'mes', ...source.extra };
         const result = await supabase.rpc(source.rpc as never, args as never);
         if (result.error) throw new Error(`${source.label}: ${result.error.message || 'no se pudo consultar la fuente.'}`);
-        return parseReport(result.data, source);
+        return parseReport(source === OTHER_SOURCE ? combinedSupplemental(result.data, from, to) : result.data, source);
       } finally { running--; waiters.shift()?.(); }
     })());
     return cache.get(key)!;
   };
+  // Availability gate: one current-range probe; no retries or fallback to a bulk raw export.
+  // Optional source failure leaves the existing three areas usable and visibly partial.
+  if (billingIds.some(id=>aggregateIds.includes(id)) && granted.includes(OTHER_SECTION)) {
+    additional='unavailable';
+    try {
+      await report(OTHER_SOURCE,ranges.from,ranges.to);
+      await report(OTHER_SOURCE,ranges.previousFrom,ranges.previousTo);
+      if(ranges.month===1)await report(OTHER_SOURCE,ranges.previousMonthFrom,ranges.previousMonthTo);
+      billingSources.push(OTHER_SOURCE);additional='available';
+    } catch { /* Missing RPC, timeout or failed controls never mean zero Others. */ }
+  }
+  const enrichTemporal = async (story: PanoramaStory): Promise<PanoramaStory> => {
+    if(!temporal || story.status!=='ready' || !billingIds.includes(story.id as typeof billingIds[number]) || story.id==='ventas_neto_anual') return story;
+    const sources=sourcesFor(story.id);
+    const kind=story.id==='ventas_facturacion'?'net':story.id==='ventas_nc_impacto'?'credit':'gross';
+    const label=kind==='net'?'Facturación neta':kind==='credit'?'Notas de crédito':'Ventas antes de NC';
+    const shift=(date:string,days:number)=>iso(new Date(Date.parse(date+'T00:00:00Z')+days*86400000));
+    const yesterday=shift(asOf,-1);
+    const weekday=new Date(asOf+'T00:00:00Z').getUTCDay();
+    const sunday=shift(asOf,-(weekday||7));
+    const windows=[
+      {kind:'day' as const,current:{from:yesterday,to:yesterday},previous:{from:shift(yesterday,-7),to:shift(yesterday,-7)}},
+      {kind:'week' as const,current:{from:shift(sunday,-6),to:sunday},previous:{from:shift(sunday,-13),to:shift(sunday,-7)}},
+    ];
+    const comparisons=await Promise.all(windows.map(async window=>{
+      try {
+        const components=await Promise.all(sources.map(async source=>{
+          const [a,b]=await Promise.all([report(source,window.current.from,window.current.to),report(source,window.previous.from,window.previous.to)]);
+          const value=(r:Report)=>numeric(r.summary[kind==='net'?source.amount:kind==='credit'?source.credit:source.gross])*(kind==='credit'&&source.creditSigned?-1:1);
+          return {section:source.section,value:value(a),previous:value(b)};
+        }));
+        return {...window,label,components};
+      } catch { return null; } // A failed optional period cannot invalidate a reconciled monthly KPI.
+    }));
+    return {...story,temporalComparisons:comparisons.filter((c):c is NonNullable<typeof c>=>c!==null)};
+  };
   const load = async (id: StoryTopicId, sources: Source[]): Promise<PanoramaStory> => {
     const story = base(id, sources, asOf);
+    if(aggregateIds.includes(id))story.billingCoverage={additional,allCoreAreas:SOURCES.every(source=>granted.includes(source.section))};
     try {
       const monthFrom = `${ranges.year}-${String(ranges.month).padStart(2, '0')}-01`;
+      story.businessWindow = { current: { from: monthFrom, to: ranges.to }, previous: { from: `${ranges.previousTo.slice(0, 7)}-01`, to: ranges.previousTo }, coverage: 'observed' };
       const monthLYFrom = `${ranges.year - 1}-${String(ranges.month).padStart(2, '0')}-01`;
       const loaded = await Promise.all(sources.map(async source => {
         const [current, previous, december] = await Promise.all([report(source, ranges.from, ranges.to), report(source, ranges.previousFrom, ranges.previousTo), ...(ranges.month === 1 ? [report(source, ranges.previousMonthFrom, ranges.previousMonthTo)] : [])]);
@@ -184,16 +228,33 @@ export const loadSalesStories: StoryLoader = async (topics, granted, asOf, perio
               (current.periods.has(`${ranges.year}-${month}`) || current.sparse) &&
               (previous.periods.has(`${ranges.year - 1}-${month}`) || previous.sparse)));
           story.chart = completeSeries ? { kind: 'trend', title: 'Ventas mensuales antes de NC', unit, currentLabel: String(ranges.year), previousLabel: String(ranges.year - 1), rows: months.map((month, index) => ({
-            label: `${['Ene', 'Feb', 'Mar', 'Abr', 'May', 'Jun', 'Jul', 'Ago', 'Sep', 'Oct', 'Nov', 'Dic'][index]}${partialMonth && index === ranges.month - 1 ? '*' : ''}`,
+            label: `${formatMonth(`${ranges.year}-${String(index + 1).padStart(2, '0')}-01`)}${partialMonth && index === ranges.month - 1 ? '*' : ''}`,
             value: loaded.reduce((total, item) => total + (item.current.periods.has(`${ranges.year}-${month}`) ? numeric(item.current.periods.get(`${ranges.year}-${month}`)![item.source.gross]) : 0), 0),
             previous: loaded.reduce((total, item) => total + (item.previous.periods.has(`${ranges.year - 1}-${month}`) ? numeric(item.previous.periods.get(`${ranges.year - 1}-${month}`)![item.source.gross]) : 0), 0),
           })) } : { kind: 'bars', title: grossLY > 0 ? 'Ventas del mismo tramo' : 'Ventas del período', unit,
             rows: grossLY > 0 ? [{ label: String(ranges.year), value: period === 'ytd' ? ytdGross : gross }, { label: String(ranges.year - 1), value: period === 'ytd' ? ytdGrossLY : grossLY }] : [{ label: String(ranges.year), value: period === 'ytd' ? ytdGross : gross }] };
+          if (id === 'ventas_evolucion') story.salesScopes = monthlyReports.map((item, index) => {
+            const { source, current, previous } = loaded[index];
+            const scopeComplete = current.monthlyComponents && previous.monthlyComponents && months.every(month =>
+              (current.periods.has(`${ranges.year}-${month}`) || current.sparse) &&
+              (previous.periods.has(`${ranges.year - 1}-${month}`) || previous.sparse));
+            return {
+              section: source.section, label: source.label, route: source.route, source: source.rpc,
+              month: { value: numeric(item.month[source.gross]), previous: numeric(item.monthLY[source.gross]) },
+              ytd: { value: numeric(item.current[source.gross]), previous: numeric(item.previous[source.gross]) },
+              chartRows: scopeComplete ? months.map((month, monthIndex) => ({
+                label: `${formatMonth(`${ranges.year}-${month}-01`)}${partialMonth && monthIndex === ranges.month - 1 ? '*' : ''}`,
+                value: current.periods.has(`${ranges.year}-${month}`) ? numeric(current.periods.get(`${ranges.year}-${month}`)![source.gross]) : 0,
+                previous: previous.periods.has(`${ranges.year - 1}-${month}`) ? numeric(previous.periods.get(`${ranges.year - 1}-${month}`)![source.gross]) : 0,
+              })) : null,
+            };
+          });
           story.breakdown = monthlyReports.map(item => ({ label: item.source.label, value: numeric(item.month[item.source.gross]), previous: numeric(item.monthLY[item.source.gross]), unit, route: item.source.route }));
           story.message = grossLY > 0 ? `Las ventas antes de NC ${gross >= grossLY ? 'subieron' : 'bajaron'} ${new Intl.NumberFormat('es-PY', { maximumFractionDigits: 1 }).format(Math.abs(salesChange(gross, grossLY)!))}% frente al mismo tramo del año anterior.` : 'No hay base comparable para calcular la variación mensual de ventas.';
           story.details.push(`Ventas positivas de facturas entre ${monthFrom} y ${ranges.to}; comparación con ${monthLYFrom} a ${ranges.previousTo}. Las NC se analizan por separado en Facturación neta.`, 'El acumulado compara fechas equivalentes de ambos años.');
           if (period === 'ytd' && id === 'ventas_evolucion') {
-            story.periodLabel = `${ranges.from}–${asOf}`;
+            story.businessWindow = { current: { from: ranges.from, to: asOf }, previous: { from: `${ranges.year - 1}-01-01`, to: ranges.previousTo }, coverage: 'observed' };
+            story.periodLabel = formatRange({ from: ranges.from, to: asOf });
             story.navigationPeriod = { from: ranges.from, to: asOf };
             story.primary = { label: 'Ventas acumuladas antes de NC', value: ytdGross, unit, comparison: { value: ytdGrossLY, label: `Mismo corte de ${ranges.year - 1}` }, note: ytdGrossLY <= 0 ? 'Sin base anual comparable.' : undefined };
             story.supporting = [{ label: 'Ventas acumuladas antes de NC', value: ytdGross, unit, comparison: { value: ytdGrossLY, label: `Mismo corte de ${ranges.year - 1}` } }];
@@ -209,7 +270,7 @@ export const loadSalesStories: StoryLoader = async (topics, granted, asOf, perio
           story.supporting = [{ label: 'Ventas antes de NC acumuladas', value: ytdGross, unit }, { label: 'NC acumuladas', value: -ytdCredits, unit }];
           story.chart = { kind: 'trend', title: 'Facturación neta mensual', unit, currentLabel: String(ranges.year), previousLabel: String(ranges.year - 1), rows: Array.from({ length: ranges.month }, (_, index) => {
             const month = String(index + 1).padStart(2, '0');
-            return { label: ['Ene', 'Feb', 'Mar', 'Abr', 'May', 'Jun', 'Jul', 'Ago', 'Sep', 'Oct', 'Nov', 'Dic'][index], value: loaded.reduce((total, item) => total + monthly(item.current, `${ranges.year}-${month}`, item.source.amount), 0), previous: loaded.reduce((total, item) => total + monthly(item.previous, `${ranges.year - 1}-${month}`, item.source.amount), 0) };
+            return { label: formatMonth(`${ranges.year}-${String(index + 1).padStart(2, '0')}-01`), value: loaded.reduce((total, item) => total + monthly(item.current, `${ranges.year}-${month}`, item.source.amount), 0), previous: loaded.reduce((total, item) => total + monthly(item.previous, `${ranges.year - 1}-${month}`, item.source.amount), 0) };
           }) };
           story.breakdown = monthlyReports.map(item => ({ label: item.source.label, value: numeric(item.current[item.source.amount]), unit, route: item.source.route }));
           story.message = ytdNetLY === 0 ? 'Sin base anual comparable.' : `El neto acumulado ${ytdNet >= ytdNetLY ? 'supera' : 'queda por debajo de'} el mismo corte del año anterior.`;
@@ -225,7 +286,19 @@ export const loadSalesStories: StoryLoader = async (topics, granted, asOf, perio
           return story;
         }
         story.visitKey = `${id}:neto-v3:${period}:${asOf.slice(0, 7)}`;
-        if (id === 'ventas_facturacion') { story.periodMode = period; story.periodOptions = ['month', 'ytd']; }
+        if (id === 'ventas_facturacion') { story.periodMode = period; story.periodOptions = ['month', 'ytd']; story.billingComponents = period === 'ytd' ? { gross: ytdGross, credits: -ytdCredits, net: ytdNet } : { gross, credits: -credits, net }; }
+        if (id === 'ventas_facturacion') story.salesScopes = monthlyReports.map((item, index) => {
+          const months = Array.from({ length: ranges.month }, (_, i) => String(i + 1).padStart(2, '0'));
+          const partialMonth = Number(asOf.slice(8)) < new Date(Date.UTC(ranges.year, ranges.month, 0)).getUTCDate();
+          const { source, current, previous } = loaded[index];
+          const component = (row: Record<string, unknown>) => ({ gross: numeric(row[source.gross]), credits: -numeric(row[source.credit]) * (source.creditSigned ? -1 : 1), net: numeric(row[source.amount]) });
+          const complete = current.monthlyComponents && previous.monthlyComponents && months.every(month => (current.periods.has(`${ranges.year}-${month}`) || current.sparse) && (previous.periods.has(`${ranges.year - 1}-${month}`) || previous.sparse));
+          return { section: source.section, label: source.label, route: source.route, source: source.rpc,
+            month: { value: numeric(item.month[source.amount]), previous: numeric(item.monthLY[source.amount]), billing: component(item.month) },
+            ytd: { value: numeric(item.current[source.amount]), previous: numeric(item.previous[source.amount]), billing: component(item.current) },
+            chartRows: complete ? months.map((month, monthIndex) => ({ label: `${formatMonth(`${ranges.year}-${month}-01`)}${partialMonth && monthIndex === ranges.month - 1 ? '*' : ''}`, value: current.periods.has(`${ranges.year}-${month}`) ? numeric(current.periods.get(`${ranges.year}-${month}`)![source.amount]) : 0, previous: previous.periods.has(`${ranges.year - 1}-${month}`) ? numeric(previous.periods.get(`${ranges.year - 1}-${month}`)![source.amount]) : 0 })) : null,
+          };
+        });
         story.primary = { label: 'Facturación neta del mes', value: net, unit, comparison: { value: netLY, label: `Mismo tramo de ${ranges.year - 1}` } };
         story.supporting = [
           { label: 'Ventas antes de NC del mes', value: gross, unit, comparison: { value: grossLY, label: `Mismo tramo de ${ranges.year - 1}` } },
@@ -238,7 +311,7 @@ export const loadSalesStories: StoryLoader = async (topics, granted, asOf, perio
         story.chart = { kind: 'bars', title: 'Neto por área autorizada', rows: monthlyReports.map(item => ({ label: item.source.label, value: numeric(item.month[item.source.amount]), previous: numeric(item.monthLY[item.source.amount]) })), unit, currentLabel: String(ranges.year), previousLabel: String(ranges.year - 1) };
         story.detailChart = { kind: 'trend', title: 'Evolución mensual de la facturación neta', unit, currentLabel: String(ranges.year), previousLabel: String(ranges.year - 1), rows: Array.from({ length: ranges.month }, (_, index) => {
           const month = String(index + 1).padStart(2, '0');
-          return { label: ['Ene', 'Feb', 'Mar', 'Abr', 'May', 'Jun', 'Jul', 'Ago', 'Sep', 'Oct', 'Nov', 'Dic'][index],
+          return { label: formatMonth(`${ranges.year}-${String(index + 1).padStart(2, '0')}-01`),
             value: loaded.reduce((total, item) => total + monthly(item.current, `${ranges.year}-${month}`, item.source.amount), 0),
             previous: loaded.reduce((total, item) => total + monthly(item.previous, `${ranges.year - 1}-${month}`, item.source.amount), 0) };
         }) };
@@ -247,17 +320,17 @@ export const loadSalesStories: StoryLoader = async (topics, granted, asOf, perio
           ...story.breakdown.map(row => ({ ...row, group: 'Áreas del mes' })),
           ...story.detailChart.rows.map(row => ({ label: row.label, value: row.value, previous: row.previous, unit, group: 'Mes a mes' })),
         ];
-        story.message = `Facturación neta del mes: $ ${new Intl.NumberFormat('es-PY', { maximumFractionDigits: 2 }).format(net)}, después de $ ${new Intl.NumberFormat('es-PY', { maximumFractionDigits: 2 }).format(credits)} en notas de crédito.`;
+        story.message = `Facturación neta del mes: $ ${new Intl.NumberFormat('es-PY', { maximumFractionDigits: 0 }).format(net)}, después de $ ${new Intl.NumberFormat('es-PY', { maximumFractionDigits: 0 }).format(credits)} en notas de crédito.`;
         story.attention = false;
         story.details.push('Cada área usa su mismo contrato de movimientos en USD. Ventas antes de NC − importe de NC = neto; el signo de NC se normaliza exactamente una vez.', `Comparación del ${monthFrom} al ${ranges.to} con ${monthLYFrom} al ${ranges.previousTo}.`, 'El acumulado neto usa el mismo corte de fechas de ambos años. El mes anterior completo es solo contexto, no un tramo equivalente.');
         if (period === 'ytd' && id === 'ventas_facturacion') {
-          story.periodLabel = `${ranges.from}–${asOf}`;
+          story.periodLabel = formatRange({ from: ranges.from, to: asOf });
           story.navigationPeriod = { from: ranges.from, to: asOf };
           story.primary = { label: 'Facturación neta acumulada', value: ytdNet, unit, comparison: { value: ytdNetLY, label: `Mismo corte de ${ranges.year - 1}` } };
           story.supporting = [{ label: 'Ventas antes de NC acumuladas', value: ytdGross, unit }, { label: 'Notas de crédito acumuladas', value: -ytdCredits, unit }];
           story.chart = { ...story.detailChart! };
           story.breakdown = monthlyReports.map(item => ({ label: item.source.label, value: numeric(item.current[item.source.amount]), unit, route: item.source.route, billing: { sales: numeric(item.current[item.source.gross]), credits: numeric(item.current[item.source.gross]) - numeric(item.current[item.source.amount]) } }));
-          story.message = `Facturación neta acumulada: $ ${new Intl.NumberFormat('es-PY', { maximumFractionDigits: 2 }).format(ytdNet)}, después de $ ${new Intl.NumberFormat('es-PY', { maximumFractionDigits: 2 }).format(ytdCredits)} en notas de crédito.`;
+          story.message = `Facturación neta acumulada: $ ${new Intl.NumberFormat('es-PY', { maximumFractionDigits: 0 }).format(ytdNet)}, después de $ ${new Intl.NumberFormat('es-PY', { maximumFractionDigits: 0 }).format(ytdCredits)} en notas de crédito.`;
         }
         return story;
       }
@@ -293,7 +366,7 @@ export const loadSalesStories: StoryLoader = async (topics, granted, asOf, perio
       story.supporting.push({ label: 'Variación interanual acumulada', value: annualChange, unit: 'percent', note: ytdLY === 0 ? 'Sin base comparable.' : undefined });
       const rows = Array.from({ length: ranges.month }, (_, index) => {
         const month = String(index + 1).padStart(2, '0');
-        return { label: ['Ene', 'Feb', 'Mar', 'Abr', 'May', 'Jun', 'Jul', 'Ago', 'Sep', 'Oct', 'Nov', 'Dic'][index], value: loaded.reduce((sum, row) => sum + monthly(row.current, `${ranges.year}-${month}`, field(row.source)), 0), previous: loaded.reduce((sum, row) => sum + monthly(row.previous, `${ranges.year - 1}-${month}`, field(row.source)), 0) };
+        return { label: formatMonth(`${ranges.year}-${String(index + 1).padStart(2, '0')}-01`), value: loaded.reduce((sum, row) => sum + monthly(row.current, `${ranges.year}-${month}`, field(row.source)), 0), previous: loaded.reduce((sum, row) => sum + monthly(row.previous, `${ranges.year - 1}-${month}`, field(row.source)), 0) };
       });
       const partialMonth = Number(asOf.slice(8)) < new Date(Date.UTC(ranges.year, ranges.month, 0)).getUTCDate();
       if (partialMonth && rows.length) rows[rows.length - 1].label += '*';
@@ -321,5 +394,5 @@ export const loadSalesStories: StoryLoader = async (topics, granted, asOf, perio
       return { ...story, status: 'error', message: error instanceof Error ? error.message : 'No se pudo consultar la fuente.', primary: null, supporting: [], chart: null, breakdown: [], attention: true };
     }
   };
-  return Promise.all([...billingIds.filter(id => sourcesFor(id).length).map(id => load(id, sourcesFor(id))), ...(wantsComposition ? [load('repuestos_clientes', [parts])] : [])]);
+  return Promise.all([...billingIds.filter(id => sourcesFor(id).length).map(id => load(id, sourcesFor(id))), ...(wantsComposition ? [load('repuestos_clientes', [parts])] : [])]).then(stories=>Promise.all(stories.map(enrichTemporal)));
 };

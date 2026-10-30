@@ -1,5 +1,6 @@
 import { interpretCampi, type CampiFinding } from './campiInterpretation';
 import { storyVisitComparison, type StoryVisitSnapshot } from './panoramaStoryVisits';
+import { partsAlertVariants } from './partsAlertFocus';
 import type { PanoramaStory, StoryTopicId, StoryUnit } from './panoramaStoryTypes';
 
 export type CampiComment = {
@@ -8,6 +9,7 @@ export type CampiComment = {
   kind: CampiFinding['kind'] | 'visit' | 'limit';
   urgency: CampiFinding['urgency'];
   text: string;
+  route?: string;
   period: string;
   evidence: { value: number; unit: StoryUnit } | null;
 };
@@ -20,8 +22,13 @@ export function buildCampiComments(stories: readonly PanoramaStory[], previous: 
   const comments = findings.filter(finding => finding.kind !== 'neutral').flatMap(finding => {
     const story = stories.find(item => item.id === finding.topic && item.status === 'ready' && item.primary?.value !== null);
     if (!story || !story.primary || story.primary.value === null) return [];
+    if (story.id === 'repuestos_alertas' && finding.kind === 'attention') return partsAlertVariants(story).map(variant => ({
+      key: `topic:repuestos_alertas:${variant.id}`, topic: story.id, kind: finding.kind, urgency: finding.urgency,
+      text: variant.text, route: variant.route, period: story.periodLabel,
+      evidence: { value: story.primary!.value!, unit: story.primary!.unit },
+    } satisfies CampiComment));
     return [{ key: `topic:${story.id}`, topic: story.id, kind: finding.kind, urgency: finding.urgency,
-      text: finding.text, period: story.periodLabel, evidence: { value: story.primary.value, unit: story.primary.unit } } satisfies CampiComment];
+      text: finding.text, route: finding.route, period: story.periodLabel, evidence: { value: story.primary.value, unit: story.primary.unit } } satisfies CampiComment];
   });
   const visits = stories.filter(story => story.id === 'maquinas_pedidos').flatMap(story => {
     const comparison = storyVisitComparison(story, previous);

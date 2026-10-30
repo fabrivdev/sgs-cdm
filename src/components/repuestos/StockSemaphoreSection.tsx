@@ -15,6 +15,7 @@ import { ResponsiveDrawer, ResponsiveDrawerBody, ResponsiveDrawerHeader } from "
 
 import { sectionTitle, tableText } from "@/lib/ui-classes";
 import { useDebouncedValue } from "@/hooks/useDebouncedValue";
+import { validPartsAlertRange } from "@/lib/campi/partsAlertFocus";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { PartsAnalysisTable } from "./PartsAnalysisTable";
 import { sortSalesRows, type SalesSort } from "@/components/ventas/salesTableInteraction";
@@ -31,13 +32,12 @@ const deepLinkFilters = (params: URLSearchParams): SemaforoFiltros => {
   const color = params.get("color") ?? "";
   const min = params.get("compra_dias_min") ?? "";
   const max = params.get("compra_dias_max") ?? "";
-  const pendingGrey = color === "LILA" && min === "336" && max === "365";
-  const pendingRed = color === "GRIS" && min === "971" && max === "1000";
+  const pendingTransition = validPartsAlertRange(color, min, max);
   return { ...INITIAL_FILTERS,
     color: color === "ANTIGUO" || SEMAFORO_COLORES.some(item => item.id === color) ? color : "",
     universo: params.get("universo") === "STOCK_POSITIVO_PANORAMA" ? "STOCK_POSITIVO_PANORAMA" : "",
     sucursal: params.get("sucursal") ?? "", familia: params.get("familia") ?? "",
-    ...(pendingGrey || pendingRed ? { compra_dias_min: min, compra_dias_max: max } : {}),
+    ...(pendingTransition ? { compra_dias_min: min, compra_dias_max: max } : {}),
   };
 };
 const quantity = (value: number | null | undefined) => value == null ? "—" : Number(value).toLocaleString("es-PY", { maximumFractionDigits: 6 });

@@ -1,0 +1,10 @@
+import {expect,it} from 'vitest';
+import {frames,spriteFrame,atlases} from './sprites';
+import type {WelcomeFrame} from './timeline';
+const frame=(beat:WelcomeFrame['beat'],progress=0,still=false):WelcomeFrame=>({beat,progress,static:still,elapsed:0,done:false});
+it('uses only the three consistent v2 sheets, with complete figures and common foot baseline',()=>{expect(frames).toHaveLength(18);expect(atlases).toHaveLength(3);frames.forEach(({bounds:[l,t,r,b],anchor,atlas})=>{expect(atlas).toMatch(/-v2.png$/);expect(l).toBeGreaterThanOrEqual(0);expect(r).toBeLessThanOrEqual(1536);expect(b).toBeLessThanOrEqual(1024);expect(b-t).toBeGreaterThan(470);expect(anchor).toBeGreaterThan(l);expect(anchor).toBeLessThan(r);expect(b-(b-540)).toBe(540);});});
+it('does not fabricate running frames',()=>{for(const beat of ['entry','brake'] as const)expect(spriteFrame(frame(beat,.5))).toBe(0);});
+it('all completed gestures reconnect to the exact same canonical neutral',()=>{for(const beat of ['greet','present','curiosity','bow'] as const){expect(spriteFrame(frame(beat,0))).toBe(0);expect(spriteFrame(frame(beat,1))).toBe(0);}});
+it('varies idle posture and blinks briefly without a permanent wink',()=>{expect(spriteFrame(frame('curiosity',.5))).toBe(2);expect(spriteFrame(frame('bow',.5))).toBe(4);expect(spriteFrame(frame('rest',.5))).toBe(5);expect(spriteFrame(frame('rest',.6))).toBe(0);});
+it('reduced motion always uses canonical neutral',()=>{for(const beat of ['greet','present','curiosity','bow','invite','exit'] as const)expect(spriteFrame(frame(beat,.5,true))).toBe(0);});
+it('holds interrupted pose and invitation without fake translation',()=>{expect(spriteFrame(frame('settle',0),8)).toBe(8);expect(spriteFrame(frame('settle',1),8)).toBe(0);expect(spriteFrame(frame('invite',1))).toBe(17);expect(spriteFrame(frame('exit',.5))).toBe(17);});

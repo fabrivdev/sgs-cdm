@@ -1,3 +1,4 @@
+import { SALES_LABELS } from "./salesLabels";
 import { useMemo } from "react";
 import { money } from "@/components/dashboard/utils";
 import { MarcaBadge } from "@/components/StatusBadges";
@@ -14,7 +15,7 @@ const unknown = (value: string) => /(?:sin|no) (?:identificar|identificado|infor
 type Amounts = { mo: number; km: number; repuestos: number; terceros: number; neto: number; horas: number | null; sin_vinculo_historico?: boolean };
 function amountColumns<T extends Amounts>(total: number): SalesDisplayColumn<T>[] {
   return [
-    ...([ ["mo", "Mano de obra"], ["km", "Kilometraje"], ["repuestos", "Repuestos"], ["terceros", "Terceros"], ["neto", "Neto"] ] as const)
+    ...([ ["mo", "Mano de obra"], ["km", "Kilometraje"], ["repuestos", "Repuestos"], ["terceros", "Terceros"], ["neto", SALES_LABELS.netRevenue] ] as const)
       .map(([key, label]) => serviceMoneyColumn<T>(key, label, row => row[key])),
     serviceNumberColumn<T>("horas", "Horas OS", row => row.sin_vinculo_historico ? null : row.horas),
     serviceShareColumn<T>(row => total ? row.neto / total : null),
@@ -39,7 +40,7 @@ export function ServiciosResumen(props: IndicadoresFiltros) {
     ...amountColumns<IndicadorMarcaTipo>(totales.neto),
   ];
   const cards: Array<[string, string]> = [
-    ["Neto", money(totales.neto)], ["Mano de obra", money(totales.mo)], ["Kilometraje", money(totales.km)],
+    [SALES_LABELS.netRevenue, money(totales.neto)], ["Mano de obra", money(totales.mo)], ["Kilometraje", money(totales.km)],
     ["Repuestos", money(totales.repuestos)], ["Terceros", money(totales.terceros)],
     ["OS facturadas", integer.format(totales.ordenes)], ["Documentos", integer.format(totales.documentos)], ["Horas OS", decimal.format(totales.horas)],
   ];

@@ -1,3 +1,4 @@
+import { SALES_LABELS } from "./salesLabels";
 /* eslint-disable @typescript-eslint/no-explicit-any -- RPC tipada al regenerar tipos. */
 import { useEffect, useMemo, useState } from "react";
 import { useIsMobile } from "@/hooks/use-mobile";
@@ -36,7 +37,7 @@ const owner = (row: InvoiceLine) => row.propietario && row.propietario !== "Prop
 const time = (row: InvoiceLine) => row.tipo_tiempo === "Garantia" ? "Garantía" : row.tipo_tiempo || null;
 const detailColumns: readonly SalesColumn<InvoiceLine>[] = [
   {key:"fecha",label:"Fecha",kind:"date",value:row=>row.fecha},
-  {key:"factura",label:"Factura",kind:"text",value:row=>row.factura === "Sin numero" ? null : row.factura,exportValue:row=>`${row.es_nota_credito ? "NC " : ""}${row.factura || "Sin número"}`},
+  {key:"factura",label:"Factura",kind:"text",value:row=>row.factura === "Sin numero" ? null : row.factura,exportValue:row=>`${row.es_nota_credito ? `${SALES_LABELS.creditNote} ` : ""}${row.factura || "Sin número"}`},
   {key:"sucursal",label:"Sucursal",kind:"text",value:row=>row.sucursal === "Sin sucursal" ? null : row.sucursal},
   {key:"cliente",label:"Cliente facturado",kind:"text",value:row=>row.cliente === "Sin cliente" ? null : row.cliente},
   {key:"propietario",label:"Propietario",kind:"text",value:owner,exportValue:row=>owner(row) || "No informado"},
@@ -46,7 +47,7 @@ const detailColumns: readonly SalesColumn<InvoiceLine>[] = [
   {key:"codigo",label:"Código",kind:"text",value:row=>row.codigo},
   {key:"descripcion",label:"Descripción",kind:"text",value:row=>row.descripcion},
   {key:"cantidad",label:"Cant.",kind:"number",value:quantityValue,align:"center"},
-  {key:"facturado",label:"Facturado",kind:"number",value:row=>Number(row.total_venta || 0),align:"right",excelFormat:'"$" #,##0.00;"$" -#,##0.00'},
+  {key:"facturado",label:SALES_LABELS.netRevenue,kind:"number",value:row=>Number(row.total_venta || 0),align:"right",excelFormat:'"$" #,##0.00;"$" -#,##0.00'},
 ];
 // Hide the invoice recipient only in this view; retain it in search, document identity and Excel.
 const visibleColumns = detailColumns.filter(column => column.key !== "cliente");
@@ -114,7 +115,7 @@ export function ServiciosDetalleOS({ desde, hasta, sucursal, buscar, tipoTiempo,
 
   if (isMobile) return <div className="mt-3">
     {loading ? <p role="status">Cargando…</p> : error ? <p role="alert" className="text-destructive">{error}</p> : <>
-      <MobileSalesTable title="Detalle de facturación" rows={rows} columns={visibleColumns.map(c => c.key === "factura" ? {...c,render:(r:InvoiceLine)=>`${r.es_nota_credito?"NC ":""}${r.factura||"Sin número"}`} : c.key === "chasis" ? {...c,render:(r:InvoiceLine)=>r.chasis?<button type="button" className="min-h-11 text-primary underline" onClick={()=>setDetailTarget({chassis:r.chasis,os:null})}>{r.chasis}</button>:"—"} : c.key === "facturado" ? {...c,render:(r:InvoiceLine)=>usd.format(Number(r.total_venta||0))} : c)} primaryKey="propietario" rowKey={r=>r.id} sort={sort} toggleSort={toggleSort} />
+      <MobileSalesTable title="Detalle de facturación" rows={rows} columns={visibleColumns.map(c => c.key === "factura" ? {...c,render:(r:InvoiceLine)=>`${r.es_nota_credito?`${SALES_LABELS.creditNote} `:""}${r.factura||"Sin número"}`} : c.key === "chasis" ? {...c,render:(r:InvoiceLine)=>r.chasis?<button type="button" className="min-h-11 text-primary underline" onClick={()=>setDetailTarget({chassis:r.chasis,os:null})}>{r.chasis}</button>:"—"} : c.key === "facturado" ? {...c,render:(r:InvoiceLine)=>usd.format(Number(r.total_venta||0))} : c)} primaryKey="propietario" rowKey={r=>r.id} sort={sort} toggleSort={toggleSort} />
       <p className="py-2 text-right text-[11px] text-muted-foreground">{rows.length} líneas · {documents} documentos</p>
     </>}
     {detailTarget && <MachineHistorySheet target={detailTarget} onOpenChange={open=>{if(!open)setDetailTarget(null);}} />}
@@ -136,7 +137,7 @@ export function ServiciosDetalleOS({ desde, hasta, sucursal, buscar, tipoTiempo,
           : !rows.length ? <div className="py-12 text-center text-[12px] text-muted-foreground">No hay líneas facturadas para estos filtros.</div>
           : rows.map(row => <div role="row" key={row.id} data-invoice-line={row.id} className={`grid ${columns} h-9 items-center gap-x-2 border-t px-3 text-[12px] hover:bg-muted/30`}>
             <div role="cell" className={`${cell} text-muted-foreground`} title={row.fecha}>{row.fecha ? shortDate.format(new Date(`${row.fecha}T00:00:00`)) : "—"}</div>
-            <div role="cell" className={`${cell} font-mono font-semibold`} title={`${row.es_nota_credito ? "Nota de crédito: " : ""}${row.factura || "Sin número"}`}>{row.es_nota_credito ? "NC " : ""}{row.factura || "Sin número"}</div>
+            <div role="cell" className={`${cell} font-mono font-semibold`} title={`${row.es_nota_credito ? "Nota de crédito: " : ""}${row.factura || "Sin número"}`}>{row.es_nota_credito ? `${SALES_LABELS.creditNote} ` : ""}{row.factura || "Sin número"}</div>
             <div role="cell" className={`${cell} text-muted-foreground`} title={row.sucursal || "Sin sucursal"}>{row.sucursal || "—"}</div>
             <div role="cell" className={cell} title={`Propietario actual: ${row.propietario || "No informado"}${row.propietario_os ? ` · En la OS: ${row.propietario_os}` : ""}`}>{row.propietario && row.propietario !== "Propietario no informado" ? row.propietario : "No informado"}</div>
             <div role="cell" className={`${cell} font-mono`} title={row.os || "Sin OS vinculada"}>{row.os || "Sin OS vinculada"}</div>

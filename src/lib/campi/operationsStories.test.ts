@@ -25,8 +25,9 @@ const resolution = () => ({
   invalidas_mes_anterior: 0, mediana_ultimo_mes: 14, mediana_mes_anterior: 16.5,
   historicas_sin_cierre: 1301, abiertas: 76, apertura_invalida: 0, p90_edad_abiertas: 60,
 });
-const chain = (result: unknown) => { const q: Record<string, unknown> = {}; for (const key of ['select','order','range']) q[key] = vi.fn(() => q); q.then = (resolve: (v: unknown) => void) => Promise.resolve(result).then(resolve); return q; };
-beforeEach(() => vi.resetAllMocks());
+const chain = (result: unknown) => { const q: Record<string, unknown> = {}; for (const key of ['select','order','range','gte','lte']) q[key] = vi.fn(() => q); q.then = (resolve: (v: unknown) => void) => Promise.resolve(result).then(resolve); return q; };
+const closure=()=>({os_numero:'1',fecha_abierta_os:'2026-09-21',fecha_cierre_os:'2026-10-05',situacion_os:'Cerrada'});
+beforeEach(() => {vi.resetAllMocks();mocks.from.mockReturnValue(chain({data:[closure()],count:1,error:null}));});
 
 describe('operational Panorama loaders', () => {
   it('requires the exact authorized sections before contacting any source', async () => {
@@ -41,16 +42,16 @@ describe('operational Panorama loaders', () => {
     expect(stories[0].supporting.find(item => item.label === 'Pedidos con stock')?.value).toBe(2);
     expect(stories[0].supporting.find(item => item.label === 'Pedidos con stock completo')?.value).toBe(0);
     expect(stories[0].chart).toBeNull();
-    expect(stories[1].primary?.comparison?.value).toBe(16.5);
-    expect(stories[1].chart).toMatchObject({ unit: 'days', rows: [{ value: 16.5 }, { value: 14 }] });
-    expect(stories[1].details.join(' ')).toContain('1301');
-    expect(mocks.from).not.toHaveBeenCalled();
+    expect(stories[1].primary?.comparison).toBeUndefined();
+    expect(stories[1].closureDistribution).toEqual({total:1,bins:[0,1,0,0]});
+    expect(stories[1].time?.window).toEqual({from:'2026-10-01',to:asOf});
+    expect(mocks.from).toHaveBeenCalledWith('ordenes_servicio_importadas');
   });
   it('does not turn an absent resolution cohort into zero days on the chart', async () => {
     mocks.rpc.mockResolvedValue({ data: { ...resolution(), cierres_mes_anterior: 0, mediana_mes_anterior: null }, error: null });
     const [story] = await loadOperationsStories(['servicios_pendientes'], ['servicios.ordenes'], asOf);
     expect(story.primary?.comparison).toBeUndefined();
-    expect(story.chart?.rows).toEqual([{ label: 'septiembre de 2026', value: 14 }]);
+    expect(story.chart).toBeNull();
   });
   it('separates the open OS queue from resolution and reads the same verified source once', async () => {
     mocks.rpc.mockImplementation(async name => ({ data: name === 'campi_os_abiertas_detalle_v1' ? openDetail() : resolution(), error: null }));
@@ -68,9 +69,10 @@ describe('operational Panorama loaders', () => {
     const topics = ['servicios_pendientes', 'servicios_abiertas'] as const;
     const [closed, open] = await loadOperationsStories(topics, ['servicios.ordenes'], asOf);
     expect(closed.status).toBe('ready');
-    expect(closed.supporting.find(row => row.label === 'Percentil 90 de edad abierta')?.value).toBeNull();
+    expect(closed.primary?.comparison).toBeUndefined();
     expect(open.status).toBe('error');
     mocks.rpc.mockImplementation(async name => ({ data: name === 'campi_os_abiertas_detalle_v1' ? openDetail() : { ...resolution(), invalidas_ultimo_mes: 1 }, error: null }));
+    mocks.from.mockReturnValue(chain({data:[{...closure(),fecha_abierta_os:null}],count:1,error:null}));
     const [invalidClosed, validOpen] = await loadOperationsStories(topics, ['servicios.ordenes'], asOf);
     expect(invalidClosed.status).toBe('error');
     expect(validOpen.status).toBe('ready');
@@ -80,6 +82,7 @@ describe('operational Panorama loaders', () => {
       ? { data: { ...ready(), unidades_con_stock: 7 }, error: null }
       : name === 'campi_pedidos_abastecimiento_v1' ? { data: supply(), error: null }
       : { data: null, error: { code: 'PGRST202' } });
+    mocks.from.mockReturnValue(chain({data:null,count:null,error:{code:'denied'}}));
     const stories = await loadOperationsStories(['maquinas_pedidos', 'servicios_pendientes'], ['parque.operaciones', 'servicios.ordenes'], asOf);
     expect(stories.every(s => s.status === 'error' && s.primary === null)).toBe(true);
   });

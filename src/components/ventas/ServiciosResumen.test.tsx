@@ -62,6 +62,8 @@ describe('service summary breakdown contract', () => {
     render(<ServiciosResumen {...props} />);
     expect(screen.getByText('HORSCH')).toBeInTheDocument();
     expect(screen.getAllByText('Histórico sin OS vinculada')).toHaveLength(2);
+    expect(screen.getAllByRole('columnheader', {name: 'Facturación Neta'})).toHaveLength(2);
+    expect(screen.queryByText('Neto')).not.toBeInTheDocument();
     const historical = screen.getAllByText('Histórico sin OS vinculada')[0].parentElement!;
     expect(historical.children[1]).toHaveTextContent('—');
     expect(historical.children[7]).toHaveTextContent('—');

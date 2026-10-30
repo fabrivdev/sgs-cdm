@@ -1,6 +1,7 @@
 import type { PanoramaStory, StoryDatum, StoryTopicId } from './panoramaStoryTypes';
+import { partsAlertFocus } from './partsAlertFocus';
 
-export type CampiFinding = { topic: StoryTopicId; kind: 'change' | 'attention' | 'neutral'; text: string; urgency: 'confirmed' | 'review' | 'none' };
+export type CampiFinding = { topic: StoryTopicId; kind: 'change' | 'attention' | 'neutral'; text: string; urgency: 'confirmed' | 'review' | 'none'; route?: string };
 const number = new Intl.NumberFormat('es-PY', { maximumFractionDigits: 1 });
 const money = new Intl.NumberFormat('es-PY', { maximumFractionDigits: 0 });
 const valid = (n: number | null | undefined): n is number => typeof n === 'number' && Number.isFinite(n);
@@ -26,6 +27,10 @@ export function interpretCampi(stories: readonly PanoramaStory[]) {
   const findings: CampiFinding[] = usable.map(s => {
     const p = s.primary!;
     const finding = (kind: CampiFinding['kind'], text: string, urgency: CampiFinding['urgency'] = 'none'): CampiFinding => ({ topic: s.id, kind, text, urgency });
+    if (s.id === 'repuestos_alertas') {
+      const focus = partsAlertFocus(s);
+      if (focus) return { ...finding('attention', focus.text, 'review'), route: focus.route };
+    }
     if (s.id === 'ventas_evolucion' && p.unit === 'USD' && valid(p.comparison?.value) && p.comparison.value > 0) {
       const previous = p.comparison.value;
       const difference = p.value! - previous;

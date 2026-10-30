@@ -1,0 +1,2 @@
+.campi-badge-touch{display:block;width:100%;height:100%;padding:0;border:0;background:transparent;border-radius:12px;cursor:pointer;overflow:hidden;touch-action:manipulation}
+.campi-badge-touch:focus-visible{outline:2px solid #46865b;outline-offset:-2px}

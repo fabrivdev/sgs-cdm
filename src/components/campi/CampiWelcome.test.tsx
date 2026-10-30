@@ -133,3 +133,12 @@ describe('Campi introduction', () => {
     expect(transitionCampi('hidden', 'close')).toBe('hidden');
   });
 });
+
+it('previsualiza la bienvenida ya vista sin marcar ni sobrescribir memoria',()=>{
+ localStorage.setItem(campiStorageKey('a'),'hidden');
+ render(<CampiWelcome userId="a" preview/>);
+ expect(screen.getByText('¡Hola! Soy Campi.')).toBeInTheDocument();
+ act(()=>vi.advanceTimersByTime(2000));
+ fireEvent.click(screen.getByRole('button',{name:'Cerrar bienvenida de Campi'}));
+ expect(localStorage.getItem(campiStorageKey('a'))).toBe('hidden');
+});

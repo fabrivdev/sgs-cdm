@@ -1,3 +1,5 @@
+import { describeImportError, importErrorFields, type ImportProgressCallback } from "./importProgress";
+import { observeImportRpc } from "./importRpcDiagnostics";
 import {
   readReceivablesPreflightFile,
   type ReceivablesPreflight,
@@ -47,6 +49,7 @@ class ReceivablesRpcFailure extends Error {
   constructor(error: ReceivablesRpcError) {
     super(error.message || "Error sin detalle en el RPC de cuentas por cobrar");
     this.code = error.code;
+    Object.assign(this, importErrorFields(error));
   }
 }
 
@@ -75,10 +78,12 @@ function explainFailure(error: unknown, cargaId: string | null, cancelError: unk
     message = `La carga de cuentas por cobrar no concilia con el preflight. ${message}`;
   }
   if (cancelError) {
-    const cancelMessage = cancelError instanceof Error ? cancelError.message : String(cancelError);
+    const cancelMessage = describeImportError(cancelError);
     message += ` No se pudo cancelar automáticamente la carga ${cargaId}: ${cancelMessage}`;
   }
-  return new Error(message);
+  return Object.assign(new Error(message), { stage: "cxc.persist" }, importErrorFields(error), {
+    details: [importErrorFields(error).details, error instanceof Error && !message.includes(error.message) ? error.message : null].filter(Boolean).join(" | ") || undefined,
+  });
 }
 
 export async function persistReceivablesFile(options: {
@@ -86,8 +91,10 @@ export async function persistReceivablesFile(options: {
   client: ReceivablesRpcClient;
   cutoffDate: string;
   expectedSha256?: string;
+  onProgress?: ImportProgressCallback;
 }): Promise<ReceivablesPersistResult> {
-  const { file, client, cutoffDate } = options;
+  const { file, cutoffDate } = options;
+  const client = observeImportRpc(options.client, "cxc", file.name, options.onProgress);
   if (!/^\d{4}-\d{2}-\d{2}$/.test(cutoffDate)) throw new Error("Confirmá una fecha de corte válida para cuentas por cobrar.");
   const preflight = await readReceivablesPreflightFile(file, file.name, { cutoffDate, sourceLastModified: file.lastModified });
   const fileSha256 = await sha256Hex(file);

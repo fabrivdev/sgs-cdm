@@ -1,5 +1,7 @@
 # Campi: bienvenida inicial de SIG CDM
 
+Actualización de fuentes del 21/10/2026: en Lovable Cloud se aplicaron las tres funciones de lectura de `supabase/review/panorama-v2` (Clientes, Pedidos y Repuestos) y la rama alternativa ya consume sus desgloses. La app autenticada concilió 31/211 propietarios con compra, 11 pedidos divididos en 4 con stock completo, 2 parcial y 5 sin cobertura, y los tramos de USD 1.128.358 de stock antiguo más 32 códigos / USD 8.981 próximos a cambiar de clasificación. Esas cifras corresponden a una lectura puntual y pueden variar. Solo se probó con un usuario administrador; faltan cuentas de prueba con permisos limitados. El historial y los hashes están en `supabase/review/panorama-v2/README.md`. La rama no se integró a `main` ni se publicó.
+
 Estado local del 21/10/2026: el catálogo activo de Panorama alternativo contiene 12 de las 20 preguntas acordadas. Se retiraron del selector las opciones ajenas a ese listado y se añadieron agenda, productividad, eficiencia, retención y cobertura de posventa. Ocho preguntas permanecen sin habilitar por requerir un cálculo o una fuente conciliada. La tabla de seguimiento vigente y sus límites están al comienzo de `docs/campi-panorama-alternativa.md`; las cifras de 17 temas y las descripciones anteriores de esta nota son históricas. Solo afecta `feat/campi-panorama-alternativa`, no `main` ni Lovable público.
 
 Actualización local del 21/10/2026: en `feat/campi-panorama-alternativa`, el personaje visible dentro de Panorama usa el modelo articulado `Campi_3D_estados.glb` y el controlador V5 del paquete entregado por el usuario. La carga es diferida al montar Panorama y se sirve desde `/campi3d/` en el mismo origen. El estado del hallazgo decide el ánimo, mientras los clics y reacciones del editor eligen gestos compatibles; la pausa por pestaña oculta, lectura del detalle y movimiento reducido alcanza al controlador. Si WebGL o el recurso fallan, reaparece la versión previa de poses como respaldo. La bienvenida histórica y su vista de prueba no se reemplazaron: no se montan en la rama alternativa. Esta integración no cambia los datos, los permisos ni los cálculos de Panorama y sigue fuera de `main` y de Lovable público. Fuente: `src/components/campi/CampiPanoramaAvatar.tsx`, `CampiThreeCanvas.tsx`, `src/components/campi3d/` y `public/campi3d/`.
@@ -139,3 +141,120 @@ El catálogo objetivo del 20/10 reúne veinte preguntas de negocio en `src/lib/c
 ### Estado vigente de la alternativa — 21/10/2026
 
 El selector actual tiene **doce temas**, no los diecisiete de etapas anteriores. Se retiró OS abiertas de más de 90 días y se incorporaron lecturas con fuente de OS facturadas, Agenda, productividad, eficiencia y clientes; el catálogo objetivo sigue siendo veinte preguntas. Los doce temas se documentan en `docs/campi-panorama-alternativa.md` y `src/lib/campi/panoramaPreferences.ts`. Las descripciones históricas de seis, cinco o diecisiete temas no deben restaurarse. La tarjeta de Evolución muestra USD antes de NC como KPI, con variación y diferencia; Facturación neta conserva su propio KPI, separados. Las tarjetas tienen hasta dos apoyos y un gráfico de área estable. Resolución de OS usa meses consecutivos, no LY. Pedidos con stock completo exige todas las unidades cubiertas. Agenda incluye canceladas en el denominador, decisión confirmada por el usuario. Retención conserva las ventanas actual/base vigentes y las hace visibles. Los enlaces de clientes transmiten el período, aunque la fuente agregada no acredita integrantes exactos de la cohorte. La rama sigue fuera de `main` y Lovable público.
+
+
+## Panorama: escena acordada, 28 octubre 2026
+
+Se integra CampiOnboardingScene con el rig 3D actual y welcome-motion existente. Referencia Figma IkBozPmGN7IgABQz3ss2by, bienvenida 25:358 y selector 27:208. El widget antiguo no forma parte de este flujo. CTA Preparar mi Panorama, selector posterior y Ver mi Panorama. La previsualización DEV no escribe preferencias; cada usuario y modo posee su instancia abortable. El primer avance real guarda solamente el paso selector por usuario; la selección definitiva conserva su contrato existente. Reduced motion mantiene bienvenida estática hasta acción explícita.
+
+Límite: se reutilizan recetas de 3,8 segundos y locomoción física; no se acredita todavía la duración artística global de 2–3 segundos. La entrada del selector conserva 280 ms con desfases 0/80/160 ms. No se acelera el rig artificialmente. Sin publicación ni SQL.
+
+
+Corrección de duración: welcome-recipes.mjs genera copias exclusivas de esta escena (un saludo breve de 1,1 s y una invitación de 1,2 s, amplitudes menores, sin timeScale). La caminata mantiene su velocidad y freno: entrada total medida con GLB real 2,90 s a 30 fps y 2,883 s a 60 fps. El selector se revela al CTA y su entrada escalonada termina en 440 ms; el gesto y frenado no bloquean navegación. El cambio de composición dura 400 ms, sin transición en movimiento reducido. Sustituye el límite de duración documentado anteriormente; duración medida desde inicio del runtime, no incluye descarga inicial del modelo.
+
+
+## Dirección 2D — prototipo local 28/10
+
+Por cambio de dirección del usuario, la escena 3D se preserva desmontada en CampiOnboardingScene3D.tsx. CampiVector es una ilustración SVG original por capas (cabeza, rostro, párpados, boca, brazos, cuerpo y piernas) compartida por bienvenida, selector y BusinessCampi. No intercambia imágenes raster ni interpreta sentimientos de datos. Saludo único, invitación, reconocimiento de selección y pausas espaciadas; reduced motion estático y suspensión con documento oculto. El prototipo requiere aprobación visual; no es arte final aprobado.
+
+Selector: catálogo actual 12 temas antes de filtrar permisos; se conserva entero y se presenta en 3 columnas con prioridades al costado. No se cambian métricas ni selección guardada. Escritorio priorizado; QA móvil diferido expresamente. Preview sigue temporal y sin persistencia. Sin push/publicación.
+
+
+## Bienvenida: corrección de método de animación
+
+La dirección vigente de bienvenida conserva la identidad del PNG Campi blanco/verde y requiere secuencias de poses completas coherentes. Se retiró el rig de recortes rotatorios por discontinuidad visual en articulaciones y apoyo no validado. CampiWelcomeActor muestra temporalmente la referencia aprobada estática y permite avanzar inmediatamente; no es la animación final. El controlador welcome2d/timeline.ts queda preparado, sin presentarlo como validación de calidad artística. Selector y badges no cambian en esta etapa. La navegación de preview no persiste preferencias.
+
+
+Prototipo de poses completas: la lámina de 1536x1024 se conserva intacta en public/campi/welcome-poses-prototype.png. Se usan límites de figuras inspeccionados por alfa y anclajes de botas, no celdas nominales. Saludo/presentación/invitación son prueba de reproducción; no animación final. Carrera excluida por falta de alternancia de piernas; faltan intermedios de presentación, giro y salida. Sin fundidos de siluetas ni rotaciones de recortes. Reduced motion muestra pose neutra; CTA disponible aun antes de cargar la lámina. Selector y badges no se modifican.
+
+
+## Fondo y expresiones: estado local vigente
+
+La bienvenida reutiliza GradientWaves y las dos capas de Auth.tsx, con escenario amplio; no modifica Auth, selector ni badges. El login inspeccionado contiene ondas verdes, no siluetas adicionales de personas o máquinas. El fondo se desmonta al activar movimiento reducido en bienvenida. El actor detiene RAF al ocultar el documento o reducir movimiento.
+
+Reposo utiliza los assets originales completos rest/blink/curious/smile: ambos ojos abiertos por defecto, sin pintar sobre el visor. Las poses corporales de la lámina siguen siendo prototipo con guiño dibujado; faltan secuencias de carrera alternada, frenada/giro, intermedios, salida y saludo con rostro coherente. La bienvenida no está terminada por aprobar tests.
+
+El tamaño visual objetivo marcado es unos 300px de alto; el SVG se limita a 368x350px y conserva proporciones. Se retiró la división por densidad que dejaba al personaje demasiado pequeño. El atlas actual (~243px útiles por figura) requiere mayor resolución para igualar nitidez de las imágenes originales. No aplicar blur ni agrandar con la escena. QA móvil diferido. Sin publicación ni cambios productivos.
+
+
+## Actualización v2 de poses completas (28 octubre)
+
+
+Se usan exclusivamente campi-reposo-v2.png, campi-saludo-v2.png y campi-presentacion-v2.png, conservados sin edición de píxeles. La primera pose de reposo es el neutro canónico al entrar y al terminar cada gesto. No se mezclan el PNG original, las expresiones antiguas ni la lámina de 24 poses.
+
+Los recortes siguen los límites alfa inspeccionados. El anclaje usa las botas y una escala uniforme: figura visible de unos 300 px, sin deformación, blur ni fundidos de siluetas. Las figuras fuente tienen aproximadamente 490 px útiles de alto; no se promete nitidez nativa a cualquier densidad de pantalla.
+
+Secuencia: pausa breve, saludo, presentación y reposo con cambios de peso, mano en cintura y parpadeo. El CTA permanece disponible; interrumpe mediante un retorno por poses compatibles e invitación. Cancela al desmontar y pausa al ocultar la página. Movimiento reducido conserva el neutro y navegación inmediata.
+
+El fondo reutiliza GradientWaves y las capas de Auth.tsx. Selector, badges y móvil quedan fuera de esta etapa. Carrera, frenada, giro y salida caminando siguen pendientes: no se simulan deslizando una pose. Las transiciones son discretas y necesitan aprobación visual; los tests no acreditan animación final.
+
+Validación final: 31 pruebas focalizadas y lint aprobados. La comprobación visual local confirmó neutro con ambos ojos abiertos y presentación con brazos abiertos. QA interactivo posterior completó el CTA: mano al pecho, brazos abiertos, invitación lateral y llegada al selector; reentrada comprobada. Se observaron saludo y retorno al neutro canónico. Pantalla revisada en 1366×768 y 1920×1080; build aprobado en 33,29 s. Las poses discretas no se presentan como fluidez final.
+
+
+## Entrada y selector escritorio (28 octubre, etapa posterior v2)
+
+CampiWelcomeActor conserva poses v2 y añade revelado escénico de 700 ms al cargar las tres láminas; no representa carrera ni desliza pies. CampiOnboardingScene conserva bienvenida saliente y selector entrante durante un empuje horizontal de 600 ms. Al retomar directamente selector no repite empuje; reduced motion elimina animaciones. Los temporizadores se cancelan al volver/cerrar.
+
+Campi desaparece completamente del selector, incluido el editor de prioridades. CampiPanorama conserva permisos, selección, reemplazo y orden; Tu enfoque pasa abajo a cuatro columnas. Se reducen textos repetidos sin eliminar errores ni instrucciones de reemplazo. BusinessCampi usa CampiIdentity con el neutro canónico v2, sin botones de detalle ni nuevas secuencias.
+
+QA local: 47 pruebas aprobadas, lint aprobado y build 33,23 s. Selector visible sin scroll en 1366×768 (contenido hasta y688) y 1920×1080. Se probó selección temporal de cuatro temas, reentrada, CTA, se capturó el empuje y se cerró preview recuperando los cuatro temas originales. No guardó cambios. Reduced motion y doble ejecución cubiertos por pruebas, no emulación visual del sistema. Tipado global conserva cuatro diagnósticos ya registrados: ApprovedMonthlyColumns.test.tsx, PanoramaStoryCard.tsx y dos en projectedStockYtd.test.ts.
+
+Revisión independiente de código encontró empuje indebido al retomar selector; corregido condicionando a bienvenida retenida. Revisión visual independiente pendiente: el agente no pudo reclamar la pestaña por pertenecer a otra sesión; no se eludió esa restricción. QA visual realizado por implementador. Sin publicación, push ni cambios productivos. Móvil diferido.
+
+
+## Entrada caminando: corrección pendiente de assets
+
+Se retiró el revelado horizontal rechazado (campi-stage-reveal); no se reemplaza con deslizamiento ni fundido. La bienvenida vuelve provisionalmente al neutro y saludo v2 existentes. No constituye entrada terminada. Las tres láminas disponibles no contienen marcha; las poses antiguas de corrida no se mezclan con v2.
+
+Mínimo solicitado para producción de assets: ocho poses completas de ciclo de marcha hacia la derecha (contacto, descenso, paso, elevación; luego apoyos opuestos) más cuatro de llegada (paso corto, doble apoyo, giro al usuario, neutro canónico). Mantener cámara, escala, proporciones, luz y plano de suelo; transparencia y rostro abierto. Integración futura debe sincronizar desplazamiento con pie apoyado, desacelerar al llegar y comenzar saludo después de detenerse. CTA temprano, cancelación y reduced motion conservan sus guardas. Empuje de 600 ms, selector, badge y preferencias permanecen intactos.
+
+
+## Integración local v5: pasos laterales canónicos
+
+Insumo local: carpeta campi-canonical-sidestep-v5 guardada por el usuario. Se inspeccionó step-wide.png y el código/HANDOFF. Los PNG reposo y saludo coinciden SHA256 con los ya utilizados; no se reemplazaron assets. Se excluyen giro, malla frontal, warping, fundido y saludo simulado del demo.
+
+entryRenderer.js encapsula la entrada lateral con dos saltitos; sin IDs DOM, eventos globales ni RAF propio. Conserva apoyos e IK del demo y destino compatible con el SVG: centro horizontal, suelo H/2+255*s, s=min(min(W,368)/600,min(H,350)/570). Congela distancia lógica y duración por ejecución; resize aplica la escala y anclaje compartidos a la escena. Puede cambiar posición en pantalla durante resize; no implica reiniciar tiempo.
+
+entryGate.js arranca el timeline real únicamente después del endpoint canónico; no llama onAdvance al llegar. CampiWelcomeActor posee un único RAF, precarga, ResizeObserver y limpieza; hidden inicial/cambios y matchMedia pausan o saltan entrada. CTA en entrada cancela y avanza una vez manteniendo pose hasta el empuje; CTA posterior delega invitación existente. Reduced motion usa neutro y navegación inmediata. Remontaje crea instancias nuevas.
+
+Pruebas: 52 aprobadas incluyendo conservación de contactos, endpoint tras resize, start-after-entry, cancelación/doble clic, reentrada y selector/preferencias. Lint aprobado. Tipado global conserva cuatro diagnósticos ya registrados en ApprovedMonthlyColumns.test.tsx, PanoramaStoryCard.tsx y projectedStockYtd.test.ts. Revisión independiente de código sin bloqueantes; tests geométricos usan canvas simulado, no certifican píxeles.
+
+QA visual v5 local pendiente: pestaña anterior 926972564 ya no existe; resolución de http://127.0.0.1:5174/panorama en Chrome agotó 10 s en Emulation.setFocusEmulationEnabled dos veces. No se enumeraron otras pestañas ni se sustituyó la cuenta por otra. No se acredita aún recorrido real, continuidad canvas→SVG, resize visual o reduced motion real. Selector, badge, fondo y empuje de 600 ms se conservaron. Sin push/publicación/productivo.
+
+
+## Entrada vertical local (sustituye v5 lateral)
+
+La entrada lateral fue rechazada y ya no es la predeterminada. entryRenderer.js mantiene el atlas canonico, cae de frente desde arriba durante 0,65 s, absorbe durante 0,22 s, rebota 0,30 s, asienta 0,24 s y mantiene neutro 0,15 s antes del timeline vigente (pausa 0,35 s y saludo 2,4 s). Sin giro, crossfade, malla ni escala no uniforme. Casco/torso rigidos; flexion moderada de piernas, pies fijos al aterrizar y sin piezas sinteticas agregadas. Un solo rebote de 20 unidades fuente (aprox. 12 px visibles).
+
+CampiWelcomeActor.tsx extiende el canvas 180 px hacia arriba conservando el ancla del SVG; evita el corte interno a la altura de la cabeza visto en la primera comprobacion. Gate, CTA, cancelacion, reduced motion, pausa oculta y empuje al selector de 600 ms conservados. No se modificaron badge, selector, preferencias ni assets.
+
+Verificacion final: 53 pruebas / 8 archivos aprobados; lint aprobado; build 21,96 s. QA real en Chrome local con fabrizio.vega: fotogramas de caida desde borde superior de bienvenida, apoyo, rebote, neutro y saludo; reentrada, CTA/doble clic, selector sin Campi y cierre de preview conservando las cuatro prioridades. La pestaña mantenia el renderer anterior hasta recarga explicita: se recargo y verifico la version vertical. No se hizo grabacion continua de video ni emulacion visual de reduced motion/resize en este lote; esos controles quedan cubiertos por tests y contrato compartido, no por aprobacion estetica del usuario. Sin publicacion/push/productivo.
+
+
+## Correcciones locales de continuidad y badge (validacion visual pendiente)
+
+Se identifico por codigo que spriteFrame(rest) cambiaba el cuerpo completo al frame 5 para parpadear; el actor ahora conserva frame 0 y su viewBox, y aplica solo un recorte del visor de frame 5. No cambia atlas ni agrega un personaje nuevo. Se suavizaron fronteras de caida/aterrizaje/rebote mediante smoothstep y sin cuadrado, sin modificar escala/proporciones. Pruebas verifican continuidad de posicion y velocidad cercana a cero en fronteras, no continuidad de aceleracion ni fluidez percibida.
+
+Badge: BusinessCampi usa campi-badge-avatar; regla especifica en panorama-dashboard.css elimina translateY, usa grid-row auto y centra el avatar 90x112 dentro del badge. Datos/comentarios/acciones intactos. Selector sigue sin Campi.
+
+Se preparo inspeccion lenta solo DEV mediante ?campi-motion=slow (velocidad 0,25); no cambia preferencias ni afecta builds publicos. No se logro ejecutar la inspeccion lenta: Chrome se desvinculo con Debugger unattached al cerrar preview, y la recuperacion acotada fallo igual. No se cambio cuenta, no se forzo otra via. Estado del clic de cierre no comprobado tras desconexion. No certificar badge/visor/fluidez posterior por tests. Revision independiente solo codigo sin bloqueantes: quedan posibles seams del visor y del cambio PNG/piezas por revisar.
+
+55 pruebas en 8 archivos aprobadas. El saludo/presentacion siguen usando pocas poses completas: faltan intermedios consistentes, pose de caida con brazos abiertos y expresiones alineadas. No se implementaron brazos expresivos nuevos ni sorpresa. La solucion es parcial y no constituye aprobacion estetica. Sin push/publicacion/productivo.
+
+
+## Revision local 2026-10-29: continuidad de cuerpo y badge
+
+La entrada conserva la actuacion v6 (0-2.2 s), con sorpresa y brazos. Se elimino el cambio visible Canvas/SVG: approvedDropScene y entryRenderer dibujan el mismo cuerpo, fuente, ancla, escala y sombra durante saludo, presentacion, reposo e invitacion. El saludo se limita intencionadamente a cabeza/rostro; no reutiliza la mano rechazada. Los gestos tienen extremos neutros; al pulsar CTA se captura la pose para retornar de forma continua. El SVG queda como respaldo si no hay renderer. No hay crossfade, warping ni intercambio visible de laminas.
+
+CampiBadgeActor mantiene personaje dentro del badge. Metadata disponible solo permite neutral (sin comentario), thinking (carga) y attentive (comentario disponible); no interpreta polaridad empresarial por texto. Contacto y teclado disparan gesto breve con bloqueo de reentrada. Pausa por documento oculto, fuera de viewport, dialogo o movimiento reducido. Sin chat, enlaces ni datos nuevos.
+
+Validacion local: 55 pruebas focalizadas pasaron; lint sin errores (advertencia Fast Refresh por export de helper), build Vite correcto. Inspeccion Chrome con Fabrizio: badge, contacto/Enter, preview, Canvas persistente y selector. La comprobacion visual es muestreo de fotogramas, no certificacion de todos los fotogramas ni aprobacion estetica del usuario. No publicacion ni push.
+
+
+## Integración local v12 aprobada (29 octubre 2026)
+
+Sustituye la simplificación de saludo a cabeza: renderer aprobado scene.js SHA256 c144828d9b91282988646491f901c08d72b2d61bcfee19976a0da2e203fbd2a9, desde CAMPI-recorrido-completo-v12.zip (39875a026b500cfc461be64205518ba864f3c886f0cbc4ef2e2527f6c769701c). Adaptaciones únicamente export ES module y cámara/ancla del host existente; transparente. Caída expresiva, aterrizaje/rebote, saludo de palma abierta constante y reposo. Gate dura 5,4 s; el timeline posterior solo alimenta el reposo v12 y conserva navegación, sin repetir saludo de atlas. No se incorporan selector, temas, datos ni preferencias mock del ZIP. Badge contextual y bordes del selector intactos.
+
+Snapshot previo en carpeta de tarea campi-before-v12. 55/55 pruebas focalizadas, lint sin errores, build 30,81 s. Comparación offline con Canvas nativo: 271/271 fotogramas idénticos al renderer entregado a igual cámara y transparencia; no acredita rendimiento navegador. Typecheck conserva cuatro errores ya registrados antes de v12 en ApprovedMonthlyColumns.test.tsx, PanoramaStoryCard.tsx y projectedStockYtd.test.ts.
+
+QA real parcial Fabrizio: fotogramas de caída con brazos y palma abierta, aterrizaje y reposo sobre fondo login; CTA pulsado. No se pudo verificar destino posterior: pestaña 926972647 desapareció y la nueva 926972672 en 5174/panorama agotó Emulation.setFocusEmulationEnabled al vincular. Pendiente recorrido normal/lento completo, CTA/selector/panorama, badge y resize/reduced motion visual de esta integración. No afirmar QA completa ni publicación.

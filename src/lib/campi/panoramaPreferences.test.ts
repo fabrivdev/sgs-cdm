@@ -19,7 +19,8 @@ describe('Campi Panorama topics', () => {
       'repuestos_stock', 'repuestos_alertas', 'servicios_os_facturadas',
       'agenda_cumplimiento', 'servicios_productividad', 'servicios_eficiencia', 'clientes_retencion', 'clientes_cobertura_posventa',
     ]));
-    const known = new Set(SECTION_ROUTES.map(route => route.id));
+    const known = new Set<string>(SECTION_ROUTES.map(route => route.id));
+    expect(known.has("servicios.dashboard")).toBe(false);
     for (const topic of PANORAMA_TOPICS) {
       expect(topic.sections.length).toBeGreaterThan(0);
       expect(topic.sections.every(section => known.has(section))).toBe(true);

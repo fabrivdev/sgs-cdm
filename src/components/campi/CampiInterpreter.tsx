@@ -1,12 +1,15 @@
-import { useCallback, useEffect, useState } from 'react';
-import { ArrowRight, ChevronRight } from 'lucide-react';
+import { useCallback, useEffect, useRef, useState } from 'react';
+import { ArrowRight } from 'lucide-react';
+import { Link } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
 import { interpretCampi } from '@/lib/campi/campiInterpretation';
 import { buildCampiComments } from '@/lib/campi/campiComments';
+import { isPartsAlertVariant, orderCampiVariants, readLastCampiVariant, rememberCampiVariant } from '@/lib/campi/campiVariantRotation';
 import { storyVisitComparison, type StoryVisitSnapshot } from '@/lib/campi/panoramaStoryVisits';
 import type { PanoramaStory } from '@/lib/campi/panoramaStoryTypes';
 import type { StoryTopicId } from '@/lib/campi/panoramaStoryTypes';
 import { CampiPanoramaAvatar } from './CampiPanoramaAvatar';
+import { storyDestinations } from '@/lib/campi/storyNavigation';
 import type { CampiMood } from './CampiSprite';
 
 const valueLabel = (value: number, unit: string) => `${unit === 'USD' ? '$ ' : unit === 'PYG' ? '₲ ' : ''}${new Intl.NumberFormat('es-PY', { maximumFractionDigits: unit === 'USD' || unit === 'PYG' ? 0 : 2 }).format(value)}${unit === 'percent' ? '%' : unit === 'days' ? ' días' : ''}`;
@@ -14,7 +17,7 @@ const signedValue = (value: number, unit: string) => `${value > 0 ? '+' : value 
 const visitDate = (at: string) => new Intl.DateTimeFormat('es-PY', { day: '2-digit', month: '2-digit', year: 'numeric' }).format(new Date(at));
 
 export function CampiInterpreter({ stories, loading, previous = null, onOpenStory, userId, detailOpen = false }: { stories: readonly PanoramaStory[]; loading: boolean; previous?: StoryVisitSnapshot | null; onOpenStory?: (id: StoryTopicId) => void; userId?: string; detailOpen?: boolean }) {
-  const [commentIndex, setCommentIndex] = useState(0);
+  const [commentPosition, setCommentPosition] = useState({ key: '', index: 0 });
   const [commentToken, setCommentToken] = useState(0);
   const [hovering, setHovering] = useState(false);
   const [keyboardFocus, setKeyboardFocus] = useState(false);
@@ -35,10 +38,18 @@ export function CampiInterpreter({ stories, loading, previous = null, onOpenStor
     return () => window.clearTimeout(timer);
   }, [showFirstTip]);
   const result = interpretCampi(stories);
-  const comments = buildCampiComments(stories, previous);
-  const commentsKey = JSON.stringify(comments.map(comment => [comment.key, comment.text, comment.period, comment.evidence]));
-  useEffect(() => { setCommentIndex(0); }, [commentsKey]);
-  const nextComment = useCallback(() => { setCommentIndex(index => (index + 1) % comments.length); setCommentToken(token => token + 1); }, [comments.length]);
+  const rawComments = buildCampiComments(stories, previous);
+  const commentsKey = JSON.stringify(rawComments.map(comment => [comment.key, comment.text, comment.route, comment.period, comment.evidence]));
+  const orderedRef = useRef<{ userId: string | undefined; key: string; comments: typeof rawComments } | null>(null);
+  if (!orderedRef.current || orderedRef.current.userId !== userId || orderedRef.current.key !== commentsKey) {
+    orderedRef.current = { userId, key: commentsKey, comments: orderCampiVariants(rawComments, readLastCampiVariant(userId ?? '')) };
+  }
+  const comments = orderedRef.current.comments;
+  const commentIndex = commentPosition.key === commentsKey ? Math.min(commentPosition.index, comments.length - 1) : 0;
+  const nextComment = useCallback(() => {
+    setCommentPosition(previous => ({ key: commentsKey, index: ((previous.key === commentsKey ? previous.index : 0) + 1) % comments.length }));
+    setCommentToken(token => token + 1);
+  }, [commentsKey, comments.length]);
   useEffect(() => {
     const onVisibility = () => setVisible(!document.hidden);
     document.addEventListener('visibilitychange', onVisibility);
@@ -51,7 +62,10 @@ export function CampiInterpreter({ stories, loading, previous = null, onOpenStor
     }, 25000);
     return () => window.clearInterval(timer);
   }, [commentsKey, commentIndex, comments.length, loading, detailOpen, reading, visible, nextComment]);
-  const current = comments[Math.min(commentIndex, comments.length - 1)];
+  const current = comments[commentIndex];
+  useEffect(() => {
+    if (!loading && visible && isPartsAlertVariant(current.key)) rememberCampiVariant(userId ?? '', current.key);
+  }, [current.key, loading, userId, visible]);
   const lead = result.findings.find(finding => finding.topic === current.topic);
   const presentedStory = stories.find(story => story.id === current.topic);
   const visitComparison = presentedStory ? storyVisitComparison(presentedStory, previous) : null;
@@ -64,7 +78,7 @@ export function CampiInterpreter({ stories, loading, previous = null, onOpenStor
   const billingDelta = billing?.primary?.comparison?.value && billing.primary.value != null ? (billing.primary.value - billing.primary.comparison.value) / Math.abs(billing.primary.comparison.value) : null;
   const mood: CampiMood = loading || current.kind === 'limit' ? 'pensativo' : current.kind === 'visit' ? 'sereno' : lead?.urgency === 'confirmed' ? 'preocupado' : lead?.kind === 'attention' ? 'atento' : lead?.topic === 'ventas_facturacion' && billingDelta !== null && billingDelta >= 0.1 && gross != null && gross > 0 && credit != null && -credit / gross < 0.2 ? 'contento' : lead?.topic === 'ventas_facturacion' && billingDelta !== null && billingDelta <= -0.5 ? 'triste' : lead?.topic === 'ventas_facturacion' && billingDelta !== null && billingDelta <= -0.25 ? 'preocupado' : 'sereno';
   const headline = loading ? 'Estoy revisando tus temas.' : current.text;
-  const actions = presentedStory ? [presentedStory] : [];
+  const canExplore = Boolean(presentedStory && (current.route || (onOpenStory && storyDestinations(presentedStory).length)));
   return <section className={`min-w-0 rounded-xl border bg-card p-3.5 panorama-hero panorama-hero--${tone} panorama-hero--${mood}`}
     onPointerEnter={() => setHovering(true)} onPointerLeave={() => setHovering(false)}
     onPointerDown={() => setKeyboardFocus(false)}
@@ -81,7 +95,9 @@ export function CampiInterpreter({ stories, loading, previous = null, onOpenStor
         <strong>{valueLabel(visit.comparison.before, visit.comparison.unit)} <span aria-hidden="true">→</span> {valueLabel(visit.comparison.current, visit.comparison.unit)}</strong>
         <small>{lead?.kind === 'attention' && <>Cambio {signedValue(visit.comparison.change, visit.comparison.unit)} · </>}Entre lecturas del mismo alcance; puede incluir correcciones y paso del tiempo.</small>
       </div>}
-      {!loading && <div className="campi-hero-actions">{onOpenStory && actions.map((story, i) => <Button key={story.id} variant={i === 0 ? 'default' : 'outline'} onClick={() => onOpenStory(story.id)}>Ver datos de {story.title.toLowerCase()}<ArrowRight className="h-4 w-4" /></Button>)}{comments.length > 1 && <Button type="button" variant="outline" aria-label="Siguiente comentario de Campi" onClick={nextComment}>Siguiente <ChevronRight className="h-4 w-4" /></Button>}</div>}
+      {!loading && canExplore && <div className="campi-hero-actions">{current.route
+        ? <Button variant="outline" className="campi-explore" asChild><Link to={current.route} aria-label={`Explorar ${presentedStory!.title}`}>Explorar<ArrowRight className="h-4 w-4" /></Link></Button>
+        : <Button type="button" variant="outline" className="campi-explore" aria-label={`Explorar ${presentedStory!.title}`} onClick={() => onOpenStory?.(presentedStory!.id)}>Explorar<ArrowRight className="h-4 w-4" /></Button>}</div>}
     </div>
   </section>;
 }

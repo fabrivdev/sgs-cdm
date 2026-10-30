@@ -176,7 +176,7 @@ describe("complete machine history", () => {
     expect(write).toHaveBeenCalledWith(expect.anything(), "historial-completo-maquina.xlsx", { bookType: "xlsx" });
     const exported = sheet.mock.calls[0][0] as unknown[][];
     expect(exported).toHaveLength(4);
-    expect(exported[0]).toEqual(["Fecha", "Tipo", "OS", "Estado", "Técnicos", "Código", "Cód. fabr.", "Descripción", "Cant.", "Factura", "Facturado"]);
+    expect(exported[0]).toEqual(["Fecha", "Tipo", "OS", "Estado", "Técnicos", "Código", "Cód. fabr.", "Descripción", "Cant.", "Factura", "Importe"]);
     expect(exported.find(exportRow => exportRow[1] === "Repuesto")).toEqual([expect.any(Date), "Repuesto", row.os_numero, null, null, "REP001", "FAB002", "Rodamiento", 2, "0010030000123", 80]);
     expect(exported.filter(exportRow => ["Cliente", "Garantía"].includes(String(exportRow[1]))).map(exportRow => exportRow[1])).toEqual(expect.arrayContaining(["Cliente", "Garantía"]));
   });

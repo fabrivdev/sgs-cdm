@@ -135,3 +135,14 @@ order by tipo_saldo, clasificacion_estado;
 
 No habilitar EBITDA, margen final ni ROA a partir de esta entrega. Primero deben
 aprobarse las versiones de cuentas necesarias y resolverse las dos cuarentenas.
+
+
+## Diagnostico de importacion: parche aislado del 23/10/2026
+
+El parche asigna Mayor antes de iniciar su persistencia y observa los RPC de Mayor/CxC con etapa, operacion, lote, filas y duracion. Conserva codigo, detalle, sugerencia y estado HTTP cuando la respuesta los proporciona; una cancelacion fallida se informa sin sustituir la causa original. No cambia orden, payloads, tamano de lotes, validaciones, confirmaciones ni cancelacion compensatoria. Fuentes: `ImportarTotvsTab.tsx`, `importRpcDiagnostics.ts`, `importProgress.ts`, `mayorPersist.ts` y `receivablesPersist.ts`.
+
+Validacion: typecheck focal sin errores. Se agregaron pruebas aisladas con clientes simulados para errores de inicio, validacion, persistencia y finalizacion, cancelacion fallida, campos seguros, avance y rechazos de red. La integracion aislada ejecuto las cuatro suites: 25 pruebas pasaron con clientes simulados, mediante ejecucion autorizada fuera del sandbox que bloqueo inicialmente realpath. No hubo RPC real, importaciones, SQL ni publicacion. El defecto de rotulacion se confirma; la causa del fallo diario sigue pendiente de la respuesta remota original y este parche no acredita resolverla.
+
+## Optimización SQL de lotes ya aplicada (23/10/2026)
+
+Se incorpora `20261023130000_optimize_totvs_mayor_batch_lookups.sql` para registrar el cuerpo aplicado `48bf0443eccd2a37f1c71104292f45f3`: materializa versiones de las claves del lote y evita repetir la búsqueda de conflictos. Guardas permiten omitir el cambio si ya está aplicado y rechazan otra definición. No se vuelve a aplicar SQL durante esta integración. El usuario confirmó después una carga manual completa de 35.849 filas con controles netos en cero; éxito de ese archivo, no garantía universal. Regresión reproducible y límites (PGlite, prueba nativa bloqueada, sin cambios de permisos/timeout): `docs/mayor-batch-lookup-optimization.md` y `scripts/test-mayor-batch-lookups.cjs`. No se incorporan datos privados ni cambios de Panorama.

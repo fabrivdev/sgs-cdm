@@ -361,7 +361,7 @@ export function AppLayout({ children, preview }: { children?: React.ReactNode; p
           </div>
         </header>
 
-        <main id="main-content" className="min-w-0 pb-6">
+        <main id="main-content" className={location.pathname === '/panorama' ? 'min-w-0 pb-0' : 'min-w-0 pb-6'}>
           <div key={location.pathname} className="min-w-0 app-page-enter">{children ?? <Outlet />}</div>
         </main>
 

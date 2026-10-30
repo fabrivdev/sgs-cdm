@@ -1,3 +1,4 @@
+import { formatDay } from './panoramaDates';
 import { SEMAFORO_COLORES } from '@/hooks/useSemaforoHistorico';
 import type { PanoramaStory } from './panoramaStoryTypes';
 
@@ -87,7 +88,7 @@ export function partsExposureStory(data: Exposure): PanoramaStory {
     status: data.codigos_stock ? 'ready' : 'empty',
     message: data.codigos_stock ? `${data.codigos_antiguos} códigos en gris o rojo; ${pct === null ? 'sin porcentaje verificable' : `${new Intl.NumberFormat('es-PY', { maximumFractionDigits: 1 }).format(pct)}% del valor positivo valorizado`}.` : 'No hay repuestos con stock físico positivo.',
     scope: 'Códigos REP con stock físico positivo; valor positivo referencial del Kardex por ubicación',
-    sections: ['repuestos.analisis'], cutoff: null, periodLabel: `Clasificación ${data.fecha_analisis}`,
+    sections: ['repuestos.analisis'], cutoff: null, time: { classificationDate: data.fecha_analisis }, periodLabel: `Clasificación ${formatDay(data.fecha_analisis)}`,
     primary: { label: 'Valor de stock gris y rojo', value: data.valor_antiguo_usd, unit: 'USD' },
     supporting: [
       { label: 'Valor positivo valorizado', value: data.valor_total_usd, unit: 'USD' },
@@ -110,11 +111,11 @@ export function partsExposureStory(data: Exposure): PanoramaStory {
     details: [
       'Gris: sin ventas en los tres años evaluados y última compra hace 366–1.000 días. Rojo: misma ausencia de ventas y última compra hace más de 1.000 días.',
       'La proporción usa solo valor positivo en dólares de ubicaciones con stock físico positivo. El Kardex es referencial, no una valoración contable.',
-      `Cobertura: ${data.ubicaciones_stock} ubicaciones con stock; ${data.ubicaciones_sin_valor} sin valor, ${data.ubicaciones_valor_no_positivo} con valor no positivo, ${data.ubicaciones_sin_saldo_kardex} sin saldo Kardex y ${data.ubicaciones_saldo_distinto} con saldo distinto. Valor positivo en ubicaciones sin stock: $ ${new Intl.NumberFormat('es-PY', { maximumFractionDigits: 2 }).format(data.valor_residual_sin_stock_usd)}; excluido.`,
+      `Cobertura: ${data.ubicaciones_stock} ubicaciones con stock; ${data.ubicaciones_sin_valor} sin valor, ${data.ubicaciones_valor_no_positivo} con valor no positivo, ${data.ubicaciones_sin_saldo_kardex} sin saldo Kardex y ${data.ubicaciones_saldo_distinto} con saldo distinto. Valor positivo en ubicaciones sin stock: $ ${new Intl.NumberFormat('es-PY', { maximumFractionDigits: 0 }).format(data.valor_residual_sin_stock_usd)}; excluido.`,
       'La fecha de clasificación no acredita el corte del inventario. Los avisos se recalculan al abrir Panorama y son condicionales a fechas y criterios de clasificación sin cambios.',
     ],
     source: 'campi_repuestos_exposicion_v1 · semáforo histórico, stock y Kardex', route: '/repuestos/analisis?color=ANTIGUO&universo=STOCK_POSITIVO_PANORAMA&vista=detalle',
-    notices: activeAlerts.map(row => ({ text: `${row.codigos} códigos, ${row.valor_usd > 0 ? `$ ${new Intl.NumberFormat('es-PY', { maximumFractionDigits: 2 }).format(row.valor_usd)}` : 'sin valor positivo acreditado'}, podrían pasar a ${row.destino.toLowerCase()} en 1–30 días`, route: link(row) })),
+    notices: activeAlerts.map(row => ({ text: `${row.codigos} códigos, ${row.valor_usd > 0 ? `$ ${new Intl.NumberFormat('es-PY', { maximumFractionDigits: 0 }).format(row.valor_usd)}` : 'sin valor positivo acreditado'}, podrían pasar a ${row.destino.toLowerCase()} en 1–30 días`, route: link(row) })),
   };
 }
 
@@ -131,7 +132,7 @@ export function partsAlertsStory(data: Exposure): PanoramaStory {
     message: codes ? `${codes} códigos podrían pasar a gris o rojo en 30 días si no cambian las fechas ni los criterios de clasificación.` : 'No hay códigos próximos a gris o rojo dentro de 30 días.',
     primary: { label: 'Valor positivo expuesto en 30 días', value: total, unit: 'USD', note: codes > 0 && total === 0 ? 'Hay códigos expuestos sin valor positivo acreditado.' : undefined },
     supporting: [{ label: 'Códigos expuestos', value: codes, unit: 'count' }, { label: 'Valor positivo valorizado', value: data.valor_total_usd, unit: 'USD' }],
-    chart: { kind: 'bars', title: 'Valor próximo a cambiar de color', unit: 'USD', rows: data.avisos.map(row => ({ label: row.destino === 'ROJO' ? 'Rojo' : 'Gris', value: row.valor_usd })) },
+    chart: { kind: 'bars', title: 'Valor próximo a cambiar de color', unit: 'USD', rows: data.avisos.map(row => ({ label: row.destino === 'ROJO' ? 'Rojo' : 'Gris', value: row.valor_usd, count: row.codigos })) },
     breakdown: original.breakdown.filter(row => row.group === 'Avisos'),
     details: ['Se incluyen códigos a 1–30 días del umbral siguiente: lila hacia gris y gris hacia rojo.', 'Es un aviso condicional: las fechas o los criterios de clasificación pueden cambiar. No expresa una fecha de vencimiento contractual.', ...original.details.slice(1)],
     notices: original.notices,

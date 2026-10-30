@@ -1,13 +1,15 @@
+import { SALES_LABELS } from "./salesLabels";
 /* eslint-disable @typescript-eslint/no-explicit-any -- RPC tipada al regenerar tipos. */
 import { useEffect, useMemo, useState } from "react";
 import { SalesDataTable, type SalesDisplayColumn } from "./SalesDataTable";
-import { serviceMoneyColumn, serviceNumberColumn, serviceShareColumn } from "./serviceSalesColumns";
+import { serviceNumberColumn, serviceShareColumn } from "./serviceSalesColumns";
 import { serviceFiltersKey, serviceFilteredRequest, type ServiceSalesFilters } from "./serviceSalesFilters";
-import { endOfDay, endOfISOWeek, endOfMonth, endOfYear, format, subDays, subMonths, subWeeks, subYears } from "date-fns";
+
 import { serviceFilteredError as serviceSalesError } from "./serviceSalesFilters";
 import { supabase } from "@/integrations/supabase/client";
 import { Panel } from "@/components/layout/AppPrimitives";
-import { pct } from "@/components/dashboard/utils";
+import { loadPeriodComparisons, type PeriodComparisons } from "./salesPeriodComparison";
+import { periodMoneyColumn, comparisonColumn, comparisonExports } from "./salesPeriodColumns";
 import type { PeriodMode } from "@/components/dashboard/types";
 import { cn } from "@/lib/utils";
 import { useSalesMobile } from "./salesMobileContext";
@@ -18,20 +20,6 @@ type PeriodoPanorama = {
   facturas: number; clientes: number; metodologia: "historico" | "actual" | "mixto";
 };
 type PanoramaResponse = { desde: string; hasta: string; agrupacion: PeriodMode; resumen: ServiciosSummary; periodos: PeriodoPanorama[] };
-const iso = (date: Date) => format(date, "yyyy-MM-dd");
-const shift = (value: string, mode: PeriodMode, amount: number) => {
-  const date = new Date(`${value}T00:00:00`);
-  const shifted = mode === "dia" ? subDays(date, amount) : mode === "semana" ? subWeeks(date, amount) : mode === "anio" ? subYears(date, amount) : subMonths(date, amount);
-  return iso(shifted);
-};
-
-function periodEnd(iso: string, mode: PeriodMode) {
-  const date = new Date(`${iso}T00:00:00`);
-  if (mode === "dia") return endOfDay(date);
-  if (mode === "semana") return endOfISOWeek(date);
-  if (mode === "anio") return endOfYear(date);
-  return endOfMonth(date);
-}
 function periodLabel(iso: string, mode: PeriodMode) {
   const date = new Date(`${iso}T00:00:00`);
   if (mode === "dia") return new Intl.DateTimeFormat("es-PY", { day: "2-digit", month: "short" }).format(date);
@@ -48,8 +36,7 @@ export function ServiciosPanorama({ desde, hasta, sucursal, buscar, tipoTiempo, 
   const filterKey = serviceFiltersKey(filtros);
   const mobile = useSalesMobile();
   const [data, setData] = useState<PanoramaResponse | null>(null);
-  const [previousPeriod, setPreviousPeriod] = useState<PanoramaResponse | null>(null);
-  const [previousYear, setPreviousYear] = useState<PanoramaResponse | null>(null);
+  const [comparisons, setComparisons] = useState<PeriodComparisons | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
@@ -70,63 +57,51 @@ export function ServiciosPanorama({ desde, hasta, sucursal, buscar, tipoTiempo, 
       p_tipo_tiempo: tipoTiempo === "TODOS" ? null : tipoTiempo, p_agrupacion: periodMode, p_buscar: buscar.trim() || null,
       p_desde: from, p_hasta: to,
     });
-    const priorFrom = shift(desde, periodMode, 1);
-    const priorTo = shift(hasta, periodMode, 1);
-    Promise.all([
-      (supabase as any).rpc(request.name, params(desde, hasta)),
-      (supabase as any).rpc(request.name, params(priorFrom, priorTo)),
-      (supabase as any).rpc(request.name, params(iso(subYears(new Date(`${desde}T00:00:00`), 1)), iso(subYears(new Date(`${hasta}T00:00:00`), 1)))),
-    ]).then(([currentResult, priorResult, yearResult]: any[]) => {
-      if (!alive) return;
-      const rpcError = currentResult.error || priorResult.error || yearResult.error;
-      if (rpcError) { setError(serviceSalesError(rpcError, filterKey)); setData(null); setPreviousPeriod(null); setPreviousYear(null); onSummary?.(null); }
-      else { const next = currentResult.data as PanoramaResponse; setData(next); setPreviousPeriod(priorResult.data as PanoramaResponse); setPreviousYear(yearResult.data as PanoramaResponse); onSummary?.(next.resumen); }
-      setLoading(false);
-    }).catch((failure: { message?: string }) => {
-      if (!alive) return;
-      setError(serviceSalesError(failure, filterKey)); setData(null); setPreviousPeriod(null); setPreviousYear(null); onSummary?.(null); setLoading(false);
-    });
+    setComparisons(null);
+    void (async () => {
+      try {
+        const current = await (supabase as any).rpc(request.name, params(desde, hasta));
+        if (current.error) throw current.error;
+        if (!alive) return;
+        const next = current.data as PanoramaResponse;
+        setData(next); onSummary?.(next.resumen); setLoading(false);
+        const compared = await loadPeriodComparisons(desde, hasta, periodMode, async window => {
+          const result = await (supabase as any).rpc(request.name, { ...params(window.from, window.to), p_agrupacion: "dia" });
+          if (result.error) throw result.error;
+          return result.data?.periodos;
+        });
+        if (alive) setComparisons(compared);
+      } catch (failure) {
+        if (!alive) return;
+        setError(serviceSalesError(failure as { message?: string }, filterKey)); setData(null); onSummary?.(null); setLoading(false);
+      }
+    })();
     return () => { alive = false; };
   }, [buscar, desde, hasta, onSummary, periodMode, sucursal, tipoTiempo, marca, tipoMaquina, filterKey]);
 
-  const rows = useMemo(() => (data?.periodos ?? []).map((row, index, all) => {
-    const previousKey = shift(row.periodo, periodMode, 1);
-    const partialPeriod = iso(periodEnd(row.periodo, periodMode)) > hasta;
-    const previous = partialPeriod
-      ? previousPeriod?.periodos.find((item) => item.periodo === previousKey) ?? null
-      : index > 0 ? all[index - 1] : previousPeriod?.periodos.find((item) => item.periodo === previousKey) ?? null;
-    const lastYearKey = shift(row.periodo, "anio", 1);
-    const lastYear = previousYear?.periodos.find((item) => item.periodo === lastYearKey) ?? null;
-    const variationLm = previous ? pct(row.total, previous.total) : null;
-    const variationLy = lastYear ? pct(row.total, lastYear.total) : null;
-    return { ...row, variationLm, variationLy };
-  }), [data, hasta, periodMode, previousPeriod, previousYear]);
-
+  const rows = useMemo(() => (data?.periodos ?? []).map(row => ({ ...row,
+    previous: comparisons?.periods[row.periodo]?.previous ?? null, ly: comparisons?.periods[row.periodo]?.ly ?? null,
+  })), [data, comparisons]);
   const components = useMemo(() => (data?.periodos ?? []).reduce((total, row) => ({
     mo: total.mo + Number(row.mo), km: total.km + Number(row.km),
     repuestos: total.repuestos + Number(row.repuestos), terceros: total.terceros + Number(row.terceros),
   }), { mo: 0, km: 0, repuestos: 0, terceros: 0 }), [data]);
-  const totalLm = data && previousPeriod ? pct(data.resumen.total, previousPeriod.resumen.total) : null;
-  const totalLy = data && previousYear ? pct(data.resumen.total, previousYear.resumen.total) : null;
-
   type Row = (typeof rows)[number];
   const columns: SalesDisplayColumn<Row>[] = [
     {key:"periodo",label:"Período",kind:"text",value:row=>row.periodo,weight:1.3,
       exportValue:row=>row.periodo === "Total del período" ? row.periodo : periodLabel(row.periodo,periodMode),
       render:row=>row.periodo === "Total del período" ? row.periodo : periodLabel(row.periodo,periodMode),className:"font-medium"},
-    ...([ ["total","Facturado"], ["mo","Mano de obra"], ["km","Kilometraje"], ["repuestos","Repuestos"], ["terceros","Terceros"] ] as const)
-      .map(([key,label])=>serviceMoneyColumn<Row>(key,label,row=>row[key])),
+    ...([ ["total",SALES_LABELS.netRevenue], ["mo","Mano de obra"], ["km","Kilometraje"], ["repuestos","Repuestos"], ["terceros","Terceros"] ] as const)
+      .map(([key,label])=>periodMoneyColumn<Row>(key,label,row=>row[key])),
     serviceNumberColumn<Row>("clientes","Clientes",row=>row.clientes),
-    serviceNumberColumn<Row>("facturas","Facturas",row=>row.facturas),
-    ...([ ["variationLm","Variación LM"], ["variationLy","Variación LY"] ] as const).map(([key,label]): SalesDisplayColumn<Row> => ({
-      key,label,kind:"number",align:"right",value:row=>row[key] == null ? null : row[key]!/100,excelFormat:'+0%;-0%;0%',
-      render:row=>row[key] == null ? "—" : <span className={cn(row[key]!<0 && "text-destructive")}>{row[key]!>0?"+":""}{row[key]}%</span>,
-    })),
+    serviceNumberColumn<Row>("facturas","Documentos",row=>row.facturas),
+    comparisonColumn<Row>("previous", "Período anterior", row => row.previous, row => row.total),
+    comparisonColumn<Row>("ly", SALES_LABELS.previousYear, row => row.ly, row => row.total),
     serviceShareColumn<Row>(row=>data?.resumen.total ? row.total/data.resumen.total : null),
   ];
   const footer: Row | undefined = data ? {
     periodo:"Total del período",total:data.resumen.total,...components,clientes:data.resumen.clientes,
-    facturas:data.resumen.facturas,metodologia:"mixto",variationLm:totalLm,variationLy:totalLy,
+    facturas:data.resumen.facturas,metodologia:"mixto",previous:comparisons?.total.previous ?? null,ly:comparisons?.total.ly ?? null,
   } : undefined;
   return <Panel className={cn("sales-periods min-w-0 p-0 lg:p-3", mobile.active && mobile.view !== "periodos" && !error && "hidden")}>
     {!mobile.active && <div className="flex min-h-11 min-w-0 items-center justify-between gap-2 px-3 lg:min-h-0 lg:px-0">
@@ -137,8 +112,8 @@ export function ServiciosPanorama({ desde, hasta, sucursal, buscar, tipoTiempo, 
     </div>}
     <div>{loading ? <div className="py-8 text-center text-[12px] text-muted-foreground">Cargando panorama…</div>
       : error ? <div role="alert" className="py-8 text-center text-[12px] text-destructive">{error}</div>
-      : <div className="min-w-0 lg:mt-3"><SalesDataTable mobileEmbedded hideDesktopTitle mobileCountKey={mobile.active ? "facturas" : undefined} mobileCountLabel="Fact." mobilePrimaryLabel={mobile.active && periodMode === "mes" ? "Mes" : undefined} mobileMetricLabel={mobile.active ? "Facturado" : undefined} title="Períodos" rows={rows} columns={columns}
-        initialSort={{key:"periodo",direction:"asc"}} rowKey={row=>row.periodo} footer={footer}
+      : <div className="min-w-0 lg:mt-3"><SalesDataTable mobileEmbedded hideDesktopTitle mobileCountKey={mobile.active ? "facturas" : undefined} mobileCountLabel="Doc." mobilePrimaryLabel={mobile.active && periodMode === "mes" ? "Mes" : undefined} mobileMetricLabel={mobile.active ? SALES_LABELS.netRevenue : undefined} title="Períodos" rows={rows} columns={columns}
+        exportColumns={columns.flatMap(c => c.key === "previous" || c.key === "ly" ? comparisonExports<Row>(c.key,c.label,row=>row[c.key as "previous" | "ly"],row=>row.total) : [c])} initialSort={{key:"periodo",direction:"asc"}} rowKey={row=>row.periodo} footer={footer}
         fileName={`ventas-servicios-periodos-${desde}-${hasta}.xlsx`}
         onRowClick={row=>{ onSelectPeriod(row.periodo === selectedPeriod ? null : row.periodo); if (mobile.active) mobile.setView("detalle"); }}
         selected={row=>row.periodo === selectedPeriod} countLabel="períodos" empty="No hay datos para este rango." /></div>}</div>

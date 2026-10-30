@@ -1,12 +1,54 @@
+import type { StoryTime } from './panoramaDates';
 import type { SectionKey } from '@/lib/permissions';
 
 export type StoryTopicId = 'ventas_evolucion' | 'ventas_facturacion' | 'ventas_neto_anual' | 'ventas_nc_impacto' | 'ventas_repuestos' | 'repuestos_sucursales' | 'repuestos_stock' | 'repuestos_alertas' | 'repuestos_concentracion' | 'repuestos_rojo' | 'repuestos_demanda' | 'maquinas_pedidos' | 'maquinas_pedidos_stock' | 'maquinas_stock' | 'maquinas_proyeccion' | 'maquinas_importacion' | 'maquinas_parque' | 'servicios_pendientes' | 'servicios_abiertas' | 'servicios_os_antiguas' | 'servicios_os_facturadas' | 'servicios_trabajo' | 'servicios_agenda' | 'servicios_comisiones' | 'agenda_cumplimiento' | 'servicios_productividad' | 'servicios_eficiencia' | 'clientes_retencion' | 'clientes_cobertura_posventa' | 'ventas_servicios' | 'ventas_maquinas' | 'repuestos_clientes' | 'repuestos_reposicion';
 export type StoryPeriod = 'month' | 'ytd';
 export type StoryUnit = 'USD' | 'PYG' | 'count' | 'percent' | 'days';
 export type StoryDatum = { label: string; value: number | null; unit: StoryUnit; note?: string; comparison?: { value: number; label: string } };
-export type StoryChartRow = { label: string; value: number; previous?: number };
+export type SeriesPoint = { from: string; to: string; value: number | null; numerator: number | null; denominator: number | null; ids: string[]; cutoff: string; complete: boolean };
+export type StoryChartRow = { label: string; value: number | null; previous?: number | null; count?: number };
+export type ClassificationChangeBucket = {
+  label: string;
+  gris: { value: number; count: number };
+  rojo: { value: number; count: number };
+};
+export type PartsAlertCandidate = {
+  code: string;
+  description: string;
+  currentColor: 'LILA' | 'GRIS';
+  destination: 'GRIS' | 'ROJO';
+  lastPurchase: string;
+  purchaseSource: string;
+  ageDays: number;
+  daysUntil: number;
+  stockUnits: number;
+  eligibleValueUsd: number;
+  kardexLoadedAt: string | null;
+  missingValueLocations: number;
+  nonpositiveValueLocations: number;
+  mismatchedKardexLocations: number;
+  salesUnits: [number, number, number];
+};
+export type SalesScope = {
+  section: SectionKey;
+  label: string;
+  route: string;
+  source: string;
+  month: { value: number; previous: number; billing?: { gross: number; credits: number; net: number } };
+  ytd: { value: number; previous: number; billing?: { gross: number; credits: number; net: number } };
+  chartRows: StoryChartRow[] | null;
+};
 export type StoryBreakdown = { label: string; value: number; unit: StoryUnit; route?: string; note?: string; group?: string; previous?: number; billing?: { sales: number; credits: number } };
 export type PanoramaStory = {
+  coverageBasis?: 'attention';
+  coverageRubros?: import('./coverageRubros').CoverageRubros;
+  coverageSelection?: SectionKey[];
+  billingCoverage?: { additional: 'available' | 'unavailable' | 'unauthorized'; allCoreAreas: boolean };
+  billingComponents?: { gross: number; credits: number; net: number };
+  temporalComparisons?: Array<{ kind: 'day' | 'week'; label: string; current: {from:string;to:string}; previous: {from:string;to:string}; components: Array<{section:SectionKey;value:number;previous:number}> }>;
+
+  customerComparison?: import('./customerComparison').CustomerComparison;
+  customerComparisonNames?: Record<string,string>;
   id: StoryTopicId;
   periodMode?: StoryPeriod;
   periodOptions?: readonly StoryPeriod[];
@@ -18,11 +60,20 @@ export type PanoramaStory = {
   sections: SectionKey[];
   cutoff: string | null;
   periodLabel: string;
+  time?: StoryTime;
+  businessWindow?: { current: { from: string; to: string }; previous: { from: string; to: string }; coverage: 'observed' };
+  series?: SeriesPoint[];
+  closureDistribution?: { total: number; bins: [number, number, number, number] };
+  closureDistributionIssue?: string;
+  cohort?: { numerator: string[]; denominator: string[] };
   visitKey?: string;
   primary: StoryDatum | null;
   supporting: StoryDatum[];
   chart: { kind: 'trend' | 'bars'; title: string; rows: StoryChartRow[]; unit: StoryUnit; currentLabel?: string; previousLabel?: string } | null;
   detailChart?: PanoramaStory['chart'];
+  changeBuckets?: ClassificationChangeBucket[];
+  partsAlertCandidates?: PartsAlertCandidate[];
+  salesScopes?: SalesScope[];
   secondaryCharts?: NonNullable<PanoramaStory['chart']>[];
   breakdown: StoryBreakdown[];
   details: string[];
@@ -41,7 +92,7 @@ export type PanoramaStory = {
     unlinked: number;
     readyUnits: number;
     billedUnits: number;
-    ready: { id: string; units: number }[];
+    ready: { id: string; units: number; pendingUnits?: number }[];
     unresolved: { id: string; units: number }[];
   };
   openOrders?: {

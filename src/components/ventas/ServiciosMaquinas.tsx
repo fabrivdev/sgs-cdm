@@ -1,3 +1,4 @@
+import { SALES_LABELS } from "./salesLabels";
 import { useMemo } from "react";
 import { MarcaBadge } from "@/components/StatusBadges";
 import { groupServiceBrandsByMachine } from "./serviceBrandGroups";
@@ -11,7 +12,7 @@ const columns: readonly SalesDisplayColumn<IndicadorMaquina>[] = [
   serviceNumberColumn("maquinas", "Máquinas", row => row.maquinas),
   serviceNumberColumn("ordenes", "OS", row => row.ordenes),
   serviceNumberColumn("horas", "Horas OS", row => row.horas),
-  ...([ ["mo", "Mano de obra"], ["km", "Kilometraje"], ["repuestos", "Repuestos"], ["terceros", "Terceros"], ["neto", "Neto"] ] as const)
+  ...([ ["mo", "Mano de obra"], ["km", "Kilometraje"], ["repuestos", "Repuestos"], ["terceros", "Terceros"], ["neto", SALES_LABELS.netRevenue] ] as const)
     .map(([key, label]) => serviceMoneyColumn<IndicadorMaquina>(key, label, row => row[key])),
 ];
 export function ServiciosMaquinas(props: IndicadoresFiltros) {

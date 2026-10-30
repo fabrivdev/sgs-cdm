@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { billedOrdersStory, customerStories, planningStory } from './managerialStories';
+import { withHistoricalSeries, billedOrdersStory, customerStories, planningStory } from './managerialStories';
 import type { OrderBilling } from '@/features/service-orders/billing';
 
 const invoice = (os: string, overrides: Partial<OrderBilling> = {}): OrderBilling => ({
@@ -42,7 +42,7 @@ describe('Panorama themes reused from managerial measures', () => {
     expect(month.chart?.rows.map(row => row.value)).toEqual([100, 0]);
     const annual = planningStory(rows, '2026-10-21', 'ytd');
     expect(annual.primary?.value).toBe(25);
-    expect(annual.chart?.rows).toEqual([{ label: 'oct.', value: 25 }]);
+    expect(annual.chart?.rows).toEqual([{ label: 'oct 2026', value: 25 }]);
   });
 
   it('does not invent a compliance rate without evaluable commitments', () => {
@@ -55,7 +55,7 @@ describe('Panorama themes reused from managerial measures', () => {
     const [retention, coverage] = customerStories({ compradores_base: 20, compradores_retenidos: 8,
       propietarios_elegibles: 100, propietarios_con_compra_actual: 25 }, '2026-10-21');
     expect(retention.primary?.value).toBe(40);
-    expect(retention.periodLabel).toBe('2026-09-01–2026-09-21 → 2026-10-01–2026-10-21');
+    expect(retention.periodLabel).toBe('Base 01/09/2026–21/09/2026 · Recompra 01/10/2026–21/10/2026');
     expect(retention.route).toBe('/parque-clientes?desde=2026-10-01&hasta=2026-10-21');
     expect(coverage.route).toBe(retention.route);
     expect(coverage.primary?.value).toBe(25);
@@ -88,4 +88,16 @@ describe('Panorama themes reused from managerial measures', () => {
     expect(billedOrdersStory([row], { 'OS-1': invoice('OS-1', { matched: false, documents: [], total: null }) }, '2026-10-21').primary?.value).toBe(0);
     expect(() => billedOrdersStory([row], { 'OS-1': invoice('OS-1', { ambiguous: true }) }, '2026-10-21')).toThrow(/conciliar/);
   });
+});
+
+it('retains a valid current KPI on optional history failure and propagates current failures', async()=>{
+ const current=customerStories({compradores_base:4,compradores_retenidos:2,propietarios_elegibles:8,propietarios_con_compra_actual:4},'2026-10-21')[0];
+ const result=await withHistoricalSeries(async()=>current,async()=>{throw new Error('history');});
+ expect(result.primary?.value).toBe(50);expect(result.status).toBe('ready');expect(result.chart).toBeNull();
+ expect(result.details.join()).toContain('Serie histórica no disponible');
+ await expect(withHistoricalSeries(async()=>{throw new Error('current');},async()=>current)).rejects.toThrow('current');
+});
+it('keeps full years on weekly agenda ranges',()=>{
+ const result=planningStory([{id:'a',fecha:'2026-10-02',estado:'Completado'}],'2026-10-21');
+ expect(result.chart?.rows[0].label).toBe('01/10/2026–04/10/2026');
 });

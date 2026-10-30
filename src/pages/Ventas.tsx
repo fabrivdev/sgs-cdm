@@ -1,3 +1,6 @@
+import { SALES_LABELS } from "@/components/ventas/salesLabels";
+import { machinePeriodData } from "@/components/ventas/machinePeriodData";
+import { loadPeriodComparisons } from "@/components/ventas/salesPeriodComparison";
 import { SalesViewSwitcher } from "@/components/ventas/SalesViewSwitcher";
 import { SalesMobileProvider, SalesMobileTabs, SalesMobileSummary, SalesMobileAverage } from "@/components/ventas/SalesMobileWorkspace";
 import { useSalesMobile, useSalesExplorerView } from "@/components/ventas/salesMobileContext";
@@ -361,7 +364,7 @@ function VentasContent({ area }: { area: VentasArea }) {
     if (area === "servicios" || area === "repuestos") { setData(null); setMaquinasData(null); setLoading(false); return; }
     if (area === "maquinas") {
       try {
-        const { data: response, error: rpcError } = await (supabase as any).rpc("ventas_maquinas_dashboard_filtros_v2", {
+        const machineParams = {
           p_desde: desde,
           p_hasta: hasta,
           p_sucursal: sucursal === "TODAS" ? null : sucursal,
@@ -370,10 +373,20 @@ function VentasContent({ area }: { area: VentasArea }) {
           p_tipo_maquina: tipoMaquina || null,
           p_vendedor: machineSeller || null,
           p_agrupacion: periodMode,
-        });
+        };
+        const { data: response, error: rpcError } = await (supabase as any).rpc("ventas_maquinas_dashboard_filtros_v2", machineParams);
         if (request !== loadRequest.current) return;
         if (rpcError) { setError(rpcError.message ?? "No se pudo cargar Ventas de Máquinas."); setMaquinasData(null); }
-        else setMaquinasData(response as MaquinasDashboardResponse);
+        else {
+          const current = machinePeriodData(response as MaquinasDashboardResponse, desde, hasta, periodMode);
+          setMaquinasData(current); setLoading(false);
+          const periodComparisons = await loadPeriodComparisons(desde, hasta, periodMode, async window => {
+            const result = await (supabase as any).rpc("ventas_maquinas_dashboard_filtros_v2", { ...machineParams, p_desde: window.from, p_hasta: window.to, p_agrupacion: "dia" });
+            if (result.error) throw result.error;
+            return result.data?.periodos;
+          });
+          if (request === loadRequest.current) setMaquinasData({ ...current, periodComparisons });
+        }
       } catch (loadError) {
         if (request !== loadRequest.current) return;
         setError(loadError instanceof Error ? loadError.message : "No se pudo cargar Ventas de Máquinas.");
@@ -444,7 +457,7 @@ function VentasContent({ area }: { area: VentasArea }) {
           <FilterSelect label="Marca" value={marca || "TODAS"} onChange={v => setMarca(v === "TODAS" ? "" : v)} placeholder="Todas" width="w-full" options={[{value:"TODAS",label:"Todas"}, ...dimensionOptions.marcas.map(value=>({value,label:value}))]} />
           <FilterSelect label="Tipo de máquina" value={tipoMaquina || "TODOS"} onChange={v => setTipoMaquina(v === "TODOS" ? "" : v)} placeholder="Todos" width="w-full" options={[{value:"TODOS",label:"Todos"}, ...dimensionOptions.tipos.map(value=>({value,label:value}))]} />
           <FilterSelect label="Componente" value={serviceFilters.componente || "TODOS"} onChange={v=>changeServiceFilter("componente",v === "TODOS" ? "" : v)} placeholder="Todos" width="w-full" options={[{value:"TODOS",label:"Todos"}, ...["Servicio","Kilometraje","Repuestos","Terceros"].map(value=>({value,label:value === "Servicio" ? "Mano de obra" : value}))]} />
-          <FilterSelect label="Documento" value={serviceFilters.documento || "TODOS"} onChange={v=>changeServiceFilter("documento",v === "TODOS" ? "" : v)} placeholder="Todos" width="w-full" options={[{value:"TODOS",label:"Todos"},{value:"factura",label:"Factura"},{value:"nc",label:"Nota de crédito"}]} />
+          <FilterSelect label="Documento" value={serviceFilters.documento || "TODOS"} onChange={v=>changeServiceFilter("documento",v === "TODOS" ? "" : v)} placeholder="Todos" width="w-full" options={[{value:"TODOS",label:"Todos"},{value:"factura",label:"Factura"},{value:"nc",label:SALES_LABELS.creditNote}]} />
           <FilterSelect label="Vínculo OS" value={serviceFilters.vinculo || "TODOS"} onChange={v=>changeServiceFilter("vinculo",v === "TODOS" ? "" : v)} placeholder="Todos" width="w-full" options={[{value:"TODOS",label:"Todos"},{value:"con_os",label:"Con OS"},{value:"sin_os",label:"Sin OS"}]} />
         </>}
         {area === "maquinas" && <>
@@ -467,7 +480,7 @@ function VentasContent({ area }: { area: VentasArea }) {
       {area === "repuestos" && partsOptionsError && <p role="alert" className="text-xs text-destructive">{partsOptionsError}</p>}
       {area === "repuestos" ? <RepuestosVentas desde={desde} hasta={hasta} sucursal={sucursal} buscar={buscar} marca={partsBrand} vendedor={partsSeller} periodMode={periodMode} selectedPeriod={selectedPeriod} onSelectPeriod={setSelectedPeriod} /> : error ? <ErrorState description={error} onRetry={() => void load()} /> : <>
         {mobile.active ? <SalesMobileSummary billing={loading || !summary ? "—" : usd.format(summary.total)} quantityLabel={area === "servicios" ? "OS" : "Unidades"} quantityTitle={area === "servicios" ? "Órdenes de servicio" : "Unidades netas"} quantity={loading || !summary ? "—" : (area === "servicios" ? serviciosSummary?.ordenes ?? 0 : maquinasData?.resumen.netas ?? 0).toLocaleString("es-PY")} clients={loading || !summary ? "—" : summary.clientes.toLocaleString("es-PY")} /> :
-          <KpiStrip><KpiItem label="Facturado" value={loading || !summary ? "—" : usd.format(summary?.total ?? 0)} icon={<Receipt />} /><KpiItem label={area === "servicios" ? "Órdenes de servicio" : area === "maquinas" ? "Unidades netas" : "Facturas"} value={loading || !summary ? "—" : (area === "servicios" ? serviciosSummary?.ordenes ?? 0 : area === "maquinas" ? maquinasData?.resumen.netas ?? 0 : data?.facturas ?? 0).toLocaleString("es-PY")} icon={<FileText />} /><KpiItem label={area === "maquinas" ? "Clientes facturados" : "Clientes"} value={loading || !summary ? "—" : (summary?.clientes ?? 0).toLocaleString("es-PY")} icon={<Users />} /><KpiItem label={area === "servicios" ? "Promedio por OS" : area === "maquinas" ? "Promedio por unidad neta" : "Promedio por factura"} value={loading || !summary ? "—" : usd.format(averageValue)} /></KpiStrip>}
+          <KpiStrip><KpiItem label={SALES_LABELS.netRevenue} value={loading || !summary ? "—" : usd.format(summary?.total ?? 0)} icon={<Receipt />} /><KpiItem label={area === "servicios" ? "Órdenes de servicio" : area === "maquinas" ? "Unidades netas" : "Facturas"} value={loading || !summary ? "—" : (area === "servicios" ? serviciosSummary?.ordenes ?? 0 : area === "maquinas" ? maquinasData?.resumen.netas ?? 0 : data?.facturas ?? 0).toLocaleString("es-PY")} icon={<FileText />} /><KpiItem label={area === "maquinas" ? "Clientes facturados" : "Clientes"} value={loading || !summary ? "—" : (summary?.clientes ?? 0).toLocaleString("es-PY")} icon={<Users />} /><KpiItem label={area === "servicios" ? "Promedio por OS" : area === "maquinas" ? "Promedio por unidad neta" : "Promedio por factura"} value={loading || !summary ? "—" : usd.format(averageValue)} /></KpiStrip>}
         <SalesMobileAverage label={area === "servicios" ? "Promedio por OS · rango general" : "Promedio por unidad neta · rango general"} value={loading || !summary ? "—" : usd.format(averageValue)} />
         
         {area === "servicios" && (

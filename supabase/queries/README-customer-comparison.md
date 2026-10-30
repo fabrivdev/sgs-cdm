@@ -1,0 +1,19 @@
+# Comparación observada de clientes del parque
+
+Actualización 27/10: función instalada en SIG CDM con autorización puntual. Transacción CREATE (sin reemplazar definición ajena), REVOKE EXECUTE sólo de PUBLIC/anon/service_role sobre esta firma, COMMIT. Se verificaron SECURITY INVOKER y acceso efectivo únicamente postgres/authenticated; sin cambios RLS ni datos. El archivo prepared conserva el antecedente de preparación: no volver a ejecutarlo como migración. Transporte local conectado en customerComparisonSource; lectura autenticada pendiente de verificación por bloqueo de enfoque del navegador. Frontend no publicado. Cobertura histórica sigue NO_ACREDITADA.
+
+`campi_customer_comparison_v1.sql` es un único SELECT parametrizado derivado del análisis V3. No es una migración ni crea funciones, tablas, permisos o endpoint. Parámetros: `$1` fecha inicial, `$2` final inclusiva, ambas del mismo año; período anterior equivalente y límites UTC. El corte canónico legacy/TOTVS del 01/07/2026 se conserva como regla de origen, no como cifra de negocio.
+
+Conserva cliente de OS incluso facturando a otro, candidatos múltiples sin escoger UUID arbitrario, claves de línea documental, pares auditados, contradicciones, monedas, NC, parque activo incluidas plataformas y controles de conservación. No reatribuir ni volver a sumar líneas en frontend.
+
+`src/lib/campi/customerComparison.ts` valida versión, reglas, ventanas exactas, UUID únicos, estados, población y conservación. Produce grupos de reducción/crecimiento de **ventas confirmadas observadas** de clientes con ventas confirmadas en ambos períodos y sin ambigüedad acotada ni moneda distinta. Los dos importes corresponden exactamente a los mismos IDs. Clientes sin antecedente no son recuperados; neto cero no es ausencia. Mantiene incertidumbre global y cobertura en el resultado; nunca habilita ausencia comercial ni certifica neto exhaustivo.
+
+## Conexión pendiente, sin aplicar aquí
+
+`campi_customer_comparison_v1.endpoint.prepared.sql` prepara el wrapper backend, fuera de migraciones automáticas. Se probó únicamente en PGlite local: SECURITY INVOKER, módulos y secciones antes de leer, denegación ante permiso nulo/falso, rechazo de fechas inválidas/infinito y resultado idéntico al SELECT. No se instaló. No contiene GRANT; REVOKE PUBLIC no elimina posibles concesiones directas o privilegios predeterminados de otros roles. Antes de cualquier instalación autorizada se deben revisar esas concesiones y RLS; no se afirma que el archivo por sí solo garantice inaccesibilidad.
+
+El transporte inyectable `loadCustomerComparison(read, allowed, window)` ya consume este resultado. La aplicación no lo registra en `BUSINESS_SOURCES` ni hace llamadas a un RPC inexistente. Para alimentarlo se necesita un acceso de lectura soportado que ejecute este SELECT con parámetros y devuelva su celda `resultado` completa, con permisos de `parque.clientes`, `repuestos.ventas`, `servicios.ordenes` y `servicios.ventas` comprobados **también en servidor**. No usar un endpoint sin esas comprobaciones, ni SECURITY DEFINER para eludir RLS. La visibilidad efectiva sigue siendo parte de la cobertura a acreditar.
+
+Una vez autorizado y probado ese acceso, conectar su cliente al transporte y cache existente por usuario/permisos/ventanas. No subir snapshots privados como constantes ni usar fecha de consulta como cobertura. La ausencia comercial seguirá deshabilitada hasta una regla explícita de acreditación de origen; un campo manual `ACREDITADA` no basta para habilitarla en este adaptador.
+
+Validación local: consulta comparada con V3 en fixtures de atribución a terceros, duplicados, NC sola, neto cero, moneda, candidatos y límites temporales. Se concilian además los grupos inciertos por año y las filas/IDs de respaldo; un detalle truncado o duplicado se rechaza. Esto prueba compatibilidad lógica local, no permisos, instalación, rendimiento o cobertura productivos.

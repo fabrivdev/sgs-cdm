@@ -1,3 +1,4 @@
+import { describeImportError, type ImportProgressEvent } from "./importProgress";
 import { File as NodeFile } from "node:buffer";
 import { describe, expect, it, vi } from "vitest";
 import { persistMayorFile, type MayorRpcClient } from "./mayorPersist";
@@ -83,5 +84,35 @@ describe("persistMayorFile", () => {
     });
     expect(calls.at(-1)).toBe("totvs_cancelar_mayor_carga_v1");
     expect(calls).not.toContain("totvs_finalizar_mayor_carga_v1");
+  });
+});
+
+
+describe("diagnostico mayor sin backend", () => {
+  it.each(["start", "validate", "persist", "finalize"])("preserva el fallo en %s aunque cancelar tambien falle", async (stage) => {
+    const events: ImportProgressEvent[] = [];
+    const calls: string[] = [];
+    const remote = { code: "57014", message: "timeout original", details: "detalle original", hint: "pista original" };
+    const client: MayorRpcClient = { rpc: async (name, params) => {
+      calls.push(name);
+      const actual = name.includes("iniciar") ? "start" : name.includes("finalizar") ? "finalize"
+        : name.includes("cancelar") ? "cancel" : params.p_modo === "validate" ? "validate" : "persist";
+      if (actual === stage) return { data: null, error: remote, status: 504, statusText: "Gateway Timeout" };
+      if (actual === "cancel") return { data: null, error: { code: "08006", message: "cancelacion fallida" } };
+      if (actual === "start") return { data: "load-test", error: null };
+      return { data: { conflictos: 0, insertadas: 1 }, error: null };
+    } };
+    const failure = await persistMayorFile({ file: xmlFile(), client,  onProgress: event => events.push(event) }).catch(error => error);
+    expect(failure).toMatchObject({ code: "57014", details: "detalle original", hint: "pista original", status: 504, stage: "mayor." + stage });
+    expect(failure.durationMs).toBeGreaterThanOrEqual(0);
+    if (stage === "validate" || stage === "persist") expect(failure).toMatchObject({ batch: 1, batchRows: 1 });
+    const displayed = describeImportError(failure, "billing.validate");
+    expect(displayed).toContain("Etapa: mayor." + stage);
+    expect(displayed).toContain("timeout original");
+    expect(displayed).toContain("57014");
+    expect(displayed).not.toContain("billing.validate");
+    expect(events.find(event => event.status === "failed")).toMatchObject({ phase: "mayor." + stage });
+    expect(calls.filter(name => name.includes("cancelar"))).toHaveLength(stage === "start" ? 0 : 1);
+    if (stage !== "start") expect(displayed).toContain("cancelacion fallida");
   });
 });

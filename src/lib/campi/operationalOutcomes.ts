@@ -1,3 +1,4 @@
+import { formatDay as displayDay, formatMonth, formatRange } from './panoramaDates';
 import type { PanoramaStory } from './panoramaStoryTypes';
 
 const record = (value: unknown): Record<string, unknown> => {
@@ -19,8 +20,8 @@ const date = (value: unknown): string => {
 };
 const nextMonth = (month: string) => new Date(Date.parse(month + 'T00:00:00Z') + 36 * 86400000).toISOString().slice(0, 7) + '-01';
 const lastDay = (month: string) => new Date(Date.parse(nextMonth(month) + 'T00:00:00Z') - 86400000).toISOString().slice(0, 10);
-const formatDate = (value: string) => new Intl.DateTimeFormat('es-PY', { month: 'long', year: 'numeric', timeZone: 'UTC' }).format(new Date(value + 'T12:00:00Z'));
-const formatDay = (value: string) => new Intl.DateTimeFormat('es-PY', { day: '2-digit', month: '2-digit', year: 'numeric', timeZone: 'UTC' }).format(new Date(value + 'T12:00:00Z'));
+const formatDate = formatMonth;
+const formatDay = displayDay;
 
 type SupplyOrder = { operacion_id: string; np_numero: string | null; unidades: number; sin_vinculo: number; sin_identidad_o_conflicto: number };
 type Supply = { fecha_analisis: string; filas: number; identidades: number; unidades_identificadas: number; estados_desconocidos: number; cantidades_invalidas: number; unidades: number; sin_unidad: number; conflicto: number; sin_vinculo: number; stock: number; importacion_arribada: number; importacion_transito: number; pedidos: number; pendientes: SupplyOrder[] };
@@ -54,7 +55,7 @@ export function machineSupplyStory(data: Supply): PanoramaStory {
     status: data.unidades ? 'ready' : 'empty',
     message: data.unidades ? `${risk} de ${data.unidades} unidades de operaciones activas no tienen un vínculo único de abastecimiento comprobado.` : 'No hay unidades en operaciones activas.',
     scope: 'Unidades de operaciones no cerradas, facturadas ni canceladas; vínculo por identidad de unidad',
-    sections: ['parque.operaciones'], cutoff: null, periodLabel: formatDay(data.fecha_analisis),
+    sections: ['parque.operaciones'], cutoff: null, time: { observedAt: data.fecha_analisis }, periodLabel: formatDay(data.fecha_analisis),
     primary: { label: 'Unidades en pedidos activos', value: data.unidades, unit: 'count' },
     supporting: [{ label: 'Unidades activas', value: data.unidades, unit: 'count' }, { label: 'Sin vínculo', value: data.sin_vinculo, unit: 'count' },
       { label: 'Sin unidad individual', value: data.sin_unidad, unit: 'count' }, { label: 'Vínculo ambiguo', value: data.conflicto, unit: 'count' },
@@ -104,7 +105,7 @@ export function readyOrdersStory(data: ReadyOrders, supply: Supply): PanoramaSto
     title: 'Pedidos pendientes', question: '¿Cuántos pedidos pendientes tienen stock vinculado y cómo se abastece el resto?',
     status: 'ready', message: `${data.pedidos_con_stock} de ${supply.pedidos} pedidos pendientes tienen al menos una unidad con stock vinculado.`,
     scope: 'Pedidos activos y su abastecimiento por unidad',
-    sections: ['parque.operaciones'], cutoff: null, periodLabel: formatDay(data.fecha_analisis),
+    sections: ['parque.operaciones'], cutoff: null, time: { observedAt: data.fecha_analisis }, periodLabel: formatDay(data.fecha_analisis),
     primary: { label: 'Pedidos pendientes', value: supply.pedidos, unit: 'count' },
     supporting: [{ label: 'Pedidos con stock completo', value: fullyCovered, unit: 'count' },
       { label: 'Pedidos con stock', value: data.pedidos_con_stock, unit: 'count', note: 'Al menos una unidad con stock; no implica cobertura completa.' },
@@ -179,11 +180,12 @@ export function serviceResolutionStory(data: Resolution): PanoramaStory {
   const period = formatDate(data.ultimo_mes);
   const previous = formatDate(data.mes_anterior);
   return { id: 'servicios_pendientes', visitKey: `servicios_pendientes:resolucion-v1:${data.ultimo_mes}`,
+    businessWindow: { current: { from: data.ultimo_mes, to: lastDay(data.ultimo_mes) }, previous: { from: data.mes_anterior, to: lastDay(data.mes_anterior) }, coverage: 'observed' },
     title: 'Resolución de órdenes de servicio', question: '¿Cuánto tardaron en resolverse las OS cerradas?',
     status: data.cierres_ultimo_mes ? 'ready' : 'empty',
     message: data.cierres_ultimo_mes ? `Mediana de ${data.cierres_ultimo_mes} OS cerradas en ${period}, con fechas válidas de apertura y cierre.` : `Sin OS con cierre operativo registrado en ${period}.`,
     scope: 'OS con cierre operativo registrado en el último mes calendario transcurrido; histórico sin fecha separado',
-    sections: ['servicios.ordenes'], cutoff: null, periodLabel: period,
+    sections: ['servicios.ordenes'], cutoff: null, time: { window: { from: data.ultimo_mes, to: lastDay(data.ultimo_mes) }, closedMonth: true }, periodLabel: formatRange({ from: data.ultimo_mes, to: lastDay(data.ultimo_mes) }),
     primary: { label: 'Mediana de resolución', value: data.mediana_ultimo_mes, unit: 'days',
       ...(data.mediana_mes_anterior !== null ? { comparison: { value: data.mediana_mes_anterior, label: previous } } : {}) },
     supporting: [{ label: `OS cerradas en ${period}`, value: data.cierres_ultimo_mes, unit: 'count' },

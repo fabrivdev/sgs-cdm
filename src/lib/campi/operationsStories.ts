@@ -1,10 +1,14 @@
+import { withOrderComposition, withPartsExpansion } from './sourceExpansion';
+import { withPartsAlertCandidateDetails } from './partsAlertCandidates';
+import { loadClosures } from './seriesData';
+import { resolutionWindow, resolutionWindowStory } from './resolutionWindow';
 import { supabase } from '@/integrations/supabase/client';
 import { fetchSemaforoHistorico, SEMAFORO_COLORES, type SemaforoResultado } from '@/hooks/useSemaforoHistorico';
 import type { SectionKey } from '@/lib/permissions';
 import type { PanoramaStory, StoryLoader, StoryTopicId } from './panoramaStoryTypes';
 import { panoramaTopicDefinition } from './panoramaPreferences';
 import { parsePartsExposure, partsAlertsStory, partsConcentrationStory, partsExposureStory, partsRedStory } from './partsExposure';
-import { parseMachineSupply, parseOpenDetail, parseReadyOrders, parseServiceResolution, readyOrdersStory, readyOrdersOpportunityStory, serviceOpenStory, serviceOldOpenStory, serviceResolutionStory } from './operationalOutcomes';
+import { parseMachineSupply, parseOpenDetail, parseReadyOrders, parseServiceResolution, readyOrdersStory, readyOrdersOpportunityStory, serviceOpenStory, serviceOldOpenStory } from './operationalOutcomes';
 
 const number = (v: unknown): number | null => typeof v === 'number' && Number.isFinite(v) ? v : null;
 const required = (v: unknown) => { const n = number(v); if (n === null) throw new Error('La fuente devolvió un valor incompleto.'); return n; };
@@ -129,7 +133,7 @@ async function machineStock() {
   return story;
 }
 
-export const loadOperationsStories: StoryLoader = async (topics, granted, asOf) => {
+export const loadOperationsStories: StoryLoader = async (topics, granted, asOf, period = 'month') => {
   if (!day(asOf)) throw new Error('Fecha de análisis inválida.');
   const selected = [...new Set(topics)].filter(id => definitions[id] && granted.includes(definitions[id]!.section));
   let partsRequest: Promise<SemaforoResultado> | undefined;
@@ -145,7 +149,7 @@ export const loadOperationsStories: StoryLoader = async (topics, granted, asOf) 
         const response = await exposureRequest;
         if (response.error) throw response.error;
         const data = parsePartsExposure(response.data);
-        return id === 'repuestos_alertas' ? partsAlertsStory(data) : id === 'repuestos_concentracion' ? partsConcentrationStory(data) : id === 'repuestos_rojo' ? partsRedStory(data) : partsExposureStory(data);
+        return id === 'repuestos_alertas' ? withPartsAlertCandidateDetails(withPartsExpansion(partsAlertsStory(data), response.data), response.data) : id === 'repuestos_concentracion' ? partsConcentrationStory(data) : id === 'repuestos_rojo' ? partsRedStory(data) : withPartsExpansion(partsExposureStory(data), response.data);
       }
       if (id === 'repuestos_sucursales') {
         partsRequest ??= fetchSemaforoHistorico({ busqueda: '', marca: '', color: '', sucursal: '' }, 0, 1);
@@ -162,7 +166,11 @@ export const loadOperationsStories: StoryLoader = async (topics, granted, asOf) 
         if (stock.error) throw stock.error;
         if (supply.error) throw supply.error;
         const ready = parseReadyOrders(stock.data), pending = parseMachineSupply(supply.data);
-        return id === 'maquinas_pedidos_stock' ? readyOrdersOpportunityStory(ready, pending) : readyOrdersStory(ready, pending);
+        return id === 'maquinas_pedidos_stock' ? readyOrdersOpportunityStory(ready, pending) : withOrderComposition(readyOrdersStory(ready, pending), supply.data);
+      }
+      if (id === 'servicios_pendientes') {
+        const window = resolutionWindow(asOf, period);
+        return resolutionWindowStory(window.from > asOf ? [] : await loadClosures(window.from, window.to), asOf, period);
       }
       serviceRequest ??= supabase.rpc('campi_resolucion_os_v1' as never);
       const response = await serviceRequest;
@@ -175,7 +183,7 @@ export const loadOperationsStories: StoryLoader = async (topics, granted, asOf) 
         const openDetail = parseOpenDetail(detail.data);
         return id === 'servicios_os_antiguas' ? serviceOldOpenStory(data, openDetail) : serviceOpenStory(data, openDetail);
       }
-      return serviceResolutionStory(data);
+      throw new Error('Tema operativo no reconocido.');
     } catch (error) {
       const migrationMissing = ['repuestos_stock', 'repuestos_alertas', 'repuestos_concentracion', 'maquinas_pedidos', 'servicios_pendientes', 'servicios_abiertas'].includes(id) && typeof error === 'object' && error !== null && 'code' in error && error.code === 'PGRST202';
       return { ...base(id), status: 'error' as const, message: migrationMissing

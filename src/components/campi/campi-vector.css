@@ -1,0 +1,8 @@
+.campi-vector{display:block;width:100%;height:100%;overflow:visible}.cv-head{transform-origin:120px 117px;transition:transform 600ms ease-in-out}.cv-body{transform-origin:120px 212px}.cv-arm-left{transform-origin:78px 145px}.cv-arm-right{transform-origin:162px 145px}.cv-arm{transition:transform 450ms ease-in-out}.cv-gaze{transition:transform 450ms ease-in-out}.cv-eyes{transform-origin:120px 72px;transition:transform 80ms ease-out}
+.campi-vector[data-gesture=blink] .cv-eyes{transform:scaleY(.12)}.campi-vector[data-gesture=look] .cv-gaze{transform:translateX(3px)}.campi-vector[data-gesture=tilt] .cv-head{transform:rotate(-3deg)}.campi-vector[data-gesture=nod] .cv-head{animation:cv-nod 900ms ease-in-out}.campi-vector[data-gesture=wave] .cv-arm-left{animation:cv-wave 1200ms ease-in-out}.campi-vector[data-gesture=invite] .cv-arm-right{transform:rotate(-42deg)}
+@keyframes cv-wave{0%,100%{transform:rotate(0)}35%{transform:rotate(132deg)}55%{transform:rotate(120deg)}72%{transform:rotate(132deg)}}@keyframes cv-nod{0%,100%{transform:rotate(0)}45%{transform:rotate(4deg)}}
+@media(prefers-reduced-motion:reduce){.campi-vector *{animation:none!important;transition:none!important}}
+
+.cv-lids{transform-origin:120px 72px;transform:scaleY(0);transition:transform 80ms ease-out}.campi-vector[data-gesture=blink] .cv-lids{transform:scaleY(.85)}
+
+.panorama-hero-avatar.campi-vector-avatar{transform:none;align-self:center;height:112px;width:100px}

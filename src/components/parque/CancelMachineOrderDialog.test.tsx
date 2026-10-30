@@ -1,0 +1,11 @@
+import {render,screen,fireEvent,waitFor,cleanup} from '@testing-library/react';
+import {it,expect,vi,beforeEach,afterEach} from 'vitest';
+const {rpc}=vi.hoisted(()=>({rpc:vi.fn()}));
+vi.mock('@/integrations/supabase/client',()=>({supabase:{rpc}}));
+import {CancelMachineOrderDialog} from './CancelMachineOrderDialog';
+beforeEach(()=>rpc.mockReset());afterEach(cleanup);
+const props=()=>({open:true,onOpenChange:vi.fn(),operationId:'fixture-order',np:'NP-PRUEBA',onCancelled:vi.fn()});
+it('confirmación clara no ejecuta nada al abrir o volver',()=>{const p=props();render(<CancelMachineOrderDialog {...p}/>);expect(screen.getByRole('heading')).toHaveTextContent('NP-PRUEBA');expect(screen.getByText(/Se conservarán/)).toBeVisible();expect(rpc).not.toHaveBeenCalled();fireEvent.click(screen.getByText('Volver'));expect(rpc).not.toHaveBeenCalled();});
+it('doble clic produce una sola llamada, sin cerrar antes de confirmación',async()=>{let done:(x:unknown)=>void=()=>{};rpc.mockReturnValue(new Promise(r=>{done=r;}));const p=props();render(<CancelMachineOrderDialog {...p}/>);const button=screen.getByRole('button',{name:'Anular pedido'});fireEvent.click(button);fireEvent.click(button);expect(rpc).toHaveBeenCalledTimes(1);expect(p.onCancelled).not.toHaveBeenCalled();done({data:{anulado:true},error:null});await waitFor(()=>expect(p.onCancelled).toHaveBeenCalledOnce());expect(p.onOpenChange).toHaveBeenCalledWith(false);});
+it('error mantiene diálogo y no finge éxito',async()=>{rpc.mockResolvedValue({data:null,error:{message:'Hay factura de venta'}});const p=props();render(<CancelMachineOrderDialog {...p}/>);fireEvent.click(screen.getByRole('button',{name:'Anular pedido'}));expect(await screen.findByRole('alert')).toHaveTextContent('Hay factura');expect(p.onCancelled).not.toHaveBeenCalled();expect(p.onOpenChange).not.toHaveBeenCalled();});
+it('función aún no instalada informa sin borrar ni fallback',async()=>{rpc.mockResolvedValue({data:null,error:{code:'PGRST202'}});render(<CancelMachineOrderDialog {...props()}/>);fireEvent.click(screen.getByRole('button',{name:'Anular pedido'}));expect(await screen.findByRole('alert')).toHaveTextContent('aún no está instalada');expect(rpc).toHaveBeenCalledExactlyOnceWith('maquinaria_anular_pedido',{p_operacion_id:'fixture-order'});});

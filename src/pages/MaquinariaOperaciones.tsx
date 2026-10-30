@@ -8,6 +8,7 @@ import { getDocument, GlobalWorkerOptions } from "pdfjs-dist";
 import pdfWorkerUrl from "pdfjs-dist/build/pdf.worker.min.mjs?url";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
+import { CancelMachineOrderDialog } from '@/components/parque/CancelMachineOrderDialog';
 import { useSectionTable } from "@/components/exports/useSectionTable";
 import { SectionActionsMenu } from "@/components/exports/SectionActionsMenu";
 import type { SalesColumn, SalesSort } from "@/components/ventas/salesTableInteraction";
@@ -2279,11 +2280,13 @@ function OperationLineValue({ line, units, canEdit, onSaved }: { line: any; unit
 
 function OperationDrawer({ operationId, billingSnapshot, onOpenChange, onEdit, onChanged }: { operationId: string | null; billingSnapshot?: BillingSnapshot; onOpenChange: (v: boolean) => void; onEdit: (id: string) => void; onChanged: () => void }) {
   const modelCatalog = useMachineCatalog(!!operationId);
-  const { isAdmin, isSuperAdmin, roles } = useAuth();
+  const { isAdmin, isSuperAdmin, roles, hasSectionAccess } = useAuth();
+  const cancelQueryClient = useQueryClient();
   const canEditChasis = isAdmin || roles.includes("jefatura");
   const [activeTab, setActiveTab] = useState("resumen");
   const [deletingLineId, setDeletingLineId] = useState<string | null>(null);
   const [deleteOrderDialogOpen, setDeleteOrderDialogOpen] = useState(false);
+  const [cancelOrderDialogOpen, setCancelOrderDialogOpen] = useState(false);
   const [deletingOrder, setDeletingOrder] = useState(false);
   const detailQuery = useQuery({
     queryKey: ["machine-operation-detail", operationId], enabled: !!operationId,
@@ -2467,6 +2470,7 @@ function OperationDrawer({ operationId, billingSnapshot, onOpenChange, onEdit, o
   const npDocument = (npDocuments[0] ?? null) as StoredMachineDocument | null;
   const canEditOrder = Boolean(detail && canEditChasis && operationId && (!isConcludedHistorical || isSuperAdmin) && detail.estado !== "CANCELADA");
   const canDeleteOrder = Boolean(detail && canEditChasis && operationId && !isConcludedHistorical && !["FACTURADA", "CERRADA", "CANCELADA"].includes(detail.estado));
+  const canCancelOrder = canDeleteOrder && hasSectionAccess("parque.operaciones");
   const deleteOrder = async () => {
     if (!operationId) return;
     setDeletingOrder(true);
@@ -2510,7 +2514,7 @@ function OperationDrawer({ operationId, billingSnapshot, onOpenChange, onEdit, o
     <ResponsiveDrawerHeader>
       <div className="flex items-start justify-between gap-3">
         <div><h2 className="text-[16px] font-semibold">{detail ? formatNpCode(detail.np_numero) : "Cargando..."}</h2><p className="text-[11px] text-muted-foreground">{detail?.cliente_nombre ?? "Cargando..."}</p></div>
-        {detail && <div className="flex flex-wrap items-start justify-end gap-1.5"><Badge variant="outline" className={cn("text-[10px]", simpleStateClass(simpleState))}>{SIMPLE_STATE_LABEL[simpleState]}</Badge><Badge variant="outline" className={cn("text-[10px]", deliveryComplete ? "border-emerald-200 bg-emerald-50 text-emerald-700" : "border-slate-200 bg-slate-50 text-slate-600")}>{deliveryLabel}</Badge>{(canEditOrder || canDeleteOrder) && <DropdownMenu><DropdownMenuTrigger asChild><Button variant="ghost" size="icon" className="-mt-1 h-8 w-8 shrink-0" aria-label="Acciones del pedido"><MoreVertical className="h-4 w-4" /></Button></DropdownMenuTrigger><DropdownMenuContent align="end" className="w-48">{canEditOrder && <DropdownMenuItem onClick={() => onEdit(operationId!)}><Pencil className="mr-2 h-4 w-4" />Editar pedido</DropdownMenuItem>}{canEditOrder && canDeleteOrder && <DropdownMenuSeparator />}{canDeleteOrder && <DropdownMenuItem onSelect={() => setDeleteOrderDialogOpen(true)} className="text-destructive focus:text-destructive"><Trash2 className="mr-2 h-4 w-4" />Eliminar pedido</DropdownMenuItem>}</DropdownMenuContent></DropdownMenu>}</div>}
+        {detail && <div className="flex flex-wrap items-start justify-end gap-1.5"><Badge variant="outline" className={cn("text-[10px]", simpleStateClass(simpleState))}>{SIMPLE_STATE_LABEL[simpleState]}</Badge><Badge variant="outline" className={cn("text-[10px]", deliveryComplete ? "border-emerald-200 bg-emerald-50 text-emerald-700" : "border-slate-200 bg-slate-50 text-slate-600")}>{deliveryLabel}</Badge>{(canEditOrder || canDeleteOrder) && <DropdownMenu><DropdownMenuTrigger asChild><Button variant="ghost" size="icon" className="-mt-1 h-8 w-8 shrink-0" aria-label="Acciones del pedido"><MoreVertical className="h-4 w-4" /></Button></DropdownMenuTrigger><DropdownMenuContent align="end" className="w-48">{canEditOrder && <DropdownMenuItem onClick={() => onEdit(operationId!)}><Pencil className="mr-2 h-4 w-4" />Editar pedido</DropdownMenuItem>}{canCancelOrder && <DropdownMenuItem onSelect={() => setCancelOrderDialogOpen(true)}>Anular pedido</DropdownMenuItem>}{canEditOrder && canDeleteOrder && <DropdownMenuSeparator />}{canDeleteOrder && <DropdownMenuItem onSelect={() => setDeleteOrderDialogOpen(true)} className="text-destructive focus:text-destructive"><Trash2 className="mr-2 h-4 w-4" />Eliminar pedido</DropdownMenuItem>}</DropdownMenuContent></DropdownMenu>}</div>}
       </div>
     </ResponsiveDrawerHeader>
     <ResponsiveDrawerBody>
@@ -2571,7 +2575,7 @@ function OperationDrawer({ operationId, billingSnapshot, onOpenChange, onEdit, o
                 </div>
                 {lineUnits.length > 0 && (
                   <div className="mt-3 space-y-3 border-t pt-3">
-                    {lineUnits.map((unit: any) => <OperationChassisValue key={unit.id} unit={unit} linkedImport={detail.imports.find((item) => item.unidad_id === unit.id)} canEdit={canEditChasis && !isConcludedHistorical} onSaved={() => { detailQuery.refetch(); onChanged(); }} />)}
+                    {lineUnits.map((unit: any) => <OperationChassisValue key={unit.id} unit={unit} linkedImport={detail.imports.find((item) => item.unidad_id === unit.id)} canEdit={canEditChasis && !isConcludedHistorical && detail.estado !== 'CANCELADA'} onSaved={() => { detailQuery.refetch(); onChanged(); }} />)}
                   </div>
                 )}
                 <OperationLineValue line={line} units={lineUnits} canEdit={canEditChasis && !["CANCELADA", "CERRADA"].includes(detail.estado) && !isConcludedHistorical} onSaved={() => { detailQuery.refetch(); onChanged(); }} />
@@ -2584,15 +2588,16 @@ function OperationDrawer({ operationId, billingSnapshot, onOpenChange, onEdit, o
         <TabsContent value="trazabilidad" className="space-y-5">
           <div className="space-y-3">{isConcludedHistorical
               ? detail.units.map((unit: any) => <ClosedHistoricalOrigin key={unit.id} unit={unit} line={detail.lines.find((line: any) => line.id === unit.linea_id)} stock={detail.stock} imports={detail.imports} />)
+              : simpleState === 'CANCELADA' ? <p className="text-[11px] text-muted-foreground">Pedido anulado: sus reservas ya no están vigentes. Se conserva la trazabilidad registrada al anular.</p>
               : canEditChasis ? detail.units.map((unit: any) => <UnitAssignment key={unit.id} unit={unit} line={detail.lines.find((line: any) => line.id === unit.linea_id)} stock={detail.stock} imports={detail.imports} suggestions={detail.suggestions.filter((suggestion: LinkSuggestionRow) => suggestion.unidad_id === unit.id)} historical={simpleState === "COMPLETADO"} onSaved={() => { detailQuery.refetch(); onChanged(); }} />) : <p className="text-[11px] text-muted-foreground">No tenés permisos para modificar el origen de las unidades.</p>}</div>
         </TabsContent>
 
         <TabsContent value="documentos" className="space-y-4">
           <div className="divide-y">
-            <DocumentRow compactActions label="Nota de pedido" fileName={npDocument?.archivo_nombre} date={npDocument ? formatDate(npDocument.creado_en) : null} onOpen={npDocument ? () => openDocument(npDocument.storage_path, npDocument.archivo_nombre) : undefined} action={<><AttachOrderDocumentButton compact operationId={operationId} type="NP" label={npDocument ? "Reemplazar" : "Adjuntar"} onUploaded={() => detailQuery.refetch()} />{npDocument && <DeleteDocumentButton compact documentLabel="Nota de pedido" onDelete={async () => { await deleteMachineDocuments({ operationId: operationId!, type: "NP" }); await detailQuery.refetch(); onChanged(); }} />}</>} />
+            <DocumentRow compactActions label="Nota de pedido" fileName={npDocument?.archivo_nombre} date={npDocument ? formatDate(npDocument.creado_en) : null} onOpen={npDocument ? () => openDocument(npDocument.storage_path, npDocument.archivo_nombre) : undefined} action={detail.estado !== "CANCELADA" ? <><AttachOrderDocumentButton compact operationId={operationId} type="NP" label={npDocument ? "Reemplazar" : "Adjuntar"} onUploaded={() => detailQuery.refetch()} />{npDocument && <DeleteDocumentButton compact documentLabel="Nota de pedido" onDelete={async () => { await deleteMachineDocuments({ operationId: operationId!, type: "NP" }); await detailQuery.refetch(); onChanged(); }} />}</> : undefined} />
           </div>
           <div className="space-y-2">
-            <div className="flex items-center justify-between gap-3"><h3 className="text-[12px] font-semibold">Facturas al cliente</h3>{operationId && <SaleInvoiceButton compact operationId={operationId} units={detail.units} lines={detail.lines} links={detail.invoiceLinks} onSaved={() => { detailQuery.refetch(); onChanged(); }} />}</div>
+            <div className="flex items-center justify-between gap-3"><h3 className="text-[12px] font-semibold">Facturas al cliente</h3>{detail.estado !== "CANCELADA" && operationId && <SaleInvoiceButton compact operationId={operationId} units={detail.units} lines={detail.lines} links={detail.invoiceLinks} onSaved={() => { detailQuery.refetch(); onChanged(); }} />}</div>
             {saleInvoiceDocuments.length ? <div className="divide-y rounded-xl border px-3">{saleInvoiceDocuments.map((document: StoredMachineDocument) => {
               const linkedUnitIds = detail.invoiceLinks.filter(link => link.documento_id === document.id).map(link => link.unidad_operacion_id);
               const linkedUnits = detail.units.filter((unit: any) => linkedUnitIds.includes(unit.id));
@@ -2600,7 +2605,7 @@ function OperationDrawer({ operationId, billingSnapshot, onOpenChange, onEdit, o
                 const line = detail.lines.find((candidate: any) => candidate.id === unit.linea_id);
                 return `${line?.modelo || line?.producto || "Máquina"} · U${unit.numero_unidad}`;
               });
-              return <DocumentRow key={document.id} compactActions label={unitNames.length ? unitNames.join(" + ") : "Factura sin máquina asignada"} fileName={document.archivo_nombre} date={formatDate(document.creado_en)} onOpen={() => openDocument(document.storage_path, document.archivo_nombre)} action={<>{!unitNames.length && operationId && <SaleInvoiceButton compact operationId={operationId} units={detail.units} lines={detail.lines} links={detail.invoiceLinks} documentId={document.id} onSaved={() => { detailQuery.refetch(); onChanged(); }} />}<DeleteDocumentButton compact documentLabel="Factura al cliente" onDelete={async () => { await deleteSaleInvoiceDocument(document); await detailQuery.refetch(); onChanged(); }} /></>} />;
+              return <DocumentRow key={document.id} compactActions label={unitNames.length ? unitNames.join(" + ") : "Factura sin máquina asignada"} fileName={document.archivo_nombre} date={formatDate(document.creado_en)} onOpen={() => openDocument(document.storage_path, document.archivo_nombre)} action={detail.estado !== "CANCELADA" ? <>{!unitNames.length && operationId && <SaleInvoiceButton compact operationId={operationId} units={detail.units} lines={detail.lines} links={detail.invoiceLinks} documentId={document.id} onSaved={() => { detailQuery.refetch(); onChanged(); }} />}<DeleteDocumentButton compact documentLabel="Factura al cliente" onDelete={async () => { await deleteSaleInvoiceDocument(document); await detailQuery.refetch(); onChanged(); }} /></> : undefined} />;
             })}</div> : <p className="rounded-xl border px-3 py-4 text-[11px] text-muted-foreground">Sin facturas cargadas.</p>}
           </div>
         </TabsContent>
@@ -2612,6 +2617,7 @@ function OperationDrawer({ operationId, billingSnapshot, onOpenChange, onEdit, o
         <AlertDialogFooter><AlertDialogCancel>Cancelar</AlertDialogCancel><AlertDialogAction className="bg-destructive text-destructive-foreground hover:bg-destructive/90" onClick={deleteOrder} disabled={deletingOrder}>{deletingOrder ? "Eliminando..." : "Eliminar pedido"}</AlertDialogAction></AlertDialogFooter>
       </AlertDialogContent>
     </AlertDialog>
+    {operationId && <CancelMachineOrderDialog open={cancelOrderDialogOpen} onOpenChange={setCancelOrderDialogOpen} operationId={operationId} np={detail?.np_numero || 'este pedido'} onCancelled={()=>{toast.success('Pedido anulado; historial conservado');void cancelQueryClient.invalidateQueries({predicate:q=>/machine|maquinaria|parque/.test(String(q.queryKey[0]))});detailQuery.refetch();onChanged();}} />}
   </ResponsiveDrawer>;
 }
 

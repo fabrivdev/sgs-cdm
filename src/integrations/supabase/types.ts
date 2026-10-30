@@ -9545,6 +9545,8 @@ export type Database = {
       }
     }
     Functions: {
+      campi_customer_comparison_v1: { Args: { p_from: string; p_to: string }; Returns: Json }
+      maquinaria_anular_pedido: { Args: { p_operacion_id: string }; Returns: Json }
       admin_actualizar_acceso_seccion: {
         Args: { p_activo: boolean; p_seccion_id: string; p_user_id: string }
         Returns: undefined

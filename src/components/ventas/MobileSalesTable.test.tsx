@@ -30,6 +30,8 @@ describe("mobile sales presentation",()=>{
     await selectExport();
     await waitFor(()=>expect(exported).toHaveBeenCalled());
     expect(exported.mock.calls[0][0].rows).toHaveLength(2);
+    expect(exported.mock.calls[0][0].columns.map((c:{key:string})=>c.key)).toEqual(["periodo","total","venta_bruta","notas_credito_monto","clientes","facturas","previous","previous_variation","ly","ly_variation","participacion"]);
+    expect(exported.mock.calls[0][0].columns[1].value(data.resumen)).toBe(1500000.25);
     fireEvent.click(screen.getByRole("button",{name:/^Facturación por período$/}));
     expect(screen.getByRole("table").closest("section")).not.toHaveClass("border");
     fireEvent.click(screen.getByRole("button",{name:"Columnas y orden de Facturación por período"}));

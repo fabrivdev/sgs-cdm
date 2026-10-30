@@ -59,7 +59,7 @@ export const PANORAMA_CONTRACTS = {
     queryGroup: 'orders-supply', unit: 'count', formula: 'Pedidos activos pendientes; cobertura completa solo si todas sus unidades pendientes tienen stock único acreditado y no facturado.',
     population: 'Excluye operaciones cerradas, facturadas y canceladas. Clasifica unidades por stock, importación arribada, tránsito y falta de vínculo.',
     period: 'Lectura de pedidos y abastecimiento.', comparison: 'snapshot', chart: 'composition',
-    limitations: ['Tener stock no reemplaza la revisión comercial para emitir factura.', 'La fuente aún no clasifica exhaustivamente pedidos completos, parciales, sin cobertura y no clasificables.'],
+    limitations: ['Tener stock no reemplaza la revisión comercial para emitir factura.', 'Ampliación SQL preparada para clasificar todo el universo; requiere aprobación de despliegue y conciliación.'],
     evidence: ['campi_pedidos_abastecimiento_v1', 'campi_pedidos_con_stock_v1'], tests: ['operationsStories.test.ts'],
   },
   maquinas_pedidos_stock: {
@@ -69,10 +69,10 @@ export const PANORAMA_CONTRACTS = {
   },
   servicios_pendientes: {
     queryGroup: 'service-outcomes', unit: 'days', formula: 'Mediana de fecha de cierre operativo menos fecha de apertura.',
-    population: 'OS cerradas en el mes con ambas fechas válidas.',
-    period: 'Último mes calendario completo.', comparison: 'closed-month', chart: 'trend',
-    limitations: ['No reconstruye reaperturas.', 'Solo hay dos medianas mensuales acreditadas; faltan otras cuatro para una serie de seis.'],
-    evidence: ['campi_resolucion_os_v1'], tests: ['operationsStories.test.ts'],
+    population: 'OS cerradas por fecha de cierre en el rango, con ambas fechas válidas; apertura anterior incluida.',
+    period: 'Mes actual hasta hoy o desde julio de 2026 hasta hoy.', comparison: 'snapshot', chart: 'trend',
+    limitations: ['No reconstruye reaperturas.', 'Lectura completa paginada; no acredita por sí sola actualización histórica del origen. Sin comparación parcial contra mes completo.'],
+    evidence: ['resolutionWindow.ts', 'seriesData.ts'], tests: ['operationsStories.test.ts'],
   },
   servicios_abiertas: {
     queryGroup: 'service-outcomes', unit: 'count', formula: 'Conteo de OS abiertas presentes en el último reporte TOTVS completo.',
@@ -90,14 +90,14 @@ export const PANORAMA_CONTRACTS = {
     queryGroup: 'service-client-billing', unit: 'percent', formula: 'OS cerradas con tipo de tiempo Cliente y documento positivo vinculado / OS cerradas del período × 100.',
     population: 'OS del reporte TOTVS con estado cerrado y fecha de cierre en el período; identidad única para conciliar factura.',
     period: 'Mes o acumulado anual hasta el corte.', comparison: 'snapshot', chart: 'trend',
-    limitations: ['La tasa describe la cohorte de cierres, no la facturación emitida en el período.', 'No hay agregación por mes de cierre con corte documental común; la tarjeta presenta solo KPI y cohorte.'],
+    limitations: ['La tasa describe la cohorte de cierres, no la facturación emitida en el período.', 'Serie por mes de cierre con un corte documental común; no reconstruye facturación conocida al cierre de cada mes.'],
     evidence: ['ordenes_servicio_importadas', 'service_orders_billing_v2'], tests: ['managerialStories.test.ts'],
   },
   repuestos_stock: {
     queryGroup: 'parts-exposure', unit: 'USD', formula: 'Valor positivo de ubicaciones con stock positivo de códigos en gris o rojo.',
     population: 'REP con saldo global positivo y ubicación física positiva.',
     period: 'Clasificación al día de análisis.', comparison: 'snapshot', chart: 'composition',
-    limitations: ['Fecha de clasificación no es corte de inventario.', 'Sin historia no equivale a inmóvil.', 'Falta valor por tramos aprobados de días desde última compra; gris/rojo es composición provisional.'],
+    limitations: ['Fecha de clasificación no es corte de inventario.', 'Sin historia no equivale a inmóvil.', 'Ampliación SQL preparada con los umbrales existentes 366–1000 y >1000 días; sin corte histórico de inventario.'],
     evidence: ['campi_repuestos_exposicion_v1'], tests: ['partsExposure.test.ts'],
   },
   repuestos_alertas: {

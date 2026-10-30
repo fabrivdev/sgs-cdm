@@ -1,15 +1,18 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { useQueries } from '@tanstack/react-query';
-import { Bookmark, RefreshCw, Settings2 } from 'lucide-react';
+import { RefreshCw, Settings2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { PageHeader, PageShell } from '@/components/layout/AppPrimitives';
 import type { SectionKey } from '@/lib/permissions';
 import { loadPanoramaStories, storySectionsForTopics } from '@/lib/campi/panoramaStories';
 import type { PanoramaTopic, PanoramaTopicId } from '@/lib/campi/panoramaPreferences';
 import type { PanoramaStory, StoryPeriod, StoryTopicId } from '@/lib/campi/panoramaStoryTypes';
+import { scopedSalesStory } from '@/lib/campi/salesScope';
 import { topicContract } from '@/lib/campi/panoramaTopicContracts';
-import { CampiInterpreter } from './CampiInterpreter';
+import { PanoramaLoadingCard } from './PanoramaLoadingCard';
+import { BusinessCampi } from './BusinessCampi';
 import { PanoramaStoryCard } from './PanoramaStoryCard';
+import { ApprovedPanoramaCard } from './ApprovedPanoramaCard';
 import { readStoryVisit, saveStoryVisit } from '@/lib/campi/panoramaStoryVisits';
 import './panorama-dashboard.css';
 
@@ -19,11 +22,19 @@ const today = () => {
   return `${value('year')}-${value('month')}-${value('day')}`;
 };
 
-export function PanoramaDashboard({ userId, topics, available, hasAccess, onEdit }: {
-  userId: string; topics: readonly PanoramaTopicId[]; available: readonly PanoramaTopic[];
+export function PanoramaDashboard({ userId, greetingName = 'Usuario', topics, available, hasAccess, onEdit }: {
+  userId: string; greetingName?: string; topics: readonly PanoramaTopicId[]; available: readonly PanoramaTopic[];
   hasAccess: (section: SectionKey) => boolean; onEdit: () => void;
 }) {
-  const asOf = useMemo(today, []);
+  const [scopeChoice,setScopeChoice]=useState<{user:string;topics:Partial<Record<StoryTopicId,SectionKey[]>>}>({user:userId,topics:{}});
+  const salesScopeFor=(id:StoryTopicId)=>scopeChoice.user===userId?(scopeChoice.topics[id]??[]).filter(section=>id==='clientes_cobertura_posventa'?hasAccess('parque.maquinas')&&(section==='repuestos.ventas'||section==='servicios.ventas'):hasAccess(section)):[];
+  const [asOf,setAsOf] = useState(today);
+  useEffect(()=>{
+    const refreshDay=()=>setAsOf(today());
+    const timer=window.setInterval(refreshDay,60_000);
+    window.addEventListener('focus',refreshDay);
+    return ()=>{window.clearInterval(timer);window.removeEventListener('focus',refreshDay);};
+  },[]);
   const previous = useMemo(() => readStoryVisit(userId), [userId]);
   const recorded = useRef<string | null>(null);
   const [openStory, setOpenStory] = useState<{ id: StoryTopicId; token: number } | null>(null);
@@ -47,7 +58,7 @@ export function PanoramaDashboard({ userId, topics, available, hasAccess, onEdit
   const reports = useQueries({ queries: groups.map(queryIds => {
     const topicGranted = storySectionsForTopics(queryIds, hasAccess);
     const period = periodByTopic[queryIds[0]] ?? 'month';
-    return { queryKey: ['campi-panorama-story', userId, queryIds.join('|'), topicGranted.join('|'), asOf, period],
+    return { queryKey: ['campi-panorama-story', userId, queryIds.join('|'), topicGranted.join('|'), asOf, period, queryIds.includes('servicios_pendientes') ? 'resolution-range-v2' : queryIds.includes('clientes_cobertura_posventa') ? `coverage-unified-v1:${import.meta.env.VITE_UNIFIED_PARK_COVERAGE_ENABLED === 'true'}:${import.meta.env.VITE_CAMPI_COVERAGE_RUBROS_ENABLED === 'true'}` : 'billing-coverage-v2'],
       queryFn: () => loadPanoramaStories(queryIds, topicGranted, asOf, period), retry: false, throwOnError: false,
       enabled: Boolean(userId), staleTime: 60_000 };
   }) });
@@ -68,9 +79,8 @@ export function PanoramaDashboard({ userId, topics, available, hasAccess, onEdit
     saveStoryVisit(userId, stories);
     recorded.current = userId;
   }, [userId, reports, selected.length, stories, reviewing]);
-  return <PageShell className="panorama-dashboard max-w-[1440px] space-y-3">
-    <PageHeader className="panorama-page-header" title="Panorama" actions={<div className="flex items-center gap-2">
-      {import.meta.env.DEV && reviewable.length > 0 && <Button variant="outline" size="sm" onClick={() => { setDetailOpen(null); setOpenStory(null); setReviewTopic(reviewing ? null : reviewable[0].id); }}>{reviewing ? 'Volver a mis prioridades' : 'Revisar temas'}</Button>}
+  return <PageShell className="panorama-dashboard space-y-0">
+    <PageHeader className="panorama-page-header" title={<>Hola <span className="panorama-greeting-name">{greetingName}</span>! Este es tu panorama:</>} actions={<div className="flex items-center gap-2">
       {!reviewing && <Button variant="outline" size="sm" className="panorama-edit" onClick={onEdit}><Settings2 className="mr-2 h-4 w-4" />Editar prioridades</Button>}
     </div>} />
     {reviewing ? <div className="flex flex-wrap items-center gap-3">
@@ -80,11 +90,10 @@ export function PanoramaDashboard({ userId, topics, available, hasAccess, onEdit
         {reviewable.map(topic => <option key={topic.id} value={topic.id}>{topic.label}</option>)}
       </select>
       <span className="text-sm text-muted-foreground">Revisión local · no cambia tus prioridades</span>
-    </div> : <CampiInterpreter key={`${userId}:${selected.join('|')}:${granted.join('|')}`} userId={userId} stories={stories} loading={loading} previous={previous} detailOpen={detailOpen !== null} onOpenStory={id => setOpenStory(current => ({ id, token: (current?.token ?? 0) + 1 }))} />}
-    {failed && <div role="alert" className="panorama-source-error"><p>No se pudo consultar una fuente. Cada prioridad conserva su lugar para que puedas reintentarla.</p><Button variant="outline" disabled={fetching} onClick={retry}><RefreshCw className="mr-2 h-4 w-4" />Reintentar</Button></div>}
-    {!!selected.length && !reviewing && <div className="panorama-priorities-heading"><Bookmark aria-hidden="true" /><h2>Tus prioridades</h2></div>}
-    <div className="panorama-stories">{selected.map((id, index) => reportFor(id)?.isLoading
-      ? <article key={id} className="panorama-story panorama-story-loading" role="status" aria-label={`Consultando ${available.find(topic => topic.id === id)?.label ?? id}`}><header className="story-header"><span className="story-index">{String(index + 1).padStart(2, '0')}</span><div className="story-heading-text"><h2>{available.find(topic => topic.id === id)?.label ?? id}</h2></div></header><span className="panorama-loading">Consultando…</span></article>
+    </div> : <BusinessCampi key={userId} userId={userId} stories={stories.map(story=>scopedSalesStory(story,salesScopeFor(story.id)))} hasAccess={hasAccess} loading={loading} failed={failed || stories.some(s=>s.status==='error')} />}    {failed && <div role="alert" className="panorama-source-error"><p>No se pudo consultar una fuente. Cada prioridad conserva su lugar para que puedas reintentarla.</p><Button variant="outline" disabled={fetching} onClick={retry}><RefreshCw className="mr-2 h-4 w-4" />Reintentar</Button></div>}
+    <div className={`panorama-stories${reviewing ? ' panorama-stories--review' : ''}`}>{selected.map((id, index) => reportFor(id)?.isLoading
+      ? <PanoramaLoadingCard key={id} index={index} label={available.find(topic => topic.id === id)?.label ?? id} />
+      : ['servicios_os_facturadas', 'servicios_pendientes', 'ventas_evolucion', 'ventas_facturacion', 'maquinas_pedidos', 'repuestos_stock', 'repuestos_alertas', 'agenda_cumplimiento', 'servicios_productividad', 'servicios_eficiencia', 'clientes_retencion', 'clientes_cobertura_posventa'].includes(id) ? <ApprovedPanoramaCard salesScope={salesScopeFor(id)} onSalesScopeChange={sections=>setScopeChoice(previous=>({user:userId,topics:{...(previous.user===userId?previous.topics:{}),[id]:sections}}))} key={id === 'ventas_evolucion' ? `${id}:${userId}:${granted.join('|')}` : id} story={stories[index]} index={index} retrying={reportFor(id)?.isFetching ?? false} onRetry={() => void reportFor(id).refetch()} openSignal={openStory?.id === id ? openStory.token : 0} onSelectorOpenChange={open => setDetailOpen(current => open ? id : current === id ? null : current)} periodMode={periodByTopic[id] ?? 'month'} onPeriodChange={mode => setPeriodByTopic(previous => ({ ...previous, [id]: mode }))} />
       : <PanoramaStoryCard key={id} story={stories[index]} index={index} retrying={reportFor(id)?.isFetching ?? false} onRetry={() => void reportFor(id).refetch()} openSignal={openStory?.id === id ? openStory.token : 0} onSelectorOpenChange={open => setDetailOpen(current => open ? id : current === id ? null : current)} periodMode={periodByTopic[id] ?? 'month'} onPeriodChange={mode => setPeriodByTopic(previous => ({ ...previous, [id]: mode }))} />)}</div>
     {!selected.length && <Button variant="outline" onClick={onEdit}>Elegir temas para Panorama</Button>}
   </PageShell>;

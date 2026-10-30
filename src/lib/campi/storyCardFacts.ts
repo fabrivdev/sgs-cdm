@@ -22,11 +22,11 @@ export function storyCardFacts(story: PanoramaStory): StoryCardFact[] {
     servicios_os_facturadas: [['Facturadas a cliente', 'Facturadas'], ['OS cerradas', 'Cerradas']],
     agenda_cumplimiento: [['Completadas', 'Completadas'], ['Evaluables', 'Evaluables']],
     servicios_productividad: [['Horas trabajadas', 'Trabajadas h'], ['Horas disponibles', 'Disponibles h']],
-    servicios_eficiencia: [['OS conciliadas', 'OS conciliadas']],
+    servicios_eficiencia: [['Horas facturadas', 'Facturadas h'], ['Horas trabajadas', 'Trabajadas h']],
     repuestos_stock: [['Códigos en gris y rojo', 'Códigos']],
     repuestos_alertas: [['Códigos expuestos', 'Códigos']],
     clientes_retencion: [['Retenidos', 'Retenidos'], ['Cohorte base', 'Cohorte']],
-    clientes_cobertura_posventa: [['Con compra', 'Con compra'], ['Propietarios', 'Propietarios']],
+    clientes_cobertura_posventa: [['Con compra', story.coverageBasis==='attention'?'Con cobertura':'Con compra'], ['Propietarios', 'Propietarios']],
   };
   return (labels[story.id] ?? []).map(([label, shortLabel]) => pick(label, shortLabel)).filter((fact): fact is StoryCardFact => fact !== null).slice(0, 2);
 }

@@ -218,3 +218,21 @@ Regresiones locales con componentes reales: `FiltersBar.search.test.tsx` y `Vent
 ## Alias confirmado de vendedor en Máquinas - 08/10/2026
 
 Fabrizio confirmó que el vendedor informado exactamente como `CARLOS` en Ventas de Máquinas corresponde a `CARLOS BENITEZ`. La vista aplica este alias solo en ese módulo y antes de agrupar, por lo que venta y nota de crédito conservan sus líneas, signos e importes mientras el resumen calcula unidades netas, clientes y facturas sobre el conjunto unificado. No es una regla global de personas: otros nombres que contienen Carlos permanecen separados. No modifica datos, usuarios, clientes ni fuentes financieras y no requiere SQL.
+
+## Tablas de períodos alineadas — 23/10/2026
+
+En Períodos, Repuestos y Máquinas muestran: Período, Facturación neta, Facturación Bruta, NC ($), Clientes, Documentos, Período anterior, LY y Participación. Servicios conserva Facturación neta y su composición neta (Mano de obra, Kilometraje, Repuestos, Terceros), seguida de Clientes, Documentos y las mismas comparaciones/participación. Esta decisión sustituye los nombres previos únicamente en estas tablas; las cantidades siguen disponibles en el detalle y otros resúmenes.
+
+Anterior/LY muestran importe y variación en una celda; USD sin decimales en escritorio y móvil. Excel conserva importes originales y variaciones en columnas numéricas separadas. Con base cero o negativa se muestra el importe y variación no calculable; un dato desconocido permanece vacío. No se suman clientes/documentos mensuales para el total ni porcentajes de filas.
+
+Servicios y Máquinas consultan las RPC existentes con agrupación diaria y exactamente los mismos filtros para sumar ventanas comparables. Se recortan extremos parciales y se respetan fines de mes/año bisiesto. LY semanal significa las mismas fechas calendario del año anterior. El error de una comparación no elimina la facturación actual. Máquinas obtiene Bruta/NC de importes de sus líneas completas, nunca de unidades, y agrega períodos vacíos dentro del rango exitosamente consultado.
+
+Referencias: `docs/sales-period-tables.md`, `salesPeriodComparison.ts`, `salesPeriodColumns.tsx`, `machinePeriodData.ts`, `ServiciosPanorama.tsx`, `RepuestosVentas.tsx`, `MaquinasVentas.tsx`, `Ventas.tsx`. No requiere SQL nuevo; pruebas locales no certifican publicación ni datos productivos. La revisión visual queda a cargo del usuario.
+
+## Nomenclatura comercial común — 23/10/2026
+
+Las vistas activas de Ventas de Repuestos, Servicios y Máquinas comparten `salesLabels.ts`: **Facturación Neta**, **Facturación Bruta**, **Nota de crédito** y **Año anterior**. El neto monetario antes presentado como Facturado/Facturación/Neto usa el mismo nombre en KPI, resumen, período, detalle, móvil, selectores, ordenación y Excel. Los títulos generales y la navegación Ventas permanecen; no se renombra Última venta.
+
+La cantidad de documentos de nota de crédito se denomina exactamente **Cant. N.C.**. Las cantidades físicas negativas de Máquinas conservan su cálculo y se presentan como **Unidades devueltas**. Los distintivos documentales usan **Nota de crédito** junto al número, sin convertirlos en importe. El historial mixto de máquina usa **Importe**, porque contiene actividad de OS que no acredita necesariamente una factura.
+
+Año anterior conserva importe y variación. Excel los separa en columnas numéricas **Año anterior — Importe** y **Año anterior — Variación (%)**, con los valores originales. Cambian solo nombres y clasificación visual de encabezados, no fórmulas, consultas, cardinalidad, unidades, signos, datos, permisos ni SQL. El código residual sin consumidores no se modifica. Fuentes: `salesLabels.ts`, `salesPeriodColumns.tsx`, `partsSalesFormat.ts` y componentes activos de `src/components/ventas`; `Ventas.tsx` comparte los nombres del KPI y del tipo documental en el filtro.

@@ -1,7 +1,8 @@
+import { SALES_LABELS } from "./salesLabels";
 import { endOfDay, endOfISOWeek, endOfMonth, endOfYear, format } from "date-fns";
 import type { PeriodMode } from "@/components/dashboard/types";
 
-export const PARTS_HEADERS = ["Facturado", "Ventas", "Notas de crédito", "Clientes", "Documentos", "Unidades netas"];
+export const PARTS_HEADERS = [SALES_LABELS.netRevenue, SALES_LABELS.grossRevenue, SALES_LABELS.creditNote, "Clientes", "Documentos", "Unidades netas"];
 
 export function partsRange({ desde, hasta }: { desde: string; hasta: string }, selected: string | null, mode: PeriodMode) {
   if (!selected) return { desde, hasta };

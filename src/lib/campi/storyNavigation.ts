@@ -11,6 +11,9 @@ export type StoryDestination = { label: string; route: string };
 /** The target page must consume every query parameter added here. */
 export function storyDestinations(story: PanoramaStory): StoryDestination[] {
   if (story.status === 'error') return [];
+  if (story.id === 'servicios_pendientes' && story.navigationPeriod && story.route.startsWith('/servicios/ordenes?')) {
+    return [{ label: 'OS cerradas del período', route: story.route }];
+  }
   if (story.navigationPeriod) {
     const query = new URLSearchParams({ desde: story.navigationPeriod.from, hasta: story.navigationPeriod.to });
     return story.sections.flatMap(section => section in SALES_SECTIONS

@@ -1,0 +1,35 @@
+.campi-scene-2d{max-width:1040px;margin:24px auto;display:grid;grid-template-columns:300px minmax(0,1fr);align-items:center;gap:56px;padding:32px 48px;border-radius:24px;background:linear-gradient(120deg,#edf5ed,#fafcf9);color:#183e32}.campi-scene-2d-character{height:340px}.campi-scene-2d-copy>span{font-size:13px;color:#64776c}.campi-scene-2d-copy h1{font-size:40px;font-weight:600;line-height:1.18;margin:12px 0 20px;letter-spacing:-1px}.campi-scene-2d-copy p{font-size:19px;line-height:1.5;max-width:390px;margin-bottom:26px;color:#52665d}.campi-scene-2d-copy button{background:#348653;color:white}.campi-scene-2d-selector[hidden]{display:none}
+.campi-scene-2d--selector{max-width:1600px;margin:0 auto;padding:12px 24px 20px;display:block;background:transparent;position:relative}.campi-scene-2d--selector .campi-scene-2d-character{position:absolute;right:38px;top:6px;width:54px;height:64px;pointer-events:none}.campi-scene-2d-selector>main{padding:0}.campi-scene-2d-selector [data-selector-title]{min-height:68px;padding-right:80px}.campi-scene-2d-selector [data-selector-title] h1{font-size:26px;line-height:32px}.campi-scene-2d-selector [data-selector-title]+div{grid-template-columns:minmax(0,1fr) 280px;gap:18px}.campi-scene-2d-selector [aria-label="Temas disponibles"]{max-height:none;overflow:visible;display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:8px;padding:0}.campi-scene-2d-selector [aria-label="Temas disponibles"]>button{margin:0;min-height:82px;padding:10px;gap:8px;align-items:flex-start}.campi-scene-2d-selector [aria-label="Temas disponibles"] strong{font-size:13px;line-height:17px}.campi-scene-2d-selector [aria-label="Temas disponibles"] button>span:first-child{width:24px;height:24px}.campi-scene-2d-selector [aria-label="Temas disponibles"] button>svg{display:none}.campi-scene-2d-selector [data-selector-priorities] ol{max-height:none;overflow:visible}.campi-scene-2d-selector [data-selector-priorities] ol li{min-height:68px}.campi-scene-2d-selector [data-selector-priorities] li>span[title]{white-space:normal;overflow:visible;line-height:17px}.campi-scene-2d-selector [data-selector-topics]>section>div:first-child span{font-size:11px}
+@media(min-width:1700px){.campi-scene-2d{margin-top:48px}.campi-scene-2d--selector{margin-top:20px}.campi-scene-2d-selector [aria-label="Temas disponibles"]>button{min-height:100px;padding:14px}.campi-scene-2d-selector [data-selector-title]+div{grid-template-columns:minmax(0,1fr) 320px}}
+
+/* Welcome only: exact login wave renderer/overlays, occupying the available desktop stage. */
+.campi-scene-2d:not(.campi-scene-2d--selector){position:relative;isolation:isolate;overflow:hidden;max-width:none;width:calc(100% - 32px);min-height:calc(100dvh - 132px);margin:16px;grid-template-columns:minmax(300px,46%) minmax(0,1fr);gap:clamp(24px,4vw,72px);padding:32px clamp(32px,6vw,100px);background:#f8faf5}
+.campi-welcome-login-background{position:absolute;inset:0;z-index:-1;pointer-events:none}
+.campi-scene-2d:not(.campi-scene-2d--selector) .campi-scene-2d-character{height:clamp(350px,62dvh,680px)}
+.campi-scene-2d:not(.campi-scene-2d--selector) .campi-scene-2d-copy h1{font-size:clamp(36px,3.4vw,62px);max-width:680px}
+.campi-scene-2d:not(.campi-scene-2d--selector) .campi-scene-2d-copy p{max-width:490px;font-size:clamp(19px,1.5vw,25px)}
+
+/* User-marked target: ~300px visible figure, independently of the much larger stage. Higher-resolution acting art remains required. */
+.campi-scene-2d:not(.campi-scene-2d--selector) .campi-scene-2d-character{height:360px;display:flex;align-items:center;justify-content:center}
+
+/* Desktop welcome -> selector: one coordinated horizontal push, no persistence. */
+.campi-flow{position:relative;overflow:hidden;min-height:calc(100dvh - 100px)}
+.campi-welcome-slide{transform:translateX(0);transition:transform 600ms cubic-bezier(.22,.7,.2,1)}
+.campi-welcome-slide--out{transform:translateX(-100%);pointer-events:none}
+.campi-flow--staged .campi-selector-slide{position:absolute;inset:0;overflow:visible}
+.campi-flow--staged .campi-selector-slide:not([hidden]){animation:campi-push-in 600ms cubic-bezier(.22,.7,.2,1) both}
+@keyframes campi-push-in{from{transform:translateX(100%)}to{transform:translateX(0)}}
+@media(min-width:1024px){
+ .campi-scene-2d--selector{max-width:none;margin:0;padding:12px 24px}
+ .panorama-topic-editor [data-selector-title]{min-height:54px;padding-right:0}
+ .panorama-topic-editor [data-selector-title]+div{display:grid;grid-template-columns:minmax(0,1fr);gap:12px}
+ .panorama-topic-editor [data-selector-topics]>section{padding:12px}
+ .panorama-topic-editor [aria-label="Temas disponibles"]{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:8px;max-height:none;overflow:visible;padding:0}
+ .panorama-topic-editor [aria-label="Temas disponibles"]>button{margin:0;min-height:70px;padding:10px;gap:8px}
+ .panorama-topic-editor [aria-label="Temas disponibles"] strong{font-size:13px;line-height:17px}
+ .panorama-topic-editor [data-selector-priorities]>section{position:static;padding:12px}
+ .panorama-topic-editor [data-selector-priorities] ol{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));min-height:72px;max-height:none;overflow:visible;border:0;gap:8px}
+ .panorama-topic-editor [data-selector-priorities] ol li{min-height:72px;border:1px solid hsl(var(--border));border-radius:8px;flex-wrap:wrap;align-content:center;row-gap:4px;padding:8px}
+ .panorama-topic-editor [data-selector-priorities] li>span[title]{white-space:normal;overflow:visible;line-height:17px;min-width:90px}
+}
+@media(prefers-reduced-motion:reduce){.campi-welcome-slide{transition:none}.campi-flow--staged .campi-selector-slide:not([hidden]){animation:none}}

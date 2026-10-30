@@ -1,5 +1,7 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { loadSalesStories, salesChange, salesRanges } from './salesStories';
+import { scopedSalesStory } from './salesScope';
+import { storyDestinations } from './storyNavigation';
 const { rpc } = vi.hoisted(() => ({ rpc: vi.fn() }));
 vi.mock('@/integrations/supabase/client', () => ({ supabase: { rpc } }));
 const parts = 'ventas_repuestos_panorama_filtros_v1';
@@ -17,6 +19,31 @@ function response(name: string, args: Record<string, string>) {
 }
 beforeEach(() => { rpc.mockReset(); rpc.mockImplementation(async (name, args) => response(name, args)); });
 describe('sales story source contracts', () => {
+  it('filters gross sales, comparison, series and destination to the authorized selected area', async () => {
+    const granted = ['repuestos.ventas', 'servicios.ventas'] as const;
+    const [month] = await loadSalesStories(['ventas_evolucion'], granted, '2026-10-16', 'month');
+    expect(month.salesScopes?.map(scope => scope.section)).toEqual(granted);
+    expect(rpc.mock.calls.every(([name]) => name !== 'ventas_maquinas_dashboard_filtros_v2')).toBe(true);
+    expect(month.primary?.value).toBe(120);
+    const partsMonth = scopedSalesStory(month, 'repuestos.ventas');
+    expect(partsMonth.primary).toMatchObject({ value: 120, comparison: { value: 70 } });
+    expect(partsMonth.chart?.rows[0]).toMatchObject({ value: 120, previous: 70 });
+    expect(partsMonth.chart?.rows[9]).toMatchObject({ value: 120, previous: 70 });
+    expect(partsMonth.sections).toEqual(['repuestos.ventas']);
+    expect(storyDestinations(partsMonth)).toEqual([{ label: 'Ventas de repuestos', route: '/repuestos/ventas?desde=2026-10-01&hasta=2026-10-16' }]);
+    const serviceMonth = scopedSalesStory(month, 'servicios.ventas');
+    expect(serviceMonth.primary).toMatchObject({ value: 0, comparison: { value: 50 } });
+    expect(serviceMonth.chart?.rows[0]).toMatchObject({ value: 0, previous: 50 });
+    expect(scopedSalesStory(month, 'parque.ventas')).toBe(month);
+    expect(scopedSalesStory(month, null)).toBe(month);
+
+    const [annual] = await loadSalesStories(['ventas_evolucion'], granted, '2026-10-16', 'ytd');
+    const partsAnnual = scopedSalesStory(annual, 'repuestos.ventas');
+    expect(partsAnnual.primary).toMatchObject({ value: 1200, comparison: { value: 700 } });
+    expect(partsAnnual.chart?.rows).toEqual(partsMonth.chart?.rows);
+    expect(storyDestinations(partsAnnual)[0].route).toBe('/repuestos/ventas?desde=2026-01-01&hasta=2026-10-16');
+    expect(scopedSalesStory(annual, null).primary?.value).toBe(1200);
+  });
   it('filters permissions before requests and hides inaccessible stories', async () => {
     expect(await loadSalesStories(['ventas_facturacion', 'repuestos_clientes'], [], '2026-10-16')).toEqual([]);
     expect(rpc).not.toHaveBeenCalled();
@@ -35,7 +62,7 @@ describe('sales story source contracts', () => {
     expect(billing.supporting[3].value).toBe(3200);
     expect(billing.supporting.find(item => item.label === 'NC acumuladas del año')?.value).toBe(-400);
     expect(billing.chart?.rows).toHaveLength(3);
-    expect(billing.detailChart).toMatchObject({ kind: 'trend', rows: expect.arrayContaining([{ label: 'Oct', value: 280, previous: 150 }]) });
+    expect(billing.detailChart).toMatchObject({ kind: 'trend', rows: expect.arrayContaining([{ label: 'oct 2026', value: 280, previous: 150 }]) });
     expect(billing.breakdown.filter(row => row.group === 'Mes a mes')).toHaveLength(10);
     expect(billing.cutoff).toBeNull();
     expect(clients.primary?.value).toBe(120);
@@ -190,13 +217,31 @@ describe('sales story source contracts', () => {
     expect(sales.supporting[0]).toMatchObject({ value: 220, unit: 'USD', comparison: { value: 70 } });
     expect(net.primary?.value).toBe(200);
     expect(sales.chart?.kind).toBe('trend');
+    expect(sales.chart?.rows).toHaveLength(10);
+    expect(sales.chart?.rows[0]).toMatchObject({ label: 'ene 2026', value: 220, previous: 70 });
+    expect(sales.chart?.rows[9]).toMatchObject({ label: 'oct 2026*', value: 220, previous: 70 });
+    expect(sales.salesScopes).toHaveLength(1);
+    expect(sales.salesScopes?.[0]).toMatchObject({ section: 'parque.ventas', month: { value: 220, previous: 70 }, ytd: { value: 2200, previous: 700 } });
+    expect(scopedSalesStory(sales, 'parque.ventas').chart?.rows[9]).toMatchObject({ value: 220, previous: 70 });
+  });
+
+  it('keeps aligned previous-year monthly values in both Mes and Acum modes', async () => {
+    const [month] = await loadSalesStories(['ventas_evolucion'], ['repuestos.ventas'], '2026-10-16', 'month');
+    const [annual] = await loadSalesStories(['ventas_evolucion'], ['repuestos.ventas'], '2026-10-16', 'ytd');
+    expect(month.primary?.value).toBe(120);
+    expect(annual.primary?.value).toBe(1200);
+    expect(month.chart?.rows).toHaveLength(10);
+    expect(annual.chart?.rows).toEqual(month.chart?.rows);
+    expect(month.chart?.rows[0]).toMatchObject({ label: 'ene 2026', value: 120, previous: 70 });
+    expect(month.chart?.rows[9]).toMatchObject({ label: 'oct 2026*', value: 120, previous: 70 });
+    expect(rpc).toHaveBeenCalledWith(parts, expect.objectContaining({ p_desde: '2025-01-01', p_hasta: '2025-10-16', p_agrupacion: 'mes' }));
   });
 
   it('answers annual net, credit impact and sector questions independently from the same reconciled sources', async () => {
     const stories = await loadSalesStories(['ventas_neto_anual', 'ventas_nc_impacto', 'ventas_repuestos', 'ventas_servicios', 'ventas_maquinas'], ['repuestos.ventas', 'servicios.ventas', 'parque.ventas'], '2026-10-16');
     expect(stories.map(story => story.status)).toEqual(['ready', 'ready', 'ready', 'ready', 'ready']);
     expect(stories.map(story => story.primary?.value)).toEqual([2800, 40, 120, 0, 200]);
-    expect(stories[0].chart).toMatchObject({ kind: 'trend', rows: expect.arrayContaining([{ label: 'Oct', value: 280, previous: 150 }]) });
+    expect(stories[0].chart).toMatchObject({ kind: 'trend', rows: expect.arrayContaining([{ label: 'oct 2026', value: 280, previous: 150 }]) });
     expect(stories[0].navigationPeriod).toEqual({ from: '2026-01-01', to: '2026-10-16' });
     expect(stories[1].supporting.find(row => row.label === 'Participación sobre ventas')?.value).toBe(12.5);
     expect(stories[2].sections).toEqual(['repuestos.ventas']);
@@ -205,4 +250,34 @@ describe('sales story source contracts', () => {
     expect(rpc).toHaveBeenCalledTimes(9);
   });
 
+});
+
+describe('factual closed day and week',()=>{
+ it('consults exact dates with the same filters once per source, shared across gross/net/NC',async()=>{
+  const rows=await loadSalesStories(['ventas_evolucion','ventas_facturacion','ventas_nc_impacto'],['repuestos.ventas'],'2026-10-28','month',true);
+  expect(rows.every(s=>s.temporalComparisons?.length===2)).toBe(true);
+  const daily=rows[0].temporalComparisons![0],weekly=rows[0].temporalComparisons![1];
+  expect(daily).toMatchObject({kind:'day',current:{from:'2026-10-27',to:'2026-10-27'},previous:{from:'2026-10-20',to:'2026-10-20'}});
+  expect(weekly).toMatchObject({kind:'week',current:{from:'2026-10-19',to:'2026-10-25'},previous:{from:'2026-10-12',to:'2026-10-18'}});
+  expect(rpc).toHaveBeenCalledTimes(6); // Two yearly card ranges plus four shared narrow ranges.
+  expect(rpc).toHaveBeenCalledWith(parts,expect.objectContaining({p_desde:'2026-10-27',p_hasta:'2026-10-27',p_sucursal:null,p_buscar:null,p_marca:null,p_vendedor:null}));
+  expect(daily.components[0].value).toBe(120);
+  expect(rows[1].temporalComparisons![0].components[0].value).toBe(100);
+  expect(rows[2].temporalComparisons![0].components[0].value).toBe(20);
+ });
+ it('keeps monthly evidence if an optional narrow window fails and never fills its value with zero',async()=>{
+  rpc.mockImplementation(async(name,args)=>args.p_desde==='2026-10-27'?{data:null,error:{message:'57014'}}:response(name,args));
+  const [story]=await loadSalesStories(['ventas_evolucion'],['repuestos.ventas'],'2026-10-28','month',true);
+  expect(story.status).toBe('ready');expect(story.primary!.value).toBe(120);
+  expect(story.temporalComparisons?.map(c=>c.kind)).toEqual(['week']);
+ });
+ it('does not fetch temporal data for a denied topic or cumulative-only KPI',async()=>{
+  expect(await loadSalesStories(['ventas_evolucion'],[],'2026-10-28','month',true)).toEqual([]);expect(rpc).not.toHaveBeenCalled();
+  await loadSalesStories(['ventas_neto_anual'],['repuestos.ventas'],'2026-10-28','month',true);
+  expect(rpc).toHaveBeenCalledTimes(2);
+ });
+ it('uses completed windows across month/year boundaries, not today versus a full day',async()=>{
+  const [story]=await loadSalesStories(['ventas_evolucion'],['repuestos.ventas'],'2026-01-01','month',true);
+  expect(story.temporalComparisons?.[0]).toMatchObject({current:{from:'2025-12-31',to:'2025-12-31'},previous:{from:'2025-12-24',to:'2025-12-24'}});
+ });
 });

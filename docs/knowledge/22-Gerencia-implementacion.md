@@ -32,6 +32,9 @@ No elevar límites de consulta como sustituto de optimización. No ejecutar cinc
 
 Punto de partida: [[SIG CDM/Generado/Codigo/src__pages__Dashboard_tsx|Dashboard.tsx]], [[SIG CDM/Generado/Pantallas/servicios-dashboard|Dashboard actual]], [[SIG CDM/Generado/Modulos/administracion|Accesos]] y [[SIG CDM/Generado/Modulos/datos|Datos]]. El prototipo de Panorama está solo en `feat/campi-panorama`; `main` conserva la bienvenida «Muy pronto». La rama explora trece temas concretos vinculados a secciones autorizadas, con selección y orden sin límite de tres, sin indicadores publicados ni permiso adicional. Ver [[36-Campi-bienvenida]]. Siguen pendientes las decisiones sobre datos, sucursales, alertas y fuente de cada KPI.
 
+Punto de partida: [[SIG CDM/Generado/Codigo/src__pages__Dashboard_tsx|Dashboard.tsx]], [[SIG CDM/Generado/Pantallas/servicios-dashboard|Dashboard actual]], [[SIG CDM/Generado/Modulos/administracion|Accesos]] y [[SIG CDM/Generado/Modulos/datos|Datos]]. Ruta/permiso gerencial nuevos quedan por decidir, no se crean en el inventario como si existieran.
+
+
 ## Pruebas de aceptación previstas
 
 - Mismo período/sucursal/moneda: conciliación financiera sin solapamiento de repuestos OS ni duplicados GRID.

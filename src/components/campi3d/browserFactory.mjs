@@ -1,11 +1,12 @@
+import { createWelcomeMotion } from './welcome-motion/welcomeMotion';
 import { applySelection, contextChanged, reactionChanged } from './selection.mjs';
 /** The supplied URL is a trusted same-origin deployment path, not user-entered content. */
-export function createCampiFactory({ runtimeBaseUrl, assetUrl, manifestUrl, seed = 216834 }) {
+export function createCampiFactory({ runtimeBaseUrl, assetUrl, manifestUrl, seed = 216834, welcome }) {
   return async ({ canvas, container, signal, onChange, onError, onRecipeResult }) => {
     const base = new URL(runtimeBaseUrl, document.baseURI);
     if (base.origin !== location.origin) throw new Error('Campi runtime must be same-origin.');
     const load = name => import(/* @vite-ignore */ new URL(name, base).href);
-    let controller, renderer, resizeObserver, model;
+    let controller, renderer, resizeObserver, model, motion, floor;
     let disposed = false, frame = 0, previousTime = 0, previousKey = '', current, selected;
     let reducedWasEnabled = false, autoBlocked = false;
     const cleanups = [];
@@ -15,7 +16,9 @@ export function createCampiFactory({ runtimeBaseUrl, assetUrl, manifestUrl, seed
       cancelAnimationFrame(frame);
       resizeObserver?.disconnect();
       cleanups.splice(0).forEach(fn => fn());
+      motion?.dispose();
       controller?.dispose();
+      floor?.geometry.dispose(); floor?.material.dispose();
       // The visible clone shares GPU resources with the sampled GLB scene.
       const resources = new Set();
       model?.traverse(node => {
@@ -48,7 +51,11 @@ export function createCampiFactory({ runtimeBaseUrl, assetUrl, manifestUrl, seed
       model = gltf.scene;
       check();
       const { THREE, CampiController } = runtime;
-      controller = new CampiController(gltf, { manifest, seed, autoPosture: false, demoAutoStates: false });
+      const Controller=welcome?(await load('locomotion.mjs')).CampiLocomotionController:CampiController;
+      check();
+      const recipes=welcome?(await load('welcome-recipes.mjs')).welcomeRecipes((await load('recipes-registry.mjs')).recipes):undefined;
+      controller = new Controller(gltf, { manifest, seed, autoPosture: false, demoAutoStates: false,...(recipes?{recipes}:{}) });
+      if(welcome)controller.place({x:0,z:0.35,yaw:0});
       model = controller.model;
       renderer = integration.createCampiRenderer({ canvas, transparent: true });
       renderer.setPixelRatio(Math.min(devicePixelRatio || 1, 2));
@@ -64,6 +71,23 @@ export function createCampiFactory({ runtimeBaseUrl, assetUrl, manifestUrl, seed
       camera.position.set(3.7, 3.1, 8.5);
       camera.lookAt(0, 1.75, 0);
       integration.configureTransparentOverlay({ renderer, scene, model });
+      if(welcome){
+        camera.position.set(0,2.6,10.5);camera.lookAt(0,1.65,0);
+        renderer.shadowMap.enabled=true;renderer.shadowMap.type=THREE.PCFSoftShadowMap;
+        light.castShadow=true;light.shadow.mapSize.set(1024,1024);
+        Object.assign(light.shadow.camera,{left:-5,right:5,top:5,bottom:-5,near:.1,far:20});
+        light.shadow.normalBias=.005;light.shadow.bias=-.0001;
+        model.traverse(node=>{if(node.isMesh){node.castShadow=true;node.receiveShadow=true;}});
+        floor=new THREE.Mesh(new THREE.PlaneGeometry(200,200),new THREE.ShadowMaterial({opacity:.13}));
+        floor.rotation.x=-Math.PI/2;floor.receiveShadow=true;scene.add(floor);
+        motion=createWelcomeMotion(controller,{...welcome,signal,
+          reducedMotion:window.matchMedia('(prefers-reduced-motion: reduce)').matches,
+          stayWelcomeWhenReduced:true, revealOnPrepare:true,
+          locomotion:{entry:[{kind:'walk',to:[0,0.65]}],toSelector:[{kind:'side-step',to:[-.32,.65]}]},
+        });
+        motion.bindEnvironment(window.matchMedia('(prefers-reduced-motion: reduce)'),document);
+        motion.start();
+      }
       const resize = () => {
         const width = Math.max(container.clientWidth, 1), height = Math.max(container.clientHeight, 1);
         renderer.setSize(width, height, false);
@@ -75,6 +99,7 @@ export function createCampiFactory({ runtimeBaseUrl, assetUrl, manifestUrl, seed
       resize();
       const update = options => {
         if (disposed) return;
+        if(motion){motion.setReducedMotion(options.reducedMotion);motion.setPaused(options.paused||document.hidden);return;}
         const previous = current;
         current = { ...options };
         if (options.reducedMotion) autoBlocked = true;
@@ -104,7 +129,7 @@ export function createCampiFactory({ runtimeBaseUrl, assetUrl, manifestUrl, seed
           const dt = previousTime ? Math.min((time - previousTime) / 1000, 0.05) : 0;
           previousTime = time;
           if (!document.hidden) {
-            const snapshot = controller.update(dt);
+            const snapshot = motion?motion.update(dt):controller.update(dt);
             renderer.render(scene, camera);
             const key = JSON.stringify([snapshot.state, snapshot.posture, snapshot.holding, snapshot.reducedMotion, snapshot.paused, snapshot.autoPosture, snapshot.recipe?.id, snapshot.recipe?.token, snapshot.recipe?.status, snapshot.recipe?.events, snapshot.context]);
             if (key !== previousKey) { previousKey = key; onChange(snapshot); }
@@ -114,7 +139,7 @@ export function createCampiFactory({ runtimeBaseUrl, assetUrl, manifestUrl, seed
       };
       listen(document, 'visibilitychange', () => {
         previousTime = 0;
-        controller.setPaused(Boolean(current?.paused) || document.hidden);
+        if(motion)motion.setPaused(document.hidden);else controller.setPaused(Boolean(current?.paused) || document.hidden);
       });
       listen(canvas, 'webglcontextlost', event => {
         event.preventDefault();
@@ -124,7 +149,7 @@ export function createCampiFactory({ runtimeBaseUrl, assetUrl, manifestUrl, seed
       listen(signal, 'abort', dispose);
       check();
       frame = requestAnimationFrame(tick);
-      return { update, dispose, listRecipes: () => controller.listRecipes?.() ?? [] };
+      return { update, dispose, prepare:()=>motion?.prepare(), listRecipes: () => controller.listRecipes?.() ?? [] };
     } catch (error) { dispose(); throw error; }
   };
 }

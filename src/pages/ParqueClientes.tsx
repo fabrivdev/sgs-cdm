@@ -1,4 +1,6 @@
-import { useMemo, useState } from "react";
+import { unifiedCoverageEnabled } from '@/lib/unifiedCoverage';
+import type { ParqueCoverageResult } from '@/components/parque/ParqueTab';
+import { useCallback, useMemo, useState } from "react";
 import { useLocation } from "react-router-dom";
 import { ParqueTab, type ParqueFacturacionEstado } from "@/components/parque/ParqueTab";
 import { MaquinasTab, type MaquinasResumen } from "@/components/parque/MaquinasTab";
@@ -25,6 +27,8 @@ const METRICAS_VACIAS: KpiResult = {
 
 export default function ParqueClientes() {
   const { can } = useAuth();
+  const [coverage,setCoverage]=useState<ParqueCoverageResult>({status:'loading',parts:null,services:null,denominator:null});
+  const coverageText=useCallback((value:number|null)=>coverage.status==='loading'?'…':coverage.status==='ready'&&value!==null?`${value.toLocaleString('es-PY',{maximumFractionDigits:1})}%`:'—',[coverage]);
   const canManagePark = can("parque:gestionar");
   const location = useLocation();
   const [clienteAbierto, setClienteAbierto] = useState<string | null>(null);
@@ -70,13 +74,13 @@ export default function ParqueClientes() {
       },
       {
         label: "Cobertura de servicio en período",
-        value: facturacionEstado === "ready" ? `${metricasMostradas.pctConServicioRango}%` : facturacionEstado === "loading" ? "…" : "—",
+        value: unifiedCoverageEnabled() ? coverageText(coverage.services) : facturacionEstado === "ready" ? `${metricasMostradas.pctConServicioRango}%` : facturacionEstado === "loading" ? "…" : "—",
         icon: CheckCircle2,
         accent: "text-emerald-600",
       },
       {
         label: "Cobertura de repuestos en período",
-        value: facturacionEstado === "ready" ? `${metricasMostradas.pctConRepuestosRango}%` : facturacionEstado === "loading" ? "…" : "—",
+        value: unifiedCoverageEnabled() ? coverageText(coverage.parts) : facturacionEstado === "ready" ? `${metricasMostradas.pctConRepuestosRango}%` : facturacionEstado === "loading" ? "…" : "—",
         icon: PackageCheck,
         accent: "text-amber-600",
       },
@@ -91,7 +95,7 @@ export default function ParqueClientes() {
       { label: "Máquinas usadas", value: stockResumen.usadas.toLocaleString(), icon: RefreshCw, accent: "text-amber-600" },
       { label: "Marcas", value: stockResumen.marcas.toLocaleString(), icon: CheckCircle2, accent: "text-blue-600" },
     ],
-    [metricasMostradas, maquinasResumen, stockResumen, vistaParque, facturacionEstado],
+    [metricasMostradas, maquinasResumen, stockResumen, vistaParque, facturacionEstado, coverageText, coverage.parts, coverage.services],
   );
 
   return (
@@ -119,6 +123,7 @@ export default function ParqueClientes() {
             onChanged={handleChanged}
             onOpenCliente={handleOpenCliente}
             onMetricasChange={setParqueMetricas}
+            onCoverageChange={setCoverage}
             onFacturacionEstadoChange={setFacturacionEstado}
           />
         ) : vistaParque === "maquinas" ? (

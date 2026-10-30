@@ -3,7 +3,8 @@ import type { StoryTopicId } from '@/lib/campi/panoramaStoryTypes';
 import { Activity, ArrowDown, ArrowUp, BarChart3, Boxes, CalendarDays, Check, ClipboardList, GripVertical, HandCoins, Package, Plus, Ship, ShoppingCart, Tractor, Truck, Wrench, X } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { PageHeader, PageShell, Panel } from '@/components/layout/AppPrimitives';
-import { CampiPanoramaAvatar, type CampiPanoramaReaction } from '@/components/campi/CampiPanoramaAvatar';
+import type { CampiPanoramaReaction } from '@/components/campi/CampiPanoramaAvatar';
+import { CampiOnboardingScene } from '@/components/campi/CampiOnboardingScene';
 import { PanoramaDashboard } from '@/components/campi/PanoramaDashboard';
 import { useAuth } from '@/hooks/useAuth';
 import { cn } from '@/lib/utils';
@@ -13,9 +14,10 @@ import {
   readPanoramaPreferences,
   reconcilePanoramaOrder,
   savePanoramaPreferences,
-  type PanoramaTopicGroup,
   type PanoramaTopicId,
 } from '@/lib/campi/panoramaPreferences';
+import { PANORAMA_GROUP_TONES } from '@/lib/campi/panoramaTopicTone';
+import { panoramaGreetingName } from '@/lib/campi/panoramaGreeting';
 
 const topicIcons: Record<PanoramaTopicId, typeof BarChart3> = {
   ventas_evolucion: BarChart3,
@@ -52,15 +54,9 @@ const topicIcons: Record<PanoramaTopicId, typeof BarChart3> = {
   clientes_retencion: Activity,
   clientes_cobertura_posventa: Activity,
 };
-const groupTone: Record<PanoramaTopicGroup, string> = {
-  Resultados: 'bg-emerald-50 text-emerald-700',
-  Compromisos: 'bg-amber-50 text-amber-700',
-  Disponibilidad: 'bg-blue-50 text-blue-700',
-  Operación: 'bg-violet-50 text-violet-700',
-  Abastecimiento: 'bg-orange-50 text-orange-700',
-};
+function resumeSelector(id:string){try{return localStorage.getItem(`sig-cdm:campi:onboarding:${id}`)==='selector';}catch{return false;}}
 export default function CampiPanorama() {
-  const { user, isAdmin, hasModuloAccess, hasSectionAccess } = useAuth();
+  const { user, profile, isAdmin, hasModuloAccess, hasSectionAccess } = useAuth();
   const userId = user?.id ?? '';
   const available = useMemo(
     () => availablePanoramaTopics(hasModuloAccess, hasSectionAccess, isAdmin),
@@ -73,12 +69,14 @@ export default function CampiPanorama() {
   const [reaction, setReaction] = useState<CampiPanoramaReaction | null>(null);
   const [replacing, setReplacing] = useState<StoryTopicId | null>(null);
   const [saveError, setSaveError] = useState(false);
+  const [selectorStarted,setSelectorStarted]=useState(()=>resumeSelector(userId));
   const firstTime = saved === null;
   const activeUserId = useRef(userId);
   useEffect(() => {
     if (activeUserId.current === userId) return;
     activeUserId.current = userId;
     const preference = readPanoramaPreferences(userId);
+    setSelectorStarted(resumeSelector(userId));
     setSaved(preference);
     setDraft(reconcilePanoramaOrder(preference, available));
     setEditing(preference === null);
@@ -131,41 +129,37 @@ export default function CampiPanorama() {
     setReplacing(null);
   };
 
-  if (!editing && persisted.length) return <PanoramaDashboard userId={userId} topics={persisted} available={available}
+  if (!editing && persisted.length) return <PanoramaDashboard userId={userId} greetingName={panoramaGreetingName(userId, profile)} topics={persisted} available={available}
     hasAccess={section => hasModuloAccess(section.split('.')[0]) && hasSectionAccess(section)} onEdit={() => setEditing(true)} />;
 
-  return <PageShell className="max-w-[1440px] space-y-3">
-    <PageHeader title="Panorama" />
-    <Panel className={`flex items-center gap-3 border-primary/15 bg-primary/5 px-3 py-2 ${firstTime ? 'min-h-[110px]' : 'min-h-[82px]'}`}>
-      <div className={`${firstTime ? 'h-[94px] w-[94px]' : 'h-[64px] w-[64px]'} shrink-0`}><CampiPanoramaAvatar reaction={reaction} greetingKey={userId} /></div>
-      <div className="min-w-0"><h2 className="text-sm font-semibold">{firstTime ? 'Soy Campi' : 'Editar prioridades'}</h2><p className="text-sm text-muted-foreground">{firstTime ? 'Elegí los temas que querés seguir y te ayudaré a interpretar sus datos.' : 'Elegí y ordená los temas que querés seguir.'}</p></div>
-    </Panel>
+  const selector=<PageShell className="panorama-topic-editor max-w-[1600px] space-y-3">
+    <div data-selector-title><PageHeader title={firstTime ? "¿En qué querés enfocarte?" : "Editar prioridades"} />{firstTime&&<p className="text-sm text-muted-foreground">Elegí hasta 4 temas. Podés cambiarlo después.</p>}</div>
     <div className="grid items-start gap-4 lg:grid-cols-[minmax(0,1.55fr)_minmax(360px,0.85fr)]">
-      <Panel className="min-w-0 space-y-3">
+      <div data-selector-topics><Panel className="min-w-0 space-y-3">
         <div className="flex min-h-9 items-center justify-between gap-2">
           <h2 className="text-[15px] font-semibold">Temas de interés</h2>
-          <span className="text-[12px] tabular-nums text-muted-foreground">{available.length} disponibles · {selected.length} seleccionados · {unselected.length} alternativas</span>
+          <span className="text-[12px] tabular-nums text-muted-foreground">{selected.length} de {MAX_PANORAMA_TOPICS} elegidos</span>
         </div>
         <div className="max-h-[430px] space-y-1.5 overflow-y-auto pr-1" aria-label="Temas disponibles">
           {unselected.map(topic => {
                 const Icon = topicIcons[topic.id];
                 return <button key={topic.id} type="button" onClick={() => add(topic.id)} aria-label={topic.label}
                   className="flex min-h-[54px] w-full items-center gap-3 rounded-lg border bg-card px-3 text-left transition-colors hover:bg-accent focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring">
-                  <span className={cn('flex h-8 w-8 shrink-0 items-center justify-center rounded-full', groupTone[topic.group])}><Icon className="h-4 w-4" /></span>
+                  <span className={cn('flex h-8 w-8 shrink-0 items-center justify-center rounded-full', PANORAMA_GROUP_TONES[topic.group].selectorClass)}><Icon className="h-4 w-4" /></span>
                   <span className="min-w-0 flex-1"><strong className="block text-[13px] font-semibold">{topic.question}</strong><span className="block text-[12px] text-muted-foreground">{topic.label}</span></span>
                   <Plus className="h-4 w-4 shrink-0 text-muted-foreground" />
                 </button>;
           })}
           {!unselected.length && <div className="px-2 py-6 text-center text-[13px] text-muted-foreground">Todos los temas están priorizados.</div>}
         </div>
-      </Panel>
-      <Panel className="space-y-3 lg:sticky lg:top-3">
+      </Panel></div>
+      <div data-selector-priorities><Panel className="space-y-3 lg:sticky lg:top-3">
         <div className="flex min-h-9 items-center justify-between gap-2">
           <h2 className="text-[15px] font-semibold">Tu enfoque</h2>
           <span className="text-[12px] tabular-nums text-muted-foreground">{selected.length} de {MAX_PANORAMA_TOPICS}</span>
         </div>
         {replacing && <div role="status" className="rounded-lg border border-primary/25 bg-primary/5 px-3 py-2 text-[12px]">Elegí qué tema reemplazar por «{topicById.get(replacing)?.label}». <button type="button" className="ml-2 underline" onClick={() => setReplacing(null)}>Cancelar</button></div>}
-        <ol className="max-h-[430px] min-h-[172px] divide-y overflow-y-auto rounded-lg border">
+        <ol className="max-h-[430px] min-h-[172px] max-lg:divide-y overflow-y-auto rounded-lg border">
           {selected.map((id, index) => {
             const topic = topicById.get(id);
             if (!topic) return null;
@@ -183,13 +177,17 @@ export default function CampiPanorama() {
           })}
           {Array.from({ length: MAX_PANORAMA_TOPICS - selected.length }, (_, index) => <li key={`empty-${index}`} className="flex min-h-[57px] items-center gap-2 px-3 text-sm text-muted-foreground"><span className="flex h-6 w-6 items-center justify-center rounded-full bg-muted text-xs">{selected.length + index + 1}</span>Elegí un tema</li>)}
         </ol>
-        <p className="text-xs text-muted-foreground">Podés continuar con menos de cuatro temas. Las posiciones vacías quedarán disponibles para después.</p>
         {saveError && <p role="alert" className="text-xs text-destructive">No se pudo guardar tu selección en este navegador. Revisá el almacenamiento y volvé a intentar.</p>}
         <div className="flex justify-end gap-2">
           {saved !== null && <Button size="sm" variant="outline" onClick={cancel}>Volver al panorama</Button>}
           <Button size="sm" onClick={save} disabled={!selected.length || !changed}><Check className="mr-2 h-4 w-4" />{firstTime ? 'Ver mi Panorama' : changed ? 'Guardar prioridades' : 'Prioridades guardadas'}</Button>
         </div>
-      </Panel>
+      </Panel></div>
     </div>
   </PageShell>;
+  const beginSelection=()=>{
+    setSelectorStarted(true);
+    try{localStorage.setItem(`sig-cdm:campi:onboarding:${userId}`,'selector');}catch{/* Navigation remains available. */}
+  };
+  return <>{firstTime?<CampiOnboardingScene key={userId} reactionKey={reaction?.token??0} name={panoramaGreetingName(userId,profile)} selecting={selectorStarted} onSelect={beginSelection}>{selector}</CampiOnboardingScene>:selector}</>;
 }

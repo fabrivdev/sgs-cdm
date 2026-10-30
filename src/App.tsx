@@ -31,6 +31,7 @@ const RepuestosSugerencias = lazy(() => import("./pages/RepuestosSugerencias"));
 const Admin = lazy(() => import("./pages/Admin"));
 const NotFound = lazy(() => import("./pages/NotFound"));
 const SinAcceso = lazy(() => import("./pages/SinAcceso"));
+
 const CampiPanorama = lazy(() => import("./pages/CampiPanorama"));
 
 const queryClient = new QueryClient();

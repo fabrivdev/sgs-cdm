@@ -31,7 +31,7 @@ const REACTION_ACTION: Record<CampiPanoramaReaction['kind'], CampiAction> = {
   comment: 'consider',
 };
 
-export function CampiPanoramaAvatar({ reaction, attention = false, change = false, mood, quiet = false, greetingKey }: { reaction?: CampiPanoramaReaction | null; attention?: boolean; change?: boolean; mood?: CampiMood; quiet?: boolean; greetingKey?: string }) {
+export function CampiPanoramaAvatar({ reaction, attention = false, change = false, mood, quiet = false, greetingKey, decorative = false }: { reaction?: CampiPanoramaReaction | null; attention?: boolean; change?: boolean; mood?: CampiMood; quiet?: boolean; greetingKey?: string; decorative?: boolean }) {
   const currentMood: CampiMood = mood ?? (attention ? 'atento' : change ? 'contento' : 'sereno');
   const [state, setState] = useState<'welcome' | 'idle'>(() => {
     try { return greetingKey && sessionStorage.getItem(`sig-cdm:campi:panorama-saludo:${greetingKey}`) ? 'idle' : 'welcome'; }
@@ -135,9 +135,10 @@ export function CampiPanoramaAvatar({ reaction, attention = false, change = fals
     reactThree();
   };
 
-  return <button type="button" className="campi-panorama-avatar" data-paused={!visible || reduced || quiet} data-posture={posture} data-three-ready={threeReady && !threeFailed}
+  const AvatarRoot = decorative ? 'div' : 'button';
+  return <AvatarRoot type={decorative ? undefined : 'button'} className="campi-panorama-avatar" data-paused={!visible || reduced || quiet} data-posture={posture} data-three-ready={threeReady && !threeFailed}
     onPointerEnter={() => setCurious(true)} onPointerLeave={() => setCurious(false)}
-    onClick={interact} aria-label="Saludar a Campi">
+    onClick={decorative ? undefined : interact} aria-label={decorative ? undefined : 'Saludar a Campi'} aria-hidden={decorative || undefined}>
     <span className="campi-panorama-fit">
       <span className="campi-panorama-fallback"><CampiSprite state={state} active={visible && !quiet && !threeReady} reduced={reduced} curious={curious} action={action} mood={currentMood} posture={posture} /></span>
       {!threeFailed && <Suspense fallback={null}><CampiThreeCanvas mood={THREE_MOOD[currentMood]} reaction={threeReaction}
@@ -145,5 +146,5 @@ export function CampiPanoramaAvatar({ reaction, attention = false, change = fals
         onReady={() => { setThreeReady(true); }}
         onError={error => { if (error.name !== 'CampiRecipeBlockedError') { setThreeReady(false); setThreeFailed(true); } }} /></Suspense>}
     </span>
-  </button>;
+  </AvatarRoot>;
 }

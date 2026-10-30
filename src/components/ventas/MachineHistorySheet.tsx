@@ -1,3 +1,4 @@
+import { SALES_LABELS } from "./salesLabels";
 /* eslint-disable @typescript-eslint/no-explicit-any -- tablas importadas. */
 import { useEffect, useMemo, useState } from "react";
 import { CompactListInfo, CompactListTable, type CompactListColumn } from "@/components/lists/CompactListTable";
@@ -264,7 +265,7 @@ export function MachineHistorySheet({ target, onOpenChange }: { target: { chassi
     { key: "descripcion", label: "Descripción", kind: "text", value: row => row.description },
     { key: "cantidad", label: "Cant.", kind: "number", align: "center", value: row => row.quantity },
     { key: "factura", label: "Factura", kind: "text", value: row => row.invoice },
-    { key: "facturado", label: "Facturado", kind: "number", align: "right", value: row => row.amount, excelFormat: '"$" #,##0.00' },
+    { key: "facturado", label: SALES_LABELS.mixedAmount, kind: "number", align: "right", value: row => row.amount, excelFormat: '"$" #,##0.00' },
   ];
   const table = useSectionTable({
     rows: visible,

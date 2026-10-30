@@ -25,7 +25,8 @@ export const SECTION_ROUTES = [
   { id: "admin.parametros", module: "admin", route: "/admin" },
 ] as const;
 
-export type SectionKey = (typeof SECTION_ROUTES)[number]["id"];
+// Legacy read permission retained by existing billing RPCs; not a navigation entry or a grant.
+export type SectionKey = (typeof SECTION_ROUTES)[number]["id"] | "servicios.dashboard";
 
 export function sectionsFromLegacyModules(modules: readonly string[], roles: readonly Role[] = []) {
   const sections = SECTION_ROUTES

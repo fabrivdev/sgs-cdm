@@ -11,8 +11,8 @@ const BLOCKING_SELECTOR = '[role="dialog"][data-state="open"], [role="alertdialo
 const isBlocked = () => Boolean(document.querySelector(BLOCKING_SELECTOR));
 
 /** Phase one: a scripted introduction. No analytics, prompts, or AI requests. */
-export function CampiWelcome({ userId, assets = {} }: { userId: string; assets?: CampiMotionAssets }) {
-  const [state, dispatch] = useReducer(transitionCampi, userId, readCampiState);
+export function CampiWelcome({ userId, assets = {}, preview = false }: { userId: string; assets?: CampiMotionAssets; preview?: boolean }) {
+  const [state, dispatch] = useReducer(transitionCampi, userId, id => preview ? 'welcome' : readCampiState(id));
   const [desktop, setDesktop] = useState(() => window.matchMedia(DESKTOP).matches);
   const [reduced, setReduced] = useState(() => window.matchMedia(REDUCED).matches);
   const [visible, setVisible] = useState(() => !document.hidden);
@@ -38,7 +38,7 @@ export function CampiWelcome({ userId, assets = {} }: { userId: string; assets?:
     const resize = () => setDesktop(media.matches);
     const preference = () => setReduced(motion.matches);
     const visibility = () => setVisible(!document.hidden);
-    const open = () => { saveCampiState(userId); dispatch('open'); };
+    const open = () => { if (!preview) saveCampiState(userId); dispatch('open'); };
     media.addEventListener('change', resize);
     motion.addEventListener('change', preference);
     document.addEventListener('visibilitychange', visibility);
@@ -58,16 +58,16 @@ export function CampiWelcome({ userId, assets = {} }: { userId: string; assets?:
       window.removeEventListener(OPEN_CAMPI_EVENT, open);
       observer.disconnect();
     };
-  }, [userId]);
+  }, [userId, preview]);
 
   useEffect(() => {
     if (!active || state === 'hidden') return;
-    if (state === 'welcome') saveCampiState(userId);
+    if (state === 'welcome') if (!preview) saveCampiState(userId);
     if (state === 'idle') return;
     const delays = { welcome: 1600, farewell: reduced ? 0 : 720 };
     const timer = window.setTimeout(() => dispatch('settled'), delays[state]);
     return () => window.clearTimeout(timer);
-  }, [state, active, reduced, userId]);
+  }, [state, active, reduced, userId, preview]);
 
   useEffect(() => {
     const element = video.current;

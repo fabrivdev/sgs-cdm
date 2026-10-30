@@ -1,3 +1,4 @@
+import { formatDateText, storyDetailDateLines } from '@/lib/campi/panoramaDates';
 import { useEffect, useRef, useState } from 'react';
 import { Bar, BarChart, CartesianGrid, Cell, LabelList, Legend, Line, LineChart, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts';
 import { ArrowRight, ArrowUpRight, RefreshCw } from 'lucide-react';
@@ -10,16 +11,17 @@ import type { PanoramaStory, StoryDatum, StoryUnit } from '@/lib/campi/panoramaS
 import { MachineOrdersDetail } from './MachineOrdersDetail';
 import { ServiceOpenOrdersDetail } from './ServiceOpenOrdersDetail';
 
+const usd = new Intl.NumberFormat('es-PY', { maximumFractionDigits: 0 });
+const usdCompact = new Intl.NumberFormat('es-PY', { notation: 'compact', maximumFractionDigits: 0 });
 const numbers = new Intl.NumberFormat('es-PY', { maximumFractionDigits: 2 });
 const compact = new Intl.NumberFormat('es-PY', { notation: 'compact', maximumFractionDigits: 1 });
-const storyValue = (value: number | null, unit: StoryUnit) => value === null || !Number.isFinite(value) ? '—' : `${value < 0 ? '−' : ''}${unit === 'USD' ? '$ ' : unit === 'PYG' ? '₲ ' : ''}${numbers.format(Math.abs(value))}${unit === 'percent' ? '%' : unit === 'days' ? ' días' : ''}`;
-const chartValue = (value: number, unit: StoryUnit) => `${unit === 'USD' ? '$ ' : unit === 'PYG' ? '₲ ' : ''}${compact.format(value)}`;
-const dateLabel = (value: string) => new Intl.DateTimeFormat('es-PY').format(new Date(`${value}T12:00:00`));
+const storyValue = (value: number | null, unit: StoryUnit) => value === null || !Number.isFinite(value) ? '—' : `${value < 0 ? '−' : ''}${unit === 'USD' ? '$ ' : unit === 'PYG' ? '₲ ' : ''}${(unit === 'USD' ? usd : numbers).format(Math.abs(value))}${unit === 'percent' ? '%' : unit === 'days' ? ' días' : ''}`;
+const chartValue = (value: number, unit: StoryUnit) => `${unit === 'USD' ? '$ ' : unit === 'PYG' ? '₲ ' : ''}${(unit === 'USD' ? usdCompact : compact).format(value)}`;
 const shortUsd = (value: number) => {
   const magnitude = Math.abs(value);
   const divisor = magnitude >= 1_000_000 ? 1_000_000 : magnitude >= 10_000 ? 1_000 : 1;
   const suffix = divisor === 1_000_000 ? ' M' : divisor === 1_000 ? ' mil' : '';
-  return `${value < 0 ? '−' : ''}$ ${new Intl.NumberFormat('es-PY', { maximumFractionDigits: divisor === 1 ? 0 : divisor === 1_000 ? 1 : 2 }).format(magnitude / divisor)}${suffix}`;
+  return `${value < 0 ? '−' : ''}$ ${new Intl.NumberFormat('es-PY', { maximumFractionDigits: 0 }).format(magnitude / divisor)}${suffix}`;
 };
 
 function BillingMetrics({ story }: { story: PanoramaStory }) {
@@ -51,7 +53,7 @@ function Datum({ datum, primary = false }: { datum: StoryDatum; primary?: boolea
   return <div className={primary ? 'story-datum story-datum-primary' : 'story-datum'}>
     <dt>{datum.label}</dt><dd>{storyValue(datum.value, datum.unit)}</dd>
     {datum.comparison && <p className="story-comparison">{datum.comparison.label}: {storyValue(datum.comparison.value, datum.unit)}</p>}
-    {datum.note && <p>{datum.note}</p>}
+    {datum.note && <p>{formatDateText(datum.note)}</p>}
   </div>;
 }
 
@@ -168,7 +170,7 @@ export function StoryPanel({ story, index, onRetry, retrying, visitChange = null
   </table></div>; };
   return <article className="panorama-story" aria-labelledby={titleId} data-story={story.id}>
     <header className="story-header"><span className="story-index">{String(index + 1).padStart(2, '0')}</span><div className="story-heading-text"><h2 id={titleId}>{story.title}</h2></div>{story.status === 'empty' && <span className="story-empty-label">Sin datos</span>}{story.status === 'ready' && story.cutoff === null && ['maquinas_stock', 'repuestos_stock'].includes(story.id) && <span className="story-cutoff-warning" title="La fuente no acredita la fecha del inventario">Corte por confirmar</span>}</header>
-    {story.status === 'error' ? <div role="alert"><p className="story-error">{story.message}</p><Button variant="outline" disabled={retrying} onClick={onRetry}><RefreshCw className="mr-2 h-4 w-4" />{retrying ? 'Consultando…' : 'Reintentar fuente'}</Button></div> : <>
+    {story.status === 'error' ? <div role="alert"><p className="story-error">{formatDateText(story.message)}</p><Button variant="outline" disabled={retrying} onClick={onRetry}><RefreshCw className="mr-2 h-4 w-4" />{retrying ? 'Consultando…' : 'Reintentar fuente'}</Button></div> : <>
       <div className={`story-summary-metric${story.primary && storyValue(story.primary.value, story.primary.unit).length > 12 ? ' story-summary-metric--long' : ''}`}>
         <dl>{story.primary && <>
           <div className="story-datum story-datum-primary"><dt>{story.primary.label}</dt><dd data-long={storyValue(story.primary.value, story.primary.unit).length > 12}>{storyValue(story.primary.value, story.primary.unit)}</dd></div>
@@ -182,7 +184,7 @@ export function StoryPanel({ story, index, onRetry, retrying, visitChange = null
       <ResponsiveDrawer open={open} onOpenChange={setOpen} size="xl" title={story.title} onCloseAutoFocus={event => { event.preventDefault(); triggerRef.current?.focus(); }}>
         <ResponsiveDrawerHeader>
           <h2 className="text-[16px] font-semibold">{story.title}</h2>
-          <div className="mt-1 text-xs text-muted-foreground">{story.periodLabel}{story.cutoff ? ` · ${dateLabel(story.cutoff)}` : ''}</div>
+          <div className="mt-1 text-xs text-muted-foreground">{storyDetailDateLines(story).join(' · ')}</div>
         </ResponsiveDrawerHeader>
         <ResponsiveDrawerBody className={story.id === 'maquinas_pedidos' || story.id === 'servicios_abiertas' ? 'panorama-story-dialog panorama-orders-dialog' : 'panorama-story-dialog space-y-4'}>
           {story.id === 'maquinas_pedidos' && story.machineOrders ? <MachineOrdersDetail story={story} open={open} /> : <>

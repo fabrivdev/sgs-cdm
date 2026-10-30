@@ -1,3 +1,4 @@
+import type { createWelcomeMotion } from './welcome-motion/welcomeMotion';
 import type { CampiFactory } from './types';
 
 export function createCampiFactory(options: {
@@ -5,4 +6,5 @@ export function createCampiFactory(options: {
   assetUrl: string;
   manifestUrl: string;
   seed?: number;
-}): CampiFactory;
+  welcome?: Parameters<typeof createWelcomeMotion>[1];
+}): (...args:Parameters<CampiFactory>)=>Promise<Awaited<ReturnType<CampiFactory>> & {prepare():void}>;

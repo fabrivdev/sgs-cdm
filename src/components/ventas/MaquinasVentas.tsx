@@ -1,3 +1,7 @@
+import { SALES_LABELS } from "./salesLabels";
+import { periodMoneyColumn, comparisonColumn, comparisonExports } from "./salesPeriodColumns";
+import type { PeriodComparisons } from "./salesPeriodComparison";
+import { SalesDataTable, type SalesDisplayColumn } from "./SalesDataTable";
 import { useMemo, useState } from "react";
 import { useIsMobile } from "@/hooks/use-mobile";
 import { useMobileDisclosure } from "@/hooks/useMobileDisclosure";
@@ -55,6 +59,7 @@ export type MaquinasResumen = {
 };
 
 export type MaquinasDashboardResponse = {
+  periodComparisons?: PeriodComparisons;
   resumen: MaquinasResumen;
   periodos: Array<MaquinasResumen & { periodo: string }>;
   por_maquina: Array<MaquinasResumen & { marca: string; tipo_maquina: string; condicion?: string }>;
@@ -150,11 +155,11 @@ function periodLabel(value: string, mode: PeriodMode) {
 function metricColumns<T extends MaquinasResumen>(total: number): SalesColumn<T>[] {
   return [
     { key: "vendidas", label: "Vendidas", kind: "number", align: "center", value: r => r.vendidas },
-    { key: "notas_credito", label: "Nota Cr.", kind: "number", align: "center", value: r => r.notas_credito },
+    { key: "notas_credito", label: SALES_LABELS.returnedUnits, kind: "number", align: "center", value: r => r.notas_credito },
     { key: "netas", label: "Netas", kind: "number", align: "center", value: r => r.netas },
     { key: "clientes", label: "Clientes", kind: "number", align: "center", value: r => r.clientes },
     { key: "facturas", label: "Facturas", kind: "number", align: "center", value: r => r.facturas },
-    { key: "total", label: "Facturación", kind: "number", align: "right", value: r => r.total, excelFormat: '"$" #,##0.00' },
+    { key: "total", label: SALES_LABELS.netRevenue, kind: "number", align: "right", value: r => r.total, excelFormat: '"$" #,##0.00' },
     { key: "participacion", label: "Participación", kind: "number", align: "right", value: r => total ? r.total / total : null, excelFormat: "0%" },
   ];
 }
@@ -169,21 +174,21 @@ export function MaquinasPanorama({ data, loading, error, periodMode, selectedPer
 }) {
   const mobile = useSalesMobile();
   const [collapsed, setCollapsed] = useMobileDisclosure(!!error);
-  const isMobile = useIsMobile(1024);
   const total = Number(data?.resumen.total || 0);
   type Period = MaquinasResumen & { periodo: string };
-  const columns: SalesColumn<Period>[] = [
-    { key: "periodo", label: "Período", kind: "text", value: r => r.periodo || null, exportValue: r => r.periodo ? periodLabel(r.periodo, periodMode) : "Total del período" },
-    { key: "total", label: "Facturado", kind: "number", align: "right", value: r => r.total, excelFormat: '"$" #,##0.00' },
-    { key: "nuevas", label: "Nuevas", kind: "number", align: "center", value: r => r.nuevas ?? 0 },
-    { key: "usadas", label: "Usadas", kind: "number", align: "center", value: r => r.usadas ?? 0 },
-    ...metricColumns<Period>(total).filter(c => ["notas_credito", "netas", "clientes", "facturas", "participacion"].includes(c.key)).map(c => ({ ...c, label: c.key === "notas_credito" ? "Notas de crédito" : c.key === "netas" ? "Unidades netas" : c.label })),
-  ];
-  const table = useSectionTable({ rows: data?.periodos ?? [], columns, title: "Períodos de Máquinas", fileName: "ventas-maquinas-periodos.xlsx",
-    initialSort: { key: "periodo", direction: "asc" }, disabled: loading || !!error,
-    footer: data ? { ...data.resumen, periodo: "" } : undefined });
-  const grid = "grid-cols-[minmax(0,1.2fr)_minmax(0,1fr)_repeat(4,minmax(0,.75fr))_repeat(2,minmax(0,.7fr))_minmax(0,.8fr)]";
-  return <Panel className={cn("sales-periods p-0 lg:p-3", mobile.active && mobile.view !== "periodos" && !error && "hidden")}>
+  const previous = (r: Period) => (r.periodo ? data?.periodComparisons?.periods[r.periodo] : data?.periodComparisons?.total)?.previous ?? null;
+  const ly = (r: Period) => (r.periodo ? data?.periodComparisons?.periods[r.periodo] : data?.periodComparisons?.total)?.ly ?? null;
+  const columns: SalesDisplayColumn<Period>[] = [
+    { key: "periodo", label: "Período", kind: "text", value: r => r.periodo, exportValue: r => r.periodo ? periodLabel(r.periodo, periodMode) : "Total del período", render:r=>r.periodo ? periodLabel(r.periodo,periodMode) : "Total del período" },
+    periodMoneyColumn("total", SALES_LABELS.netRevenue, r=>r.total),
+    periodMoneyColumn("venta_bruta", SALES_LABELS.grossRevenue, r=>r.venta_bruta),
+    periodMoneyColumn("notas_credito_monto", SALES_LABELS.creditNote, r=>r.notas_credito_monto == null ? null : -Math.abs(r.notas_credito_monto)),
+    {key:"clientes",label:"Clientes",kind:"number",align:"center",value:r=>r.clientes},
+    {key:"facturas",label:"Documentos",kind:"number",align:"center",value:r=>r.facturas},
+    comparisonColumn("previous","Período anterior",previous,r=>r.total),
+    comparisonColumn("ly",SALES_LABELS.previousYear,ly,r=>r.total),
+    {key:"participacion",label:"Participación",kind:"number",align:"right",value:r=>total ? r.total/total : null,excelFormat:"0%",render:r=>total ? `${Math.round(r.total/total*100)}%` : "—"},
+  ];  return <Panel className={cn("sales-periods p-0 lg:p-3", mobile.active && mobile.view !== "periodos" && !error && "hidden")}>
     {!mobile.active && <button type="button" aria-expanded={!collapsed} onClick={() => setCollapsed(value => !value)} className="flex min-h-11 w-full items-center justify-between gap-2 px-3 text-left lg:min-h-0 lg:px-0">
       <h2 className="text-[13px] font-semibold">Facturación por período</h2>
       <div className="flex items-center gap-2">
@@ -191,39 +196,14 @@ export function MaquinasPanorama({ data, loading, error, periodMode, selectedPer
         {collapsed ? <ChevronDown className="h-4 w-4 text-muted-foreground" /> : <ChevronUp className="h-4 w-4 text-muted-foreground" />}
       </div>
     </button>}
-    {(mobile.active || !collapsed) && (loading ? <div className="py-8 text-center text-[12px] text-muted-foreground">Cargando facturación…</div>
+    <div hidden={!mobile.active && collapsed}>{loading ? <div className="py-8 text-center text-[12px] text-muted-foreground">Cargando facturación…</div>
       : error ? <div role="alert" className="py-8 text-center text-[12px] text-destructive">{error}</div>
-      : !data?.periodos.length ? <div className="py-8 text-center text-[12px] text-muted-foreground">No hay ventas de máquinas para este rango.</div>
-      : isMobile ? <div><MobileSalesTable embedded countKey={mobile.active ? "netas" : undefined} countLabel="Unid." primaryLabel={mobile.active && periodMode === "mes" ? "Mes" : undefined} metricLabel={mobile.active ? "Facturación" : undefined} title="Facturación por período" rows={table.ordered} columns={columns.map(c => c.key === "periodo" ? {...c, render: (r: Period) => periodLabel(r.periodo, periodMode)} : c)} rowKey={r => r.periodo} sort={table.sort} toggleSort={table.toggleSort} footer={{...data.resumen, periodo:""}} onRowClick={r => { onSelectPeriod(selectedPeriod === r.periodo ? null : r.periodo); if (mobile.active) mobile.setView("detalle"); }} selected={r => selectedPeriod === r.periodo} /></div>
-      : <div className="mt-3 overflow-hidden rounded-md border"><div className="overflow-x-auto"><div className="min-w-0">
-        <TableScroll rows={data.periodos.length}>
-        <div className={`grid ${grid} ${scrollHead} bg-muted/60 px-3 py-2 text-[11px] font-medium text-muted-foreground ${salesHeader}`}>
-          {columns.map(c => <div key={c.key} className={`min-w-0 ${salesColumnClass(c.label, c.key === "notas_credito" ? "quantity" : undefined)}`}>{table.heading(c.key)}</div>)}
-        </div>
-        {table.ordered.map(row => <button key={row.periodo} type="button" onClick={() => onSelectPeriod(selectedPeriod === row.periodo ? null : row.periodo)} className={cn(`grid w-full ${grid} items-center border-t px-3 py-2 text-left text-[12px] hover:bg-accent`, selectedPeriod === row.periodo && "bg-primary/5 outline outline-1 outline-primary/20")}>
-          <div className="truncate font-medium capitalize">{periodLabel(row.periodo, periodMode)}</div>
-          <div className="text-right font-semibold tabular-nums">{money(Number(row.total))}</div>
-          <div className="text-center tabular-nums">{decimal.format(Number(row.nuevas ?? 0))}</div>
-          <div className="text-center tabular-nums">{decimal.format(Number(row.usadas ?? 0))}</div>
-          <div className="text-center tabular-nums text-muted-foreground">{decimal.format(Number(row.notas_credito))}</div>
-          <div className="text-center font-medium tabular-nums">{decimal.format(Number(row.netas))}</div>
-          <div className="text-center tabular-nums text-muted-foreground">{integer.format(Number(row.clientes))}</div>
-          <div className="text-center tabular-nums text-muted-foreground">{integer.format(Number(row.facturas))}</div>
-          <div className="text-right tabular-nums text-muted-foreground">{total ? `${Math.round(Number(row.total) / total * 100)}%` : "—"}</div>
-        </button>)}
-        </TableScroll>
-        <div className={`grid ${grid} items-center border-t bg-muted/30 px-3 py-2 text-[12px] font-semibold`}>
-          <div>Total del período</div>
-          <div className="text-right tabular-nums">{money(total)}</div>
-          <div className="text-center tabular-nums">{decimal.format(Number(data.resumen.nuevas ?? 0))}</div>
-          <div className="text-center tabular-nums">{decimal.format(Number(data.resumen.usadas ?? 0))}</div>
-          <div className="text-center tabular-nums text-muted-foreground">{decimal.format(Number(data.resumen.notas_credito))}</div>
-          <div className="text-center tabular-nums">{decimal.format(Number(data.resumen.netas))}</div>
-          <div className="text-center tabular-nums">{integer.format(Number(data.resumen.clientes))}</div>
-          <div className="text-center tabular-nums">{integer.format(Number(data.resumen.facturas))}</div>
-          <div className="text-right tabular-nums text-muted-foreground">{total ? "100%" : "—"}</div>
-        </div>
-      </div></div><RowCount rows={data.periodos.length} label="períodos" /></div>)}
+      : <SalesDataTable mobileCountKey={mobile.active ? "facturas" : undefined} mobileCountLabel="Doc." mobilePrimaryLabel={mobile.active && periodMode === "mes" ? "Mes" : undefined} mobileMetricLabel={SALES_LABELS.netRevenue} title="Facturación por período" sheetName="Máquinas" hideDesktopTitle mobileEmbedded rows={data?.periodos ?? []} columns={columns}
+        exportColumns={columns.flatMap(c=>c.key==="previous"||c.key==="ly" ? comparisonExports<Period>(c.key,c.label,c.key==="previous"?previous:ly,r=>r.total) : [c])}
+        initialSort={{key:"periodo",direction:"asc"}} rowKey={r=>r.periodo} footer={data ? {...data.resumen,periodo:""} : undefined}
+        fileName="ventas-maquinas-periodos.xlsx" selected={r=>r.periodo===selectedPeriod}
+        onRowClick={r=>{onSelectPeriod(selectedPeriod===r.periodo?null:r.periodo);if(mobile.active)mobile.setView("detalle");}}
+        empty="No hay ventas de máquinas para este rango." countLabel="períodos" />}</div>
   </Panel>;
 }
 
@@ -346,10 +326,10 @@ function DetailTable({ lines }: { lines: MaquinaVentaLinea[] }) {
     ...(["factura", "cliente_facturado", "marca", "tipo_maquina", "modelo", "chasis"] as const).map((key, i) => ({ key, label: ["Factura", "Cliente", "Marca", "Tipo", "Modelo", "Chasis"][i], kind: "text" as const, value: (r: MaquinaVentaLinea) => r[key] })),
     { key: "condicion", label: "Condición", kind: "text", value: r => conditionLabel(r.condicion) },
     { key: "comercial", label: "Vendedor", kind: "text", value: r => sellerLabel(r.comercial) },
-    { key: "facturado", label: "Facturado", kind: "number", align: "right", value: r => r.facturado, excelFormat: '"$" #,##0.00' },
+    { key: "facturado", label: SALES_LABELS.netRevenue, kind: "number", align: "right", value: r => r.facturado, excelFormat: '"$" #,##0.00' },
   ];
   const table = useSectionTable({ rows: lines, columns, title: "Detalle de Máquinas", fileName: "ventas-maquinas-detalle.xlsx", initialSort: { key: "fecha", direction: "desc" } });
-  if (isMobile) return <div className="mt-3"><MobileSalesTable title="Detalle de Máquinas" rows={table.ordered} columns={columns.map(c => c.key === "factura" ? {...c, render:(r:MaquinaVentaLinea)=>`${r.es_nota_credito ? "NC " : ""}${r.factura}`} : c)} primaryKey="cliente_facturado" rowKey={r => r.id} sort={table.sort} toggleSort={table.toggleSort} /></div>;
+  if (isMobile) return <div className="mt-3"><MobileSalesTable title="Detalle de Máquinas" rows={table.ordered} columns={columns.map(c => c.key === "factura" ? {...c, render:(r:MaquinaVentaLinea)=>`${r.es_nota_credito ? `${SALES_LABELS.creditNote} ` : ""}${r.factura}`} : c)} primaryKey="cliente_facturado" rowKey={r => r.id} sort={table.sort} toggleSort={table.toggleSort} /></div>;
   return <>
     <div className="mt-3 overflow-hidden rounded-md border"><div className="overflow-x-auto"><TableScroll rows={lines.length}><table className="w-full min-w-0 table-fixed text-[11px] [&_th]:whitespace-nowrap [&_th]:px-2.5 [&_th]:py-2 [&_th]:font-medium [&_td]:overflow-hidden [&_td]:whitespace-nowrap [&_td]:px-2.5 [&_td]:py-1.5 [&_td]:align-middle">
       <thead className={`bg-muted/60 text-left text-muted-foreground ${scrollHead} ${salesHeader}`}><tr>{columns.map(c => <th key={c.key} className={c.align === "right" ? "text-right" : "text-left"}>{table.heading(c.key)}</th>)}</tr></thead>

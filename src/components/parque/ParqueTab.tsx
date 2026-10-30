@@ -1,3 +1,4 @@
+import { loadUnifiedCoverage, unifiedCoverageEnabled, unifiedCoverageProjection, type UnifiedCoverage } from '@/lib/unifiedCoverage';
 import { sortSalesRows, type SalesColumn } from "@/components/ventas/salesTableInteraction";
 import { SectionActionsMenu } from "@/components/exports/SectionActionsMenu";
 import { useEffect, useMemo, useState } from "react";
@@ -192,6 +193,7 @@ const antiguedadColor = (a: number | null) => {
 };
 
 export type { KpiResult as ParqueMetricas };
+export type ParqueCoverageResult = {status:'loading'|'error'|'ready'; parts:number|null; services:number|null; denominator:number|null};
 export type ParqueFacturacionEstado = "loading" | "error" | "ready";
 
 export function ParqueTab({
@@ -199,7 +201,9 @@ export function ParqueTab({
   onOpenCliente,
   onMetricasChange,
   onFacturacionEstadoChange,
+  onCoverageChange,
 }: {
+  onCoverageChange?: (value:ParqueCoverageResult)=>void;
   onChanged?: () => void;
   onOpenCliente?: (id: string) => void;
   onMetricasChange?: (m: KpiResult) => void;
@@ -217,7 +221,11 @@ export function ParqueTab({
     return valid(from) && valid(to) && from! <= to!
       ? { from: new Date(`${from}T12:00:00`), to: new Date(`${to}T12:00:00`) } : null;
   }, [location.search]);
-  const { can } = useAuth();
+  const { can, user, hasSectionAccess } = useAuth();
+  const coverageAllowed=hasSectionAccess('parque.maquinas');
+  const [coverageSource,setCoverageSource]=useState<UnifiedCoverage|null>(null);
+  const [coverageSourceKey,setCoverageSourceKey]=useState('');
+  const [coverageStatus,setCoverageStatus]=useState<'loading'|'error'|'ready'>('loading');
   const [loading, setLoading] = useState(true);
   const [loadError, setLoadError] = useState(false);
   const [factLoading, setFactLoading] = useState(true);
@@ -371,6 +379,17 @@ export function ParqueTab({
       prevHastaDate: prevHasta,
     };
   }, [rango, customDesde, customHasta]);
+
+  const coverageFrom=format(desdeDate,'yyyy-MM-dd'),coverageTo=format(hastaDate,'yyyy-MM-dd');
+  const coverageRequestKey=`${user?.id??''}|${coverageAllowed}|${coverageFrom}|${coverageTo}`;
+  useEffect(()=>{
+    if(!unifiedCoverageEnabled())return;
+    const controller=new AbortController();let live=true;
+    setCoverageSource(null);setCoverageSourceKey('');setCoverageStatus('loading');
+    if(!user?.id||!coverageAllowed){setCoverageStatus('error');return;}
+    loadUnifiedCoverage(coverageFrom,coverageTo,controller.signal).then(value=>{if(live){setCoverageSource(value);setCoverageSourceKey(coverageRequestKey);setCoverageStatus('ready');}}).catch(()=>{if(live)setCoverageStatus('error');});
+    return ()=>{live=false;controller.abort();};
+  },[coverageFrom,coverageTo,user?.id,coverageAllowed,coverageRequestKey,factReloadKey]);
 
   // Fase B: agregados de facturación (RPC) — depende del rango
   useEffect(() => {
@@ -602,6 +621,16 @@ export function ParqueTab({
       return true;
     });
   }, [rows, q, fSucursal, fMarca, fSubgrupo]);
+
+  useEffect(()=>{
+    if(!unifiedCoverageEnabled())return;
+    if(coverageSourceKey!==coverageRequestKey&&coverageStatus!=='error'){onCoverageChange?.({status:'loading',parts:null,services:null,denominator:null});return;}
+    if(coverageStatus!=='ready'||!coverageSource){onCoverageChange?.({status:coverageStatus,parts:null,services:null,denominator:null});return;}
+    const scope=filtradas.map(row=>row.cliente.id);
+    const parts=unifiedCoverageProjection(coverageSource,coverageFrom,coverageTo,['parts'],scope);
+    const services=unifiedCoverageProjection(coverageSource,coverageFrom,coverageTo,['services'],scope);
+    onCoverageChange?.({status:parts&&services?'ready':'error',parts:parts?.percent??null,services:services?.percent??null,denominator:parts?.denominator??null});
+  },[coverageSource,coverageSourceKey,coverageRequestKey,coverageStatus,coverageFrom,coverageTo,filtradas,onCoverageChange]);
 
   const clientesConTrabajoAbierto = useMemo(
     () => buildClientesConTrabajoAbierto(trabajos),
