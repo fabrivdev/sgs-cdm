@@ -1,0 +1,19 @@
+import {expect,it,vi,afterEach} from 'vitest';
+import type {SupabaseClient} from '@supabase/supabase-js';
+import {createTopicRequestApi,parseTopicRequest,topicRequestsEnabled} from './topicRequestApi';
+const row={id:'r',owner_id:'u',client_key:'k',question:'Comparar ventas por semana',created_at:'2026-10-30T12:00:00Z',status:'recibida',topic_id:null,reason:''};
+function setup(tables:Record<string,unknown[]>={}){
+ const query={select:vi.fn().mockReturnThis(),order:vi.fn().mockReturnThis(),eq:vi.fn().mockReturnThis(),range:vi.fn()};
+ const from=vi.fn((table:string)=>({...query,range:vi.fn(async(start:number,end:number)=>({data:(tables[table]??[]).slice(start,end+1),error:null}))}));
+ const client={auth:{getUser:vi.fn().mockResolvedValue({data:{user:{id:'u'}},error:null})},from,rpc:vi.fn().mockResolvedValue({data:row,error:null})};
+ return {client,api:createTopicRequestApi(client as unknown as SupabaseClient,()=>true)};
+}
+afterEach(()=>vi.unstubAllEnvs());
+it('is opt-in only',()=>{vi.stubEnv('VITE_CAMPI_TOPIC_REQUESTS_ENABLED',undefined);expect(topicRequestsEnabled()).toBe(false);vi.stubEnv('VITE_CAMPI_TOPIC_REQUESTS_ENABLED','true');expect(topicRequestsEnabled()).toBe(true);vi.stubEnv('VITE_CAMPI_TOPIC_REQUESTS_ENABLED','false');expect(topicRequestsEnabled()).toBe(false);});
+it('no remote call when disabled',async()=>{const {client}=setup();const api=createTopicRequestApi(client as unknown as SupabaseClient,()=>false);await expect(api.submit('u','k',row.question)).rejects.toThrow('no está habilitado');expect(client.auth.getUser).not.toHaveBeenCalled();expect(client.rpc).not.toHaveBeenCalled();});
+it('confirms real row and key instead of trusting HTTP success',async()=>{const {client,api}=setup();expect((await api.submit('u','k',row.question)).id).toBe('r');client.rpc.mockResolvedValue({data:{...row,client_key:'wrong'},error:null});await expect(api.submit('u','k',row.question)).rejects.toThrow('confirmar');});
+it('rejects session mismatch before queries',async()=>{const {client,api}=setup();await expect(api.load('other',true)).rejects.toThrow('sesión cambió');expect(client.from).not.toHaveBeenCalled();});
+it('rejects a leaked owner even if a client filter fails',async()=>{const {api}=setup({campi_topic_requests:[{...row,owner_id:'other'}]});await expect(api.load('u',false)).rejects.toThrow('acceso');});
+it('requires matching private notice and visible release for availability',async()=>{const request={...row,status:'disponible',topic_id:'ventas_evolucion'};const tables={campi_topic_requests:[request],campi_topic_releases:[{topic_id:'ventas_evolucion',title:'Ventas'}],campi_topic_notices:[] as unknown[]};const {api}=setup(tables);expect((await api.load('u',false)).rows[0].notified).toBe(false);tables.campi_topic_notices.push({id:'n',request_id:'r',owner_id:'u',topic_id:'ventas_evolucion'});expect((await api.load('u',false)).rows[0].notified).toBe(true);tables.campi_topic_releases=[];expect((await api.load('u',false)).rows[0].notified).toBe(false);});
+it('paginates beyond server page and validates structure',async()=>{const {api}=setup({campi_topic_requests:Array.from({length:201},(_,i)=>({...row,id:String(i)}))});expect((await api.load('u',false)).rows).toHaveLength(201);expect(()=>parseTopicRequest({...row,status:'inventado'})).toThrow();expect(()=>parseTopicRequest(null)).toThrow();});
+it('validates management response and sends no client owner or role',async()=>{const {client,api}=setup();client.rpc.mockResolvedValue({data:{...row,status:'preparacion'},error:null});expect((await api.manage('u','r','preparacion','','')).status).toBe('preparacion');expect(client.rpc).toHaveBeenCalledWith('campi_manage_topic_request',{p_id:'r',p_status:'preparacion',p_topic:null,p_reason:''});client.rpc.mockResolvedValue({data:row,error:null});await expect(api.manage('u','r','preparacion','','')).rejects.toThrow('verificar');});

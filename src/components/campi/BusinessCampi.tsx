@@ -1,3 +1,5 @@
+import { TopicRequestDialog } from './TopicRequestDialog';
+import type { PanoramaTopic } from '@/lib/campi/panoramaPreferences';
 import { commentReaction } from '@/lib/campi/commentReaction';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import type { SectionKey } from '@/lib/permissions';
@@ -7,7 +9,8 @@ import { detectBusinessFindings, readFindingMemory } from '@/lib/campi/businessF
 import { CampiBadgeActor } from './CampiBadgeActor';
 
 /** Factual rounds share card evidence. Previous finding memory is never erased. */
-export function BusinessCampi({userId,stories,hasAccess,loading,failed=false}:{
+export function BusinessCampi({userId,stories,hasAccess,loading,failed=false,requestTopics=[],superadmin=false,onChooseTopics}:{
+ requestTopics?:readonly PanoramaTopic[];superadmin?:boolean;onChooseTopics?:()=>void;
  userId:string;stories:readonly PanoramaStory[];hasAccess:(s:SectionKey)=>boolean;loading:boolean;failed?:boolean;onRetry?:()=>void;
 }) {
  const [memory,setMemory]=useState(()=>readFindingMemory(userId));
@@ -37,6 +40,6 @@ export function BusinessCampi({userId,stories,hasAccess,loading,failed=false}:{
  const gesture={neutral:'neutral',consultar:'consultando',presentar:'presentacion',comparar:'comparacion',saltito:'saltito'}[reaction.gesture];
  return <section aria-label="Campi" className="min-w-0 rounded-xl border bg-card p-3.5 panorama-hero panorama-hero--serene panorama-hero--sereno">
   <div className="panorama-hero-avatar campi-vector-avatar campi-badge-avatar"><CampiBadgeActor messageKey={`${userId}|${current?.id??'empty'}|${current?.text??''}`} mood={reaction.mood} reaction={gesture}/></div>
-  <div className="panorama-hero-message"><div className="campi-synthesis"><h2 ref={heading}>{current?.text ?? (loading?'Estoy revisando las novedades de tu panorama.':failed?'No pude verificar los datos de tus temas.':stories.some(s=>s.status==='ready'&&s.sections.length>0&&s.sections.every(hasAccess))?'Por ahora no hay comparaciones verificadas para comentar.':'Todavía no tengo información suficiente para destacar una novedad.')}</h2></div></div>
+  <div className="panorama-hero-message"><div className="campi-synthesis"><h2 ref={heading}>{current?.text ?? (loading?'Estoy revisando las novedades de tu panorama.':failed?'No pude verificar los datos de tus temas.':stories.some(s=>s.status==='ready'&&s.sections.length>0&&s.sections.every(hasAccess))?'Por ahora no hay comparaciones verificadas para comentar.':'Todavía no tengo información suficiente para destacar una novedad.')}</h2></div>{import.meta.env.DEV&&<TopicRequestDialog key={userId} userId={userId} superadmin={superadmin} topics={requestTopics} onChoose={onChooseTopics}/>}</div>
  </section>;
 }

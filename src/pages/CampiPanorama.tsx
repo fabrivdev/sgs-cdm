@@ -56,7 +56,7 @@ const topicIcons: Record<PanoramaTopicId, typeof BarChart3> = {
 };
 function resumeSelector(id:string){try{return localStorage.getItem(`sig-cdm:campi:onboarding:${id}`)==='selector';}catch{return false;}}
 export default function CampiPanorama() {
-  const { user, profile, isAdmin, hasModuloAccess, hasSectionAccess } = useAuth();
+  const { user, profile, isAdmin, isSuperAdmin, hasModuloAccess, hasSectionAccess } = useAuth();
   const userId = user?.id ?? '';
   const available = useMemo(
     () => availablePanoramaTopics(hasModuloAccess, hasSectionAccess, isAdmin),
@@ -129,7 +129,7 @@ export default function CampiPanorama() {
     setReplacing(null);
   };
 
-  if (!editing && persisted.length) return <PanoramaDashboard userId={userId} greetingName={panoramaGreetingName(userId, profile)} topics={persisted} available={available}
+  if (!editing && persisted.length) return <PanoramaDashboard userId={userId} superadmin={isSuperAdmin} greetingName={panoramaGreetingName(userId, profile)} topics={persisted} available={available}
     hasAccess={section => hasModuloAccess(section.split('.')[0]) && hasSectionAccess(section)} onEdit={() => setEditing(true)} />;
 
   const selector=<PageShell className="panorama-topic-editor max-w-[1600px] space-y-3">

@@ -9,9 +9,9 @@ let show:IntersectionObserverCallback;
 beforeEach(()=>{vi.useFakeTimers();vi.setSystemTime(new Date('2026-10-28T12:00:00Z'));localStorage.clear();globalThis.IntersectionObserver=class {constructor(cb:IntersectionObserverCallback){show=cb;}observe(){}disconnect(){}} as unknown as typeof IntersectionObserver;});
 afterEach(()=>{cleanup();vi.useRealTimers();vi.unstubAllGlobals();});
 const view=(stories:PanoramaStory[],allowed=true,user='a')=><BusinessCampi userId={user} stories={stories} hasAccess={()=>allowed} loading={false}/>;
-it('solo comenta sin botones enlaces ni detalle; respeta rondas y vuelve al primero al terminar',()=>{
+it('permite proponer un tema sin enlaces ni detalle; respeta rondas y vuelve al primero al terminar',()=>{
  render(view([row('ventas_evolucion','Ventas'),row('ventas_facturacion','Neto')]));
- expect(screen.getAllByRole('button')).toHaveLength(1);expect(screen.getByRole('button',{name:'Saludar a Campi'})).toBeInTheDocument();expect(screen.queryByRole('link')).toBeNull();expect(screen.queryByText(/Ver detalle|Más detalles/)).toBeNull();
+ expect(screen.getAllByRole('button')).toHaveLength(2);expect(screen.getByRole('button',{name:'Proponer un tema'})).toBeInTheDocument();expect(screen.getByRole('button',{name:'Saludar a Campi'})).toBeInTheDocument();expect(screen.queryByRole('link')).toBeNull();expect(screen.queryByText(/Ver detalle|Más detalles/)).toBeNull();
  expect(screen.getByRole('heading')).toHaveTextContent('facturación bruta');
  act(()=>show([{isIntersecting:true,intersectionRatio:1}] as IntersectionObserverEntry[],{} as IntersectionObserver));
  act(()=>vi.advanceTimersByTime(60000));expect(screen.getByRole('heading')).toHaveTextContent('facturación neta');

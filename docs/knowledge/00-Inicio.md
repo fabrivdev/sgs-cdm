@@ -1,5 +1,7 @@
 # SGS-CDM: inicio
 
+- [[45-Campi-solicitudes-temas-local|Campi: solicitudes de temas, conexión real preparada y backend pendiente]]
+
 - [[44-Panorama-integracion-main|Panorama: integración a main, configuración y límites de validación]] — retiro del recorrido temporal; publicación pública reservada al usuario.
 
 - [[32-Panorama-hallazgos-negocio|Panorama: banco de hallazgos, cobertura y memoria local]] — cambio local del 26/10/2026, sin publicación.
