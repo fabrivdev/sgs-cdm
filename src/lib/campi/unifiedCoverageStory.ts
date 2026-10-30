@@ -12,8 +12,8 @@ export async function loadUnifiedCoverageStory(base:PanoramaStory,asOf:string,pe
   primary:{label:'Cobertura posventa',value:current.value,unit:'percent'},supporting:[{label:'Con compra',value:current.numerator,unit:'count'},{label:'Propietarios',value:current.denominator,unit:'count'}],
   cohort:{numerator:current.ids,denominator:data.owners},series,
   coverageRubros:{owners:data.owners,rows:rows.map(r=>({from:r.from,to:r.to,parts:r.parts,services:r.services}))},
-  chart:{kind:'trend',title:'Cobertura de posventa del parque principal',unit:'percent',rows:series.map(r=>({label:formatMonth(r.to.slice(0,7)+'-01'),value:r.value}))},
+  chart:{kind:'trend',title:'Cobertura de posventa del parque',unit:'percent',rows:series.map(r=>({label:formatMonth(r.to.slice(0,7)+'-01'),value:r.value}))},
   source:'parque_cobertura_unificada_v1',message:`${current.numerator} de ${current.denominator} propietarios recibieron atención o compraron repuestos.`,
-  details:['Parque principal actual, sin plataformas ni cabezales. Una identidad por propietario.','OS cerradas: cierre como referencia; apertura histórica sólo si falta cierre. OS abiertas: jornada completada fechada.','Repuestos: neto positivo del propietario en el período, conservando NC y sustitución legacy/TOTVS.'],
+  details:['Parque activo actual completo. Una identidad por propietario.','OS cerradas: cierre como referencia; apertura histórica sólo si falta cierre. OS abiertas: jornada completada fechada.','Repuestos: neto positivo del propietario en el período, conservando NC y sustitución legacy/TOTVS.'],
  };
 }

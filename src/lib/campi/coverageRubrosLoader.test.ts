@@ -4,6 +4,7 @@ vi.mock('@/integrations/supabase/client',()=>({supabase:{rpc:mock.rpc}}));
 import {loadManagerialStories} from './managerialStories';
 import {monthWindows} from './panoramaDates';
 beforeEach(()=>{
+ vi.stubEnv('VITE_UNIFIED_PARK_COVERAGE_ENABLED','false');
  mock.fail=false;mock.rpc.mockReset();
  mock.rpc.mockImplementation(async(name:string)=>{
  const windows=monthWindows('2026-10-29',6);

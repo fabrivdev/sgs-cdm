@@ -1,4 +1,6 @@
-import {it,expect,vi} from 'vitest';
+import {it,expect,vi,beforeEach,afterEach} from 'vitest';
+beforeEach(()=>vi.stubEnv('VITE_UNIFIED_PARK_COVERAGE_ENABLED','false'));
+afterEach(()=>vi.unstubAllEnvs());
 const rpc=vi.hoisted(()=>vi.fn());
 vi.mock('@/integrations/supabase/client',()=>({supabase:{rpc}}));
 import {loadManagerialStories} from './managerialStories';

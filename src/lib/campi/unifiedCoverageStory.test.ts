@@ -5,10 +5,11 @@ import {loadManagerialStories} from './managerialStories';
 import {scopedCoverageStory} from './coverageRubros';
 import {factualVariants} from './factualRounds';
 import {unifiedCoverageProjection,parseUnifiedCoverage} from '../unifiedCoverage';
-const payload={version:1,policy:'principal_closed_or_completed_v1',from:'2026-05-01',to:'2026-10-29',owners:['a','b'],parts:[['a','2026-10-01',10]],services:[['b','2026-10-02','OS1','apertura_historica']],uncertainOwners:[]};
+const payload={version:1,policy:'all_park_closed_or_completed_v2',from:'2026-05-01',to:'2026-10-29',owners:['a','b'],parts:[['a','2026-10-01',10]],services:[['b','2026-10-02','OS1','apertura_historica']],uncertainOwners:[]};
 beforeEach(()=>{vi.stubEnv('VITE_UNIFIED_PARK_COVERAGE_ENABLED','true');mock.rpc.mockReset();mock.rpc.mockResolvedValue({data:payload,error:null});});
 afterEach(()=>vi.unstubAllEnvs());
-it('uses one shared RPC, not buyer summaries, and reconciles the Parque projection',async()=>{
+it.each([undefined,'true'] as const)('uses shared RPC and Parque projection with flag %s',async flag=>{
+ vi.stubEnv('VITE_UNIFIED_PARK_COVERAGE_ENABLED',flag);
  const [story]=await loadManagerialStories(['clientes_cobertura_posventa'],['parque.maquinas'],'2026-10-29');
  expect(mock.rpc.mock.calls.map(c=>c[0])).toEqual(['parque_cobertura_unificada_v1']);expect(story.coverageBasis).toBe('attention');expect(story.primary?.value).toBe(100);
  const source=parseUnifiedCoverage(payload,payload.from,payload.to);

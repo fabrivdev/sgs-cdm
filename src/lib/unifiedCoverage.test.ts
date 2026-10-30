@@ -1,7 +1,7 @@
 import { describe,expect,it,vi,afterEach } from 'vitest';
-import { parseUnifiedCoverage,unifiedCoverageWindow,unifiedCoverageProjection } from './unifiedCoverage';
+import { unifiedCoverageEnabled,parseUnifiedCoverage,unifiedCoverageWindow,unifiedCoverageProjection } from './unifiedCoverage';
 vi.mock('@/integrations/supabase/client',()=>({supabase:{rpc:vi.fn()}}));
-const fixture=()=>({version:1,policy:'principal_closed_or_completed_v1',from:'2026-01-01',to:'2026-10-29',owners:['a','b','c'],parts:[['a','2026-01-05',100],['a','2026-10-01',-100],['b','2026-10-02',10]],services:[['a','2026-10-03','OS1','cierre'],['a','2026-10-05','OS2:J1','jornada'],['c','2026-01-02','OS3','apertura_historica']],uncertainOwners:[]});
+const fixture=()=>({version:1,policy:'all_park_closed_or_completed_v2',from:'2026-01-01',to:'2026-10-29',owners:['a','b','c'],parts:[['a','2026-01-05',100],['a','2026-10-01',-100],['b','2026-10-02',10]],services:[['a','2026-10-03','OS1','cierre'],['a','2026-10-05','OS2:J1','jornada'],['c','2026-01-02','OS3','apertura_historica']],uncertainOwners:[]});
 const source=()=>parseUnifiedCoverage(fixture(),'2026-01-01','2026-10-29');
 afterEach(()=>vi.unstubAllEnvs());
 describe('shared source projections',()=>{
@@ -32,4 +32,15 @@ describe('shared source projections',()=>{
   expect(()=>parseUnifiedCoverage(p,'2026-01-01','2026-10-29')).toThrow();
  });
  it('rejects range beyond loaded source',()=>expect(()=>unifiedCoverageWindow(source(),'2025-01-01','2026-10-29')).toThrow());
+});
+
+describe('shared activation policy',()=>{
+ it.each([undefined,'true','false'] as const)('handles flag %s', value=>{
+  vi.stubEnv('VITE_UNIFIED_PARK_COVERAGE_ENABLED',value);
+  expect(unifiedCoverageEnabled()).toBe(value!=='false');
+ });
+});
+
+it('rejects the previous restricted universe instead of presenting it as all park',()=>{
+ expect(()=>parseUnifiedCoverage({...fixture(),policy:'principal_closed_or_completed_v1'},'2026-01-01','2026-10-29')).toThrow();
 });

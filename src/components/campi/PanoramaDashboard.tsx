@@ -1,3 +1,4 @@
+import { unifiedCoverageEnabled } from '@/lib/unifiedCoverage';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { useQueries } from '@tanstack/react-query';
 import { RefreshCw, Settings2 } from 'lucide-react';
@@ -58,7 +59,7 @@ export function PanoramaDashboard({ userId, greetingName = 'Usuario', topics, av
   const reports = useQueries({ queries: groups.map(queryIds => {
     const topicGranted = storySectionsForTopics(queryIds, hasAccess);
     const period = periodByTopic[queryIds[0]] ?? 'month';
-    return { queryKey: ['campi-panorama-story', userId, queryIds.join('|'), topicGranted.join('|'), asOf, period, queryIds.includes('servicios_pendientes') ? 'resolution-range-v2' : queryIds.includes('clientes_cobertura_posventa') ? `coverage-unified-v1:${import.meta.env.VITE_UNIFIED_PARK_COVERAGE_ENABLED === 'true'}:${import.meta.env.VITE_CAMPI_COVERAGE_RUBROS_ENABLED === 'true'}` : 'billing-coverage-v2'],
+    return { queryKey: ['campi-panorama-story', userId, queryIds.join('|'), topicGranted.join('|'), asOf, period, queryIds.includes('servicios_pendientes') ? 'resolution-range-v2' : queryIds.includes('clientes_cobertura_posventa') ? `coverage-unified-v2:${unifiedCoverageEnabled()}:${import.meta.env.VITE_CAMPI_COVERAGE_RUBROS_ENABLED === 'true'}` : 'billing-coverage-v2'],
       queryFn: () => loadPanoramaStories(queryIds, topicGranted, asOf, period), retry: false, throwOnError: false,
       enabled: Boolean(userId), staleTime: 60_000 };
   }) });

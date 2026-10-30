@@ -56,4 +56,26 @@ p=await run();assert.equal(p.uncertainOwners.length,2);assert(!p.services.some(r
 for(const setting of ["SET test.uid='none'","SET test.uid='yes';SET test.role='tecnico'","SET test.role='admin';SET test.section='no'","SET test.section='yes';SET test.module='no'"]){await db.exec(setting);await assert.rejects(run(),/Sin acceso/);}
 await db.exec("SET test.module='yes'");await assert.rejects(run('2026-10-30'),/Rango/);
 const acl=(await db.query("SELECT has_function_privilege('anon','public.parque_cobertura_unificada_v1(date,date)','EXECUTE') a,has_function_privilege('service_role','public.parque_cobertura_unificada_v1(date,date)','EXECUTE') s,has_function_privilege('authenticated','public.parque_cobertura_unificada_v1(date,date)','EXECUTE') u")).rows[0];assert.deepEqual(acl,{a:false,s:false,u:true});
-console.log('PASS SQL aislado: principal/unicos, cierre/apertura, abierta con jornada, canceladas, prioridad, fechas invalidas, identidad ambigua, NC, permisos y ACL. No producción.');await db.close();
+// All-park replacement: synthetic data only; current ACL must stay identical.
+await db.exec((await readFile('supabase/migrations/20261030180000_unified_coverage_all_park.sql','utf8')).replace(/\r\n/g,'\n'));
+await db.exec(`DELETE FROM parque_maquinas WHERE id='10000000-0000-0000-0000-000000000006';
+DELETE FROM ordenes_servicio_importadas WHERE os_numero='bad-date';
+INSERT INTO parque_maquinas(cliente_id,activo,id,serie,subgrupo) VALUES
+('00000000-0000-0000-0000-000000000005',true,'10000000-0000-0000-0000-000000000007','C5B','PLATAFORMAS'),
+('00000000-0000-0000-0000-000000000006',false,'10000000-0000-0000-0000-000000000008','C6','TRACTORES');
+INSERT INTO facturacion VALUES
+('00000000-0000-0000-0000-000000000005','2026-01-10','A',100,'USD','repuestos','P5',false),
+('00000000-0000-0000-0000-000000000005','2026-01-11','A',-25,'USD','repuestos','NC5',false),
+('00000000-0000-0000-0000-000000000007','2026-01-10','A',99,'USD','repuestos','NO-PARK',false);`);
+p=await run();assert.equal(p.policy,'all_park_closed_or_completed_v2');assert.equal(p.owners.length,5);
+assert.equal(new Set(p.owners).size,5);assert(p.services.some(r=>r[2]==='platform'));
+const platform=p.owners.find(id=>id.endsWith('005'));assert(platform);
+assert.equal(p.parts.filter(r=>r[0]===platform).reduce((n,r)=>n+r[2],0),75);
+assert.equal(p.parts.some(r=>r[0].endsWith('007')),false);
+const union=new Set([...p.services.map(r=>r[0]),platform]);assert.equal(union.size,4);
+assert((await run('2026-10-01')).services.some(r=>r[2]==='platform'));
+assert.equal((await db.query("SELECT proacl::text acl FROM pg_proc WHERE oid='public.parque_cobertura_unificada_v1(date,date)'::regprocedure")).rows[0].acl,aclBefore);
+await assert.rejects(db.exec((await readFile('supabase/migrations/20261030180000_unified_coverage_all_park.sql','utf8')).replace(/\r\n/g,'\n')),/differs from approved baseline/);
+await db.exec('ROLLBACK');
+console.log('PASS all-park SQL: platform-only owner, multiple machines unique owner, service, net parts/NC, union, month, inactive/no-park excluded, unchanged ACL, baseline guard. Synthetic only.');
+await db.close();

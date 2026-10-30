@@ -1,13 +1,13 @@
 import { supabase } from '@/integrations/supabase/client';
 import { projectCoverage, type CoverageRubric, type CoverageWindow } from './parqueCoverage';
-export const unifiedCoverageEnabled = () => import.meta.env.VITE_UNIFIED_PARK_COVERAGE_ENABLED === 'true';
-export type UnifiedCoverage = { version: 1; policy: 'principal_closed_or_completed_v1'; from: string; to: string; owners: string[]; parts: [string,string,number][]; services: [string,string,string,string][]; uncertainOwners: string[] };
+export const unifiedCoverageEnabled = () => import.meta.env.VITE_UNIFIED_PARK_COVERAGE_ENABLED !== 'false';
+export type UnifiedCoverage = { version: 1; policy: 'all_park_closed_or_completed_v2'; from: string; to: string; owners: string[]; parts: [string,string,number][]; services: [string,string,string,string][]; uncertainOwners: string[] };
 const validDay=(v:unknown):v is string=>typeof v==='string' && /^\d{4}-\d{2}-\d{2}$/.test(v) && Number.isFinite(Date.parse(v)) && new Date(v).toISOString().slice(0,10)===v;
 export function parseUnifiedCoverage(raw: unknown, from: string, to: string): UnifiedCoverage {
  const fail=()=>{throw new Error('La cobertura compartida no está completa.');};
  if(!raw||typeof raw!=='object')return fail();
  const p=raw as UnifiedCoverage;
- if(p.version!==1||p.policy!=='principal_closed_or_completed_v1'||p.from!==from||p.to!==to||!validDay(from)||!validDay(to)||from>to)return fail();
+ if(p.version!==1||p.policy!=='all_park_closed_or_completed_v2'||p.from!==from||p.to!==to||!validDay(from)||!validDay(to)||from>to)return fail();
  if(!Array.isArray(p.owners)||p.owners.some(x=>typeof x!=='string'||!x)||new Set(p.owners).size!==p.owners.length)return fail();
  if(!Array.isArray(p.uncertainOwners)||p.uncertainOwners.some(x=>!p.owners.includes(x)))return fail();
  const seenParts=new Set<string>(),seenServices=new Set<string>();

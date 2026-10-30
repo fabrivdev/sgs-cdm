@@ -250,7 +250,7 @@ export function ParqueTab({
   const [sortKey, setSortKey] = useState<SortKey>("cantTotal");
   const [sortDir, setSortDir] = useState<"asc" | "desc">("desc");
 
-  const [incluirPlataformas, setIncluirPlataformas] = useState(false);
+  const [incluirPlataformas, setIncluirPlataformas] = useState(true);
 
   const filtrosActivos =
     (fSucursal !== "all" ? 1 : 0) +
@@ -258,7 +258,7 @@ export function ParqueTab({
     (fRubro !== "all" ? 1 : 0) +
     (fSubgrupo !== "all" ? 1 : 0) +
     (rango !== "365d" ? 1 : 0) +
-    (incluirPlataformas ? 1 : 0);
+    (!incluirPlataformas ? 1 : 0);
 
   const limpiarFiltros = () => {
     setFSucursal("all");
@@ -268,7 +268,7 @@ export function ParqueTab({
     setRango("365d");
     setCustomDesde(undefined);
     setCustomHasta(undefined);
-    setIncluirPlataformas(false);
+    setIncluirPlataformas(true);
   };
 
   // Fase A: datos rápidos (clientes, contactos, máquinas, seguimientos)
