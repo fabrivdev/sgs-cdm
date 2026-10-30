@@ -1,14 +1,15 @@
+import {clearCampiAssetCache} from './campiAssets';
 import {act,cleanup,fireEvent,render,screen} from '@testing-library/react';
 import {afterEach,beforeEach,expect,it,vi} from 'vitest';
 import {CampiBadgeActor,badgeMood} from './CampiBadgeActor';
 let show:IntersectionObserverCallback,reduced=false,change:()=>void,images:MockImage[]=[],rafs:Map<number,FrameRequestCallback>,clock=1000,id=0;
 class MockImage{onload:(()=>void)|null=null;onerror:(()=>void)|null=null;src='';constructor(){images.push(this)}}
-beforeEach(()=>{images=[];rafs=new Map();clock=1000;id=0;reduced=false;vi.stubGlobal('Image',MockImage);vi.stubGlobal('requestAnimationFrame',(cb:FrameRequestCallback)=>{rafs.set(++id,cb);return id});vi.stubGlobal('cancelAnimationFrame',(key:number)=>rafs.delete(key));
+beforeEach(()=>{clearCampiAssetCache();images=[];rafs=new Map();clock=1000;id=0;reduced=false;vi.stubGlobal('Image',MockImage);vi.stubGlobal('requestAnimationFrame',(cb:FrameRequestCallback)=>{rafs.set(++id,cb);return id});vi.stubGlobal('cancelAnimationFrame',(key:number)=>rafs.delete(key));
  globalThis.IntersectionObserver=class{constructor(cb:IntersectionObserverCallback){show=cb;}observe(){}disconnect(){}} as unknown as typeof IntersectionObserver;
  window.matchMedia=(()=>({get matches(){return reduced},addEventListener(_:string,cb:()=>void){change=cb},removeEventListener(){}})) as unknown as typeof matchMedia;
  const noop=()=>{};const ctx=new Proxy({drawImage:vi.fn(),createRadialGradient:()=>({addColorStop:noop})},{get:(o,k)=>k in o?o[k as keyof typeof o]:noop,set:()=>true});vi.spyOn(HTMLCanvasElement.prototype,'getContext').mockReturnValue(ctx as unknown as CanvasRenderingContext2D);
 });
-afterEach(()=>{cleanup();vi.unstubAllGlobals();vi.restoreAllMocks();});
+afterEach(()=>{cleanup();clearCampiAssetCache();vi.unstubAllGlobals();vi.restoreAllMocks();});
 const load=()=>act(()=>images.forEach(i=>i.onload?.()));
 const visible=(value=true)=>act(()=>show([{isIntersecting:value,intersectionRatio:value?1:0}] as IntersectionObserverEntry[],{} as IntersectionObserver));
 const advance=(seconds:number)=>act(()=>{for(let i=0;i<seconds*20+2;i++){clock+=50;const list=[...rafs.values()];rafs.clear();list.forEach(f=>f(clock));}});
@@ -40,7 +41,7 @@ it('does not reveal or start after a failed asset even if other assets finish la
  const t=render(<CampiBadgeActor mood="neutral" messageKey="error"/>);
  act(()=>images[1].onerror?.());load();
  expect(t.container.querySelector('canvas')).toHaveStyle({visibility:'hidden'});
- expect(screen.getByRole('button',{name:'Campi no disponible'})).toBeDisabled();expect(rafs.size).toBe(0);
+ expect(screen.getByRole('button',{name:'Reintentar cargar Campi'})).not.toBeDisabled();expect(rafs.size).toBe(0);
 });
 it('ignores decoded images after disposal and supports a fresh mount',async()=>{
  let resolve!:()=>void;const pending=new Promise<void>(r=>{resolve=r});
@@ -56,7 +57,7 @@ it('handles decode rejection without exposing an incomplete frame',async()=>{
  Object.assign(images[0],{decode:()=>Promise.reject(new Error('decode failed'))});
  await act(async()=>{images.forEach(i=>i.onload?.());await Promise.resolve();});
  expect(t.container.querySelector('canvas')).toHaveStyle({visibility:'hidden'});
- expect(screen.getByRole('button',{name:'Campi no disponible'})).toHaveAttribute('aria-busy','false');
+ expect(screen.getByRole('button',{name:'Reintentar cargar Campi'})).toHaveAttribute('aria-busy','false');
  expect(rafs.size).toBe(0);
 });
 it('ignores repeated image load events without creating another actor',()=>{
