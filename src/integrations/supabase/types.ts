@@ -232,6 +232,53 @@ export type Database = {
           },
         ]
       }
+      campi_os_abiertas_cortes: {
+        Row: {
+          abiertas: number
+          fecha: string
+          registradas_en: string
+        }
+        Insert: {
+          abiertas: number
+          fecha: string
+          registradas_en?: string
+        }
+        Update: {
+          abiertas?: number
+          fecha?: string
+          registradas_en?: string
+        }
+        Relationships: []
+      }
+      campi_os_abiertas_cortes_totvs: {
+        Row: {
+          abiertas: number
+          fecha: string
+          importacion_id: string
+          registradas_en: string
+        }
+        Insert: {
+          abiertas: number
+          fecha: string
+          importacion_id: string
+          registradas_en?: string
+        }
+        Update: {
+          abiertas?: number
+          fecha?: string
+          importacion_id?: string
+          registradas_en?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "campi_os_abiertas_cortes_totvs_importacion_id_fkey"
+            columns: ["importacion_id"]
+            isOneToOne: false
+            referencedRelation: "importaciones"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       clientes: {
         Row: {
           activo: boolean
@@ -1464,6 +1511,70 @@ export type Database = {
           version?: string
         }
         Relationships: []
+      }
+      facturacion_totvs_linea_versiones: {
+        Row: {
+          cambio_comercial: boolean
+          creado_en: string
+          firma_anterior: Json
+          firma_nueva: Json
+          fuente_recibida: Json
+          id: number
+          identidad: string
+          importacion_id: string
+          linea_id: string
+          version_anterior: Json
+          version_nueva: Json
+        }
+        Insert: {
+          cambio_comercial: boolean
+          creado_en?: string
+          firma_anterior: Json
+          firma_nueva: Json
+          fuente_recibida: Json
+          id?: never
+          identidad: string
+          importacion_id: string
+          linea_id: string
+          version_anterior: Json
+          version_nueva: Json
+        }
+        Update: {
+          cambio_comercial?: boolean
+          creado_en?: string
+          firma_anterior?: Json
+          firma_nueva?: Json
+          fuente_recibida?: Json
+          id?: never
+          identidad?: string
+          importacion_id?: string
+          linea_id?: string
+          version_anterior?: Json
+          version_nueva?: Json
+        }
+        Relationships: [
+          {
+            foreignKeyName: "facturacion_totvs_linea_versiones_importacion_id_fkey"
+            columns: ["importacion_id"]
+            isOneToOne: false
+            referencedRelation: "importaciones"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "facturacion_totvs_linea_versiones_linea_id_fkey"
+            columns: ["linea_id"]
+            isOneToOne: false
+            referencedRelation: "facturacion_lineas_importadas"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "facturacion_totvs_linea_versiones_linea_id_fkey"
+            columns: ["linea_id"]
+            isOneToOne: false
+            referencedRelation: "v_repuestos_ventas_unificadas"
+            referencedColumns: ["linea_id"]
+          },
+        ]
       }
       facturacion_totvs_preservaciones_auditadas: {
         Row: {
@@ -3267,6 +3378,7 @@ export type Database = {
       maquinaria_operaciones: {
         Row: {
           actualizado_en: string
+          anulacion: Json | null
           cliente_id: string | null
           cliente_nombre: string | null
           comercial: string | null
@@ -3282,6 +3394,7 @@ export type Database = {
         }
         Insert: {
           actualizado_en?: string
+          anulacion?: Json | null
           cliente_id?: string | null
           cliente_nombre?: string | null
           comercial?: string | null
@@ -3297,6 +3410,7 @@ export type Database = {
         }
         Update: {
           actualizado_en?: string
+          anulacion?: Json | null
           cliente_id?: string | null
           cliente_nombre?: string | null
           comercial?: string | null
@@ -6754,6 +6868,24 @@ export type Database = {
         }
         Relationships: []
       }
+      totvs_kardex_importador_versiones: {
+        Row: {
+          definicion_rpc: string
+          guardado_en: string
+          version: string
+        }
+        Insert: {
+          definicion_rpc: string
+          guardado_en?: string
+          version: string
+        }
+        Update: {
+          definicion_rpc?: string
+          guardado_en?: string
+          version?: string
+        }
+        Relationships: []
+      }
       totvs_kardex_movimientos: {
         Row: {
           actualizado_en: string
@@ -6867,6 +6999,47 @@ export type Database = {
           tipo_cambio?: number
         }
         Relationships: []
+      }
+      totvs_kardex_movimientos_versiones: {
+        Row: {
+          carga_id: string
+          creado_en: string
+          id: number
+          movimiento_id: string
+          recno_origen: string
+          tabla_origen: string
+          version_anterior: Json
+          version_nueva: Json
+        }
+        Insert: {
+          carga_id: string
+          creado_en?: string
+          id?: never
+          movimiento_id: string
+          recno_origen: string
+          tabla_origen: string
+          version_anterior: Json
+          version_nueva: Json
+        }
+        Update: {
+          carga_id?: string
+          creado_en?: string
+          id?: never
+          movimiento_id?: string
+          recno_origen?: string
+          tabla_origen?: string
+          version_anterior?: Json
+          version_nueva?: Json
+        }
+        Relationships: [
+          {
+            foreignKeyName: "totvs_kardex_movimientos_versiones_movimiento_id_fkey"
+            columns: ["movimiento_id"]
+            isOneToOne: false
+            referencedRelation: "totvs_kardex_movimientos"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       totvs_kardex_sintetico: {
         Row: {
@@ -9545,11 +9718,46 @@ export type Database = {
       }
     }
     Functions: {
-      campi_customer_comparison_v1: { Args: { p_from: string; p_to: string }; Returns: Json }
-      maquinaria_anular_pedido: { Args: { p_operacion_id: string }; Returns: Json }
       admin_actualizar_acceso_seccion: {
         Args: { p_activo: boolean; p_seccion_id: string; p_user_id: string }
         Returns: undefined
+      }
+      campi_clientes_cohortes_v1: {
+        Args: {
+          p_desde: string
+          p_hasta: string
+          p_prev_desde: string
+          p_prev_hasta: string
+          p_sucursal?: string
+        }
+        Returns: Json
+      }
+      campi_cobertura_parque_actual_serie_v1: {
+        Args: { p_hasta: string; p_modo: string }
+        Returns: Json
+      }
+      campi_cobertura_rubros_v1: {
+        Args: { p_hasta: string; p_modo: string }
+        Returns: Json
+      }
+      campi_customer_comparison_v1: {
+        Args: { p_from: string; p_to: string }
+        Returns: Json
+      }
+      campi_facturacion_adicional_v1: {
+        Args: { p_desde: string; p_hasta: string }
+        Returns: Json
+      }
+      campi_os_abiertas_capturar_v1: { Args: never; Returns: undefined }
+      campi_os_abiertas_detalle_v1: { Args: never; Returns: Json }
+      campi_os_snapshot_numeros_v1: { Args: never; Returns: string[] }
+      campi_pedidos_abastecimiento_v1: { Args: never; Returns: Json }
+      campi_pedidos_con_stock_v1: { Args: never; Returns: Json }
+      campi_repuestos_exposicion_v1: { Args: never; Returns: Json }
+      campi_resolucion_os_v1: { Args: never; Returns: Json }
+      campi_ventas_servicios_componentes_v1: {
+        Args: { p_desde: string; p_hasta: string }
+        Returns: Json
       }
       cliente_nombre_canonico: { Args: { p_nombre: string }; Returns: string }
       comisiones_actualizar_tipo_tiempo: {
@@ -9772,6 +9980,10 @@ export type Database = {
         }
         Returns: boolean
       }
+      facturacion_totvs_estado_mutable: {
+        Args: { p_linea: Json }
+        Returns: Json
+      }
       facturacion_totvs_fingerprint_auditado: {
         Args: { p_linea: Json }
         Returns: string
@@ -9949,6 +10161,10 @@ export type Database = {
       maquinaria_actualizar_unidad_importacion: {
         Args: { p_datos: Json; p_unidad_id: string }
         Returns: undefined
+      }
+      maquinaria_anular_pedido: {
+        Args: { p_operacion_id: string }
+        Returns: Json
       }
       maquinaria_anular_recepcion_importacion: {
         Args: { p_importacion_unidad_id: string }
@@ -10173,6 +10389,10 @@ export type Database = {
           marca: string
           os_numero: string
         }[]
+      }
+      parque_cobertura_unificada_v1: {
+        Args: { p_desde: string; p_hasta: string }
+        Returns: Json
       }
       parque_facturacion_atribuida: {
         Args: never
@@ -10411,6 +10631,24 @@ export type Database = {
           p_orden?: string
         }
         Returns: Json
+      }
+      repuestos_color_historico: {
+        Args: {
+          actual: number
+          anterior: number
+          antiguo: number
+          dias_venta: number
+        }
+        Returns: string
+      }
+      repuestos_color_ventas_compra: {
+        Args: {
+          actual: number
+          anterior: number
+          antiguo: number
+          dias_compra: number
+        }
+        Returns: string
       }
       repuestos_completar_notas_credito_historicas: {
         Args: { p_anclas: Json; p_carga_id: string; p_filas: Json }
@@ -10935,6 +11173,19 @@ export type Database = {
       ventas_maquinas_cancelar_historico_v2: {
         Args: { p_carga_id: string }
         Returns: undefined
+      }
+      ventas_maquinas_dashboard_filtros_v2: {
+        Args: {
+          p_agrupacion?: string
+          p_buscar?: string
+          p_desde: string
+          p_hasta: string
+          p_marca?: string
+          p_sucursal?: string
+          p_tipo_maquina?: string
+          p_vendedor?: string
+        }
+        Returns: Json
       }
       ventas_maquinas_dashboard_v1: {
         Args: {
