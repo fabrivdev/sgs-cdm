@@ -1729,12 +1729,12 @@
       "id": "panorama-periodo-automatico",
       "title": "Periodo automatico de Panorama",
       "module": "asistente",
-      "description": "Preferencia manual por usuario o calendario de cinco dias habiles; fuente actualizada acreditada antes de confirmar el mes. Preparacion local 02/11/2026.",
+      "description": "Periodo inicial interno por calendario, sin nuevos controles ni textos; la eleccion manual por usuario prevalece.",
       "steps": [
-        "Resolver fecha America/Asuncion y dias no laborables solo bajo permiso existente.",
-        "Primeros cinco dias: acumulado disponible; desde el sexto: mes sujeto a completitud del origen.",
-        "Respetar Mes/Acum. manual hasta Auto, conservar avisos de actualizacion y no acumular fotografias.",
-        "Compartir periodo entre tarjeta, comparacion y comentario sin modificar formulas."
+        "Resolver fecha America/Asuncion y calendario bajo permisos existentes.",
+        "Sin preferencia manual: Acum. los primeros cinco dias habiles; Mes desde el sexto.",
+        "Conservar Mes/Acum. y textos previos; persistir la eleccion manual sin control Auto.",
+        "No modificar fotografias, formulas, permisos ni animaciones."
       ],
       "entities": [
         "usuario",

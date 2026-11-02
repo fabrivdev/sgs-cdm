@@ -27,7 +27,7 @@ beforeEach(() => { vi.useFakeTimers({toFake:['Date']}); vi.setSystemTime(new Dat
 afterEach(() => { cleanup(); vi.useRealTimers(); });
 
 const story = (id: StoryTopicId, overrides: Partial<PanoramaStory> = {}): PanoramaStory => ({
-  sourceFreshness:{through:asuncionDay(),complete:true}, id, title: `Tema ${id}`, question: `¿Cómo viene ${id}?`, status: 'ready', message: 'Conclusión verificada', scope: 'Alcance autorizado', sections: ['repuestos.ventas'], cutoff: null, time:{window:{from:asuncionDay().slice(0,7)+'-01',to:asuncionDay()}}, periodLabel: 'Octubre 2026',
+  id, title: `Tema ${id}`, question: `¿Cómo viene ${id}?`, status: 'ready', message: 'Conclusión verificada', scope: 'Alcance autorizado', sections: ['repuestos.ventas'], cutoff: null, time:{window:{from:asuncionDay().slice(0,7)+'-01',to:asuncionDay()}}, periodLabel: 'Octubre 2026',
   primary: { label: 'Principal', value: 1234.56, unit: 'USD' }, supporting: [{ label: 'Mismo período del año anterior', value: 1000, unit: 'USD' }, { label: 'Acumulado anual', value: 5000, unit: 'USD' }],
   chart: { kind: 'trend', title: `Evolución ${id}`, unit: 'USD', rows: [{ label: 'Septiembre', value: 100 }, { label: 'Octubre', value: 1234.56 }] },
   breakdown: [{ label: 'Repuestos', value: 1234.56, unit: 'USD' }], details: ['Se conservan las notas de crédito.'], source: 'Fuente verificada', route: '/repuestos/ventas', ...overrides,
@@ -267,8 +267,7 @@ it('el recorrido real conserva referencia de visita sin modo de prueba',async()=
 
 describe('automatic calendar period shared with Campi', () => {
   function periodSource(ids: StoryTopicId[], _sections: SectionKey[], asOf: string, period: 'month'|'ytd') {
-    return Promise.resolve(ids.map(id => story(id, { periodMode:period, periodOptions:['month','ytd'], sourceFreshness:{through:asOf,complete:true},
-      time:{window:{from:period==='month'?asOf.slice(0,7)+'-01':asOf.slice(0,4)+'-01-01',to:asOf}},
+    return Promise.resolve(ids.map(id => story(id, { periodMode:period, periodOptions:['month','ytd'], time:{window:{from:period==='month'?asOf.slice(0,7)+'-01':asOf.slice(0,4)+'-01-01',to:asOf}},
       primary:{label:'Facturación neta',value:period==='ytd'?900:10,unit:'USD',comparison:{value:period==='ytd'?800:5,label:'anterior'}},
       temporalComparisons:[{kind:'day',label:'Facturación neta',current:{from:'2026-11-01',to:'2026-11-01'},previous:{from:'2026-10-25',to:'2026-10-25'},components:[{section:'repuestos.ventas',value:5000,previous:4000}]}],
     })));
@@ -279,19 +278,19 @@ describe('automatic calendar period shared with Campi', () => {
     await waitFor(()=>expect(screen.getByRole('region',{name:'Campi'})).toHaveTextContent('La facturación neta acumulada alcanza $ 900'));
     expect(load).toHaveBeenCalledWith(['ventas_facturacion'],expect.any(Array),'2026-11-02','ytd');
     expect(screen.getByText('$ 900')).toBeInTheDocument();
-    expect(screen.getByRole('button',{name:'Período automático'})).toHaveAttribute('aria-pressed','true');
+    expect(screen.queryByRole('button',{name:'Período automático'})).not.toBeInTheDocument();
     fireEvent.click(screen.getByRole('button',{name:'Mes'}));
     await waitFor(()=>expect(screen.getByRole('region',{name:'Campi'})).toHaveTextContent('La facturación neta de este mes alcanza $ 10'));
     expect(readPeriodPreferences('manager-a')).toEqual({ventas_facturacion:'month'});
     expect(screen.getByRole('region',{name:'Campi'})).not.toHaveTextContent('última jornada');
   });
-  it('uses saved manual choice on remount, then re-enters automatic mode explicitly', async () => {
+  it('keeps manual choice on remount without an Auto control', async () => {
     vi.setSystemTime(new Date('2026-11-02T15:00:00Z'));savePeriodChoice('manager-a','ventas_facturacion','month');load.mockImplementation(periodSource);
-    show();await screen.findByRole('button',{name:'Período automático'});
+    show();await screen.findByRole('button',{name:'Mes'});
     expect(load).toHaveBeenCalledWith(['ventas_facturacion'],expect.any(Array),'2026-11-02','month');
-    fireEvent.click(screen.getByRole('button',{name:'Período automático'}));
-    await waitFor(()=>expect(load).toHaveBeenLastCalledWith(['ventas_facturacion'],expect.any(Array),'2026-11-02','ytd'));
-    expect(readPeriodPreferences('manager-a')).toEqual({});
+    expect(screen.queryByRole('button',{name:'Período automático'})).not.toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button',{name:'Acum.'}));
+    expect(readPeriodPreferences('manager-a')).toEqual({ventas_facturacion:'ytd'});
   });
   it('re-evaluates the sixth business day and new month on focus without erasing manual choices', async () => {
     vi.setSystemTime(new Date('2026-11-06T15:00:00Z'));load.mockImplementation(periodSource);show();
@@ -301,20 +300,16 @@ describe('automatic calendar period shared with Campi', () => {
     vi.setSystemTime(new Date('2026-12-01T15:00:00Z'));fireEvent(window,new Event('focus'));
     await waitFor(()=>expect(load).toHaveBeenLastCalledWith(['ventas_facturacion'],expect.any(Array),'2026-12-01','ytd'));
   });
-  it('keeps an unverified source explicit and lets the user choose an open month', async () => {
-    load.mockResolvedValue([story('ventas_facturacion',{sourceFreshness:undefined,periodMode:'month',periodOptions:['month','ytd']})]);show();
+  it('keeps observed values without new freshness or period commentary', async () => {
+    load.mockResolvedValue([story('ventas_facturacion',{periodMode:'month',periodOptions:['month','ytd']})]);show();
     await screen.findByRole('button',{name:'Mes'});
-    expect(screen.getAllByText(/Se muestran los datos disponibles del mes, sin confirmar su actualización/).length).toBeGreaterThan(0);
     expect(screen.getByText('$ 1.235')).toBeInTheDocument();
-    fireEvent.click(screen.getByRole('button',{name:'Mes'}));
-    expect(await screen.findByText('$ 1.235')).toBeInTheDocument();
-    expect(screen.getByRole('region',{name:'Campi'})).toHaveTextContent('La actualización de la fuente al corte solicitado no está verificada.');
-    expect(load).toHaveBeenCalledTimes(1);
+    expect(screen.queryByText(/actualización.*verificada|Información desde|Desde julio de 2026 hasta hoy/i)).not.toBeInTheDocument();
   });
   it('does not read the protected calendar without its permission', async () => {
     vi.mocked(loadBusinessClosures).mockClear();load.mockImplementation(periodSource);show(['ventas_facturacion'],s=>s==='repuestos.ventas');
-    await screen.findByRole('button',{name:'Período automático'});
+    await screen.findByRole('button',{name:'Mes'});
     expect(loadBusinessClosures).not.toHaveBeenCalled();
-    expect(screen.getByText(/no se pudieron verificar los días no laborables/)).toBeInTheDocument();
+    expect(screen.queryByText(/no se pudieron verificar los días no laborables/)).not.toBeInTheDocument();
   });
 });

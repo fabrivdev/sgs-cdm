@@ -24,7 +24,6 @@ function pair(s:PanoramaStory,a:string,b:string,integer=true){const n=support(s,
 /** Only known zero denominators certify empty; a missing value or error never does. */
 export function topicCopy(s:PanoramaStory):string|null {
  const p=s.primary?.value,ytd=s.periodMode==='ytd';
- const accumulated = (s.time?.window??s.navigationPeriod)?.from==='2026-07-01' ? 'Desde julio de 2026' : 'En el acumulado disponible';
  let v=finite(p)?percentage(p):null;
  if(s.status==='error')return null;
  switch(s.id){
@@ -41,7 +40,7 @@ export function topicCopy(s:PanoramaStory):string|null {
   if(q&&q.n!==q.d&&['100','0'].includes(v!))v=percentage(q.n/q.d*100);
   if(q?.n===0)return `Ninguna de las ${num(q.d)} órdenes cerradas del período registra facturación a clientes.`;
   if(q&&q.n===q.d)return `Las ${num(q.d)} órdenes de servicio cerradas del período registran facturación a clientes.`;
-  return (ytd?`${accumulated}, el ${v}% de las órdenes cerradas tuvo facturación a clientes`:`Este mes, el ${v}% de las órdenes de servicio cerradas registró facturación a clientes`)+(q?` (${num(q.n)} de ${num(q.d)}).`:'.');
+  return (ytd?`En el acumulado disponible, el ${v}% de las órdenes cerradas tuvo facturación a clientes`:`Este mes, el ${v}% de las órdenes de servicio cerradas registró facturación a clientes`)+(q?` (${num(q.n)} de ${num(q.d)}).`:'.');
  }
  case 'agenda_cumplimiento':{
   if(s.status==='empty')return support(s,'Evaluables')===0?'No hay compromisos evaluables en el período seleccionado.':null;
@@ -49,7 +48,7 @@ export function topicCopy(s:PanoramaStory):string|null {
   if(q&&q.n!==q.d&&['100','0'].includes(v!))v=percentage(q.n/q.d*100);
   if(q?.n===0)return `Ninguno de los ${num(q.d)} compromisos evaluables del período fue completado.`;
   if(q&&q.n===q.d)return `Se completaron los ${num(q.d)} compromisos evaluables del período, alcanzando un cumplimiento del 100%.`;
-  return ytd?`${accumulated}, la agenda registra un cumplimiento del ${v}%${q?` (${num(q.n)} de ${num(q.d)} compromisos evaluables)`:''}.`:`Este mes se completó el ${v}% de los compromisos evaluables de la agenda${q?` (${num(q.n)} de ${num(q.d)})`:''}.`;
+  return ytd?`En el acumulado disponible, la agenda registra un cumplimiento del ${v}%${q?` (${num(q.n)} de ${num(q.d)} compromisos evaluables)`:''}.`:`Este mes se completó el ${v}% de los compromisos evaluables de la agenda${q?` (${num(q.n)} de ${num(q.d)})`:''}.`;
  }
  case 'servicios_productividad':case 'servicios_eficiencia':{
   const efficiency=s.id==='servicios_eficiencia',q=pair(s,efficiency?'Horas facturadas':'Horas trabajadas',efficiency?'Horas trabajadas':'Horas disponibles',false);
@@ -57,7 +56,7 @@ export function topicCopy(s:PanoramaStory):string|null {
   if(!finite(p))return null;
   if(q&&q.n!==q.d&&['100','0'].includes(v!))v=percentage(q.n/q.d*100);
   if(q?.n===0)return efficiency?`Se registran ${num(q.d)} horas trabajadas conciliadas, sin horas facturadas contabilizadas en el período.`:`Se registran ${num(q.d)} horas de capacidad disponible, sin horas trabajadas contabilizadas en el período.`;
-  const head=efficiency?ytd?`${accumulated}, la eficiencia del taller se sitúa en ${v}%`:`La eficiencia del taller alcanza el ${v}% este mes`:ytd?`${accumulated}, la productividad técnica se sitúa en ${v}%`:`La productividad técnica de este mes alcanza el ${v}%`;
+  const head=efficiency?ytd?`En el acumulado disponible, la eficiencia del taller se sitúa en ${v}%`:`La eficiencia del taller alcanza el ${v}% este mes`:ytd?`En el acumulado disponible, la productividad técnica se sitúa en ${v}%`:`La productividad técnica de este mes alcanza el ${v}%`;
   return head+(q?efficiency?`, con ${num(q.n)} horas facturadas sobre ${num(q.d)} trabajadas conciliadas.`:`, con ${num(q.n)} horas trabajadas sobre ${num(q.d)} disponibles.`:'.');
  }
  case 'clientes_retencion':case 'clientes_cobertura_posventa':{

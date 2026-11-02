@@ -1,4 +1,3 @@
-import { periodCaption, type PeriodChoice } from '@/lib/campi/automaticPeriod';
 import { formatMonth, monthTick, storyDateLines } from '@/lib/campi/panoramaDates';
 import { useEffect, useState } from 'react';
 import { ArrowRight, CircleCheck, FileText, Package, RefreshCw, Tractor, Wrench } from 'lucide-react';
@@ -181,9 +180,9 @@ function ServiceRatio({ story }: { story: PanoramaStory }) {
   </figure>;
 }
 
-export function PanoramaStoryCard({ story, index, retrying, onRetry, openSignal = 0, onSelectorOpenChange, periodMode = 'month', periodChoice, onPeriodChange }: {
+export function PanoramaStoryCard({ story, index, retrying, onRetry, openSignal = 0, onSelectorOpenChange, periodMode = 'month', onPeriodChange }: {
   story: PanoramaStory; index: number; retrying: boolean; onRetry: () => void; openSignal?: number;
-  onSelectorOpenChange?: (open: boolean) => void; periodMode?: StoryPeriod; periodChoice?: PeriodChoice; onPeriodChange?: (mode: PeriodChoice) => void;
+  onSelectorOpenChange?: (open: boolean) => void; periodMode?: StoryPeriod; onPeriodChange?: (mode: StoryPeriod) => void;
 }) {
   const navigate = useNavigate();
   const [selectorOpen, setSelectorOpen] = useState(false);
@@ -220,9 +219,7 @@ export function PanoramaStoryCard({ story, index, retrying, onRetry, openSignal 
       && (story.chart?.kind !== 'trend' || chartValues.length >= 2);
   const showBasis = story.id === 'ventas_evolucion';
   return <article className="panorama-story" aria-labelledby={`story-${story.id}`} data-story={story.id} data-has-chart={hasChart}>
-    <header className="story-header"><span className="story-index">{String(index + 1).padStart(2, '0')}</span><div className="story-heading-text"><h2 id={`story-${story.id}`}>{story.title}</h2></div><div className="story-header-period">{story.periodOptions?.length === 2 && onPeriodChange && <div className="story-period-switch" role="group" aria-label={`Período de ${story.title}`}>{periodChoice !== undefined && <button type="button" aria-pressed={periodChoice === 'auto'} onClick={() => onPeriodChange?.('auto')} aria-label="Período automático">Auto</button>}{(['month', 'ytd'] as const).map(mode => <button key={mode} type="button" aria-pressed={periodMode === mode} onClick={() => onPeriodChange(mode)}>{mode === 'month' ? 'Mes' : 'Acum.'}</button>)}</div>}<span className="sr-only">{dateLines.map(line => <span key={line}>{line}</span>)}</span></div>{story.status === 'empty' && <span className="story-empty-label">Sin datos</span>}</header>
-    {story.periodOptions?.length === 2 && <p>{periodCaption(story)}</p>}
-    {story.periodNotice && story.status !== 'error' && <p role="status">{story.periodNotice}</p>}
+    <header className="story-header"><span className="story-index">{String(index + 1).padStart(2, '0')}</span><div className="story-heading-text"><h2 id={`story-${story.id}`}>{story.title}</h2></div><div className="story-header-period">{story.periodOptions?.length === 2 && onPeriodChange && <div className="story-period-switch" role="group" aria-label={`Período de ${story.title}`}>{(['month', 'ytd'] as const).map(mode => <button key={mode} type="button" aria-pressed={periodMode === mode} onClick={() => onPeriodChange(mode)}>{mode === 'month' ? 'Mes' : 'Acum.'}</button>)}</div>}<span className="sr-only">{dateLines.map(line => <span key={line}>{line}</span>)}</span></div>{story.status === 'empty' && <span className="story-empty-label">Sin datos</span>}</header>
     {story.status === 'error' ? <div role="alert"><p className="story-error">{story.message}</p><Button variant="outline" disabled={retrying} onClick={onRetry}><RefreshCw className="mr-2 h-4 w-4" />{retrying ? 'Consultando…' : 'Reintentar fuente'}</Button></div> : <>
       <div className={`story-summary-metric${story.primary && valueLabel(story.primary.value, story.primary.unit).length > 12 ? ' story-summary-metric--long' : ''}`}>
         {story.primary && <><div className="story-main-value"><strong aria-label={`${story.primary.label}: ${valueLabel(story.primary.value, story.primary.unit)}`} data-long={valueLabel(story.primary.value, story.primary.unit).length > 12}>{valueLabel(story.primary.value, story.primary.unit)}</strong>{osMovement !== null && <span className="story-os-movement" data-direction={osMovement.delta < 0 ? 'down' : osMovement.delta > 0 ? 'up' : 'flat'} title={osMovement.partial ? 'Mes actual parcial frente al mes anterior completo: diferencia aritmética, no tramos equivalentes.' : 'Dos meses completos consecutivos.'} aria-label={`${osMovement.delta < 0 ? 'Bajó' : osMovement.delta > 0 ? 'Subió' : 'Sin cambio'} ${number.format(Math.abs(osMovement.delta))} puntos porcentuales; ${osMovement.partial ? 'mes actual parcial frente al mes anterior completo, no tramos equivalentes' : 'dos meses completos consecutivos'}`}><b>{osMovement.delta > 0 ? '+' : osMovement.delta < 0 ? '−' : ''}{number.format(Math.abs(osMovement.delta))} p.p.</b><small>{osMovement.partial ? 'parcial vs mes ant. completo' : 'vs. mes anterior'}</small></span>}{percentage?.kind === 'variation' && <span className="story-change" data-direction="neutral">{percentage.value > 0 ? '+' : ''}{number.format(percentage.value)}% <small>vs LY</small></span>}</div>{showBasis && <p className="story-support-line">Ventas antes de NC</p>}</>}

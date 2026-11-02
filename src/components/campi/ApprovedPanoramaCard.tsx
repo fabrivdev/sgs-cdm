@@ -1,4 +1,3 @@
-import { periodCaption, type PeriodChoice } from '@/lib/campi/automaticPeriod';
 import { billingComponents } from '@/lib/campi/billingComponents';
 import { useEffect, useState, type CSSProperties } from 'react';
 import { Area, AreaChart, ComposedChart, Line, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts';
@@ -269,10 +268,10 @@ function Chart({ story, periodMode }: { story: PanoramaStory; periodMode: StoryP
   }
 }
 
-export function ApprovedPanoramaCard({ story, index, retrying, onRetry, openSignal = 0, onSelectorOpenChange, periodMode = 'month', periodChoice, onPeriodChange, salesScope, onSalesScopeChange }: {
+export function ApprovedPanoramaCard({ story, index, retrying, onRetry, openSignal = 0, onSelectorOpenChange, periodMode = 'month', onPeriodChange, salesScope, onSalesScopeChange }: {
   salesScope?: readonly SectionKey[]; onSalesScopeChange?: (scope: SectionKey[]) => void;
   story: PanoramaStory; index: number; retrying: boolean; onRetry: () => void; openSignal?: number;
-  onSelectorOpenChange?: (open: boolean) => void; periodMode?: StoryPeriod; periodChoice?: PeriodChoice; onPeriodChange?: (mode: PeriodChoice) => void;
+  onSelectorOpenChange?: (open: boolean) => void; periodMode?: StoryPeriod; onPeriodChange?: (mode: StoryPeriod) => void;
 }) {
   const navigate = useNavigate();
   const [requestedScope, setRequestedScope] = useState<SectionKey[]>([]);
@@ -295,10 +294,8 @@ export function ApprovedPanoramaCard({ story, index, retrying, onRetry, openSign
     ? `${resolutionDays.format(displayed.primary.value)} días` : approvedValue(displayed.primary?.value, displayed.primary?.unit ?? 'count');
   return <article className="approved-story-card" data-topic={story.id} style={{ '--approved-accent': tone.accent, '--approved-tint': tone.tint } as CSSProperties} aria-labelledby={`approved-${story.id}`}>
     <header className="approved-card-header"><span className="approved-card-index">{String(index + 1).padStart(2, '0')}</span><h2 id={`approved-${story.id}`}>{title}</h2><div className="approved-period" role="group" aria-label={`Período de ${title}`} title={periodEnabled ? undefined : 'No existe una agregación Mes/Acum. válida para este indicador'}>
-      {periodChoice !== undefined && periodEnabled && <button type="button" aria-pressed={periodChoice === 'auto'} onClick={() => onPeriodChange?.('auto')} aria-label="Período automático">Auto</button>}{(['month', 'ytd'] as const).map(mode => <button key={mode} type="button" disabled={!periodEnabled} aria-pressed={(!periodEnabled && story.id === 'servicios_pendientes' && mode === 'month') || (periodEnabled && periodMode === mode)} onClick={() => onPeriodChange?.(mode)}>{mode === 'month' ? 'Mes' : 'Acum.'}</button>)}
+      {(['month', 'ytd'] as const).map(mode => <button key={mode} type="button" disabled={!periodEnabled} aria-pressed={(!periodEnabled && story.id === 'servicios_pendientes' && mode === 'month') || (periodEnabled && periodMode === mode)} onClick={() => onPeriodChange?.(mode)}>{mode === 'month' ? 'Mes' : 'Acum.'}</button>)}
     </div><span className="sr-only">{storyDateLines(story).join('; ')}</span></header>
-    {periodEnabled && (story.id !== 'servicios_pendientes' || story.status === 'error') && <p className="approved-card-context">{periodCaption(story)}</p>}
-    {story.periodNotice && story.status !== 'error' && <p role="status" className="approved-card-context">{story.periodNotice}</p>}
     {story.status === 'error' ? <div className="approved-card-error" role="alert"><p>{story.message}</p><Button variant="outline" disabled={retrying} onClick={onRetry}><RefreshCw size={16} className="mr-2" />{retrying ? 'Consultando…' : 'Reintentar fuente'}</Button></div> : <div className="approved-card-body">
       <div className="approved-card-summary"><div className="approved-kpi-row"><strong aria-label={`${displayed.primary?.label ?? title}: ${primaryText}`}>{primaryText}</strong>{badge && <span className="approved-badge" data-direction={badge.direction} data-assessment={approvedAssessment(displayed)} title={badge.description} aria-label={`${badge.text}; ${badge.description}; ${assessmentLabel[approvedAssessment(displayed)]}`}>{badge.text}</span>}</div>
         {context && <p className="approved-card-context">{context}</p>}
