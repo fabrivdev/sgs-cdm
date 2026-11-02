@@ -7,7 +7,7 @@ describe('Panorama business-question catalog', () => {
     const ids = PANORAMA_CATALOG_TARGETS.map(target => target.id);
     expect(ids).toHaveLength(20);
     expect(new Set(ids).size).toBe(20);
-    expect(PANORAMA_TOPICS).toHaveLength(12);
+    expect(PANORAMA_TOPICS).toHaveLength(13);
     expect(ids).toContain('ventas_evolucion');
     expect(ids).toContain('facturacion_neta_nc');
     expect(ids).toContain('parque_instalado_crecimiento');

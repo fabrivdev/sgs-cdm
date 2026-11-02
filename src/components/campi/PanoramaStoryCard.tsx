@@ -1,3 +1,4 @@
+import { ApprovedPanoramaCard } from './ApprovedPanoramaCard';
 import { formatMonth, monthTick, storyDateLines } from '@/lib/campi/panoramaDates';
 import { useEffect, useState } from 'react';
 import { ArrowRight, CircleCheck, FileText, Package, RefreshCw, Tractor, Wrench } from 'lucide-react';
@@ -180,7 +181,7 @@ function ServiceRatio({ story }: { story: PanoramaStory }) {
   </figure>;
 }
 
-export function PanoramaStoryCard({ story, index, retrying, onRetry, openSignal = 0, onSelectorOpenChange, periodMode = 'month', onPeriodChange }: {
+function NativePanoramaStoryCard({ story, index, retrying, onRetry, openSignal = 0, onSelectorOpenChange, periodMode = 'month', onPeriodChange }: {
   story: PanoramaStory; index: number; retrying: boolean; onRetry: () => void; openSignal?: number;
   onSelectorOpenChange?: (open: boolean) => void; periodMode?: StoryPeriod; onPeriodChange?: (mode: StoryPeriod) => void;
 }) {
@@ -242,4 +243,8 @@ export function PanoramaStoryCard({ story, index, retrying, onRetry, openSignal 
       {action}
     </>}
   </article>;
+}
+
+export function PanoramaStoryCard(props: Parameters<typeof NativePanoramaStoryCard>[0]) {
+  return props.story.id === 'maquinas_importacion' ? <ApprovedPanoramaCard {...props} /> : <NativePanoramaStoryCard {...props} />;
 }

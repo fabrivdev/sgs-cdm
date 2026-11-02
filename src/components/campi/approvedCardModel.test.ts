@@ -8,8 +8,9 @@ const story = (id: PanoramaStory['id'], overrides: Partial<PanoramaStory> = {}):
 });
 
 describe('approved Panorama card contracts', () => {
-  it('selects all 12 approved topics through the same renderer', () => {
-    expect(APPROVED_CARD_IDS).toHaveLength(12);
+  it('selects all 13 approved topics through the same renderer', () => {
+    expect(APPROVED_CARD_IDS).toHaveLength(13);
+    expect(isApprovedCard('maquinas_importacion')).toBe(true);
     expect(isApprovedCard('servicios_os_facturadas')).toBe(true);
     expect(isApprovedCard('clientes_cobertura_posventa')).toBe(true);
     expect(isApprovedCard('servicios_pendientes')).toBe(true);

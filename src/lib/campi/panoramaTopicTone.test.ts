@@ -4,7 +4,7 @@ import { PANORAMA_GROUP_TONES, panoramaTopicTone } from './panoramaTopicTone';
 
 describe('Panorama topic identity colors', () => {
   it('uses the selector group palette for every selectable card', () => {
-    expect(PANORAMA_TOPICS).toHaveLength(12);
+    expect(PANORAMA_TOPICS).toHaveLength(13);
     for (const topic of PANORAMA_TOPICS) {
       const tone = panoramaTopicTone(topic.id);
       expect(tone).toBe(PANORAMA_GROUP_TONES[topic.group]);

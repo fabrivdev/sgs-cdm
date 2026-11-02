@@ -75,6 +75,14 @@ export function topicCopy(s:PanoramaStory):string|null {
   if(q.n===q.d)return coverage?`Todos los ${num(q.d)} propietarios del parque registraron compras de ${s.coverageSelection?.length===1?s.coverageSelection[0]==='repuestos.ventas'?'repuestos':'servicios':'posventa'} durante el período analizado.`:`Los ${num(q.d)} clientes considerados para el análisis volvieron a comprar, alcanzando una retención del 100%.`;
   return coverage?`La cobertura de posventa alcanza el ${v}%: ${num(q.n)} de los ${num(q.d)} propietarios del parque registraron compras de ${s.coverageSelection?.length===1?s.coverageSelection[0]==='repuestos.ventas'?'repuestos':'servicios':'repuestos o servicios'}.`:`De los ${num(q.d)} clientes considerados para el análisis, ${num(q.n)} volvieron a comprar, alcanzando una retención del ${v}%.`;
  }
+ case 'maquinas_importacion': {
+  const data=s.machineImports;
+  if(!data||!count(data.total)||!count(data.completed)||data.completed>data.total)return null;
+  if(data.total===0)return `No hay máquinas con embarque estimado válido en ${data.year}; el porcentaje completado no tiene denominador.`;
+  if(!finite(data.completionPercent))return null;
+  const rate=new Intl.NumberFormat('es-PY',{maximumFractionDigits:1}).format(data.completionPercent);
+  return `En ${data.year}, ${num(data.completed)} de ${num(data.total)} máquinas previstas por embarque estimado están completadas: ${rate}%.`;
+ }
  case 'maquinas_pedidos':{
   if(!count(p))return null;if(p===0)return 'Actualmente no se registran pedidos pendientes de máquinas.';
   const n=support(s,'Pedidos con stock completo'),rows=s.chart?.rows,full=rows?.find(x=>x.label==='Cobertura completa')?.value;

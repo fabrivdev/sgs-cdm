@@ -7,7 +7,7 @@ const compact = new Intl.NumberFormat('es-PY', { notation: 'compact', maximumFra
 
 export const APPROVED_CARD_IDS = [
   'servicios_os_facturadas', 'servicios_pendientes', 'ventas_evolucion', 'ventas_facturacion',
-  'maquinas_pedidos', 'repuestos_stock', 'repuestos_alertas',
+  'maquinas_importacion', 'maquinas_pedidos', 'repuestos_stock', 'repuestos_alertas',
   'agenda_cumplimiento', 'servicios_productividad', 'servicios_eficiencia',
   'clientes_retencion', 'clientes_cobertura_posventa',
 ] as const;
@@ -21,6 +21,7 @@ export const APPROVED_TITLES: Record<ApprovedCardId, string> = {
   servicios_pendientes: 'Resolución de OS',
   ventas_evolucion: 'Evolución de ventas',
   ventas_facturacion: 'Facturación neta',
+  maquinas_importacion: 'Importaciones de máquinas',
   maquinas_pedidos: 'Pedidos pendientes de máquinas',
   repuestos_stock: 'Stock antiguo de repuestos',
   repuestos_alertas: 'Próximos cambios de clasificación',
@@ -62,6 +63,10 @@ export function approvedContext(story: PanoramaStory): string | null {
       const components = billingComponents(story);
       return components && components.gross > 0
         ? `Sobre el total facturado se descontó ${decimal.format(-components.credits / components.gross * 100)}% en NC` : null;
+    }
+    case 'maquinas_importacion': {
+      const data = story.machineImports;
+      return data ? `${whole.format(data.completed)} de ${whole.format(data.total)} completadas · ${data.year}` : null;
     }
     case 'maquinas_pedidos': {
       const linked = support(story, 'Pedidos con stock');

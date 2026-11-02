@@ -2,6 +2,7 @@ import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import { MemoryRouter } from 'react-router-dom';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { machineImportsStory } from '@/lib/campi/machineImports';
 import { asuncionDay } from '@/lib/campi/factualRounds';
 import { PanoramaDashboard } from './PanoramaDashboard';
 import { PANORAMA_TOPICS, type PanoramaTopicId } from '@/lib/campi/panoramaPreferences';
@@ -38,6 +39,29 @@ function show(topics: PanoramaTopicId[] = ['ventas_facturacion'], hasAccess: (se
 }
 
 describe('Campi alternative story dashboard', () => {
+  it('renders annual imports through the actual approved-card registry with the inactive sibling tabs', async () => {
+    const imports = machineImportsStory({ observedAt: asuncionDay(), year: 2026, total: 5, completed: 2, completionPercent: 40,
+      excludedMissingETA: 1, excludedOtherYears: 2, excludedCancelled: 0,
+      states: { PLANIFICADO: 1, EN_TRANSITO: 1, ARRIBADO: 1, COMPLETADO: 2 },
+      brands: [{label:'CLAAS',total:3,completed:1},{label:'HORSCH',total:2,completed:1}] });
+    load.mockResolvedValue([imports]);
+    show(['maquinas_importacion'], section => section === 'parque.importaciones');
+    await screen.findByRole('link', { name: 'Abrir importaciones: Importaciones de máquinas' });
+    const card = screen.getByRole('heading', { name: 'Importaciones de máquinas' }).closest('article')!;
+    expect(card).toHaveClass('approved-story-card');
+    expect(card).toHaveAttribute('data-topic', 'maquinas_importacion');
+    expect(card.querySelector('.story-mini-bars')).toBeNull();
+    expect(card.querySelector('.machine-imports-columns')).toBeNull();
+    expect(within(card).getByLabelText('Completadas sobre previstas en 2026: 40%')).toBeInTheDocument();
+    expect(within(card).getByLabelText('Planificado: 1 de 5').querySelector('i')).toHaveStyle({width:'20%'});
+    expect(within(card).getByText('2 de 5 completadas · 2026')).toBeInTheDocument();
+    const period=within(card).getByRole('group',{name:'Período de Importaciones de máquinas'});
+    expect(within(period).getByRole('button',{name:'Mes'})).toBeDisabled();
+    expect(within(period).getByRole('button',{name:'Acum.'})).toBeDisabled();
+    expect(screen.getByRole('heading',{name:/En 2026, 2 de 5 máquinas previstas por embarque estimado están completadas: 40%/})).toBeInTheDocument();
+    expect(load).toHaveBeenCalledWith(['maquinas_importacion'], ['parque.importaciones'], asuncionDay(), 'month');
+  });
+
   it('keeps the greeting in the page h1 and colors only the name', () => {
     load.mockReturnValue(new Promise(() => {}));
     show(['ventas_facturacion'], () => true, vi.fn(), 'Ana Pérez');

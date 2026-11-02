@@ -12,6 +12,7 @@ import { scopedSalesStory } from '@/lib/campi/salesScope';
 import { storyDestinations } from '@/lib/campi/storyNavigation';
 import { panoramaTopicTone } from '@/lib/campi/panoramaTopicTone';
 import { APPROVED_TITLES, approvedAssessment, assessmentLabel, approvedBadge, approvedContext, approvedPeriodEnabled, approvedValue, type ApprovedCardId } from './approvedCardModel';
+import { MachineImportsChart } from './MachineImportsChart';
 import './approved-panorama-card.css';
 
 const decimal = new Intl.NumberFormat('es-PY', { maximumFractionDigits: 1 });
@@ -236,7 +237,7 @@ function Action({ story, openSignal, onSelectorOpenChange }: { story: PanoramaSt
   const title = APPROVED_TITLES[story.id as ApprovedCardId] ?? story.title;
   const destinations = storyDestinations(story);
   const label = story.id === 'ventas_evolucion' ? 'Abrir ventas' : story.id === 'ventas_facturacion' ? 'Abrir facturación'
-    : story.id === 'maquinas_pedidos' ? 'Abrir pedidos' : story.id === 'repuestos_stock' ? 'Abrir inventario'
+    : story.id === 'maquinas_importacion' ? 'Abrir importaciones' : story.id === 'maquinas_pedidos' ? 'Abrir pedidos' : story.id === 'repuestos_stock' ? 'Abrir inventario'
       : story.id === 'repuestos_alertas' ? 'Abrir proyección' : story.id === 'agenda_cumplimiento' ? 'Abrir agenda'
         : story.id === 'servicios_productividad' ? 'Abrir productividad' : story.id === 'servicios_eficiencia' ? 'Abrir eficiencia'
           : story.id.startsWith('clientes_') ? 'Abrir clientes' : 'Abrir OS';
@@ -259,6 +260,7 @@ function Chart({ story, periodMode }: { story: PanoramaStory; periodMode: StoryP
     case 'servicios_pendientes': return <ResolutionDistribution story={story} />;
     case 'servicios_os_facturadas': case 'ventas_evolucion': case 'servicios_productividad': case 'servicios_eficiencia': return <ApprovedTrend story={story} />;
     case 'ventas_facturacion': return <Waterfall story={story} />;
+    case 'maquinas_importacion': return <MachineImportsChart story={story} />;
     case 'maquinas_pedidos': return <Distribution story={story} />;
     case 'repuestos_stock': case 'clientes_retencion': return <Composition story={story} />;
     case 'repuestos_alertas': return <Changes story={story} />;
@@ -289,7 +291,7 @@ export function ApprovedPanoramaCard({ story, index, retrying, onRetry, openSign
   const badge = approvedBadge(displayed);
   const context = approvedContext(displayed);
   const title = APPROVED_TITLES[story.id as ApprovedCardId] ?? story.title;
-  const tone = panoramaTopicTone(story.id);
+  const tone = story.id === 'maquinas_importacion' ? { accent: '#00855f', tint: '#eaf6f1' } : panoramaTopicTone(story.id);
   const primaryText = story.id === 'servicios_pendientes' && typeof displayed.primary?.value === 'number' && Number.isFinite(displayed.primary.value)
     ? `${resolutionDays.format(displayed.primary.value)} días` : approvedValue(displayed.primary?.value, displayed.primary?.unit ?? 'count');
   return <article className="approved-story-card" data-topic={story.id} style={{ '--approved-accent': tone.accent, '--approved-tint': tone.tint } as CSSProperties} aria-labelledby={`approved-${story.id}`}>
@@ -298,7 +300,7 @@ export function ApprovedPanoramaCard({ story, index, retrying, onRetry, openSign
     </div><span className="sr-only">{storyDateLines(story).join('; ')}</span></header>
     {story.status === 'error' ? <div className="approved-card-error" role="alert"><p>{story.message}</p><Button variant="outline" disabled={retrying} onClick={onRetry}><RefreshCw size={16} className="mr-2" />{retrying ? 'Consultando…' : 'Reintentar fuente'}</Button></div> : <div className="approved-card-body">
       <div className="approved-card-summary"><div className="approved-kpi-row"><strong aria-label={`${displayed.primary?.label ?? title}: ${primaryText}`}>{primaryText}</strong>{badge && <span className="approved-badge" data-direction={badge.direction} data-assessment={approvedAssessment(displayed)} title={badge.description} aria-label={`${badge.text}; ${badge.description}; ${assessmentLabel[approvedAssessment(displayed)]}`}>{badge.text}</span>}</div>
-        {context && <p className="approved-card-context">{context}</p>}
+        {story.id === 'maquinas_importacion' && displayed.machineImports ? <div className="approved-import-context"><p>{context}</p><p className="approved-import-brands">{displayed.machineImports.brands.map((brand, brandIndex) => <span key={brand.label}>{brandIndex > 0 && '  ·  '}{brand.label} <strong>{whole.format(brand.total)}</strong></span>)}</p></div> : context && <p className="approved-card-context">{context}</p>}
         {displayed.billingCoverage && (displayed.billingCoverage.additional !== 'available' || !displayed.billingCoverage.allCoreAreas) && <p className="approved-card-context" role="status">Cobertura parcial: una o más fuentes no están disponibles.</p>}
         {story.status === 'empty' && <p className="approved-card-context"><strong>Sin datos.</strong> {story.message}</p>}
         {story.status === 'ready' && scopes.length > 0 && <div className="approved-sales-scopes" role="group" aria-label="Ámbito de ventas">

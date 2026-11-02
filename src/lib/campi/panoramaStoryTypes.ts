@@ -63,6 +63,7 @@ export type PanoramaStory = {
   time?: StoryTime;
   businessWindow?: { current: { from: string; to: string }; previous: { from: string; to: string }; coverage: 'observed' };
   series?: SeriesPoint[];
+  machineImports?: import('./machineImports').MachineImports;
   closureDistribution?: { total: number; bins: [number, number, number, number] };
   closureDistributionIssue?: string;
   cohort?: { numerator: string[]; denominator: string[] };

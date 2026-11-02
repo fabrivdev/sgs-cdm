@@ -16,6 +16,7 @@ import { PanoramaLoadingCard } from './PanoramaLoadingCard';
 import { BusinessCampi } from './BusinessCampi';
 import { PanoramaStoryCard } from './PanoramaStoryCard';
 import { ApprovedPanoramaCard } from './ApprovedPanoramaCard';
+import { isApprovedCard } from './approvedCardModel';
 import { readStoryVisit, saveStoryVisit } from '@/lib/campi/panoramaStoryVisits';
 import './panorama-dashboard.css';
 
@@ -83,7 +84,7 @@ export function PanoramaDashboard({ userId, greetingName = 'Usuario', topics, av
   const reports = useQueries({ queries: groups.map(queryIds => {
     const topicGranted = storySectionsForTopics(queryIds, hasAccess);
     const period = periodFor(queryIds[0]);
-    return { queryKey: ['campi-panorama-story', userId, queryIds.join('|'), topicGranted.join('|'), asOf, period, queryIds.includes('servicios_pendientes') ? 'resolution-range-v2' : queryIds.includes('clientes_cobertura_posventa') ? `coverage-unified-v2:${unifiedCoverageEnabled()}:${import.meta.env.VITE_CAMPI_COVERAGE_RUBROS_ENABLED === 'true'}` : 'billing-coverage-v2'],
+    return { queryKey: ['campi-panorama-story', userId, queryIds.join('|'), topicGranted.join('|'), asOf, period, queryIds.includes('maquinas_importacion') ? 'imports-annual-eta-v2' : queryIds.includes('servicios_pendientes') ? 'resolution-range-v2' : queryIds.includes('clientes_cobertura_posventa') ? `coverage-unified-v2:${unifiedCoverageEnabled()}:${import.meta.env.VITE_CAMPI_COVERAGE_RUBROS_ENABLED === 'true'}` : 'billing-coverage-v2'],
       queryFn: () => loadPanoramaStories(queryIds, topicGranted, asOf, period), retry: false, throwOnError: false,
       enabled: Boolean(userId) && !(calendarPending && queryIds.some(id => PERIOD_TOPICS.includes(id) && !choices[id])), staleTime: 60_000 };
   }) });
@@ -118,7 +119,7 @@ export function PanoramaDashboard({ userId, greetingName = 'Usuario', topics, av
     </div> : <BusinessCampi key={userId} userId={userId} requestTopics={reviewable} superadmin={superadmin} onChooseTopics={onEdit} stories={stories.map(story=>scopedSalesStory(story,salesScopeFor(story.id)))} hasAccess={hasAccess} loading={loading} failed={failed || stories.some(s=>s.status==='error')} />}    {failed && <div role="alert" className="panorama-source-error"><p>No se pudo consultar una fuente. Cada prioridad conserva su lugar para que puedas reintentarla.</p><Button variant="outline" disabled={fetching} onClick={retry}><RefreshCw className="mr-2 h-4 w-4" />Reintentar</Button></div>}
     <div className={`panorama-stories${reviewing ? ' panorama-stories--review' : ''}`}>{selected.map((id, index) => reportFor(id)?.isPending
       ? <PanoramaLoadingCard key={id} index={index} label={available.find(topic => topic.id === id)?.label ?? id} />
-      : ['servicios_os_facturadas', 'servicios_pendientes', 'ventas_evolucion', 'ventas_facturacion', 'maquinas_pedidos', 'repuestos_stock', 'repuestos_alertas', 'agenda_cumplimiento', 'servicios_productividad', 'servicios_eficiencia', 'clientes_retencion', 'clientes_cobertura_posventa'].includes(id) ? <ApprovedPanoramaCard salesScope={salesScopeFor(id)} onSalesScopeChange={sections=>setScopeChoice(previous=>({user:userId,topics:{...(previous.user===userId?previous.topics:{}),[id]:sections}}))} key={id === 'ventas_evolucion' ? `${id}:${userId}:${granted.join('|')}` : id} story={stories[index]} index={index} retrying={reportFor(id)?.isFetching ?? false} onRetry={() => void reportFor(id).refetch()} openSignal={openStory?.id === id ? openStory.token : 0} onSelectorOpenChange={open => setDetailOpen(current => open ? id : current === id ? null : current)} periodMode={periodFor(id)} onPeriodChange={mode => choosePeriod(id, mode)} />
+      : isApprovedCard(id) ? <ApprovedPanoramaCard salesScope={salesScopeFor(id)} onSalesScopeChange={sections=>setScopeChoice(previous=>({user:userId,topics:{...(previous.user===userId?previous.topics:{}),[id]:sections}}))} key={id === 'ventas_evolucion' ? `${id}:${userId}:${granted.join('|')}` : id} story={stories[index]} index={index} retrying={reportFor(id)?.isFetching ?? false} onRetry={() => void reportFor(id).refetch()} openSignal={openStory?.id === id ? openStory.token : 0} onSelectorOpenChange={open => setDetailOpen(current => open ? id : current === id ? null : current)} periodMode={periodFor(id)} onPeriodChange={mode => choosePeriod(id, mode)} />
       : <PanoramaStoryCard key={id} story={stories[index]} index={index} retrying={reportFor(id)?.isFetching ?? false} onRetry={() => void reportFor(id).refetch()} openSignal={openStory?.id === id ? openStory.token : 0} onSelectorOpenChange={open => setDetailOpen(current => open ? id : current === id ? null : current)} periodMode={periodFor(id)} onPeriodChange={mode => choosePeriod(id, mode)} />)}</div>
     {!selected.length && <Button variant="outline" onClick={onEdit}>Elegir temas para Panorama</Button>}
   </PageShell>;

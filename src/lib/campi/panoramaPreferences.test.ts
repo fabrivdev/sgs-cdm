@@ -13,7 +13,7 @@ beforeEach(() => localStorage.clear());
 
 describe('Campi Panorama topics', () => {
   it('offers business themes mapped to real sections, not a menu copy', () => {
-    expect(PANORAMA_TOPICS).toHaveLength(12);
+    expect(PANORAMA_TOPICS).toHaveLength(13);
     expect(PANORAMA_TOPICS.map(topic => topic.id)).toEqual(expect.arrayContaining([
       'ventas_evolucion', 'ventas_facturacion', 'maquinas_pedidos', 'servicios_pendientes',
       'repuestos_stock', 'repuestos_alertas', 'servicios_os_facturadas',

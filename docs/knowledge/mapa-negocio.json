@@ -40,6 +40,7 @@
       "title": "Importaciones de máquinas",
       "description": "Seguimiento por unidad, OC, embarque, documentos de proveedor, arribo y conciliación física con stock. No confundir con importación de archivos.",
       "notes": [
+        "48-Panorama-importaciones-maquinas",
         "05-Importaciones",
         "19-Gerencia-importaciones",
         "25-Revision-movil-transversal"

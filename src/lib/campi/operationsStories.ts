@@ -1,3 +1,4 @@
+import { loadMachineImports } from './machineImportsSource';
 import { withOrderComposition, withPartsExpansion } from './sourceExpansion';
 import { withPartsAlertCandidateDetails } from './partsAlertCandidates';
 import { loadClosures } from './seriesData';
@@ -25,6 +26,7 @@ const definitions: Partial<Record<StoryTopicId, { section: SectionKey; route: st
   repuestos_rojo: { section: 'repuestos.analisis', route: '/repuestos/analisis', source: 'campi_repuestos_exposicion_v1' },
   maquinas_pedidos: { section: 'parque.operaciones', route: '/parque-operaciones', source: 'campi_pedidos_abastecimiento_v1 + campi_pedidos_con_stock_v1' },
   maquinas_pedidos_stock: { section: 'parque.operaciones', route: '/parque-operaciones', source: 'campi_pedidos_abastecimiento_v1 + campi_pedidos_con_stock_v1' },
+  maquinas_importacion: { section: 'parque.importaciones', route: '/parque-importaciones', source: 'maquinaria_importacion_unidades_operativas' },
   maquinas_stock: { section: 'parque.stock', route: '/parque-stock', source: 'parque_stock_maquinas · saldo_actual' },
   maquinas_proyeccion: { section: 'parque.stock_proyectado', route: '/parque-stock-proyectado', source: 'parque_stock_proyectado_v1' },
   servicios_pendientes: { section: 'servicios.ordenes', route: '/servicios/ordenes', source: 'campi_resolucion_os_v1' },
@@ -156,6 +158,7 @@ export const loadOperationsStories: StoryLoader = async (topics, granted, asOf, 
         return parts(id, await partsRequest);
       }
       if (id === 'maquinas_proyeccion') return await projected(asOf);
+      if (id === 'maquinas_importacion') return await loadMachineImports(asOf);
       if (id === 'maquinas_stock') return await machineStock();
       if (id === 'maquinas_pedidos' || id === 'maquinas_pedidos_stock') {
         readyRequest ??= supabase.rpc('campi_pedidos_con_stock_v1' as never);

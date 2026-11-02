@@ -33,6 +33,9 @@ export function factualVariants(story: PanoramaStory, allowed: (s:SectionKey)=>b
   const text=isSales(story.id)?story.status==='ready'?salesCopy(story.id,p,period,previousLabel):null:topicCopy(story);
   push('primary',text,`¿Cuánto registra ${p.label.toLowerCase()} ${period==='ytd'?'en el acumulado disponible':'este mes'}?`,commentEvidence(story,p,period,window,previousWindow,isSales(story.id)));
  }
+ if(story.id==='maquinas_importacion' && story.machineImports?.observedAt===today && story.machineImports.year===Number(today.slice(0,4)) && story.time?.observedAt===today) {
+  push('imports-year',topicCopy(story),story.question,commentEvidence(story,p,'snapshot'));
+ }
  const snapshot=story.id==='maquinas_pedidos'
   ?story.time?.observedAt===today&&story.machineOrders?.asOf===today&&story.machineOrders.orders===p.value
   :['repuestos_stock','repuestos_alertas'].includes(story.id)&&story.time?.inventoryCutoff===today&&story.time?.classificationDate===today;

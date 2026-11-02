@@ -14,8 +14,15 @@ export type TopicContract = {
   evidence: readonly string[];
   tests: readonly string[];
 };
-export type EnabledTopicId = Exclude<StoryTopicId, 'repuestos_clientes' | 'maquinas_proyeccion' | 'maquinas_stock' | 'repuestos_demanda' | 'servicios_trabajo' | 'servicios_agenda' | 'maquinas_importacion' | 'maquinas_parque' | 'repuestos_reposicion' | 'servicios_comisiones'>;
+export type EnabledTopicId = Exclude<StoryTopicId, 'repuestos_clientes' | 'maquinas_proyeccion' | 'maquinas_stock' | 'repuestos_demanda' | 'servicios_trabajo' | 'servicios_agenda' | 'maquinas_parque' | 'repuestos_reposicion' | 'servicios_comisiones'>;
 export const PANORAMA_CONTRACTS = {
+  maquinas_importacion: {
+    queryGroup: 'machine-imports-annual', unit: 'percent', formula: 'Completadas / unidades con ETA efectiva del año actual × 100; estados y marcas sobre la misma cohorte.',
+    population: 'Unidades operativas de importación de máquinas, canceladas excluidas, una por identidad; ETA válida del año del análisis para TODOS los estados.',
+    period: 'Año actual de embarque estimado efectivo; estado actual de esa programación.', comparison: 'snapshot', chart: 'composition',
+    limitations: ['ETA es embarque estimado y no cambia a ATA al completar.', 'Sin ETA válida queda fuera del denominador; no se inventa año.', 'Reprogramar ETA puede cambiar la cohorte; no reconstruye el plan original ni una tasa histórica.'],
+    evidence: ['machineImports.ts', 'machineImportsSource.ts', 'machineImportStatus.ts'], tests: ['machineImports.test.ts', 'machineImportsSource.test.ts', 'PanoramaDashboard.test.tsx'],
+  },
   ventas_evolucion: {
     queryGroup: 'sales', unit: 'USD', formula: 'Ventas antes de NC del período; variación = (actual / mismo tramo LY − 1) × 100 solo con base LY positiva.',
     population: 'Movimientos de venta de cada sección autorizada, sin consolidado parcial.',

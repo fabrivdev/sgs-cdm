@@ -1,5 +1,7 @@
 # SGS-CDM: inicio
 
+- [[48-Panorama-importaciones-maquinas|Panorama: avance anual de importaciones de máquinas]] - preparación local, sin publicación.
+
 - [[47-Panorama-periodo-automatico|Panorama: periodo automatico y preferencias manuales]] - preparacion local; limites de frescura por origen.
 
 - [[45-Campi-solicitudes-temas-local|Campi: solicitudes de temas y habilitación compartida]]
