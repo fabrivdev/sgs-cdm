@@ -1,5 +1,7 @@
 # SGS-CDM: inicio
 
+- [[47-Panorama-periodo-automatico|Panorama: periodo automatico y preferencias manuales]] - preparacion local; limites de frescura por origen.
+
 - [[45-Campi-solicitudes-temas-local|Campi: solicitudes de temas y habilitación compartida]]
 
 - [[44-Panorama-integracion-main|Panorama: integración a main, configuración y límites de validación]] — retiro del recorrido temporal; publicación pública reservada al usuario.

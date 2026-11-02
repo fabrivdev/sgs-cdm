@@ -40,6 +40,11 @@ export type SalesScope = {
 };
 export type StoryBreakdown = { label: string; value: number; unit: StoryUnit; route?: string; note?: string; group?: string; previous?: number; billing?: { sales: number; credits: number } };
 export type PanoramaStory = {
+  /** Only an explicit, complete source watermark; never the query's requested cutoff. */
+  sourceFreshness?: { through: string; complete: boolean };
+  periodNotice?: string;
+  /** Dashboard period choice is authoritative for all comments derived from this story. */
+  selectedPeriodOnly?: boolean;
   coverageBasis?: 'attention';
   coverageRubros?: import('./coverageRubros').CoverageRubros;
   coverageSelection?: SectionKey[];

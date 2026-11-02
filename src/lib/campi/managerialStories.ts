@@ -57,6 +57,7 @@ export function planningStory(rows: readonly PlanningRow[], asOf: string, period
   const count = (status: string) => eligible.filter(row => row.estado === status).length;
   const completed = count('Completado');
   const story = base('agenda_cumplimiento', 'servicios.planificador', `/?desde=${from}&hasta=${asOf}`, 'servicio_jornadas', asOf);
+  story.sourceFreshness = { through: asOf, complete: true }; // Complete live agenda read; not an imported data watermark.
   story.periodMode = period; story.periodOptions = ['month', 'ytd']; story.visitKey = `agenda_cumplimiento:${period}:${asOf}`;
   story.time = { window: { from, to: asOf } };
   story.periodLabel = formatRange(story.time.window!);

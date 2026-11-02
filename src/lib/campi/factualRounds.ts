@@ -18,7 +18,7 @@ const cumulative: Partial<Record<StoryTopicId,string>> = {
 export function factualVariants(story: PanoramaStory, allowed: (s:SectionKey)=>boolean, today = asuncionDay()): FactualComment[] {
  const original=story.primary;
  const p=original?{...original}:null;
- if(story.status==='error'||!p||!story.sections.length||!story.sections.every(allowed)) return [];
+ if(story.status==='error'||story.periodNotice||!p||!story.sections.length||!story.sections.every(allowed)) return [];
  const result:FactualComment[]=[];
  const push=(id:string,text:string|null,question:string,evidence:CommentEvidence)=>{if(text&&story.billingCoverage&&(story.billingCoverage.additional!=='available'||!story.billingCoverage.allCoreAreas))text+=' Cobertura parcial.';if(text&&!result.some(c=>c.text===text))result.push({id:`${story.id}|${id}`,topic:story.id,text,question,evidence});};
  const window=story.time?.window??story.navigationPeriod;
@@ -41,7 +41,7 @@ export function factualVariants(story: PanoramaStory, allowed: (s:SectionKey)=>b
  if(story.id==='servicios_pendientes'&&story.time?.closedMonth&&window?.from===previousEnd.slice(0,7)+'-01'&&window.to===previousEnd)
   push('closed-month',topicCopy(story),'¿Cuál fue la mediana de resolución el mes pasado?',commentEvidence(story,p,'closed-month',window,undefined,false));
  // Exact date-range reads, same report contract and selected authorized sections.
- for(const temporal of (story.status==='ready'&&isSales(story.id)?story.temporalComparisons??[]:[])) {
+ for(const temporal of (!story.selectedPeriodOnly&&story.status==='ready'&&isSales(story.id)?story.temporalComparisons??[]:[])) {
   const shift=(day:string,days:number)=>new Date(Date.parse(day+'T00:00:00Z')+days*86400000).toISOString().slice(0,10);
   const yesterday=shift(today,-1),sunday=shift(today,-(new Date(today+'T00:00:00Z').getUTCDay()||7));
   const expected=temporal.kind==='day'?{from:yesterday,to:yesterday,previousFrom:shift(yesterday,-7),previousTo:shift(yesterday,-7)}:{from:shift(sunday,-6),to:sunday,previousFrom:shift(sunday,-13),previousTo:shift(sunday,-7)};
@@ -53,7 +53,7 @@ export function factualVariants(story: PanoramaStory, allowed: (s:SectionKey)=>b
  }
  // These exact labels are produced from the same gross/net KPI by salesStories.
  const annual=story.supporting.find(d=>d.label===cumulative[story.id]&&d.unit===p.unit);
- if(annual && currentWindow && story.status==='ready' && story.periodMode!=='ytd') push('accumulated',salesCopy(story.id,annual,'ytd'),`¿Cómo varía el acumulado disponible de ${p.label.toLowerCase()}?`,commentEvidence(story,annual,'ytd',undefined,undefined,true));
+ if(!story.selectedPeriodOnly && annual && currentWindow && story.status==='ready' && story.periodMode!=='ytd') push('accumulated',salesCopy(story.id,annual,'ytd'),`¿Cómo varía el acumulado disponible de ${p.label.toLowerCase()}?`,commentEvidence(story,annual,'ytd',undefined,undefined,true));
  // Do not traverse historic chart points: old months are not current commentary.
  return result;
 }

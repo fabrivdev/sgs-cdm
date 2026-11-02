@@ -1726,6 +1726,33 @@
   ],
   "flows": [
     {
+      "id": "panorama-periodo-automatico",
+      "title": "Periodo automatico de Panorama",
+      "module": "asistente",
+      "description": "Preferencia manual por usuario o calendario de cinco dias habiles; fuente actualizada acreditada antes de confirmar el mes. Preparacion local 02/11/2026.",
+      "steps": [
+        "Resolver fecha America/Asuncion y dias no laborables solo bajo permiso existente.",
+        "Primeros cinco dias: acumulado disponible; desde el sexto: mes sujeto a completitud del origen.",
+        "Respetar Mes/Acum. manual hasta Auto, conservar avisos de actualizacion y no acumular fotografias.",
+        "Compartir periodo entre tarjeta, comparacion y comentario sin modificar formulas."
+      ],
+      "entities": [
+        "usuario",
+        "permiso",
+        "asistente"
+      ],
+      "rules": [
+        "acceso-servidor"
+      ],
+      "sources": [
+        "src/lib/campi/automaticPeriod.ts",
+        "src/lib/campi/businessCalendar.ts",
+        "src/components/campi/PanoramaDashboard.tsx",
+        "src/lib/campi/factualRounds.ts",
+        "docs/knowledge/47-Panorama-periodo-automatico.md"
+      ]
+    },
+    {
       "id": "configurar-y-leer-panorama",
       "title": "Priorizar temas y leer Panorama",
       "module": "asistente",
