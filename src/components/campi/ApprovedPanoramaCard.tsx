@@ -291,7 +291,7 @@ export function ApprovedPanoramaCard({ story, index, retrying, onRetry, openSign
   const badge = approvedBadge(displayed);
   const context = approvedContext(displayed);
   const title = APPROVED_TITLES[story.id as ApprovedCardId] ?? story.title;
-  const tone = story.id === 'maquinas_importacion' ? { accent: '#00855f', tint: '#eaf6f1' } : panoramaTopicTone(story.id);
+  const tone = panoramaTopicTone(story.id);
   const primaryText = story.id === 'servicios_pendientes' && typeof displayed.primary?.value === 'number' && Number.isFinite(displayed.primary.value)
     ? `${resolutionDays.format(displayed.primary.value)} días` : approvedValue(displayed.primary?.value, displayed.primary?.unit ?? 'count');
   return <article className="approved-story-card" data-topic={story.id} style={{ '--approved-accent': tone.accent, '--approved-tint': tone.tint } as CSSProperties} aria-labelledby={`approved-${story.id}`}>
@@ -300,7 +300,7 @@ export function ApprovedPanoramaCard({ story, index, retrying, onRetry, openSign
     </div><span className="sr-only">{storyDateLines(story).join('; ')}</span></header>
     {story.status === 'error' ? <div className="approved-card-error" role="alert"><p>{story.message}</p><Button variant="outline" disabled={retrying} onClick={onRetry}><RefreshCw size={16} className="mr-2" />{retrying ? 'Consultando…' : 'Reintentar fuente'}</Button></div> : <div className="approved-card-body">
       <div className="approved-card-summary"><div className="approved-kpi-row"><strong aria-label={`${displayed.primary?.label ?? title}: ${primaryText}`}>{primaryText}</strong>{badge && <span className="approved-badge" data-direction={badge.direction} data-assessment={approvedAssessment(displayed)} title={badge.description} aria-label={`${badge.text}; ${badge.description}; ${assessmentLabel[approvedAssessment(displayed)]}`}>{badge.text}</span>}</div>
-        {story.id === 'maquinas_importacion' && displayed.machineImports ? <div className="approved-import-context"><p>{context}</p><p className="approved-import-brands">{displayed.machineImports.brands.map((brand, brandIndex) => <span key={brand.label}>{brandIndex > 0 && '  ·  '}{brand.label} <strong>{whole.format(brand.total)}</strong></span>)}</p></div> : context && <p className="approved-card-context">{context}</p>}
+        {story.id === 'maquinas_importacion' && displayed.machineImports ? <div className="approved-card-context approved-import-context"><p>{context}</p><p className="approved-import-brands">{displayed.machineImports.brands.map((brand, brandIndex) => <span key={brand.label}>{brandIndex > 0 && '  ·  '}{brand.label} <strong>{whole.format(brand.total)}</strong></span>)}</p></div> : context && <p className="approved-card-context">{context}</p>}
         {displayed.billingCoverage && (displayed.billingCoverage.additional !== 'available' || !displayed.billingCoverage.allCoreAreas) && <p className="approved-card-context" role="status">Cobertura parcial: una o más fuentes no están disponibles.</p>}
         {story.status === 'empty' && <p className="approved-card-context"><strong>Sin datos.</strong> {story.message}</p>}
         {story.status === 'ready' && scopes.length > 0 && <div className="approved-sales-scopes" role="group" aria-label="Ámbito de ventas">

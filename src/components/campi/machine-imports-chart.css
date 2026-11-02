@@ -1,29 +1,10 @@
-/* Figma 46:304 / 53:304. Extends the shared approved card; data remain dynamic. */
-.approved-story-card[data-topic="maquinas_importacion"] {
-  --approved-accent: #00855f;
-  --approved-tint: #eaf6f1;
-  min-height: 256px;
-  padding: 17px 22px;
-  gap: 18px;
-  border-color: #cfe7df;
-}
-.approved-story-card[data-topic="maquinas_importacion"] .approved-card-summary { gap: 15px; }
-.approved-import-context { min-width: 0; color: var(--approved-muted); font-size: 13px; line-height: 20px; }
+/* Inherit type, spacing and theme from the approved siblings. Only chart columns differ. */
+.approved-import-context { min-width: 0; }
 .approved-import-context p { margin: 0; }
 .approved-import-brands { overflow-wrap: anywhere; }
 .approved-import-brands strong { font-weight: 600; }
-.approved-import-states { width: 100%; height: 164px; margin: 0; display: flex; flex-direction: column; gap: 12px; }
-.approved-import-state { display: grid; grid-template-columns: 116px minmax(0, 1fr) 24px; gap: 10px; align-items: center; width: 100%; max-width: 405px; min-height: 18px; font-size: 12px; line-height: 1.3; }
-.approved-import-state > span:first-child { color: var(--approved-muted); font-weight: 500; }
-.approved-import-state strong { color: var(--approved-ink); font-weight: 600; font-variant-numeric: tabular-nums; }
-.approved-import-track { width: 100%; height: 10px; overflow: hidden; border-radius: 5px; background: var(--approved-guide); }
-.approved-import-track i { display: block; height: 100%; border-radius: 4px; background: #00855f; }
-.approved-import-track [data-state="PLANIFICADO"] { background: #728095; }
-.approved-import-track [data-state="EN_TRANSITO"] { background: #eca14a; }
+.approved-resolution-row.approved-import-state { grid-template-columns: 116px minmax(0, 1fr) 24px; width: 100%; max-width: 405px; }
 @container approvedCard (max-width: 420px) {
-  .approved-import-state { grid-template-columns: 96px minmax(0, 1fr) 24px; gap: 8px; }
+  .approved-resolution-row.approved-import-state { grid-template-columns: 96px minmax(0, 1fr) 24px; gap: 8px; }
   .approved-story-card[data-topic="maquinas_importacion"] .approved-card-error { flex-direction: column; align-items: flex-start; justify-content: center; }
 }
-
-.approved-story-card[data-topic="maquinas_importacion"] .approved-card-header { height: 38px; }
-.approved-story-card[data-topic="maquinas_importacion"] .approved-kpi-row > strong { font-size: 30px; }

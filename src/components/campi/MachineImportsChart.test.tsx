@@ -2,10 +2,15 @@ import { cleanup, fireEvent, render, screen, within } from '@testing-library/rea
 import { MemoryRouter } from 'react-router-dom';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { machineImportsStory, type MachineImports } from '@/lib/campi/machineImports';
+import { panoramaTopicTone } from '@/lib/campi/panoramaTopicTone';
+import { readFileSync } from 'node:fs';
+import { resolve } from 'node:path';
 import { ApprovedPanoramaCard } from './ApprovedPanoramaCard';
 import { PanoramaStoryCard } from './PanoramaStoryCard';
 
 afterEach(cleanup);
+const sharedStyles = readFileSync(resolve('src/components/campi/approved-panorama-card.css'), 'utf8');
+const importStyles = readFileSync(resolve('src/components/campi/machine-imports-chart.css'), 'utf8');
 const data: MachineImports = { observedAt: '2026-11-02', year: 2026, total: 10, completed: 5, completionPercent: 50,
   states: { PLANIFICADO: 2, EN_TRANSITO: 1, ARRIBADO: 2, COMPLETADO: 5 }, brands: [{ label: 'CLAAS', total: 6, completed: 3 }, { label: 'HORSCH', total: 4, completed: 2 }],
   excludedMissingETA: 2, excludedOtherYears: 3, excludedCancelled: 0 };
@@ -13,6 +18,22 @@ const show = (story = machineImportsStory(data), legacy = false) => { const Card
   return render(<MemoryRouter><Card story={story} index={0} retrying={false} onRetry={vi.fn()} onPeriodChange={vi.fn()} /></MemoryRouter>); };
 
 describe('approved annual imports card', () => {
+  it('inherits the canonical topic tone and the same typography and bar styles as approved siblings', () => {
+    const {container}=show();
+    const card=container.querySelector<HTMLElement>('.approved-story-card')!;
+    const tone=panoramaTopicTone('maquinas_importacion');
+    expect(tone).toMatchObject({accent:'#c2410c',tint:'#fff7ed'});
+    expect(card.style.getPropertyValue('--approved-accent')).toBe(tone.accent);
+    expect(card.style.getPropertyValue('--approved-tint')).toBe(tone.tint);
+    expect(container.querySelector('.approved-import-context')).toHaveClass('approved-card-context');
+    expect(container.querySelector('.approved-import-states')).toHaveClass('approved-resolution');
+    expect(container.querySelectorAll('.approved-resolution-row')).toHaveLength(4);
+    expect(container.querySelectorAll('.approved-resolution-track')).toHaveLength(4);
+    expect(importStyles).not.toMatch(/font-size|line-height|--approved-accent|--approved-tint|background:|border-color|approved-kpi-row|approved-card-header|approved-card-summary/);
+    expect(sharedStyles).toContain('font-size: clamp(20px, 3.4cqw, 30px)');
+    expect(sharedStyles).toContain('background: color-mix(in srgb, var(--approved-accent) 62%, white)');
+  });
+
   it('renders the percentage, common brand denominator and horizontal states instead of months', () => {
     const { container } = show();
     expect(screen.getByLabelText('Completadas sobre previstas en 2026: 50%')).toBeInTheDocument();
