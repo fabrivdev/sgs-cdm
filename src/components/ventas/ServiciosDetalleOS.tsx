@@ -22,6 +22,7 @@ type InvoiceLine = ServiceSalesSearchLine & {
   descripcion: string | null; cantidad: number | null; total_venta: number;
   cantidad_os?: number | null;
   codigo?: string | null;
+  marca_maquina?: string | null; modelo_maquina?: string | null;
   es_nota_credito?: boolean;
 };
 const shortDate = new Intl.DateTimeFormat("es-PY", { day: "2-digit", month: "2-digit", year: "2-digit" });
@@ -109,8 +110,14 @@ export function ServiciosDetalleOS({ desde, hasta, sucursal, buscar, tipoTiempo,
 
   useSalesSectionExport({ id: "services-detail", label: "Exportar Detalle de facturación", disabled: loading || Boolean(error) || !rows.length, onSelect: async () => {
     const snapshot = rows;
+    const { loadServiceDetailMachines } = await import("./serviceDetailMachines");
+    const exportRows = await loadServiceDetailMachines(snapshot);
+    const exportColumns: readonly SalesColumn<InvoiceLine>[] = [...detailColumns,
+      {key:"marca_maquina",label:"Marca",kind:"text",value:row=>row.marca_maquina},
+      {key:"modelo_maquina",label:"Modelo de la máquina",kind:"text",value:row=>row.modelo_maquina},
+    ];
     const { exportSalesTable } = await import("./salesTableExport");
-    exportSalesTable({rows:snapshot,columns:detailColumns,sheetName:"Detalle Servicios",fileName:`ventas-servicios-detalle-${desde}-${hasta}.xlsx`});
+    exportSalesTable({rows:exportRows,columns:exportColumns,sheetName:"Detalle Servicios",fileName:`ventas-servicios-detalle-${desde}-${hasta}.xlsx`});
   } }, can("datos:exportar"));
 
   if (isMobile) return <div className="mt-3">

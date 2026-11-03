@@ -7,6 +7,10 @@ const { rpc, can, exportSalesTable, viewport } = vi.hoisted(() => ({ rpc: vi.fn(
 vi.mock('@/hooks/use-mobile', () => ({useIsMobile:()=>viewport.mobile}));
 vi.mock('@/hooks/useAuth', () => ({useAuth:()=>({can})}));
 vi.mock('./salesTableExport',()=>({exportSalesTable}));
+vi.mock('./serviceDetailMachines',()=>({loadServiceDetailMachines: async (rows: {chasis:string|null}[]) => rows.map(row=>({...row,
+  marca_maquina: row.chasis === 'C7501463' ? 'CLAAS' : null,
+  modelo_maquina: row.chasis === 'C7501463' ? 'LEXION 770' : null,
+}))}));
 vi.mock('@/integrations/supabase/client', () => ({ supabase: { rpc } }));
 vi.mock('@/components/ventas/MachineHistorySheet', () => ({ MachineHistorySheet: ({target}: {target:{chassis:string}}) => <div>Historial: {target.chassis}</div> }));
 afterEach(() => { cleanup(); vi.clearAllMocks(); can.mockReturnValue(true); exportSalesTable.mockReset(); viewport.mobile=false; });
@@ -55,10 +59,26 @@ describe('invoice line detail', () => {
     expect(exported.rows.map((row:{id:string})=>row.id)).toEqual(Array.from(container.querySelectorAll('[data-invoice-line]')).map(row=>row.getAttribute('data-invoice-line')));
     expect(exported.rows).toHaveLength(25);
     expect(exported.rows.some((row:{id:string})=>row.id==='excluded')).toBe(false);
-    expect(exported.columns.map((column:{label:string})=>column.label)).toEqual(['Fecha','Factura','Sucursal','Cliente facturado','Propietario','OS','Chasis','Tiempo','Código','Descripción','Cant.','Facturación Neta']);
+    expect(exported.columns.map((column:{label:string})=>column.label)).toEqual(['Fecha','Factura','Sucursal','Cliente facturado','Propietario','OS','Chasis','Tiempo','Código','Descripción','Cant.','Facturación Neta','Marca','Modelo de la máquina']);
     expect(exported.columns[1].exportValue(exported.rows[0])).toBe('000001234');
     expect(exported.columns[10].value(exported.rows[0])).toBeNull();
     expect(exported.columns[11].value(exported.rows[0])).toBe(-2);
+    // Serialize an actual XLSX through the export callback's rows and columns.
+    const { createSalesWorkbook } = await vi.importActual<typeof import('./salesTableExport')>('./salesTableExport');
+    const XLSX = await import('xlsx');
+    const workbook = createSalesWorkbook(exported.rows, exported.columns, exported.sheetName);
+    const bytes = XLSX.write(workbook,{type:'array',bookType:'xlsx'});
+    const sheet = XLSX.read(bytes,{type:'array',cellNF:true}).Sheets['Detalle Servicios'];
+    expect(sheet['!ref']).toBe('A1:N26');
+    expect(sheet['!autofilter']).toEqual({ref:'A1:N26'});
+    expect(sheet.M1.v).toBe('Marca');
+    expect(sheet.N1.v).toBe('Modelo de la máquina');
+    expect(sheet.M2).toMatchObject({v:'CLAAS',t:'s',z:'@'});
+    expect(sheet.N2).toMatchObject({v:'LEXION 770',t:'s',z:'@'});
+    expect(sheet.B2).toMatchObject({v:'000001234',t:'s',z:'@'});
+    expect(sheet.L2).toMatchObject({v:-2,t:'n',z:'"$" #,##0.00;"$" -#,##0.00'});
+    expect(sheet.A2.z).toBe('dd/mm/yy');
+    expect(workbook.Sheets['Detalle Servicios']['!cols']).toHaveLength(14);
     expect(rpc).toHaveBeenCalledTimes(1);
   });
   it('preserves export types and exact visible quantity semantics for NC, zero, long text and unknowns', async () => {
@@ -77,6 +97,22 @@ describe('invoice line detail', () => {
     expect(columns[10].value(km)).toBe(0);
     expect(columns[10].value(part)).toBe(3);
     expect(columns[11].value(nc)).toBe(-10.25);
+  });
+  it('writes empty machine cells without dropping unlinked invoice lines', async () => {
+    rpc.mockResolvedValue({error:null,data:[{...line,chasis:null,os:null}]});
+    render(<ServiciosDetalleOS {...props} />);
+    await screen.findByText('1 líneas · 1 documentos');
+    await selectExport();
+    await waitFor(()=>expect(exportSalesTable).toHaveBeenCalledTimes(1));
+    const exported=exportSalesTable.mock.calls[0][0];
+    const {createSalesWorkbook}=await vi.importActual<typeof import('./salesTableExport')>('./salesTableExport');
+    const XLSX=await import('xlsx');
+    const bytes=XLSX.write(createSalesWorkbook(exported.rows,exported.columns,exported.sheetName),{type:'array',bookType:'xlsx'});
+    const sheet=XLSX.read(bytes,{type:'array'}).Sheets['Detalle Servicios'];
+    expect(sheet['!ref']).toBe('A1:N2');
+    expect(sheet.M2).toBeUndefined();
+    expect(sheet.N2).toBeUndefined();
+    expect(sheet.L2.v).toBe(200);
   });
   it('hides export without permission and blocks exports while loading, after errors or without rows', async () => {
     can.mockReturnValue(false); rpc.mockResolvedValue({error:null,data:[line]});
