@@ -14,6 +14,14 @@ Validación: pruebas aisladas de PostgreSQL, parser, permisos, caché vacía, re
 
 ---
 
+## Odómetros inconsistentes — decisión confirmada el 10/11/2026
+
+El usuario indicó conservar los valores originales y excluir inconsistencias, sin reemplazar kilometrajes. fuelOdometerIssues diagnostica por vehículo: retrocesos aislados que recuperan la secuencia y tramos altos que luego retroceden. Una lectura baja aislada no invalida las anteriores correctas. Se excluyen intervalos con un extremo observado inconsistente, sin unir artificialmente los extremos a través de la carga descartada. Litros, importes, registros y exportaciones originales permanecen intactos.
+
+El diagnóstico usa la serie completa incluso cuando se filtra un período. Después selecciona los intervalos comprendidos en las fechas solicitadas. Búsqueda no modifica el diagnóstico ni el consumo. No requiere SQL ni modifica la base real. No interpreta un reinicio/cambio de odómetro como un recorrido confirmado ni adivina valores correctos. Las detecciones son exclusiones preventivas, no certificación de que las restantes lecturas sean correctas.
+
+Validación: pruebas de retroceso aislado, salto sostenido, recuperación del tramo posterior, filtro que oculta el retroceso, permisos y navegación. Diagnóstico privado sobre copia de las planillas; no equivale a consulta de la base actual. Sin publicación en Lovable.
+
 ## Importes y recorrido — revisión posterior del 10/11/2026
 
 Importes en tablas, tarjetas y detalle usan Gs junto al número para PYG. La moneda queda almacenada y exportable, pero sin columna visible independiente. Otras monedas conservan su código y nunca se suman entre sí.

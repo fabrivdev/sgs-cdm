@@ -1,3 +1,4 @@
+import { fuelOdometerIssues } from "./fuelOdometer";
 import type { FleetVehicle } from "./model";
 export const maintenanceCategories = [
   "Filtros",
@@ -143,8 +144,12 @@ export function invoiceValidation(
   return null;
 }
 /** Exclude incomplete/cross-month or discontinuous intervals. Purchased liters remain an estimate. */
-export function estimatedConsumption(rows: readonly FuelEntry[]) {
-  return fuelIntervals(rows, true);
+export function estimatedConsumption(
+  rows: readonly FuelEntry[],
+  from = "",
+  to = "9999-12-31",
+) {
+  return fuelIntervals(rows, true, from, to);
 }
 /** Validated intervals; mileage can cross months. */
 export function fuelIntervals(
@@ -158,6 +163,7 @@ export function fuelIntervals(
       (a.vehicle_id ?? "").localeCompare(b.vehicle_id ?? "") ||
       a.occurred_at.localeCompare(b.occurred_at),
   );
+  const issues = fuelOdometerIssues(ordered);
   const occurrences = new Map<string, number>();
   for (const r of rows) {
     const key = r.vehicle_id + "|" + r.occurred_at;
@@ -203,25 +209,7 @@ export function fuelIntervals(
       !/diesel|nafta|gasolina|gasoil/i.test(b.product)
     )
       continue;
-    // Both endpoints of a rollback are excluded.
-    if (
-      i > 1 &&
-      ordered[i - 2].vehicle_id === a.vehicle_id &&
-      ordered[i - 2].odometer_km != null &&
-      ordered[i - 2].odometer_km! > a.odometer_km
-    )
-      continue;
-    if (
-      ordered
-        .slice(i + 1)
-        .some(
-          (next) =>
-            next.vehicle_id === b.vehicle_id &&
-            next.odometer_km != null &&
-            next.odometer_km < b.odometer_km!,
-        )
-    )
-      continue;
+    if (issues.has(a) || issues.has(b)) continue;
     if (a.occurred_at.slice(0, 10) < from || b.occurred_at.slice(0, 10) > to)
       continue;
     intervals++;

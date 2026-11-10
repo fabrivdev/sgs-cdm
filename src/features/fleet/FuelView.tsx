@@ -98,7 +98,22 @@ export function FuelView({
             ["Cargas", scope.length],
             [
               "Consumo estimado (L/100 km)",
-              fmt(fleetConsumption(scope, data.vehicles)),
+              fmt(
+                fleetConsumption(
+                  data.fuel,
+                  data.vehicles
+                    .filter((v) => !vehicleId || v.id === vehicleId)
+                    .filter(
+                      (v) =>
+                        !filters.plate ||
+                        data.fuel.some(
+                          (r) =>
+                            r.vehicle_id === v.id && r.plate === filters.plate,
+                        ),
+                    ),
+                  filters,
+                ),
+              ),
             ],
           ]}
         />

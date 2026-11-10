@@ -113,7 +113,7 @@ export function VehicleDetail({
           ["Gasto mantenimiento", invoiceMoney(invoices)],
           [
             "Consumo estimado (L/100 km)",
-            fmt(fleetConsumption(fuel, [vehicle])),
+            fmt(fleetConsumption(data.fuel, [vehicle], filters)),
           ],
         ]}
       />

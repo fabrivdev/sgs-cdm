@@ -125,9 +125,14 @@ export const invoiceMoney = (rows: Invoice[]) =>
 export function fleetConsumption(
   fuel: FuelEntry[],
   vehicles: ManagedVehicle[],
+  filters: Pick<FleetFilters, "from" | "to"> = initialFilters,
 ) {
   const intervals = vehicles.map((v) =>
-    estimatedConsumption(fuel.filter((f) => f.vehicle_id === v.id)),
+    estimatedConsumption(
+      fuel.filter((f) => f.vehicle_id === v.id),
+      rangeError(filters) ? "" : filters.from,
+      rangeError(filters) ? "9999-12-31" : filters.to || "9999-12-31",
+    ),
   );
   const km = intervals.reduce((n, r) => n + r.km, 0),
     liters = intervals.reduce((n, r) => n + r.liters, 0);

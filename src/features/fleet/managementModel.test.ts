@@ -192,6 +192,28 @@ it("excludes a multi-load odometer spike that later rolls back", () => {
     row("e", "2026-10-05", 1800),
     row("f", "2026-10-06", 2200),
   ];
-  expect(mileage([], "v", initialFilters, rows)).toBe(400);
-  expect(estimatedConsumption(rows).km).toBe(400);
+  expect(mileage([], "v", initialFilters, rows)).toBe(800);
+  expect(estimatedConsumption(rows).km).toBe(800);
+});
+
+it("isolates a low typo without losing valid history or bridging the bad reading", () => {
+  const rows = [
+    row("a", "2026-10-01", 1000),
+    row("b", "2026-10-02", 1400),
+    { ...row("c", "2026-10-03", 1), previous_odometer_km: 1400 },
+    { ...row("d", "2026-10-04", 1800), previous_odometer_km: 1 },
+    row("e", "2026-10-05", 2200),
+  ];
+  expect(estimatedConsumption(rows).km).toBe(800);
+  expect(estimatedConsumption(rows, "2026-10-01", "2026-10-02").km).toBe(400);
+  expect(rows[2].odometer_km).toBe(1);
+});
+it("keeps the entire series for anomaly detection even when the rollback is after the period", () => {
+  const rows = [
+    row("a", "2026-10-01", 1000),
+    { ...row("b", "2026-10-02", 700000), previous_odometer_km: 1000 },
+    { ...row("c", "2026-10-03", 700400), previous_odometer_km: 700000 },
+    { ...row("d", "2026-11-01", 1400), previous_odometer_km: 700400 },
+  ];
+  expect(estimatedConsumption(rows, "2026-10-01", "2026-10-31").km).toBe(0);
 });
