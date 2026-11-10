@@ -1,3 +1,4 @@
+import { moneyCell } from "./workspaceModel";
 import { useMemo } from "react";
 import {
   ManagementTable,
@@ -178,7 +179,11 @@ export function MaintenanceView({
         label="Mantenimiento"
         fields={fields}
         rows={rows}
-        omittedColumns={vehicleId ? ["plate"] : []}
+        omittedColumns={vehicleId ? ["plate", "currency"] : ["currency"]}
+        render={{
+          amount: (r) =>
+            moneyCell(r.amount as number | null, r.currency as string | null),
+        }}
         onSelect={onSelect}
       />
     </>

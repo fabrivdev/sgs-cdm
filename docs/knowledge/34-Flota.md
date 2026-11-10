@@ -8,11 +8,19 @@ Consumo: se calcula por vehículo con las cargas del período, antes de aplicar 
 
 Migración 20261110200000_fleet_invoice_integrity.sql: importe con versión/motivo, bloqueo de fila y auditoría completa anterior/nueva; CHECK no negativo para facturas. Reintento actualiza la reserva propia y preserva duplicados/RUC; una modificación de Jefatura impide sobrescribirla. Descartar anula la reserva propia pendiente y conserva datos/archivo/auditoría. Nueva importación de combustible exige moneda: del Excel o selección explícita; conserva ajustes negativos originales.
 
-El usuario confirmó PYG para el histórico de combustible. Su SQL privado de corrección está en la entrega, fuera del repositorio, limitado a las claves y valores del archivo. No se ejecutó SQL remoto; aplicar antes de publicar el frontend. Commit/push no acredita publicación en Lovable.
+El usuario confirmó PYG para el histórico de combustible. Su SQL privado de corrección está en la entrega, fuera del repositorio, limitado a las claves y valores del archivo. El usuario declaró haber aplicado los dos SQL entregados. La aplicación publicada consultada no expuso la ruta de Flota (404); no se verificó la base productiva desde esa sesión. Commit/push no acredita publicación en Lovable.
 
 Validación: pruebas aisladas de PostgreSQL, parser, permisos, caché vacía, recuperación editada, conflicto de versión, negativos y consumo independiente de búsqueda. Revisión visual de escritorio 1280 px con copia local de las planillas; no acredita sesión productiva ni escrituras reales.
 
 ---
+
+## Importes y recorrido — revisión posterior del 10/11/2026
+
+Importes en tablas, tarjetas y detalle usan Gs junto al número para PYG. La moneda queda almacenada y exportable, pero sin columna visible independiente. Otras monedas conservan su código y nunca se suman entre sí.
+
+Km del período prioriza intervalos manuales fechados. Cuando no hay un intervalo manual calculable, usa intervalos continuos de las cargas del vehículo, incluidos cruces de mes, con ambos extremos dentro del período. No suma fuentes superpuestas ni usa el kilometraje inicial sin fecha. Ausencia de intervalos queda en —. La validación descarta saltos de odómetro que retroceden posteriormente, aunque permanezcan altos durante varias cargas; conserva los registros originales. Consumo conserva su regla mensual y también excluye esos saltos.
+
+Validación: pruebas aisladas de reintento editado, importe con versión/auditoría, descarte conservando fila, parser de moneda, permisos y cálculos. Revisión visual con copia local de planillas. No se crearon ni editaron facturas reales, ni se publicó en Lovable. Estas correcciones de presentación y cálculo no requieren otro SQL de migración.
 
 ## Proveedor fuera del maestro — 10/11/2026
 

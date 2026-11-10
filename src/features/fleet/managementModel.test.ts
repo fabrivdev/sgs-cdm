@@ -123,3 +123,75 @@ describe("Vehicle mileage source", () => {
     ).toEqual({ km: 159137, date: "2026-10-07", source: "Lectura" });
   });
 });
+import { initialFilters, mileage, money, moneyCell } from "./workspaceModel";
+import type { FleetOdometerReading } from "./model";
+describe("Period mileage and currency presentation", () => {
+  const fuel = [
+    row("a", "2026-09-30", 1000),
+    row("b", "2026-10-02", 1400),
+    row("c", "2026-10-05", 1800),
+  ];
+  it("uses imported mileage across months without requiring manual readings", () => {
+    expect(mileage([], "v", initialFilters, fuel)).toBe(800);
+    expect(
+      mileage([], "v", { ...initialFilters, from: "2026-10-01" }, fuel),
+    ).toBe(400);
+    expect(
+      mileage([], "v", { ...initialFilters, search: "not found" }, fuel),
+    ).toBe(800);
+    expect(mileage([], "other", initialFilters, fuel)).toBeNull();
+    expect(mileage([], "v", initialFilters, fuel.slice(0, 1))).toBeNull();
+  });
+  it("does not combine overlapping sources or count discontinuities", () => {
+    const readings = [
+      {
+        id: "a",
+        vehicle_id: "v",
+        reading_date: "2026-10-01",
+        voided_at: null,
+        odometer_km: 1000,
+      },
+      {
+        id: "b",
+        vehicle_id: "v",
+        reading_date: "2026-10-03",
+        voided_at: null,
+        odometer_km: 1300,
+      },
+    ] as FleetOdometerReading[];
+    expect(mileage(readings, "v", initialFilters, fuel)).toBe(300);
+    expect(
+      mileage([], "v", initialFilters, [
+        fuel[0],
+        { ...fuel[1], previous_odometer_km: 50 },
+      ]),
+    ).toBeNull();
+    expect(
+      mileage([], "v", { ...initialFilters, from: "2026-10-99" }, fuel),
+    ).toBeNull();
+  });
+  it("keeps Gs beside amounts, preserves zero and separates other currencies", () => {
+    expect(moneyCell(1234567, "PYG")).toBe("Gs 1.234.567");
+    expect(moneyCell(0, "PYG")).toBe("Gs 0");
+    expect(moneyCell(null, "PYG")).toBe("—");
+    expect(
+      money([
+        { amount: 100, currency: "PYG" },
+        { amount: 25, currency: "USD" },
+      ]),
+    ).toBe("Gs 100 · USD 25");
+  });
+});
+
+it("excludes a multi-load odometer spike that later rolls back", () => {
+  const rows = [
+    row("a", "2026-10-01", 1000),
+    { ...row("b", "2026-10-02", 700000), previous_odometer_km: 1000 },
+    { ...row("c", "2026-10-03", 700400), previous_odometer_km: 700000 },
+    { ...row("d", "2026-10-04", 1400), previous_odometer_km: 700400 },
+    row("e", "2026-10-05", 1800),
+    row("f", "2026-10-06", 2200),
+  ];
+  expect(mileage([], "v", initialFilters, rows)).toBe(400);
+  expect(estimatedConsumption(rows).km).toBe(400);
+});

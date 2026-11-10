@@ -75,7 +75,7 @@ export function VehiclesList({
         state: v.operational_status,
         km: vehicleMileageDisplay(v, vehicleLatestReading(v.id, data.readings))
           .km,
-        distance: mileage(data.readings, v.id, filters),
+        distance: mileage(data.readings, v.id, filters, data.fuel),
       })),
     [vehicles, data, filters],
   );

@@ -1,3 +1,4 @@
+import { moneyCell } from "./workspaceModel";
 import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -108,6 +109,7 @@ export function ExpenseDetails({
                 .filter(
                   ([k]) =>
                     k !== "id" &&
+                    k !== "currency" &&
                     !(
                       selectedInvoice &&
                       ["classification", "description"].includes(k)
@@ -131,15 +133,20 @@ export function ExpenseDetails({
                         key}
                     </dt>
                     <dd>
-                      {["date", "invoice_date", "performed"].includes(key)
-                        ? show(value)
-                            .slice(0, 10)
-                            .split("-")
-                            .reverse()
-                            .join("/")
-                        : typeof value === "number"
-                          ? value.toLocaleString("es-PY")
-                          : show(value)}
+                      {key === "amount"
+                        ? moneyCell(
+                            value as number | null,
+                            detail.currency as string | null,
+                          )
+                        : ["date", "invoice_date", "performed"].includes(key)
+                          ? show(value)
+                              .slice(0, 10)
+                              .split("-")
+                              .reverse()
+                              .join("/")
+                          : typeof value === "number"
+                            ? value.toLocaleString("es-PY")
+                            : show(value)}
                     </dd>
                   </div>
                 ))}

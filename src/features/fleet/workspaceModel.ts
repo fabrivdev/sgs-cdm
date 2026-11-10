@@ -1,5 +1,5 @@
 import type { ManagedVehicle, FuelEntry, Invoice } from "./managementModel";
-import { estimatedConsumption } from "./managementModel";
+import { estimatedConsumption, fuelIntervals } from "./managementModel";
 import { periodMileage, todayInParaguay } from "./period";
 import {
   currentFleetResponsibility,
@@ -72,6 +72,7 @@ export function mileage(
   readings: FleetOdometerReading[],
   id: string,
   f: FleetFilters,
+  fuel: FuelEntry[] = [],
 ) {
   if (rangeError(f)) return null;
   const result = periodMileage(
@@ -82,13 +83,29 @@ export function mileage(
       valid: true,
     },
   );
-  return result.coverageFrom ? result.exactKm : null;
+  if (result.coverageFrom) return result.exactKm;
+  // Do not add overlapping sources or fabricate dates for initial mileage.
+  const imported = fuelIntervals(
+    fuel.filter((r) => r.vehicle_id === id),
+    false,
+    f.from,
+    f.to || todayInParaguay(),
+  );
+  return imported.intervals ? imported.km : null;
 }
 export function responsible(id: string, events: FleetResponsibilityEvent[]) {
   return (
     currentFleetResponsibility(id, events, todayInParaguay())
       ?.responsible_name_snapshot ?? null
   );
+}
+export function moneyCell(
+  amount: number | null | undefined,
+  currency: string | null | undefined,
+) {
+  if (amount == null) return "—";
+  const unit = currency === "PYG" ? "Gs" : currency;
+  return unit ? `${unit} ${fmt(amount)}` : fmt(amount);
 }
 export function money(
   rows: { amount: number | null; currency: string | null }[],
@@ -98,7 +115,7 @@ export function money(
   for (const r of known)
     groups.set(r.currency!, (groups.get(r.currency!) ?? 0) + Number(r.amount));
   return groups.size
-    ? [...groups].map(([c, n]) => `${fmt(n)} ${c}`).join(" · ")
+    ? [...groups].map(([c, n]) => moneyCell(n, c)).join(" · ")
     : "—";
 }
 export const fuelMoney = (rows: FuelEntry[]) =>

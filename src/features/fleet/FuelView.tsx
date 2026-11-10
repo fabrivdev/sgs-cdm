@@ -1,3 +1,4 @@
+import { moneyCell } from "./workspaceModel";
 import { useMemo } from "react";
 import {
   ManagementTable,
@@ -106,7 +107,11 @@ export function FuelView({
         label="Combustible"
         fields={fields}
         rows={rows}
-        omittedColumns={vehicleId ? ["plate"] : []}
+        omittedColumns={vehicleId ? ["plate", "currency"] : ["currency"]}
+        render={{
+          amount: (r) =>
+            moneyCell(r.amount as number | null, r.currency as string | null),
+        }}
         onSelect={onSelect}
         actions={[
           { id: "import", label: "Importar combustible", onSelect: onImport },

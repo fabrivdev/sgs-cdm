@@ -144,6 +144,15 @@ export function invoiceValidation(
 }
 /** Exclude incomplete/cross-month or discontinuous intervals. Purchased liters remain an estimate. */
 export function estimatedConsumption(rows: readonly FuelEntry[]) {
+  return fuelIntervals(rows, true);
+}
+/** Validated intervals; mileage can cross months. */
+export function fuelIntervals(
+  rows: readonly FuelEntry[],
+  sameMonth: boolean,
+  from = "",
+  to = "9999-12-31",
+) {
   const ordered = [...rows].sort(
     (a, b) =>
       (a.vehicle_id ?? "").localeCompare(b.vehicle_id ?? "") ||
@@ -165,7 +174,7 @@ export function estimatedConsumption(rows: readonly FuelEntry[]) {
       !a.vehicle_id ||
       a.vehicle_id !== b.vehicle_id ||
       a.occurred_at === b.occurred_at ||
-      a.occurred_at.slice(0, 7) !== b.occurred_at.slice(0, 7)
+      (sameMonth && a.occurred_at.slice(0, 7) !== b.occurred_at.slice(0, 7))
     )
       continue;
     if (
@@ -203,11 +212,17 @@ export function estimatedConsumption(rows: readonly FuelEntry[]) {
     )
       continue;
     if (
-      i + 1 < ordered.length &&
-      ordered[i + 1].vehicle_id === b.vehicle_id &&
-      ordered[i + 1].odometer_km != null &&
-      ordered[i + 1].odometer_km! < b.odometer_km
+      ordered
+        .slice(i + 1)
+        .some(
+          (next) =>
+            next.vehicle_id === b.vehicle_id &&
+            next.odometer_km != null &&
+            next.odometer_km < b.odometer_km!,
+        )
     )
+      continue;
+    if (a.occurred_at.slice(0, 10) < from || b.occurred_at.slice(0, 10) > to)
       continue;
     intervals++;
     coveredDates.push(a.occurred_at.slice(0, 10), b.occurred_at.slice(0, 10));

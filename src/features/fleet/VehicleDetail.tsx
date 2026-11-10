@@ -104,7 +104,10 @@ export function VehicleDetail({
             "Km actuales",
             <span title={km.source ?? undefined}>{fmt(km.km)}</span>,
           ],
-          ["Km del período", fmt(mileage(data.readings, vehicle.id, filters))],
+          [
+            "Km del período",
+            fmt(mileage(data.readings, vehicle.id, filters, data.fuel)),
+          ],
           ["Litros", fmt(fuel.reduce((n, r) => n + r.liters, 0))],
           ["Gasto combustible", fuelMoney(fuel)],
           ["Gasto mantenimiento", invoiceMoney(invoices)],
