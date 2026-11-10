@@ -1,44 +1,41 @@
-# Corregir los problemas del módulo Flota
+# Rehacer Flota: simple, sin perder datos y con la misma estética de la app
 
-Auditoría completa del módulo (pantallas, cálculos, permisos y pruebas). No se encontró nada crítico ni datos de demostración visibles en producción. Estos son los problemas, por prioridad, y lo que haré con cada uno.
+## Qué cambia para el usuario
 
-## Alta prioridad
+**Menú Flota (igual que hoy):** Vehículos · Combustible · Mantenimiento · Cargar factura (Operativos solo ve esta última).
 
-1. **Se pierde el vehículo al abrir "Lecturas y responsables".** Si los datos todavía están cargando, la pantalla descarta el vehículo elegido y muestra la lista general. Esperar a que carguen los datos antes de validar la selección.
-2. **Reintentar una factura puede ignorar los cambios.** Si se edita la factura después del primer intento, el sistema guarda los datos viejos pero muestra "guardado" con los nuevos. Bloquear los campos una vez reservada, o actualizarlos de verdad en el servidor.
-3. **Editar el monto de una factura puede pisar el trabajo de otro gerente.** No verifica si otro la cambió antes, ni pide motivo. Exigir versión y motivo, y registrar el valor anterior y el nuevo.
-4. **Sin salida cuando una factura queda anulada.** El sistema dice "iniciá una nueva carga", pero el formulario siempre recupera el mismo intento. Agregar botón "Descartar intento / Nueva carga".
+### 1. Vehículos (lista)
+- Barra de filtros estándar de la app en una sola fila: Buscar, Estado, Sucursal, Departamento. El resto va al panel lateral "Más filtros", igual que en Ventas.
+- 4 tarjetas arriba: Vehículos activos · Km del período · Gasto combustible · Gasto mantenimiento.
+- Tabla de una línea por vehículo: Chapa, Marca/modelo, Responsable, Sucursal, Estado, Última lectura (km), Km del período. Con scroll interno si hay más de 20 filas.
 
-## Prioridad media
+### 2. Ficha del vehículo: una sola página, todo visible
+- Encabezado: chapa, marca/modelo, responsable, sucursal, estado y botón "Editar".
+- Tarjetas: Km actuales · Km del período · Litros · Gasto combustible · Gasto mantenimiento · Consumo estimado (L/100 km).
+- Pestañas alineadas al título: **Combustible · Mantenimiento · Lecturas**.
+  - Combustible: una tabla de cargas (fecha, km, litros, importe, moneda). Se quita el selector "Resumen mensual / Cargas".
+  - Mantenimiento: una tabla única que une historial y facturas (fecha, tipo, descripción, proveedor, importe, factura). Se quitan las tres vistas separadas.
+  - Lecturas: tabla de lecturas de km y cambios de responsable, sin la pantalla vieja embebida.
+- Se eliminan: los desplegables con flecha ("Lecturas y responsables", "Cambios del vehículo"), la ventana flotante del consumo y la lista de cambios de auditoría (los datos quedan guardados, no se borran).
 
-5. **El consumo cambia según lo que se busque.** Al buscar texto, el consumo (km/l) se calcula solo con las cargas visibles. Calcularlo con todas las cargas del vehículo y después filtrar.
-6. **El consumo mensual mezcla monedas.** Cada fila es mes + moneda, pero el consumo usa todo el mes. Mostrarlo por mes, separado de la moneda.
-7. **"Consumo" es una estimación.** Se basa en litros comprados, no en tanque lleno. Rotularlo "Consumo estimado" y documentar el criterio.
-8. **La importación de combustible pierde la moneda.** Todo queda como "Sin moneda". Leer la moneda del Excel o pedirla al importar (nunca asumir guaraníes).
-9. **Se aceptan montos negativos en facturas.** Rechazarlos en pantalla y en la base.
-10. **Fechas "desde" mayor que "hasta" muestran lista vacía sin aviso.** Mostrar mensaje de período inválido.
-11. **Período personalizado acepta fechas mal formadas.** Validar fechas reales.
-12. **Un vehículo inexistente en el enlace muestra otra vista.** Mostrar "Vehículo no encontrado" con botón para volver.
-13. **La tabla vuelve a la página 1 sola.** Mantener la página salvo que cambien los filtros u orden.
-14. **Cada vista descarga todos los datos de la flota.** Cargar solo lo que necesita cada pestaña.
-15. **Un usuario de gerencia con solo Flota puede ser enviado ahí y rechazado.** Unificar quién puede entrar en menú, pantalla de inicio y base.
-16. **Faltan tipos de datos de Flota.** Regenerar tipos y usar funciones tipadas.
+### 3. Combustible y Mantenimiento (generales)
+- Mismo patrón: filtros en una fila, tarjetas arriba, una tabla principal. Sin selectores de vista ni textos explicativos.
 
-## Baja prioridad (visual y mantenimiento)
-
-17. Etiquetas de filtros y encabezados a 11px como el resto de la app.
-18. Filas que se parten en dos líneas en celular: una sola línea con recorte.
-19. Colores fijos en la pantalla antigua: pasar a colores del tema.
-20. "-" para sin dato: cambiar a "—".
-21. Separar la lógica de demostración de la pantalla real.
-22. La demostración comparte caché con datos reales: separarla.
-23. "Hoy" no se actualiza pasada la medianoche si la pantalla queda abierta.
-24. Una prueba de base de datos falla por tiempo cuando corren todas juntas: ampliar su límite.
+### 4. Datos que hoy se pierden (se corrigen)
+- La moneda de las cargas de combustible se lee del Excel o se elige al importar; nunca "Sin moneda".
+- Reintentar una factura guarda realmente los datos editados.
+- Editar un importe no pisa el cambio de otro gerente y queda registrado el valor anterior.
+- Botón "Descartar intento" cuando una carga queda trabada.
+- No se aceptan importes negativos.
+- El consumo se calcula con todas las cargas del vehículo, no solo las visibles por la búsqueda.
+- La ficha ya no pierde el vehículo al abrirse.
+- Fechas inválidas muestran aviso en vez de lista vacía.
 
 ## Detalles técnicos
-
-- Archivos: `src/pages/Flota.tsx`, `src/pages/FleetWorkspace.tsx`, `src/features/fleet/{InvoiceUpload,ManagementTable,managementModel,managementApi,api,period,useFleet,workbookImports}`, `src/lib/permissions.ts`, `src/components/lists/CompactListTable.tsx` (modo una línea opcional).
-- Nueva migración: `fleet_set_invoice_amount` con `p_version` y `p_reason`, incremento de versión y auditoría antes/después; `CHECK (amount >= 0)`; RPC para descartar/actualizar factura reservada.
-- Pruebas nuevas: selección inicial con caché vacía, reintento con metadatos editados, conflicto de versión en monto, consumo independiente de búsqueda, rango inválido, monto negativo.
-- Actualizar `docs/knowledge/34-Flota.md` y hacer commit/push a `origin/main` al terminar; informar la migración aplicada.
-- Se hará por tandas: primero alta, luego media, luego baja.
+- Usar `FiltersBar`, `SummaryCard`, `TableScroll`/`RowCount`/`scrollHead`, `Tabs` y `ResponsiveDrawer` existentes; etiquetas 11px, capitalización de oración, `—` sin dato, colores del tema.
+- `FleetWorkspace.tsx` se divide en `VehiclesList`, `VehicleDetail`, `FuelView`, `MaintenanceView` dentro de `src/features/fleet/`; se deja de renderizar `Flota.tsx` en producción (queda solo para la vista de demostración, con clave de caché propia).
+- `ManagementTable`: quitar `expanded` y el diálogo de columnas; filas memoizadas para no volver a página 1.
+- Migración: `fleet_set_invoice_amount(p_id, p_amount, p_currency, p_version, p_reason)` con control de versión y auditoría; `CHECK (amount >= 0)`; RPC para actualizar o descartar factura reservada. Sin borrar datos.
+- `workbookImports.mjs`: leer moneda o recibirla como parámetro de importación.
+- Pruebas: ficha con caché vacía, reintento con datos editados, conflicto de versión, consumo independiente de la búsqueda, importe negativo, moneda importada.
+- Actualizar `docs/knowledge/34-Flota.md`; commit y push a `origin/main` al terminar.
