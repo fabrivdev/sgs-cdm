@@ -81,6 +81,8 @@ export function ManagementTable({
   showRowCount = true,
   actionsTarget,
   detailStyle = false,
+  columnWidths,
+  centeredColumns = [],
 }: {
   rows: GridRow[];
   fields: GridField[];
@@ -92,6 +94,8 @@ export function ManagementTable({
   showRowCount?: boolean;
   actionsTarget?: HTMLElement | null;
   detailStyle?: boolean;
+  columnWidths?: Record<string, string>;
+  centeredColumns?: string[];
 }) {
   const { can } = useAuth();
   const omittedKey = omittedColumns.join("|");
@@ -157,6 +161,13 @@ export function ManagementTable({
           aria-label={label}
           className={`w-full whitespace-nowrap ${detailStyle ? "table-fixed" : ""}`}
         >
+          {columnWidths && (
+            <colgroup>
+              {visible.map(([key]) => (
+                <col key={key} style={{ width: columnWidths[key] }} />
+              ))}
+            </colgroup>
+          )}
           <thead
             className={`${scrollHead} text-[11px] font-medium bg-muted text-muted-foreground`}
           >
@@ -171,7 +182,7 @@ export function ManagementTable({
                         : "descending"
                       : "none"
                   }
-                  className={`px-3 py-2 font-medium ${kind === "number" || (detailStyle && key === "expense") ? "text-right" : "text-left"}`}
+                  className={`px-3 py-2 font-medium ${centeredColumns.includes(key) ? "text-center" : kind === "number" || (detailStyle && key === "expense") ? "text-right" : "text-left"}`}
                 >
                   <button onClick={() => toggleSort(key)}>
                     {title}

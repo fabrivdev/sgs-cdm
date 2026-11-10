@@ -1,5 +1,12 @@
+import { MaintenanceGroupCell } from "./MaintenanceGroupCell";
+import {
+  maintenanceGroups,
+  groupHistoryWorks,
+  groupInvoiceWorks,
+  exportWorkGroups,
+} from "./maintenanceGroups";
 import { formatInvoiceNumber } from "./invoiceNumber";
-import { workCategories, compactCategories } from "./maintenancePresentation";
+import { workCategories } from "./maintenancePresentation";
 import { maintenanceCategories } from "./managementModel";
 import { moneyCell } from "./workspaceModel";
 import { useMemo, useState, type ReactNode } from "react";
@@ -27,9 +34,10 @@ const fields: GridField[] = [
   ["date", "Fecha", "date"],
   ["invoice", "N.º de factura"],
   ["supplier", "Proveedor"],
-  ["classification", "Descripción"],
-  ["amount", "Monto", "number"],
   ["km", "Km", "number"],
+  ...maintenanceGroups.map((group): GridField => ["group" + group, group]),
+  ["amount", "Monto", "number"],
+  ["classification", "Clasificación"],
   ["plate", "Chapa"],
   ["type", "Origen"],
   ["description", "Detalle de trabajos"],
@@ -87,10 +95,31 @@ export function MaintenanceView({
       ),
     [data.history, vehicleId, filters],
   );
+  const groupsById = useMemo(
+    () =>
+      new Map([
+        ...history.map(
+          (r) =>
+            [
+              r.id,
+              { groups: groupHistoryWorks(r.works), description: undefined },
+            ] as const,
+        ),
+        ...invoices.map(
+          (r) =>
+            [
+              r.id,
+              { groups: groupInvoiceWorks(r), description: r.description },
+            ] as const,
+        ),
+      ]),
+    [history, invoices],
+  );
   const rows = useMemo(
     () =>
       [
         ...history.map((r) => ({
+          ...exportWorkGroups(groupHistoryWorks(r.works)),
           id: r.id,
           date: r.occurred_on,
           plate: r.plate,
@@ -115,6 +144,7 @@ export function MaintenanceView({
           status: null,
         })),
         ...invoices.map((r) => ({
+          ...exportWorkGroups(groupInvoiceWorks(r)),
           id: r.id,
           date: r.performed_on ?? r.invoice_date,
           plate: r.plate,
@@ -214,6 +244,23 @@ export function MaintenanceView({
       )}
       <ManagementTable
         detailStyle={!!vehicleId}
+        columnWidths={
+          vehicleId
+            ? {
+                date: "10%",
+                invoice: "15%",
+                supplier: "20%",
+                km: "9%",
+                groupAceites: "7%",
+                groupFiltros: "7%",
+                groupCubiertas: "8%",
+                groupRepuestos: "8%",
+                groupOtros: "6%",
+                amount: "10%",
+              }
+            : undefined
+        }
+        centeredColumns={maintenanceGroups.map((group) => "group" + group)}
         showRowCount={false}
         actionsTarget={actionsTarget}
         label="Mantenimiento"
@@ -221,14 +268,28 @@ export function MaintenanceView({
         rows={rows}
         omittedColumns={
           vehicleId
-            ? ["plate", "currency", "description", "type", "status"]
-            : ["currency", "description"]
+            ? [
+                "plate",
+                "currency",
+                "description",
+                "type",
+                "status",
+                "classification",
+              ]
+            : ["currency", "description", "classification"]
         }
         render={{
-          classification: (r) => (
-            <span title={String(r.classification || "Sin clasificar")}>
-              {compactCategories(String(r.classification || "").split(" · "))}
-            </span>
+          ...Object.fromEntries(
+            maintenanceGroups.map((group) => [
+              "group" + group,
+              (r: GridRow) => (
+                <MaintenanceGroupCell
+                  group={group}
+                  works={groupsById.get(r.id)?.groups[group] ?? []}
+                  invoiceDescription={groupsById.get(r.id)?.description}
+                />
+              ),
+            ]),
           ),
           amount: (r) =>
             moneyCell(r.amount as number | null, r.currency as string | null),

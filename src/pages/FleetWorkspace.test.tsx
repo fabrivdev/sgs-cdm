@@ -128,9 +128,13 @@ describe("Fleet role journeys", () => {
       ["Descripción del trabajo", "Filtro"],
     ])
       fireEvent.change(screen.getByLabelText(label), { target: { value } });
-    fireEvent.change(screen.getByLabelText("N.º de factura"), { target: { value: "001-001-1" } });
+    fireEvent.change(screen.getByLabelText("N.º de factura"), {
+      target: { value: "001-001-1" },
+    });
     fireEvent.blur(screen.getByLabelText("N.º de factura"));
-    expect(screen.getByLabelText("N.º de factura")).toHaveValue("001-001-0000001");
+    expect(screen.getByLabelText("N.º de factura")).toHaveValue(
+      "001-001-0000001",
+    );
     fireEvent.focus(screen.getByLabelText("RUC del proveedor"));
     fireEvent.click(await screen.findByRole("option", { name: /Taller/ }));
     fireEvent.click(screen.getByRole("button", { name: "Clasificación" }));
@@ -181,7 +185,9 @@ describe("Fleet role journeys", () => {
     fireEvent.submit(
       screen.getByRole("button", { name: "Reintentar carga" }).closest("form")!,
     );
-    await screen.findByText("Factura 001-001-0000001 · TEST123: carga completada");
+    await screen.findByText(
+      "Factura 001-001-0000001 · TEST123: carga completada",
+    );
     expect(mocks.submit).toHaveBeenCalledWith(
       "attempt",
       expect.objectContaining({
@@ -363,7 +369,7 @@ it("shows linked maintenance from past years and undated originals, with indepen
     ],
   });
   mount("/servicios/flota?vehicle=" + v.id + "&vehicleTab=Mantenimiento");
-  await screen.findByText("Filtros", { selector: "span" });
+  await screen.findByRole("button", { name: "Consultar Filtros" });
   expect(
     within(screen.getByRole("table", { name: "Mantenimiento" }))
       .getAllByRole("columnheader")
@@ -372,12 +378,16 @@ it("shows linked maintenance from past years and undated originals, with indepen
     "Fecha",
     "N.º de factura",
     "Proveedor",
-    "Descripción",
-    "Monto",
     "Km",
+    "Aceites",
+    "Filtros",
+    "Cubiertas",
+    "Repuestos",
+    "Otros",
+    "Monto",
   ]);
   expect(
-    screen.getByText("Aceites y fluidos", { selector: "span" }),
+    screen.getByRole("button", { name: "Consultar Aceites" }),
   ).toBeInTheDocument();
   expect(screen.queryByText("Original")).not.toBeInTheDocument();
   fireEvent.change(screen.getByRole("combobox", { name: "Clasificación" }), {
