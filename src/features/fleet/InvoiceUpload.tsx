@@ -1,4 +1,5 @@
-import { useRef, useState } from "react";
+import { useAuth } from "@/hooks/useAuth";
+import { useEffect, useRef, useState } from "react";
 import { PageHeader, PageShell } from "@/components/layout/AppPrimitives";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -15,6 +16,7 @@ import { submitInvoice } from "./managementApi";
 const empty = {
   plate: "",
   supplier: "",
+  supplier_tax_id: "",
   invoice_number: "",
   invoice_date: "",
   description: "",
@@ -29,13 +31,61 @@ export default function InvoiceUpload({
   onDone?: () => void;
   embedded?: boolean;
 }) {
-  const [values, setValues] = useState({ ...empty, plate }),
+  const { user } = useAuth();
+  const draftKey =
+    "fleet-invoice-draft:" +
+    (user?.id ?? "local") +
+    (embedded ? ":" + plate : "");
+  const [draft] = useState(() => {
+    try {
+      return JSON.parse(sessionStorage.getItem(draftKey) ?? "null") as {
+        values: typeof empty;
+        id: string;
+        reserved: boolean;
+        file: { name: string; size: number; type: string } | null;
+      } | null;
+    } catch {
+      return null;
+    }
+  });
+  const [confirmation, setConfirmation] = useState("");
+  const [values, setValues] = useState(draft?.values ?? { ...empty, plate }),
     [file, setFile] = useState<File | null>(null),
     [pending, setPending] = useState(false),
     [error, setError] = useState("");
-  const request = useRef(crypto.randomUUID()),
-    reserved = useRef(false),
+  const request = useRef(draft?.id ?? crypto.randomUUID()),
+    reserved = useRef(draft?.reserved ?? false),
     input = useRef<HTMLInputElement>(null);
+  const expectedFile = useRef(draft?.file ?? null);
+  useEffect(() => {
+    try {
+      sessionStorage.setItem(
+        draftKey,
+        JSON.stringify({
+          values,
+          id: request.current,
+          reserved: reserved.current,
+          file: expectedFile.current,
+        }),
+      );
+    } catch {
+      /* Storage may be unavailable; the form still works. */
+    }
+  }, [values, pending, draftKey]);
+  const errorField = /RUC/i.test(error)
+    ? "supplier_tax_id"
+    : /chapa/i.test(error)
+      ? "plate"
+      : /fecha/i.test(error)
+        ? "invoice_date"
+        : /clasificaci/i.test(error)
+          ? "classification"
+          : /archivo|PDF/i.test(error)
+            ? "file"
+            : null;
+  useEffect(() => {
+    if (errorField) document.getElementById("invoice-" + errorField)?.focus();
+  }, [error, errorField]);
   const change = (key: string, value: unknown) => {
     setValues((v) => ({ ...v, [key]: value }));
     setError("");
@@ -43,6 +93,23 @@ export default function InvoiceUpload({
   async function submit(e: React.FormEvent) {
     e.preventDefault();
     if (pending) return;
+    if (
+      reserved.current &&
+      expectedFile.current &&
+      file &&
+      (file.name !== expectedFile.current.name ||
+        file.size !== expectedFile.current.size ||
+        file.type !== expectedFile.current.type)
+    ) {
+      setError(
+        "Seleccioná el mismo archivo del intento anterior. Jefatura puede completar la carga con otro archivo.",
+      );
+      return;
+    }
+    if (!/^[0-9][0-9 .-]{2,19}$/.test(values.supplier_tax_id ?? "")) {
+      setError("Ingresá el RUC del proveedor");
+      return;
+    }
     const problem = invoiceValidation(values, file);
     if (problem) {
       setError(problem);
@@ -53,8 +120,35 @@ export default function InvoiceUpload({
     try {
       await submitInvoice(request.current, values, file!, () => {
         reserved.current = true;
+        expectedFile.current = {
+          name: file!.name,
+          size: file!.size,
+          type: file!.type,
+        };
+        try {
+          sessionStorage.setItem(
+            draftKey,
+            JSON.stringify({
+              values,
+              id: request.current,
+              reserved: true,
+              file: expectedFile.current,
+            }),
+          );
+        } catch {
+          /* unavailable storage */
+        }
       });
       toast.success("Factura cargada");
+      setConfirmation(
+        `Factura ${values.invoice_number} · ${values.plate}: carga completada`,
+      );
+      expectedFile.current = null;
+      try {
+        sessionStorage.removeItem(draftKey);
+      } catch {
+        /* unavailable storage */
+      }
       request.current = crypto.randomUUID();
       reserved.current = false;
       setValues({ ...empty, plate });
@@ -78,6 +172,11 @@ export default function InvoiceUpload({
     <PageShell>
       {!embedded && <PageHeader title="Cargar factura de mantenimiento" />}
       <form onSubmit={submit} className="max-w-3xl space-y-5">
+        {confirmation && (
+          <p role="status" className="text-sm">
+            {confirmation}
+          </p>
+        )}
         <fieldset
           disabled={pending || reserved.current}
           className="grid gap-4 sm:grid-cols-2"
@@ -86,6 +185,7 @@ export default function InvoiceUpload({
             [
               ["plate", "Chapa"],
               ["supplier", "Proveedor"],
+              ["supplier_tax_id", "RUC del proveedor"],
               ["invoice_number", "N.º de factura"],
               ["invoice_date", "Fecha de factura"],
             ] as const
@@ -94,6 +194,10 @@ export default function InvoiceUpload({
               <Label htmlFor={"invoice-" + key}>{label}</Label>
               <Input
                 id={"invoice-" + key}
+                aria-invalid={errorField === key || undefined}
+                aria-describedby={
+                  errorField === key ? "invoice-error" : undefined
+                }
                 type={key === "invoice_date" ? "date" : "text"}
                 required
                 maxLength={
@@ -113,6 +217,12 @@ export default function InvoiceUpload({
                   type="button"
                   variant="outline"
                   className="w-full justify-start"
+                  id="invoice-classification"
+                  aria-describedby={
+                    errorField === "classification"
+                      ? "invoice-error"
+                      : undefined
+                  }
                   aria-label="Clasificación"
                 >
                   <span
@@ -157,29 +267,66 @@ export default function InvoiceUpload({
               onChange={(e) => change("description", e.target.value)}
             />
           </div>
-          <div className="space-y-1 sm:col-span-2">
-            <Label htmlFor="invoice-file">Archivo de factura</Label>
-            <Input
-              ref={input}
-              id="invoice-file"
-              type="file"
-              accept="application/pdf,image/jpeg,image/png"
-              required
-              onChange={(e) => {
-                setFile(e.target.files?.[0] ?? null);
-                setError("");
-              }}
-            />
-          </div>
         </fieldset>
+        <div className="space-y-1">
+          <Label htmlFor="invoice-file">Archivo de factura</Label>
+          <Input
+            ref={input}
+            id="invoice-file"
+            aria-invalid={errorField === "file" || undefined}
+            aria-describedby={
+              errorField === "file" ? "invoice-error" : undefined
+            }
+            disabled={pending}
+            type="file"
+            accept="application/pdf,image/jpeg,image/png"
+            required
+            onChange={(e) => {
+              setFile(e.target.files?.[0] ?? null);
+              setError("");
+            }}
+          />
+        </div>
+        {reserved.current && (
+          <p role="status" className="text-sm">
+            Carga pendiente: {expectedFile.current?.name}. Seleccioná el archivo
+            para reintentar.
+          </p>
+        )}
         {error && (
-          <p role="alert" className="text-sm text-destructive">
+          <p
+            id="invoice-error"
+            role="alert"
+            className="text-sm text-destructive"
+          >
             {error}
           </p>
         )}
-        <div className="flex justify-end">
+        <div className="flex justify-end gap-2">
+          {reserved.current && (
+            <Button
+              disabled={pending}
+              type="button"
+              variant="outline"
+              onClick={() => {
+                reserved.current = false;
+                expectedFile.current = null;
+                request.current = crypto.randomUUID();
+                setValues({ ...empty, plate });
+                setFile(null);
+                setError("");
+                if (input.current) input.current.value = "";
+              }}
+            >
+              Nueva carga
+            </Button>
+          )}
           <Button disabled={pending} type="submit">
-            {pending ? "Cargando…" : "Cargar factura"}
+            {pending
+              ? "Cargando…"
+              : reserved.current
+                ? "Reintentar carga"
+                : "Cargar factura"}
           </Button>
         </div>
       </form>

@@ -66,6 +66,7 @@ function mount(path = "/servicios/flota") {
 }
 afterEach(() => {
   cleanup();
+  sessionStorage.clear();
   vi.clearAllMocks();
   mocks.roles = ["jefatura"];
 });
@@ -98,7 +99,11 @@ describe("Fleet role journeys", () => {
       ).not.toBeInTheDocument(),
     );
     fireEvent.click(screen.getByRole("button", { name: "DEMO-001" }));
-    expect(screen.getAllByRole("searchbox")[0]).toHaveValue("");
+    fireEvent.mouseDown(screen.getByRole("tab", { name: "Combustible" }), {
+      button: 0,
+      ctrlKey: false,
+    });
+    expect((await screen.findAllByRole("searchbox"))[0]).toHaveValue("");
     fireEvent.mouseDown(screen.getByRole("tab", { name: "Mantenimiento" }), {
       button: 0,
       ctrlKey: false,
@@ -116,7 +121,7 @@ describe("Fleet role journeys", () => {
       screen.getByRole("button", { name: "Cargar factura" }),
     ).toBeInTheDocument();
     fireEvent.click(screen.getByRole("button", { name: "← Vehículos" }));
-    expect(screen.getAllByRole("searchbox")[0]).toHaveValue("MAXUS");
+    expect((await screen.findAllByRole("searchbox"))[0]).toHaveValue("MAXUS");
   });
   it("keeps a failed reservation editable so an operator can correct the input", async () => {
     mocks.roles = ["operativo"];
@@ -125,6 +130,7 @@ describe("Fleet role journeys", () => {
     for (const [label, value] of [
       ["Chapa", "TEST123"],
       ["Proveedor", "Taller"],
+      ["RUC del proveedor", "80000001-1"],
       ["N.º de factura", "001"],
       ["Fecha de factura", "2026-10-01"],
       ["Descripción del trabajo", "Filtro"],
@@ -142,5 +148,70 @@ describe("Fleet role journeys", () => {
     );
     await screen.findByRole("alert");
     expect(screen.getByLabelText("N.º de factura")).not.toBeDisabled();
+  });
+  it("restores an interrupted operator upload after reopening, without loading management data", async () => {
+    mocks.roles = ["operativo"];
+    sessionStorage.setItem(
+      "fleet-invoice-draft:test",
+      JSON.stringify({
+        id: "attempt",
+        reserved: true,
+        values: {
+          plate: "TEST123",
+          supplier: "Taller",
+          supplier_tax_id: "80000001-1",
+          invoice_number: "001",
+          invoice_date: "2026-10-01",
+          description: "Filtro",
+          categories: ["Filtros"],
+        },
+        file: { name: "factura.pdf", size: 3, type: "application/pdf" },
+      }),
+    );
+    mocks.submit.mockResolvedValue(undefined);
+    mount();
+    expect(screen.getByLabelText("Chapa")).toHaveValue("TEST123");
+    expect(screen.getByLabelText("Chapa")).toBeDisabled();
+    expect(screen.getByLabelText("Archivo de factura")).not.toBeDisabled();
+    fireEvent.change(screen.getByLabelText("Archivo de factura"), {
+      target: {
+        files: [new File(["pdf"], "factura.pdf", { type: "application/pdf" })],
+      },
+    });
+    fireEvent.submit(
+      screen.getByRole("button", { name: "Reintentar carga" }).closest("form")!,
+    );
+    await screen.findByText("Factura 001 · TEST123: carga completada");
+    expect(mocks.submit).toHaveBeenCalledWith(
+      "attempt",
+      expect.objectContaining({ plate: "TEST123" }),
+      expect.any(File),
+      expect.any(Function),
+    );
+    expect(mocks.load).not.toHaveBeenCalled();
+  });
+  it("shows incomplete invoices to management without adding them to documented totals", async () => {
+    mocks.load.mockResolvedValue({
+      ...data,
+      invoices: [
+        {
+          id: "pending",
+          plate: "TEST123",
+          invoice_date: "2026-10-01",
+          supplier: "Taller",
+          invoice_number: "PEND001",
+          categories: ["Filtros"],
+          description: "Trabajo",
+          status: "pending",
+          amount: 100,
+          currency: "PYG",
+        },
+      ],
+    });
+    mount("/servicios/flota/mantenimientos?maintenance%3Aview=Facturas");
+    await screen.findByText("PEND001");
+    expect(screen.getAllByText("Incompleta").length).toBeGreaterThan(0);
+    expect(screen.getByText("Cargas incompletas: 1")).toBeInTheDocument();
+    expect(screen.queryByText(/Importe documentado/)).not.toBeInTheDocument();
   });
 });

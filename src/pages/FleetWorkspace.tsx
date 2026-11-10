@@ -1,3 +1,7 @@
+import {
+  InvoiceActions,
+  InvoiceActionMenu,
+} from "@/features/fleet/InvoiceActions";
 import { useRef, useState } from "react";
 import { Plus } from "lucide-react";
 import { mobileHeaderCreateButton } from "@/lib/ui-classes";
@@ -44,7 +48,8 @@ export default function FleetWorkspace() {
   const allowed = auth.hasSectionAccess("servicios.flota");
   if (!canSubmitInvoice(auth.roles, allowed))
     return <Navigate to="/sin-acceso" replace />;
-  if (!canManageFleet(auth.roles, allowed)) return <InvoiceUpload />;
+  if (!canManageFleet(auth.roles, allowed))
+    return <InvoiceUpload key={auth.user?.id} />;
   return <ManagementWorkspace />;
 }
 const show = (v: unknown) =>
@@ -137,19 +142,34 @@ export function ManagementWorkspace() {
     : location.pathname.endsWith("/mantenimientos")
       ? "maintenance"
       : "vehicles";
+  const scope = params.get("vehicle")
+    ? params.get("vehicleTab") === "Datos e historial"
+      ? "vehicles"
+      : params.get("vehicleTab") === "Mantenimiento"
+        ? "maintenance"
+        : "fuel"
+    : section;
   const query = useQuery({
-    queryKey: ["fleet-management", user?.id],
-    queryFn: loadManagement,
+    queryKey: ["fleet-management", user?.id, scope],
+    queryFn: () => loadManagement(scope),
     retry: false,
   });
   const [editor, setEditor] = useState<ManagedVehicle | "new" | null>(null),
     [upload, setUpload] = useState(false),
     [detail, setDetail] = useState<GridRow | null>(null);
+  const [fuelImport, setFuelImport] = useState<
+    Record<string, unknown>[] | null
+  >(null);
+  const [importError, setImportError] = useState("");
   const [importing, setImporting] = useState(false),
     [amountInvoice, setAmountInvoice] = useState<Invoice | null>(null),
     [amount, setAmount] = useState(""),
     [currency, setCurrency] = useState(""),
     [saving, setSaving] = useState(false);
+  const [invoiceAction, setInvoiceAction] = useState<{
+    invoice: Invoice;
+    mode: "edit" | "file" | "void" | "audit";
+  } | null>(null);
   const fileRef = useRef<HTMLInputElement>(null);
   const data = query.data;
   const prefix = params.get("vehicle")
@@ -182,7 +202,7 @@ export function ManagementWorkspace() {
     view =
       get("view") ||
       ((vehicle ? tab === "Mantenimiento" : section === "maintenance")
-        ? "Historial"
+        ? "Actividad"
         : "Mensual");
   const refresh = async () => {
     await cache.invalidateQueries({ queryKey: ["fleet-management"] });
@@ -195,7 +215,11 @@ export function ManagementWorkspace() {
       n.set("vehicle", id);
       n.set(
         "vehicleTab",
-        section === "maintenance" ? "Mantenimiento" : "Combustible",
+        section === "maintenance"
+          ? "Mantenimiento"
+          : section === "vehicles"
+            ? "Datos e historial"
+            : "Combustible",
       );
       return n;
     });
@@ -217,7 +241,46 @@ export function ManagementWorkspace() {
       ? id === vehicle.id
       : (!plateFilter || plate === plateFilter) &&
         (!association || (association === "De la flota" ? !!id : !id));
-  const dates = (
+  const monthlyView =
+    (vehicle ? tab === "Combustible" : section === "fuel") && view !== "Cargas";
+  const dates = monthlyView ? (
+    <>
+      <label className="text-xs">
+        Desde mes
+        <Input
+          type="month"
+          aria-label="Desde mes"
+          value={from.slice(0, 7)}
+          onChange={(e) =>
+            set("from", e.target.value ? e.target.value + "-01" : "")
+          }
+        />
+      </label>
+      <label className="text-xs">
+        Hasta mes
+        <Input
+          type="month"
+          aria-label="Hasta mes"
+          value={to.slice(0, 7)}
+          onChange={(e) => {
+            const m = e.target.value;
+            set(
+              "to",
+              m
+                ? m +
+                    "-" +
+                    new Date(
+                      Number(m.slice(0, 4)),
+                      Number(m.slice(5)),
+                      0,
+                    ).getDate()
+                : "",
+            );
+          }}
+        />
+      </label>
+    </>
+  ) : (
     <>
       <FilterDate label="Desde" value={from} onChange={(v) => set("from", v)} />
       <FilterDate label="Hasta" value={to} onChange={(v) => set("to", v)} />
@@ -228,14 +291,24 @@ export function ManagementWorkspace() {
     (vehicle && tab === "Mantenimiento");
   const fuelView =
     (section === "fuel" && !vehicle) || (vehicle && tab === "Combustible");
-  const historyView = invoiceView && view !== "Facturas";
+  const historyView = invoiceView && view === "Historial";
+  const activityView =
+    invoiceView && view !== "Facturas" && view !== "Historial";
   const invoices = (data?.invoices ?? []).filter(
     (r) =>
-      within(r.invoice_date) &&
+      (!get("invoiceState")
+        ? r.status !== "void"
+        : r.status === get("invoiceState")) &&
+      (!get("missingAmount") ||
+        (r.status === "uploaded" && r.amount == null)) &&
+      within(
+        activityView ? (r.performed_on ?? r.invoice_date) : r.invoice_date,
+      ) &&
       matchesVehicle(r.vehicle_id, r.plate) &&
       (!supplier || r.supplier === supplier) &&
       (!category || r.categories.includes(category)) &&
       matches(
+        r.supplier_tax_id,
         r.plate,
         r.supplier,
         r.invoice_number,
@@ -272,16 +345,35 @@ export function ManagementWorkspace() {
       const rows = parseFuel(
         XLSX.read(await file.arrayBuffer(), { type: "array" }),
       );
-      const count = await fleetRpc<number>("fleet_import_fuel_entries", {
-        p_rows: rows,
-      });
-      await refresh();
-      toast.success(`${count} cargas incorporadas`);
+      setFuelImport(rows);
+      setImportError("");
     } catch (e) {
       toast.error(show((e as { message?: string }).message ?? e));
     } finally {
       setImporting(false);
       if (fileRef.current) fileRef.current.value = "";
+    }
+  }
+  async function confirmFuelImport() {
+    if (!fuelImport || importing) return;
+    setImporting(true);
+    setImportError("");
+    try {
+      const count = await fleetRpc<number>("fleet_import_fuel_entries", {
+        p_rows: fuelImport,
+      });
+      await refresh();
+      toast.success(
+        count +
+          " cargas incorporadas · " +
+          (fuelImport.length - count) +
+          " repetidas omitidas",
+      );
+      setFuelImport(null);
+    } catch (e) {
+      setImportError(String((e as { message?: string }).message ?? e));
+    } finally {
+      setImporting(false);
     }
   }
   if (query.isPending)
@@ -311,7 +403,8 @@ export function ManagementWorkspace() {
       ["brand", "Marca"],
       ["model", "Modelo"],
       ["responsible", "Responsable"],
-      ["status", "Estado"],
+      ["status", "Estado operativo"],
+      ["lifecycle", "Situación patrimonial"],
       ["km", "Último km", "number"],
       ["date", "Fecha lectura", "date"],
       ["distance", "Km período", "number"],
@@ -341,6 +434,7 @@ export function ManagementWorkspace() {
           model: v.model,
           responsible: responsible(v.id),
           status: v.operational_status,
+          lifecycle: v.lifecycle_status,
           km: reading?.odometer_km,
           date: reading?.reading_date,
           distance: distance?.coverageFrom ? distance.exactKm : null,
@@ -388,6 +482,46 @@ export function ManagementWorkspace() {
           : null,
       }));
     }
+  } else if (activityView) {
+    columns.push(
+      ["date", "Fecha de referencia", "date"],
+      ["plate", "Chapa"],
+      ["origin", "Origen"],
+      ["invoice_date", "Fecha de factura", "date"],
+      ["performed", "Fecha del trabajo", "date"],
+      ["km", "Kilometraje", "number"],
+      ["supplier", "Proveedor"],
+      ["invoice", "N.º factura"],
+      ["description", "Descripción"],
+    );
+    rows = [
+      ...history.map((r) => ({
+        id: r.id,
+        date: r.occurred_on,
+        plate: r.plate,
+        origin: "Planilla inicial",
+        invoice_date: null,
+        performed: r.occurred_on,
+        km: r.odometer_km,
+        supplier: r.supplier,
+        invoice: r.invoice_number,
+        description: null,
+      })),
+      ...invoices
+        .filter((r) => r.status === "uploaded")
+        .map((r) => ({
+          id: r.id,
+          date: r.performed_on ?? r.invoice_date,
+          plate: r.plate,
+          origin: "Factura",
+          invoice_date: r.invoice_date,
+          performed: r.performed_on,
+          km: r.odometer_km,
+          supplier: r.supplier,
+          invoice: r.invoice_number,
+          description: r.description,
+        })),
+    ];
   } else if (invoiceView) {
     columns.push(
       ["date", "Fecha", "date"],
@@ -434,6 +568,8 @@ export function ManagementWorkspace() {
       }));
     } else {
       columns.push(
+        ["status", "Estado de carga"],
+        ["supplier_tax_id", "RUC"],
         ["classification", "Clasificación"],
         ["description", "Descripción"],
         ["currency", "Moneda"],
@@ -445,6 +581,13 @@ export function ManagementWorkspace() {
         plate: r.plate,
         supplier: r.supplier,
         invoice: r.invoice_number,
+        status:
+          r.status === "pending"
+            ? "Incompleta"
+            : r.status === "void"
+              ? "Anulada"
+              : "Completa",
+        supplier_tax_id: r.supplier_tax_id,
         classification: r.categories.join(", "),
         description: r.description,
         currency: r.currency,
@@ -578,6 +721,7 @@ export function ManagementWorkspace() {
               ["before", "Anterior"],
               ["after", "Nuevo"],
               ["actor", "Autor"],
+              ["reason", "Motivo"],
             ]}
             rows={data!.changes
               .filter((c) => c.vehicle_id === vehicle.id)
@@ -595,6 +739,7 @@ export function ManagementWorkspace() {
                     before: show(c.before_data[k]),
                     after: show(c.after_data[k]),
                     actor: c.actor_name,
+                    reason: c.reason,
                   })),
               )}
           />
@@ -610,7 +755,9 @@ export function ManagementWorkspace() {
                     : "Mensual"
                   : view === "Facturas"
                     ? "Facturas"
-                    : "Historial"
+                    : view === "Historial"
+                      ? "Historial"
+                      : "Actividad"
               }
               onValueChange={(v) => {
                 set("view", v);
@@ -621,14 +768,14 @@ export function ManagementWorkspace() {
                 <TabsList>
                   {(fuelView
                     ? ["Mensual", "Cargas"]
-                    : ["Historial", "Facturas"]
+                    : ["Actividad", "Historial", "Facturas"]
                   ).map((t) => (
                     <TabsTrigger key={t} value={t}>
                       {t}
                     </TabsTrigger>
                   ))}
                 </TabsList>
-                {invoiceView && !historyView && (
+                {invoiceView && !historyView && !activityView && (
                   <Button size="sm" onClick={() => setUpload(true)}>
                     Cargar factura
                   </Button>
@@ -658,22 +805,61 @@ export function ManagementWorkspace() {
               {consume && (
                 <>
                   <span>Km evaluados: {consume.km || "—"}</span>
-                  <span>
-                    L/100 km estimado: {consume.l100?.toFixed(2) ?? "—"}
-                  </span>
+                  <details>
+                    <summary className="cursor-pointer">
+                      L/100 km estimado:{" "}
+                      {consume.l100?.toLocaleString("es-PY", {
+                        maximumFractionDigits: 2,
+                      }) ?? "—"}
+                    </summary>
+                    <dl className="grid grid-cols-2 gap-2 py-2">
+                      <dt>Intervalos válidos</dt>
+                      <dd>{consume.intervals}</dd>
+                      <dt>Litros evaluados</dt>
+                      <dd>{consume.liters.toLocaleString("es-PY")}</dd>
+                      <dt>Desde</dt>
+                      <dd>
+                        {consume.from?.split("-").reverse().join("/") ?? "—"}
+                      </dd>
+                      <dt>Hasta</dt>
+                      <dd>
+                        {consume.to?.split("-").reverse().join("/") ?? "—"}
+                      </dd>
+                    </dl>
+                    <p className="max-w-md text-xs">
+                      Se usan intervalos consecutivos dentro del mes, con
+                      kilometraje creciente y cargas compatibles. Se excluyen
+                      ajustes, discontinuidades y lecturas ambiguas. Sin
+                      intervalos válidos no se calcula consumo.
+                    </p>
+                  </details>
                 </>
               )}
             </div>
           )}
-          {invoiceView && !historyView && (
+          {invoiceView && !historyView && !activityView && (
             <div className="flex gap-5 text-sm">
+              <span>
+                Sin importe:{" "}
+                {
+                  invoices.filter(
+                    (r) => r.status === "uploaded" && r.amount == null,
+                  ).length
+                }
+              </span>
+              <span>
+                Cargas incompletas:{" "}
+                {invoices.filter((r) => r.status === "pending").length}
+              </span>
               {opts(
-                invoices.filter((r) => r.amount != null).map((r) => r.currency),
+                invoices
+                  .filter((r) => r.status === "uploaded" && r.amount != null)
+                  .map((r) => r.currency),
               ).map((c) => (
                 <span key={c}>
                   Importe documentado ({c}):{" "}
                   {invoices
-                    .filter((r) => r.currency === c)
+                    .filter((r) => r.status === "uploaded" && r.currency === c)
                     .reduce((s, r) => s + Number(r.amount ?? 0), 0)
                     .toLocaleString("es-PY")}
                 </span>
@@ -694,6 +880,23 @@ export function ManagementWorkspace() {
             }
             rows={from && to && from > to ? [] : rows}
             fields={columns.length ? columns : [["id", "Registro"]]}
+            onReset={() =>
+              setParams(
+                (previous) => {
+                  const n = new URLSearchParams(previous);
+                  for (const k of Array.from(n.keys()))
+                    if (k.startsWith(prefix) && !k.endsWith(":view"))
+                      n.delete(k);
+                  return n;
+                },
+                { replace: true },
+              )
+            }
+            activeFilters={
+              Array.from(params.entries()).filter(
+                ([k, v]) => k.startsWith(prefix) && !k.endsWith(":view") && !!v,
+              ).length
+            }
             search={search}
             onSearch={(v) => set("search", v)}
             filters={
@@ -767,6 +970,34 @@ export function ManagementWorkspace() {
                     />
                   )}{" "}
                   {invoiceView && !historyView && (
+                    <>
+                      <label className="text-xs">
+                        Estado de carga
+                        <select
+                          aria-label="Estado de carga"
+                          className="block h-8 border rounded-md bg-background"
+                          value={get("invoiceState")}
+                          onChange={(e) => set("invoiceState", e.target.value)}
+                        >
+                          <option value="">Vigentes</option>
+                          <option value="pending">Incompletas</option>
+                          <option value="uploaded">Completas</option>
+                          <option value="void">Anuladas</option>
+                        </select>
+                      </label>
+                      <label className="flex items-center gap-2 text-xs">
+                        <input
+                          type="checkbox"
+                          checked={!!get("missingAmount")}
+                          onChange={(e) =>
+                            set("missingAmount", e.target.checked ? "yes" : "")
+                          }
+                        />
+                        Sin importe
+                      </label>
+                    </>
+                  )}
+                  {invoiceView && !historyView && (
                     <Choice
                       label="Clasificación"
                       value={category}
@@ -831,6 +1062,70 @@ export function ManagementWorkspace() {
           />
         </>
       )}
+      <Dialog
+        open={!!fuelImport}
+        onOpenChange={(open) => {
+          if (!open && !importing) setFuelImport(null);
+        }}
+      >
+        <DialogContent closeLabel="Cerrar">
+          <DialogTitle>Importar combustible</DialogTitle>
+          {fuelImport && (
+            <>
+              <dl className="grid grid-cols-2 gap-3 text-sm">
+                <dt>Movimientos</dt>
+                <dd>{fuelImport.length}</dd>
+                <dt>Comprobantes existentes</dt>
+                <dd>
+                  {
+                    fuelImport.filter((r) =>
+                      data!.fuel.some((f) => f.source_key === r.source_key),
+                    ).length
+                  }
+                </dd>
+                <dt>Desde</dt>
+                <dd>
+                  {fuelImport
+                    .map((r) => String(r.occurred_at).slice(0, 10))
+                    .sort()[0]
+                    ?.split("-")
+                    .reverse()
+                    .join("/")}
+                </dd>
+                <dt>Hasta</dt>
+                <dd>
+                  {fuelImport
+                    .map((r) => String(r.occurred_at).slice(0, 10))
+                    .sort()
+                    .at(-1)
+                    ?.split("-")
+                    .reverse()
+                    .join("/")}
+                </dd>
+                <dt>Litros netos del archivo</dt>
+                <dd>
+                  {fuelImport
+                    .reduce((n, r) => n + Number(r.liters), 0)
+                    .toLocaleString("es-PY")}
+                </dd>
+              </dl>
+              {importError && (
+                <p role="alert" className="text-destructive text-sm">
+                  {importError}
+                </p>
+              )}
+              <div className="flex justify-end">
+                <Button
+                  disabled={importing}
+                  onClick={() => void confirmFuelImport()}
+                >
+                  {importing ? "Importando…" : "Importar archivo"}
+                </Button>
+              </div>
+            </>
+          )}
+        </DialogContent>
+      </Dialog>
       <input
         ref={fileRef}
         hidden
@@ -845,8 +1140,22 @@ export function ManagementWorkspace() {
           onSaved={() => void refresh()}
         />
       )}
+      {invoiceAction && (
+        <InvoiceActions
+          invoice={invoiceAction.invoice}
+          initialMode={invoiceAction.mode}
+          onClose={() => setInvoiceAction(null)}
+          onSaved={async () => {
+            await refresh();
+            setInvoiceAction(null);
+          }}
+        />
+      )}
       <Dialog open={upload} onOpenChange={setUpload}>
-        <DialogContent className="max-h-[90vh] max-w-4xl overflow-auto">
+        <DialogContent
+          closeLabel="Cerrar"
+          className="max-h-[90vh] max-w-4xl overflow-auto"
+        >
           <DialogTitle>Cargar factura</DialogTitle>
           <InvoiceUpload
             embedded
@@ -864,7 +1173,10 @@ export function ManagementWorkspace() {
           if (!open) setDetail(null);
         }}
       >
-        <DialogContent className="max-h-[90vh] max-w-4xl overflow-auto">
+        <DialogContent
+          closeLabel="Cerrar"
+          className="max-h-[90vh] max-w-4xl overflow-auto"
+        >
           <DialogTitle>
             {selectedInvoice
               ? "Factura"
@@ -889,7 +1201,15 @@ export function ManagementWorkspace() {
                     <dt className="text-muted-foreground">
                       {columns.find((c) => c[0] === key)?.[1] ?? key}
                     </dt>
-                    <dd>{show(value)}</dd>
+                    <dd>
+                      {key === "date"
+                        ? show(value)
+                            .slice(0, 10)
+                            .split("-")
+                            .reverse()
+                            .join("/")
+                        : show(value)}
+                    </dd>
                   </div>
                 ))}
           </dl>
@@ -922,7 +1242,17 @@ export function ManagementWorkspace() {
                 </div>
               </dl>
               <div className="flex gap-3">
+                <InvoiceActionMenu
+                  invoice={selectedInvoice}
+                  onSelect={(mode) => {
+                    setInvoiceAction({ invoice: selectedInvoice, mode });
+                    setDetail(null);
+                  }}
+                />
                 <Button
+                  className={
+                    selectedInvoice.status !== "uploaded" ? "hidden" : undefined
+                  }
                   onClick={async () => {
                     const popup = window.open("about:blank", "_blank");
                     if (!popup) {
@@ -944,6 +1274,9 @@ export function ManagementWorkspace() {
                 </Button>
                 <Button
                   variant="outline"
+                  className={
+                    selectedInvoice.status !== "uploaded" ? "hidden" : undefined
+                  }
                   onClick={() => {
                     setAmountInvoice(selectedInvoice);
                     setAmount(
@@ -977,9 +1310,20 @@ export function ManagementWorkspace() {
               />
               <details>
                 <summary>Datos originales</summary>
-                <pre className="whitespace-pre-wrap break-all text-xs">
-                  {JSON.stringify(selectedHistory.raw_data, null, 2)}
-                </pre>
+                <ManagementTable
+                  label="Datos originales"
+                  fields={[
+                    ["field", "Campo"],
+                    ["value", "Valor original"],
+                  ]}
+                  rows={Object.entries(selectedHistory.raw_data).map(
+                    ([field, value]) => ({
+                      id: field,
+                      field,
+                      value: show(value),
+                    }),
+                  )}
+                />
               </details>
             </>
           )}
@@ -1003,7 +1347,7 @@ export function ManagementWorkspace() {
           if (!open && !saving) setAmountInvoice(null);
         }}
       >
-        <DialogContent>
+        <DialogContent closeLabel="Cerrar">
           <DialogTitle>Importe de factura</DialogTitle>
           <form
             className="space-y-3"

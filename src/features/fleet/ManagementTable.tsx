@@ -1,4 +1,6 @@
-import type { CSSProperties, ReactNode } from "react";
+import { Dialog, DialogContent, DialogTitle } from "@/components/ui/dialog";
+import { useEffect, useState, type CSSProperties, type ReactNode } from "react";
+import { Button } from "@/components/ui/button";
 import {
   CompactListTable,
   type CompactListColumn,
@@ -67,7 +69,11 @@ export function ManagementTable({
   onSearch,
   actions = [],
   render,
+  onReset,
+  activeFilters = 0,
 }: {
+  onReset?: () => void;
+  activeFilters?: number;
   rows: GridRow[];
   fields: [string, string, ("text" | "number" | "date")?][];
   label: string;
@@ -80,6 +86,14 @@ export function ManagementTable({
   render?: Record<string, (r: GridRow) => ReactNode>;
 }) {
   const { can } = useAuth();
+  const [page, setPage] = useState(0);
+  useEffect(() => setPage(0), [rows]);
+  const [columnPicker, setColumnPicker] = useState(false),
+    [hiddenColumns, setHiddenColumns] = useState<string[]>([]);
+  const currentPage = Math.min(
+    page,
+    Math.max(0, Math.ceil(rows.length / 50) - 1),
+  );
   const columns: CompactListColumn<GridRow>[] = fields.map(
     ([key, label, kind], index) => ({
       key,
@@ -112,10 +126,10 @@ export function ManagementTable({
           : (r) => formatCell(r[key], kind)),
     }),
   );
-  const tableWidth = fields.reduce(
-    (sum, [key]) => sum + (fieldWidths[key] ?? 160),
-    0,
-  );
+  const visibleColumns = columns.filter((c) => !hiddenColumns.includes(c.key));
+  const tableWidth = fields
+    .filter(([k]) => !hiddenColumns.includes(k))
+    .reduce((sum, [key]) => sum + (fieldWidths[key] ?? 160), 0);
   const mobileKeys =
     fields[0][0] === "plate"
       ? ["plate", "status", "km"]
@@ -131,6 +145,18 @@ export function ManagementTable({
   });
   const options = [
     ...actions,
+    ...(onSearch && fields.length > 8
+      ? [
+          {
+            id: "columns",
+            label: "Elegir columnas",
+            onSelect: () => setColumnPicker(true),
+          },
+        ]
+      : []),
+    ...(onReset && activeFilters
+      ? [{ id: "reset", label: "Limpiar filtros", onSelect: onReset }]
+      : []),
     ...(can("datos:exportar") && rows.length > 0
       ? [
           {
@@ -159,6 +185,30 @@ export function ManagementTable({
   ];
   return (
     <div className="space-y-3">
+      <Dialog open={columnPicker} onOpenChange={setColumnPicker}>
+        <DialogContent closeLabel="Cerrar">
+          <DialogTitle>Columnas visibles</DialogTitle>
+          <div className="grid grid-cols-2 gap-3">
+            {fields.map(([key, label], index) => (
+              <label key={key} className="flex gap-2 text-sm">
+                <input
+                  type="checkbox"
+                  disabled={index < 2}
+                  checked={!hiddenColumns.includes(key)}
+                  onChange={(e) =>
+                    setHiddenColumns(
+                      e.target.checked
+                        ? hiddenColumns.filter((k) => k !== key)
+                        : [...hiddenColumns, key],
+                    )
+                  }
+                />
+                {label}
+              </label>
+            ))}
+          </div>
+        </DialogContent>
+      </Dialog>
       <FiltersBar
         search={
           onSearch
@@ -170,14 +220,49 @@ export function ManagementTable({
       >
         {filters}
       </FiltersBar>
+      {onSearch && (
+        <div className="flex justify-between text-xs text-muted-foreground">
+          <span>
+            {rows.length} registros
+            {activeFilters ? ` · ${activeFilters} filtros activos` : ""}
+          </span>
+          {rows.length > 50 && (
+            <div className="flex items-center gap-2">
+              <Button
+                size="sm"
+                variant="ghost"
+                disabled={currentPage === 0}
+                onClick={() => setPage(currentPage - 1)}
+              >
+                Anterior
+              </Button>
+              <span>
+                {currentPage + 1} / {Math.ceil(rows.length / 50)}
+              </span>
+              <Button
+                size="sm"
+                variant="ghost"
+                disabled={(currentPage + 1) * 50 >= rows.length}
+                onClick={() => setPage(currentPage + 1)}
+              >
+                Siguiente
+              </Button>
+            </div>
+          )}
+        </div>
+      )}
       <div
         style={{ "--fleet-table-width": `${tableWidth}px` } as CSSProperties}
       >
         <CompactListTable
           className="sm:min-w-[var(--fleet-table-width)]"
           label={label}
-          rows={ordered}
-          columns={columns}
+          rows={
+            onSearch
+              ? ordered.slice(currentPage * 50, currentPage * 50 + 50)
+              : ordered
+          }
+          columns={visibleColumns}
           mobileColumns={columns
             .filter((c) => mobileKeys.includes(c.key))
             .map((c) => ({ ...c, widthPx: undefined, stickyLeft: undefined }))}
@@ -185,7 +270,13 @@ export function ManagementTable({
           sort={sort}
           onSort={toggleSort}
           onSelect={onSelect}
-          status={!rows.length ? "Sin registros" : undefined}
+          status={
+            !rows.length
+              ? activeFilters
+                ? "Sin coincidencias"
+                : "Sin registros"
+              : undefined
+          }
         />
       </div>
     </div>

@@ -38,6 +38,9 @@ describe("Fleet calculations and input", () => {
       km: 800,
       liters: 80,
       l100: 10,
+      intervals: 2,
+      from: "2026-10-01",
+      to: "2026-10-15",
     });
     expect(
       estimatedConsumption([a, { ...b, previous_liters: 12 }]).l100,

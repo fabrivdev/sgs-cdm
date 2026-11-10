@@ -1,5 +1,15 @@
 # Flota
 
+## Mejoras de recuperación y escritorio — 10/11/2026
+
+Implementadas localmente corrección/anulación de facturas con motivo y versiones, recuperación por Jefatura de cargas incompletas y conservación de vínculos al cambiar la chapa. Un cambio real conserva alias; una corrección de escritura retira el alias incorrecto sin perder gastos ya asociados. Operativos mantiene solo carga, con borrador de sesión por usuario.
+
+Confirmado por el usuario: una chapa por factura e identidad del proveedor por RUC. No inferir RUC anteriores. Actividad reúne registros de ambas fuentes sin deducir intervenciones únicas ni fechas de trabajo. Las fechas efectivas y km se completan opcionalmente por Jefatura.
+
+La interfaz prioriza escritorio, concentra acciones en menús, permite elegir columnas/limpiar filtros y distingue facturas incompletas, anuladas y sin importe. Consulta por sección y paginación visual de 50 filas, manteniendo exportación completa. No confundir con paginación de filtros en servidor. Combustible permite consultar cobertura del cálculo e inspeccionar el archivo antes de importar.
+
+Fuentes: src/features/fleet/InvoiceActions.tsx, InvoiceUpload.tsx, ManagementTable.tsx, managementApi.ts, src/pages/FleetWorkspace.tsx y supabase/migrations/20261110150000_fleet_recovery.sql. Instalación y límites en docs/fleet-operations-local.md. Sin push, publicación ni SQL remoto.
+
 ## Implementación local vigente — 10/11/2026
 
 La nueva implementación de `main` local está descrita en `docs/fleet-operations-local.md`. No está publicada ni se aplicó SQL remoto. Esta sección reemplaza el alcance y los permisos anteriores como especificación del código local; los apartados fechados siguientes son antecedentes.

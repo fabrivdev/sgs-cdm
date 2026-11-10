@@ -28,6 +28,7 @@ async function fixture(db: PGlite) {
     "20261006132000_add_fleet_management.sql",
     "20261006201000_add_fleet_responsibility_history.sql",
     "20261110120000_fleet_operations.sql",
+    "20261110150000_fleet_recovery.sql",
   ])
     await db.exec(readFileSync("supabase/migrations/" + file, "utf8"));
   await db.exec("SET ROLE authenticated");
@@ -193,6 +194,7 @@ describe("fleet operations / isolated PostgreSQL", () => {
       const invoice = {
         plate: "NO123",
         supplier: "Taller",
+        supplier_tax_id: "80000001-1",
         invoice_number: "001",
         invoice_date: "2026-10-01",
         categories: ["Filtros"],
@@ -215,7 +217,7 @@ describe("fleet operations / isolated PostgreSQL", () => {
         ).rows,
       ).toEqual(result.rows);
       await expect(rpc("fleet_finalize_invoice", [inv])).rejects.toThrow(
-        "no está completo",
+        "incompleta",
       );
       await db.query(
         "INSERT INTO storage.objects(bucket_id,name,metadata) VALUES ($1,$2,$3)",
@@ -259,6 +261,204 @@ describe("fleet operations / isolated PostgreSQL", () => {
           )
         ).rows,
       ).toEqual([{ linked: true }]);
+
+      // A real registration change must retain old expenses and accept later
+      // invoices for the historical plate, without creating another vehicle.
+      await rpc("fleet_edit_vehicle", [
+        id,
+        JSON.stringify({
+          ...vehicle,
+          plate: "NEW-123",
+          plate_change_type: "change",
+          plate_change_reason: "Nueva chapa",
+        }),
+      ]);
+      expect(
+        (
+          await db.query(
+            "SELECT vehicle_id FROM fleet_fuel_entries WHERE source_key='a'",
+          )
+        ).rows,
+      ).toEqual([{ vehicle_id: id }]);
+      expect(
+        (await db.query("SELECT vehicle_id FROM fleet_maintenance_history"))
+          .rows,
+      ).toEqual([{ vehicle_id: id }]);
+      await expect(
+        rpc("fleet_create_vehicle", ["Prueba", "TEST123", null, null, null]),
+      ).rejects.toThrow("historial");
+      await expect(
+        rpc("fleet_reserve_invoice", [
+          "00000000-0000-4000-8000-000000000009",
+          JSON.stringify({
+            ...invoice,
+            supplier: "Otro nombre del mismo proveedor",
+            supplier_tax_id: "80.000.001-1",
+            invoice_number: "0-0-1",
+          }),
+        ]),
+      ).rejects.toThrow("ya fue registrada");
+      const currentInvoice = (
+        await db.query<{ version: number }>(
+          "SELECT version FROM fleet_maintenance_invoices WHERE id=$1",
+          [inv],
+        )
+      ).rows[0];
+      await rpc("fleet_correct_invoice", [
+        inv,
+        currentInvoice.version,
+        JSON.stringify({
+          ...invoice,
+          plate: "test123",
+          description: "Corregido",
+        }),
+        "Chapa y trabajo corregidos",
+        false,
+      ]);
+      expect(
+        (
+          await db.query(
+            "SELECT vehicle_id,description FROM fleet_maintenance_invoices WHERE id=$1",
+            [inv],
+          )
+        ).rows,
+      ).toEqual([{ vehicle_id: id, description: "Corregido" }]);
+      await expect(
+        rpc("fleet_correct_invoice", [
+          inv,
+          currentInvoice.version,
+          JSON.stringify(invoice),
+          "Intento obsoleto",
+          false,
+        ]),
+      ).rejects.toThrow("cambió");
+      const replacement = "00000000-0000-4000-8000-000000000004";
+      const revision = (
+        await rpc("fleet_reserve_invoice_file", [
+          replacement,
+          inv,
+          currentInvoice.version + 1,
+          JSON.stringify({
+            filename: "nuevo.pdf",
+            mime_type: "application/pdf",
+            size_bytes: 12,
+          }),
+          "Archivo legible",
+        ])
+      ).rows[0] as { value: string };
+      await expect(
+        rpc("fleet_finalize_invoice_file", [replacement]),
+      ).rejects.toThrow("completo");
+      await db.query(
+        "INSERT INTO storage.objects(bucket_id,name,metadata) VALUES ($1,$2,$3)",
+        [
+          "fleet-invoices",
+          revision.value,
+          JSON.stringify({ size: 12, mimetype: "application/pdf" }),
+        ],
+      );
+      await rpc("fleet_finalize_invoice_file", [replacement]);
+      await rpc("fleet_finalize_invoice_file", [replacement]); // Idempotent retry.
+      expect(
+        (await db.query("SELECT * FROM storage.objects")).rows,
+      ).toHaveLength(2);
+      await db.exec("SELECT set_config('test.role','operativo',false)");
+      expect(
+        (await db.query("SELECT * FROM fleet_invoice_audit")).rows,
+      ).toEqual([]);
+      expect(
+        (await db.query("SELECT * FROM fleet_invoice_files")).rows,
+      ).toEqual([]);
+      expect(
+        (await db.query("SELECT * FROM fleet_plate_aliases")).rows,
+      ).toEqual([]);
+      await expect(
+        rpc("fleet_correct_invoice", [
+          inv,
+          currentInvoice.version + 2,
+          JSON.stringify(invoice),
+          "Sin permiso",
+          false,
+        ]),
+      ).rejects.toThrow("Sin acceso");
+      await expect(
+        rpc("fleet_finalize_invoice_file", [replacement]),
+      ).rejects.toThrow("Sin acceso");
+      await db.exec("SELECT set_config('test.role','jefatura',false)");
+      await rpc("fleet_correct_invoice", [
+        inv,
+        currentInvoice.version + 2,
+        "{}",
+        "Factura incorrecta",
+        true,
+      ]);
+      await expect(rpc("fleet_finalize_invoice", [inv])).rejects.toThrow(
+        "no disponible",
+      );
+      await rpc("fleet_edit_vehicle", [
+        id,
+        JSON.stringify({
+          ...vehicle,
+          plate: "FINAL123",
+          plate_change_type: "correction",
+          plate_change_reason: "Error de escritura",
+        }),
+      ]);
+      expect(
+        (await db.query("SELECT vehicle_id FROM fleet_maintenance_history"))
+          .rows,
+      ).toEqual([{ vehicle_id: id }]);
+      expect(
+        (
+          await db.query(
+            "SELECT * FROM fleet_plate_aliases WHERE plate_normalized='NEW123'",
+          )
+        ).rows,
+      ).toEqual([]);
+      expect(
+        (
+          await db.query(
+            "SELECT * FROM fleet_change_events WHERE reason='Error de escritura'",
+          )
+        ).rows,
+      ).toHaveLength(1);
+      const pending = "00000000-0000-4000-8000-000000000005";
+      await rpc("fleet_reserve_invoice", [pending, JSON.stringify(invoice)]);
+      await db.exec(
+        "RESET ROLE; INSERT INTO auth.users VALUES ('00000000-0000-4000-8000-000000000099','manager@example.invalid'); SET ROLE authenticated; SELECT set_config('test.uid','00000000-0000-4000-8000-000000000099',false)",
+      );
+      const recover = "00000000-0000-4000-8000-000000000006";
+      const recovery = (
+        await rpc("fleet_reserve_invoice_file", [
+          recover,
+          pending,
+          1,
+          JSON.stringify({
+            filename: "recuperado.pdf",
+            mime_type: "application/pdf",
+            size_bytes: 14,
+          }),
+          "Recuperar intento interrumpido",
+        ])
+      ).rows[0] as { value: string };
+      await db.query(
+        "INSERT INTO storage.objects(bucket_id,name,metadata) VALUES ($1,$2,$3)",
+        [
+          "fleet-invoices",
+          recovery.value,
+          JSON.stringify({ size: 14, mimetype: "application/pdf" }),
+        ],
+      );
+      await rpc("fleet_finalize_invoice_file", [recover]);
+      expect(
+        (
+          await db.query(
+            "SELECT status FROM fleet_maintenance_invoices WHERE id=$1",
+            [pending],
+          )
+        ).rows,
+      ).toEqual([{ status: "uploaded" }]);
+
       await db.exec("SELECT set_config('test.access','no',false)");
       expect((await db.query("SELECT * FROM fleet_vehicles")).rows).toEqual([]);
       await expect(

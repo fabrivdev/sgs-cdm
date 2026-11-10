@@ -134,6 +134,37 @@ export function VehicleEditor({
                 </select>
               </div>
             ))}
+            {vehicle &&
+              data.plate.replace(/[^a-z0-9]/gi, "").toUpperCase() !==
+                vehicle.plate.replace(/[^a-z0-9]/gi, "").toUpperCase() && (
+                <div className="col-span-2 space-y-2">
+                  <Label htmlFor="plate-change-type">
+                    Tipo de cambio de chapa
+                  </Label>
+                  <select
+                    id="plate-change-type"
+                    required
+                    className="h-10 w-full rounded-md border bg-background px-2"
+                    value={data.plate_change_type ?? ""}
+                    onChange={(e) =>
+                      setData({ ...data, plate_change_type: e.target.value })
+                    }
+                  >
+                    <option value="">Seleccionar</option>
+                    <option value="change">Cambio real de chapa</option>
+                    <option value="correction">Corrección de escritura</option>
+                  </select>
+                  <Label htmlFor="plate-change-reason">Motivo del cambio</Label>
+                  <Input
+                    id="plate-change-reason"
+                    required
+                    value={data.plate_change_reason ?? ""}
+                    onChange={(e) =>
+                      setData({ ...data, plate_change_reason: e.target.value })
+                    }
+                  />
+                </div>
+              )}
           </fieldset>
           {error && (
             <p role="alert" className="text-destructive">

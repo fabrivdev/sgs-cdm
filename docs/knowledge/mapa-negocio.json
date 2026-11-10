@@ -681,7 +681,8 @@
         "fleet_vehicles",
         "fleet_odometer_readings",
         "fleet_vehicle_responsibility_events",
-        "fleet_change_events"
+        "fleet_change_events",
+        "fleet_plate_aliases"
       ],
       "related": [
         "gasto-flota",
@@ -697,7 +698,8 @@
         "fleet_fuel_entries",
         "fleet_maintenance_history",
         "fleet_maintenance_invoices",
-        "fleet_invoice_audit"
+        "fleet_invoice_audit",
+        "fleet_invoice_files"
       ],
       "related": [
         "vehiculo-flota"
@@ -1775,6 +1777,13 @@
         "src/features/fleet/managementModel.ts",
         "supabase/migrations/20261110120000_fleet_operations.sql"
       ]
+    },
+    {
+      "id": "flota-recuperacion-facturas",
+      "title": "Correcciones, recuperación y RUC",
+      "module": "servicios",
+      "description": "Una chapa por factura. Identidad por RUC; Jefatura corrige, anula y reemplaza con motivo/versiones, sin borrar originales. Operativos solo carga y reintenta su borrador. Los cambios reales de chapa conservan alias e historial; una corrección retira el alias incorrecto sin perder vínculos existentes.",
+      "sources": ["src/features/fleet/InvoiceActions.tsx", "src/features/fleet/InvoiceUpload.tsx", "supabase/migrations/20261110150000_fleet_recovery.sql"]
     },
     {
       "id": "flota-sin-inferencias",

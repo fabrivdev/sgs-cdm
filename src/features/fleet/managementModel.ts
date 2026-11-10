@@ -49,6 +49,7 @@ export interface Invoice {
   vehicle_id: string | null;
   plate: string;
   supplier: string;
+  supplier_tax_id?: string | null;
   invoice_number: string;
   invoice_date: string;
   categories: string[];
@@ -57,7 +58,10 @@ export interface Invoice {
   currency: string | null;
   storage_path: string;
   filename: string;
-  status: "pending" | "uploaded";
+  status: "pending" | "uploaded" | "void";
+  version?: number;
+  performed_on?: string | null;
+  odometer_km?: number | null;
 }
 export interface FuelEntry {
   id: string;
@@ -150,6 +154,8 @@ export function estimatedConsumption(rows: readonly FuelEntry[]) {
     const key = r.vehicle_id + "|" + r.occurred_at;
     occurrences.set(key, (occurrences.get(key) ?? 0) + 1);
   }
+  let intervals = 0;
+  const coveredDates: string[] = [];
   let km = 0,
     liters = 0;
   for (let i = 1; i < ordered.length; i++) {
@@ -203,10 +209,19 @@ export function estimatedConsumption(rows: readonly FuelEntry[]) {
       ordered[i + 1].odometer_km! < b.odometer_km
     )
       continue;
+    intervals++;
+    coveredDates.push(a.occurred_at.slice(0, 10), b.occurred_at.slice(0, 10));
     km += b.odometer_km - a.odometer_km;
     liters += a.liters;
   }
-  return { km, liters, l100: km > 0 ? (liters / km) * 100 : null };
+  return {
+    km,
+    liters,
+    intervals,
+    from: coveredDates.sort()[0] ?? null,
+    to: coveredDates.sort().at(-1) ?? null,
+    l100: km > 0 ? (liters / km) * 100 : null,
+  };
 }
 export function monthlyFuel(rows: readonly FuelEntry[]) {
   const groups = new Map<string, FuelEntry[]>();
