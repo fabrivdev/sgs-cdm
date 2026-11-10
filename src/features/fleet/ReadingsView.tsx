@@ -111,6 +111,8 @@ export function ReadingsView({
       </FleetFilterBar>
       <ManagementTable
         label="Lecturas"
+        actionsTarget={actionsTarget}
+        showRowCount={false}
         fields={fields}
         rows={rows}
         actions={[

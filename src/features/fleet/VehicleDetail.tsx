@@ -1,4 +1,14 @@
-import { currentVehicleMileage } from "./maintenanceAlert";
+import { useState } from "react";
+import {
+  ResponsiveDrawer,
+  ResponsiveDrawerHeader,
+  ResponsiveDrawerBody,
+} from "@/components/ui/responsive-drawer";
+import { ReadingsView } from "./ReadingsView";
+import { initialFilters } from "./workspaceModel";
+import { todayInParaguay } from "./period";
+import { fuelMonthRows } from "./vehicleFuelSummary";
+import { currentVehicleMileage, maintenanceAlert } from "./maintenanceAlert";
 import { PageHeader } from "@/components/layout/AppPrimitives";
 import { Button } from "@/components/ui/button";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
@@ -7,7 +17,6 @@ import type { ManagementData } from "./VehiclesList";
 import type { GridRow } from "./ManagementTable";
 import { FuelView } from "./FuelView";
 import { MaintenanceView } from "./MaintenanceView";
-import { ReadingsView } from "./ReadingsView";
 import { SummaryCards } from "./workspaceShared";
 import {
   fmt,
@@ -45,6 +54,23 @@ export function VehicleDetail({
   onImport: () => void;
   onSaved: () => Promise<void>;
 }) {
+  const [administration, setAdministration] = useState(false);
+  const [adminFilters, setAdminFilters] = useState({ ...initialFilters });
+  const adminChange: FilterChange = (key, value, to) =>
+    setAdminFilters((f) =>
+      key === "reset"
+        ? { ...initialFilters }
+        : key === "period"
+          ? { ...f, from: value, to: to ?? "" }
+          : { ...f, [key]: value },
+    );
+  const vehicleActions = [
+    {
+      id: "vehicle-administration",
+      label: "Kilometraje y responsable",
+      onSelect: () => setAdministration(true),
+    },
+  ];
   const fuel = data.fuel.filter(
       (r) => r.vehicle_id === vehicle.id && within(r.occurred_at, filters),
     ),
@@ -54,6 +80,24 @@ export function VehicleDetail({
         within(r.performed_on ?? r.invoice_date, filters),
     );
   const km = currentVehicleMileage(vehicle, data.readings, data.fuel);
+  const alert = maintenanceAlert(vehicle, km, data.history, data.invoices);
+  const trend = fuelMonthRows(
+    data.fuel.filter((r) => r.vehicle_id === vehicle.id),
+    filters,
+  )
+    .filter((r) => r.to < todayInParaguay())
+    .at(-1);
+  const lastWork = [
+    ...data.history
+      .filter((r) => r.vehicle_id === vehicle.id)
+      .map((r) => r.occurred_on),
+    ...data.invoices
+      .filter((r) => r.vehicle_id === vehicle.id && r.status === "uploaded")
+      .map((r) => r.performed_on),
+  ]
+    .filter((d): d is string => !!d)
+    .sort()
+    .at(-1);
   return (
     <>
       <Button variant="ghost" size="sm" onClick={onBack}>
@@ -64,7 +108,7 @@ export function VehicleDetail({
         tabs={
           <Tabs value={tab} onValueChange={onTab}>
             <TabsList>
-              {["Combustible", "Mantenimiento", "Lecturas"].map((t) => (
+              {["Combustible", "Mantenimiento"].map((t) => (
                 <TabsTrigger key={t} value={t}>
                   {t}
                 </TabsTrigger>
@@ -95,33 +139,49 @@ export function VehicleDetail({
         ))}
       </dl>
       <SummaryCards
-        items={[
-          [
-            "Km actuales",
-            <span title={km.source ?? undefined}>{fmt(km.km)}</span>,
-          ],
-          [
-            "Km del período",
-            fmt(mileage(data.readings, vehicle.id, filters, data.fuel)),
-          ],
-          ["Litros", fmt(fuel.reduce((n, r) => n + r.liters, 0))],
-          ["Gasto combustible", fuelMoney(fuel)],
-          ["Gasto mantenimiento", invoiceMoney(invoices)],
-          [
-            "Consumo estimado (L/100 km)",
-            fmt(fleetConsumption(data.fuel, [vehicle], filters)),
-          ],
-        ]}
+        items={
+          tab === "Mantenimiento"
+            ? [
+                [
+                  "Último mantenimiento registrado",
+                  lastWork?.split("-").reverse().join("/") ?? "—",
+                ],
+                ["Km actuales", fmt(km.km)],
+                ["Próximo mantenimiento", alert.label],
+                ["Gasto mantenimiento", invoiceMoney(invoices)],
+              ]
+            : [
+                [
+                  "Km actuales",
+                  <span title={km.source ?? undefined}>{fmt(km.km)}</span>,
+                ],
+                [
+                  "Km del período",
+                  fmt(mileage(data.readings, vehicle.id, filters, data.fuel)),
+                ],
+                ["Litros", fmt(fuel.reduce((n, r) => n + r.liters, 0))],
+                ["Gasto combustible", fuelMoney(fuel)],
+                [
+                  "Variación mensual",
+                  trend && trend.trend !== "—" ? (
+                    <span title="Variación de L/100 km frente al mes anterior completo">
+                      {trend.trend}{" "}
+                      <span className="text-xs text-muted-foreground">
+                        ({trend.date.slice(5, 7)}/{trend.date.slice(0, 4)})
+                      </span>
+                    </span>
+                  ) : (
+                    "—"
+                  ),
+                ],
+                [
+                  "Consumo promedio (L/100 km)",
+                  fmt(fleetConsumption(data.fuel, [vehicle], filters)),
+                ],
+              ]
+        }
       />
-      {tab === "Lecturas" ? (
-        <ReadingsView
-          data={data}
-          vehicleId={vehicle.id}
-          filters={filters}
-          onChange={onChange}
-          onSaved={onSaved}
-        />
-      ) : tab === "Mantenimiento" ? (
+      {tab === "Mantenimiento" ? (
         <MaintenanceView
           data={data}
           vehicleId={vehicle.id}
@@ -129,6 +189,7 @@ export function VehicleDetail({
           onChange={onChange}
           onSelect={onSelect}
           showSummary={false}
+          vehicleActions={vehicleActions}
         />
       ) : (
         <FuelView
@@ -139,8 +200,28 @@ export function VehicleDetail({
           onSelect={onSelect}
           onImport={onImport}
           showSummary={false}
+          vehicleActions={vehicleActions}
         />
       )}
+      <ResponsiveDrawer
+        title="Kilometraje y responsable"
+        size="xl"
+        open={administration}
+        onOpenChange={setAdministration}
+      >
+        <ResponsiveDrawerHeader>
+          <h2>Kilometraje y responsable</h2>
+        </ResponsiveDrawerHeader>
+        <ResponsiveDrawerBody>
+          <ReadingsView
+            data={data}
+            vehicleId={vehicle.id}
+            filters={adminFilters}
+            onChange={adminChange}
+            onSaved={onSaved}
+          />
+        </ResponsiveDrawerBody>
+      </ResponsiveDrawer>
     </>
   );
 }

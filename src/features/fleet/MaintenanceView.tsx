@@ -23,7 +23,8 @@ import {
 const fields: GridField[] = [
   ["date", "Fecha", "date"],
   ["plate", "Chapa"],
-  ["type", "Tipo"],
+  ["type", "Origen"],
+  ["km", "Km", "number"],
   ["description", "Descripción"],
   ["supplier", "Proveedor"],
   ["amount", "Importe", "number"],
@@ -38,6 +39,7 @@ export function MaintenanceView({
   onChange,
   onSelect,
   showSummary = true,
+  vehicleActions = [],
 }: {
   data: ManagementData;
   vehicleId?: string;
@@ -45,6 +47,7 @@ export function MaintenanceView({
   onChange: FilterChange;
   onSelect: (r: GridRow) => void;
   showSummary?: boolean;
+  vehicleActions?: { id: string; label: string; onSelect: () => void }[];
 }) {
   const [actionsTarget, setActionsTarget] = useState<HTMLDivElement | null>(
     null,
@@ -86,7 +89,18 @@ export function MaintenanceView({
           date: r.occurred_on,
           plate: r.plate,
           type: "Historial",
-          description: r.works.map((w) => w.work).join(", "),
+          km: r.odometer_km,
+          description: r.works
+            .map((w) =>
+              [
+                w.work,
+                w.value == null || w.value === "X" ? "" : String(w.value),
+                w.comment,
+              ]
+                .filter(Boolean)
+                .join(": "),
+            )
+            .join(" · "),
           supplier: r.supplier,
           amount: null,
           currency: null,
@@ -98,6 +112,7 @@ export function MaintenanceView({
           date: r.performed_on ?? r.invoice_date,
           plate: r.plate,
           type: "Factura",
+          km: r.odometer_km,
           description: r.description,
           supplier: r.supplier,
           amount: r.amount,
@@ -160,7 +175,7 @@ export function MaintenanceView({
           />
         )}
         <Choice
-          label="Tipo"
+          label="Origen"
           value={filters.type}
           onChange={(v) => onChange("type", v)}
           options={["Historial", "Factura"]}
@@ -187,9 +202,15 @@ export function MaintenanceView({
         rows={rows}
         omittedColumns={vehicleId ? ["plate", "currency"] : ["currency"]}
         render={{
+          description: (r) => (
+            <span className="block max-w-[440px] whitespace-normal leading-5">
+              {r.description || "—"}
+            </span>
+          ),
           amount: (r) =>
             moneyCell(r.amount as number | null, r.currency as string | null),
         }}
+        actions={vehicleActions}
         onSelect={onSelect}
       />
     </>

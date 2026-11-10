@@ -42,21 +42,27 @@ export function ManagementWorkspace() {
   const [defaultPeriod] = useState(() =>
     quickPeriodPresets(new Date()).find((p) => p.key === "current-year")!,
   );
-  const prefix = vehicleId ? `vehicle:${vehicleId}:` : section + ":";
+  const maintenanceDetail =
+    !!vehicleId && params.get("vehicleTab") === "Mantenimiento";
+  const prefix = vehicleId
+    ? `vehicle:${vehicleId}:${maintenanceDetail ? "maintenance:" : ""}`
+    : section + ":";
   const filters = useMemo(
     () =>
       Object.fromEntries(
         Object.keys(initialFilters).map((k) => [
           k,
           params.get(prefix + k) ??
-            (k === "from"
-              ? defaultPeriod.from
-              : k === "to"
-                ? defaultPeriod.to
-                : ""),
+            (maintenanceDetail
+              ? ""
+              : k === "from"
+                ? defaultPeriod.from
+                : k === "to"
+                  ? defaultPeriod.to
+                  : ""),
         ]),
       ) as unknown as FleetFilters,
-    [params, prefix, defaultPeriod],
+    [params, prefix, defaultPeriod, maintenanceDetail],
   );
   const change: FilterChange = (key, value, to) =>
     setParams(
@@ -132,7 +138,7 @@ export function ManagementWorkspace() {
           filters={filters}
           onChange={change}
           tab={
-            ["Combustible", "Mantenimiento", "Lecturas"].includes(
+            ["Combustible", "Mantenimiento"].includes(
               params.get("vehicleTab") ?? "",
             )
               ? params.get("vehicleTab")!

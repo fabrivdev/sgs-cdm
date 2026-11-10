@@ -1,3 +1,4 @@
+import { fuelMonthRows, usesMonthlyFuel } from "./vehicleFuelSummary";
 import { moneyCell } from "./workspaceModel";
 import { useMemo, useState } from "react";
 import {
@@ -38,6 +39,7 @@ export function FuelView({
   onSelect,
   onImport,
   showSummary = true,
+  vehicleActions = [],
 }: {
   data: ManagementData;
   vehicleId?: string;
@@ -46,6 +48,7 @@ export function FuelView({
   onSelect: (r: GridRow) => void;
   onImport: () => void;
   showSummary?: boolean;
+  vehicleActions?: { id: string; label: string; onSelect: () => void }[];
 }) {
   const [actionsTarget, setActionsTarget] = useState<HTMLDivElement | null>(
     null,
@@ -79,6 +82,15 @@ export function FuelView({
         currency: r.currency,
       })),
     [visible],
+  );
+  const monthly = !!vehicleId && usesMonthlyFuel(filters);
+  const monthRows = useMemo(
+    () =>
+      fuelMonthRows(
+        data.fuel.filter((r) => r.vehicle_id === vehicleId),
+        filters,
+      ),
+    [data.fuel, vehicleId, filters],
   );
   return (
     <>
@@ -128,16 +140,66 @@ export function FuelView({
       <ManagementTable
         showRowCount={false}
         actionsTarget={actionsTarget}
-        label="Combustible"
-        fields={fields}
-        rows={rows}
+        label={monthly ? "Combustible por mes" : "Combustible"}
+        fields={
+          monthly
+            ? [
+                ["date", "Mes", "date"],
+                ["loads", "Cargas", "number"],
+                ["liters", "Litros", "number"],
+                ["expense", "Importe"],
+                ["km", "Km evaluados", "number"],
+                ["consumption", "L/100 km", "number"],
+                ["trend", "Variación mensual"],
+              ]
+            : fields
+        }
+        rows={
+          monthly
+            ? monthRows.filter(
+                (m) =>
+                  !filters.search ||
+                  scope.some(
+                    (r) =>
+                      r.occurred_at.startsWith(m.id) &&
+                      matches(
+                        filters.search,
+                        m.id,
+                        r.station,
+                        r.product,
+                        r.raw_data,
+                      ),
+                  ),
+              )
+            : rows
+        }
         omittedColumns={vehicleId ? ["plate", "currency"] : ["currency"]}
         render={{
+          ...(monthly
+            ? {
+                date: (r: GridRow) => (
+                  <button
+                    className="text-primary underline underline-offset-2"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      onChange("period", String(r.from), String(r.to));
+                    }}
+                  >
+                    {String(r.date).slice(0, 7).split("-").reverse().join("/")}
+                  </button>
+                ),
+              }
+            : {}),
           amount: (r) =>
             moneyCell(r.amount as number | null, r.currency as string | null),
         }}
-        onSelect={onSelect}
+        onSelect={
+          monthly
+            ? (r) => onChange("period", String(r.from), String(r.to))
+            : onSelect
+        }
         actions={[
+          ...vehicleActions,
           { id: "import", label: "Importar combustible", onSelect: onImport },
         ]}
       />

@@ -111,7 +111,7 @@ describe("Fleet role journeys", () => {
       button: 0,
       ctrlKey: false,
     });
-    expect(await screen.findAllByRole("tab")).toHaveLength(3);
+    expect(await screen.findAllByRole("tab")).toHaveLength(2);
     expect(screen.queryByLabelText("Ver")).not.toBeInTheDocument();
     fireEvent.click(screen.getByRole("button", { name: "← Vehículos" }));
     expect((await screen.findAllByRole("searchbox"))[0]).toHaveValue("MAXUS");
@@ -237,7 +237,15 @@ it("opens a vehicle from an empty cache and keeps consumption independent of sea
       raw_data: {},
     })),
   });
-  mount("/servicios/flota?vehicle=" + v.id);
+  mount(
+    "/servicios/flota?vehicle=" +
+      v.id +
+      "&vehicle:" +
+      v.id +
+      ":from=2026-10-01&vehicle:" +
+      v.id +
+      ":to=2026-10-31",
+  );
   await screen.findByRole("heading", { name: v.plate });
   expect(
     within(screen.getByRole("region", { name: "Resumen" })).getByText("10"),
@@ -255,7 +263,7 @@ it("opens a vehicle from an empty cache and keeps consumption independent of sea
   expect(
     within(screen.getByRole("region", { name: "Resumen" })).getByText("10"),
   ).toBeInTheDocument();
-  expect(screen.getAllByRole("tab")).toHaveLength(3);
+  expect(screen.getAllByRole("tab")).toHaveLength(2);
 });
 it("reports invalid date ranges without presenting an unexplained empty result", async () => {
   mocks.load.mockResolvedValue(data);
@@ -312,4 +320,55 @@ it("defaults to this year and changes both dates atomically using the shared sho
     "",
   );
   expect(dates()[0]).toBe("2025-02-01");
+});
+
+it("shows linked maintenance from past years and undated originals, with independent dates", async () => {
+  const v = data.vehicles[0];
+  mocks.load.mockResolvedValue({
+    ...data,
+    history: [
+      {
+        id: "h1",
+        vehicle_id: v.id,
+        plate: v.plate,
+        occurred_on: "2024-01-10",
+        odometer_km: 10000,
+        supplier: "Taller",
+        invoice_number: "1",
+        works: [{ work: "Filtro", value: "X", comment: "Original" }],
+      },
+      {
+        id: "h2",
+        vehicle_id: v.id,
+        plate: v.plate,
+        occurred_on: null,
+        odometer_km: null,
+        supplier: "Otro",
+        invoice_number: "2",
+        works: [{ work: "Aceite", value: 5, comment: null }],
+      },
+      {
+        id: "outside",
+        vehicle_id: null,
+        plate: "AJENO",
+        occurred_on: "2024-01-10",
+        works: [],
+      },
+    ],
+  });
+  mount("/servicios/flota?vehicle=" + v.id + "&vehicleTab=Mantenimiento");
+  await screen.findByText("Filtro: Original");
+  expect(screen.getByText("Aceite: 5")).toBeInTheDocument();
+  expect(screen.queryByText("AJENO")).not.toBeInTheDocument();
+  expect(
+    screen.queryByRole("tab", { name: "Lecturas" }),
+  ).not.toBeInTheDocument();
+  expect(document.querySelector('input[type="date"]')).toHaveValue("");
+  fireEvent.keyDown(screen.getByRole("button", {name:"Acciones de la sección"}), {key:"Enter"});
+  fireEvent.click(
+    await screen.findByRole("menuitem", { name: "Kilometraje y responsable" }),
+  );
+  expect(
+    (await screen.findAllByRole("heading", { name: "Kilometraje y responsable" }))[0],
+  ).toBeInTheDocument();
 });
