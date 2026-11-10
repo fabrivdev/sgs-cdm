@@ -1,5 +1,17 @@
 # Flota
 
+## Implementación local vigente — 10/11/2026
+
+La nueva implementación de `main` local está descrita en `docs/fleet-operations-local.md`. No está publicada ni se aplicó SQL remoto. Esta sección reemplaza el alcance y los permisos anteriores como especificación del código local; los apartados fechados siguientes son antecedentes.
+
+El menú Flota contiene Vehículos, Gastos de combustible y Gastos de mantenimiento para Jefatura. Operativos solo ve Cargar factura, con chapa, proveedor, fecha/número, clasificación, descripción y archivo. Las tablas, RPC y Storage restringen también el acceso del servidor. No se copian permisos ni se crea una aprobación manual.
+
+Flota e historial se importan una sola vez por tipo mediante una carga inicial transaccional sin botón permanente. Después Jefatura administra manualmente vehículos, estado y responsables, conservando lecturas y auditoría. Los gastos se vinculan automáticamente por chapa exacta normalizada; las chapas ajenas no crean vehículos. El historial mantiene trabajos desglosados y datos originales, sin importes inferidos. Combustible conserva ajustes y permite consultar litros, gasto mensual y L/100 km estimado cuando hay intervalos válidos.
+
+Fuentes: `src/pages/FleetWorkspace.tsx`, `src/features/fleet/managementModel.ts`, `src/features/fleet/workbookImports.mjs`, `scripts/fleet-initial-load.mjs` y `supabase/migrations/20261110120000_fleet_operations.sql`. La ficha reutiliza `Flota.tsx` para lecturas, correcciones e historial de responsables.
+
+Validación: pruebas locales con PostgreSQL aislado, parsers, cálculos, permisos y navegación, compilación y revisión visual DEMO. Pendiente: aplicar SQL autorizado, confirmar hojas del padrón y probar cuentas/archivos reales en el destino antes de publicar. Ver el documento de instalación para datos ausentes, fórmula y límites.
+
 ## Densidad de la lista móvil - 07/10/2026
 
 Bajo 640 px, cada vehículo ocupa una fila continua. La identidad conserva marca/modelo, chapa única y responsable en líneas separadas; kilómetros del período y estado permanecen a la derecha. El responsable se mantiene por criterio conservador hasta validar si es contexto diario de despacho. Sólo la fecha de última lectura se retira de la fila y continúa en el detalle, junto con historial y lecturas. `Sin lectura` aparece una sola vez como estado. Abrir la fila conserva el mismo callback y nombre accesible con modelo/chapa; no se agregan gráficos, cards, consultas ni cálculos.

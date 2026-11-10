@@ -10,6 +10,8 @@ import { scrollTableClass } from "@/components/ventas/TableScroll";
 
 export type CompactListColumn<T> = SalesColumn<T> & {
   width: string;
+  widthPx?: number;
+  stickyLeft?: number;
   hiddenBelow?: "sm" | "md" | "lg" | "xl";
   render?: (row: T) => ReactNode;
   title?: (row: T) => string;
@@ -35,9 +37,10 @@ export function CompactListTable<T>({ rows, columns, mobileColumns, id, label, s
   const displayedColumns = phone && mobileColumns ? mobileColumns : columns;
   return <Table className={cn("compact-list-table table-fixed", className)} aria-label={label}
     containerClassName={scrollTableClass(rows.length)}>
-    <colgroup>{displayedColumns.map(column => <col key={column.key} className={cn(column.width, column.hiddenBelow && visibility[column.hiddenBelow][0])} />)}
+    <colgroup>{displayedColumns.map(column => <col key={column.key} style={column.widthPx ? {width:column.widthPx} : undefined} className={cn(column.width, column.hiddenBelow && visibility[column.hiddenBelow][0])} />)}
       {actions && <col className={actions.width} />}</colgroup>
     <TableHeader className="sticky top-0 z-10 bg-card"><TableRow>{displayedColumns.map((column, index) => <TableHead key={column.key}
+      style={column.stickyLeft == null ? undefined : {position:"sticky",left:column.stickyLeft,zIndex:20,background:"hsl(var(--card))"}}
       className={cn("h-9 overflow-hidden whitespace-nowrap px-1 text-[12px] sm:px-2 max-md:[&_button]:min-h-11 max-md:[&_span]:whitespace-normal max-md:[&_span]:overflow-visible", axis(column.align), column.hiddenBelow && visibility[column.hiddenBelow][1])}
       aria-sort={sort?.key === column.key ? sort.direction === "asc" ? "ascending" : "descending" : "none"}>
       <div className="flex min-w-0 items-center gap-1">
@@ -55,6 +58,7 @@ export function CompactListTable<T>({ rows, columns, mobileColumns, id, label, s
     <TableBody>{status ? <TableRow><TableCell colSpan={displayedColumns.length + (actions ? 1 : 0)} className="h-20 text-center text-[13px] text-muted-foreground">{status}</TableCell></TableRow> : rows.map(row => <TableRow key={id(row)}
       className={cn(onSelect && "cursor-pointer hover:bg-accent/40", rowClassName?.(row))} onClick={onSelect ? () => onSelect(row) : undefined}>
       {displayedColumns.map(column => <TableCell key={column.key} title={column.title?.(row) ?? String(column.value(row) ?? "—")}
+        style={column.stickyLeft == null ? undefined : {position:"sticky",left:column.stickyLeft,zIndex:10,background:"hsl(var(--card))"}}
         className={cn("overflow-hidden whitespace-nowrap px-1 py-2 text-[13px] leading-5 sm:px-2", axis(column.align), column.kind === "number" && "tabular-nums", column.hiddenBelow && visibility[column.hiddenBelow][1], column.className)}>
         <div className="min-w-0 truncate max-sm:whitespace-normal">{column.render ? column.render(row) : String(column.value(row) ?? "—")}</div>
       </TableCell>)}{actions && <TableCell className="overflow-hidden whitespace-nowrap px-0 py-2"><div className="flex items-center justify-center gap-1">{actions.render(row)}</div></TableCell>}

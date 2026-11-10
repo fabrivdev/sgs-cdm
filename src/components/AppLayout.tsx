@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { NavLink, Outlet, useLocation, useNavigate } from "react-router-dom";
+import { canManageFleet, canSubmitInvoice } from "@/features/fleet/managementModel";
 import { useAuth } from "@/hooks/useAuth";
 import {
   BriefcaseBusiness,
@@ -63,7 +64,7 @@ import { HelpDrawer } from "@/components/layout/HelpDrawer";
 import type { SectionKey } from "@/lib/permissions";
 
 type NavItem = { to: string; label: string; icon: typeof ListChecks; section: SectionKey; end?: boolean; managementOnly?: boolean; adminOnly?: boolean };
-type NavGroup = { modulo: string; label: string; icon: typeof BriefcaseBusiness; items: NavItem[] };
+type NavGroup = { id?: string; modulo: string; label: string; icon: typeof BriefcaseBusiness; items: NavItem[] };
 
 // Temporary kill switch: preserves the assistant configuration and history for a future re-enable.
 const AI_ASSISTANT_ENABLED = false;
@@ -79,7 +80,7 @@ const navGroups: NavGroup[] = [
       { to: "/trabajos", label: "Trabajos", icon: Wrench, section: "servicios.trabajos" },
       { to: "/calendario", label: "Calendario", icon: CalendarDays, section: "servicios.calendario" },
       { to: "/servicios/ordenes", label: "Órdenes de servicio", icon: ListChecks, section: "servicios.ordenes", managementOnly: true },
-      { to: "/servicios/flota", label: "Flota", icon: CarFront, section: "servicios.flota" },
+
       { to: "/comisiones", label: "Comisiones", icon: HandCoins, section: "servicios.comisiones", adminOnly: true },
     ],
   },
@@ -194,7 +195,13 @@ export function AppLayout({ children, preview }: { children?: React.ReactNode; p
 
   // Un grupo solo aparece si el usuario tiene acceso a ese modulo; las vistas
   // ejecutivas exigen ademas la capacidad correspondiente.
-  const visibleGroups = navGroups
+  const fleetManager = canManageFleet(roles, hasSectionAccess("servicios.flota"));
+  const fleetItems: NavItem[] = fleetManager ? [
+    {to:"/servicios/flota",label:"Vehículos",icon:CarFront,section:"servicios.flota",end:true},
+    {to:"/servicios/flota/combustible",label:"Gastos de combustible",icon:BadgeDollarSign,section:"servicios.flota"},
+    {to:"/servicios/flota/mantenimientos",label:"Gastos de mantenimiento",icon:Wrench,section:"servicios.flota"},
+  ] : canSubmitInvoice(roles, hasSectionAccess("servicios.flota")) ? [{to:"/servicios/flota",label:"Cargar factura",icon:ClipboardList,section:"servicios.flota"}] : [];
+  const visibleGroups = [...navGroups, {id:"flota",modulo:"servicios",label:"Flota",icon:CarFront,items:fleetItems}]
     .filter((group) => preview ? group.modulo === preview.modulo : hasModuloAccess(group.modulo))
     .map((group) => ({
       ...group,
@@ -207,12 +214,12 @@ export function AppLayout({ children, preview }: { children?: React.ReactNode; p
 
   // Acordeon: un solo grupo de modulo abierto a la vez. Se sincroniza con la
   // ruta activa para que al navegar se abra el grupo correspondiente.
-  const [openModulo, setOpenModulo] = useState<string | null>(visibleGroups[0]?.modulo ?? null);
+  const [openModulo, setOpenModulo] = useState<string | null>(visibleGroups[0]?.id ?? visibleGroups[0]?.modulo ?? null);
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [helpOpen, setHelpOpen] = useState(false);
   useEffect(() => {
     const activeGroup = visibleGroups.find((group) => group.items.some(isItemActive));
-    if (activeGroup) setOpenModulo(activeGroup.modulo);
+    if (activeGroup) setOpenModulo(activeGroup.id ?? activeGroup.modulo);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [location.pathname]);
 
@@ -280,10 +287,10 @@ export function AppLayout({ children, preview }: { children?: React.ReactNode; p
           </div>
           {visibleGroups.map((group) => (
             <ModuloNavGroup
-              key={group.modulo}
+              key={group.id ?? group.modulo}
               group={group}
-              open={openModulo === group.modulo}
-              onOpenChange={(isOpen) => setOpenModulo(isOpen ? group.modulo : null)}
+              open={openModulo === (group.id ?? group.modulo)}
+              onOpenChange={(isOpen) => setOpenModulo(isOpen ? (group.id ?? group.modulo) : null)}
               isItemActive={isItemActive}
             />
           ))}
@@ -384,7 +391,7 @@ export function AppLayout({ children, preview }: { children?: React.ReactNode; p
               {visibleGroups.map((group) => {
                 const GroupIcon = group.icon;
                 return (
-                  <section key={group.modulo}>
+                  <section key={group.id ?? group.modulo}>
                     <div className="mb-1.5 flex items-center gap-2 px-2 text-[11px] font-semibold uppercase tracking-[0.1em] text-muted-foreground">
                       <GroupIcon className="h-4 w-4 text-primary" />
                       {group.label}

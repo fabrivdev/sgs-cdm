@@ -33,7 +33,7 @@ function useFleetMutation<TInput>(mutationFn: (input: TInput) => Promise<string>
   return useMutation({
     mutationFn,
     onSuccess: async () => {
-      await queryClient.invalidateQueries({ queryKey: [FLEET_QUERY_KEY] });
+      await Promise.all([queryClient.invalidateQueries({ queryKey: [FLEET_QUERY_KEY] }), queryClient.invalidateQueries({ queryKey: ["fleet-management"] })]);
     },
   });
 }

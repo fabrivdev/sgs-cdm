@@ -1,5 +1,7 @@
 # SGS-CDM: inicio
 
+- [[34-Flota|Flota: administración manual y carga de facturas por rol]] — implementación local del 10/11/2026; flota e historial se importan una sola vez, sin publicación ni SQL remoto.
+
 - [[48-Panorama-importaciones-maquinas|Panorama: avance anual de importaciones de máquinas]] - preparación local, sin publicación.
 
 - [[47-Panorama-periodo-automatico|Panorama: periodo automatico y preferencias manuales]] - preparacion local; limites de frescura por origen.

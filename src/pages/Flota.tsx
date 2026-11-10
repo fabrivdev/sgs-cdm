@@ -105,14 +105,14 @@ function readingObservation(reading: FleetPeriodReading) {
   return "-";
 }
 
-export default function Flota({ previewData }: { previewData?: FleetPreviewSnapshot }) {
+export default function Flota({ previewData, initialVehicleId }: { previewData?: FleetPreviewSnapshot; initialVehicleId?: string }) {
   const today = useMemo(() => previewData ? "2026-10-06" : todayInParaguay(), [previewData]);
   const query = useFleet(previewData);
   const createVehicle = useCreateFleetVehicle();
   const addReading = useAddFleetReading();
   const correctReading = useCorrectFleetReading();
   const setResponsible = useSetFleetResponsible();
-  const [selectedVehicleId, setSelectedVehicleId] = useState<string | null>(null);
+  const [selectedVehicleId, setSelectedVehicleId] = useState<string | null>(initialVehicleId ?? null);
   const [vehicleDialogOpen, setVehicleDialogOpen] = useState(false);
   const [readingDialogOpen, setReadingDialogOpen] = useState(false);
   const [correcting, setCorrecting] = useState<FleetOdometerReading | null>(null);
@@ -123,7 +123,7 @@ export default function Flota({ previewData }: { previewData?: FleetPreviewSnaps
   const [brandFilter, setBrandFilter] = useState("all");
   const [modelFilter, setModelFilter] = useState("all");
   const [readingPresence, setReadingPresence] = useState<FleetReadingPresence>("all");
-  const [customFrom, setCustomFrom] = useState(previewData ? "2026-07-29" : defaultCustomFrom(today));
+  const [customFrom, setCustomFrom] = useState(previewData ? "2026-07-29" : initialVehicleId ? "" : defaultCustomFrom(today));
   const [customTo, setCustomTo] = useState(previewData ? "2026-09-16" : today);
 
   const snapshot = previewSnapshot ?? query.data;
@@ -133,7 +133,7 @@ export default function Flota({ previewData }: { previewData?: FleetPreviewSnaps
   const responsibleCandidates = snapshot?.responsibleCandidates ?? EMPTY_RESPONSIBLE_CANDIDATES;
   const previewActorId = previewData?.vehicles[0]?.created_by ?? "00000000-0000-4000-8000-000000000001";
   const previewActorName = previewData?.vehicles[0]?.created_by_name ?? "Usuario DEMO";
-  const period = useMemo(() => resolveFleetPeriod("custom", today, customFrom, customTo), [customFrom, customTo, today]);
+  const period = useMemo(() => resolveFleetPeriod("custom", today, initialVehicleId && !customFrom ? readings.filter(r=>r.vehicle_id===initialVehicleId).map(r=>r.reading_date).sort()[0] ?? today : customFrom, customTo), [customFrom, customTo, today, initialVehicleId, readings]);
   const activeVehicles = useMemo(() => vehicles.filter((vehicle) => vehicle.active), [vehicles]);
   const brandOptions = useMemo(() => fleetBrandOptions(activeVehicles), [activeVehicles]);
   const modelOptions = useMemo(() => fleetModelOptions(activeVehicles, brandFilter), [activeVehicles, brandFilter]);
@@ -407,14 +407,15 @@ export default function Flota({ previewData }: { previewData?: FleetPreviewSnaps
     + (modelFilter !== "all" ? 1 : 0)
     + (readingPresence !== "all" ? 1 : 0);
 
-  return <PageShell>
+  return <PageShell className={initialVehicleId ? "px-0 py-0 sm:px-0 sm:py-0 lg:px-0" : undefined}>
     <PageHeader
-      title="Flota"
+      title={initialVehicleId ? "Lecturas y responsables" : "Flota"}
       actions={selectedVehicle
         ? <Button size="sm" aria-label="Registrar lectura" className={mobileHeaderCreateButton} onClick={() => setReadingDialogOpen(true)}><Gauge className="h-4 w-4 sm:mr-1.5" /><span className="hidden sm:inline">Registrar lectura</span></Button>
         : <Button size="sm" aria-label="Nuevo vehículo" className={mobileHeaderCreateButton} onClick={() => setVehicleDialogOpen(true)}><Plus className="h-4 w-4 sm:mr-1.5" /><span className="hidden sm:inline">Nuevo vehículo</span></Button>}
     />
 
+    {initialVehicleId && <FiltersBar><FilterDate label="Desde" value={customFrom} onChange={setCustomFrom}/><FilterDate label="Hasta" value={customTo} onChange={setCustomTo}/></FiltersBar>}
     {previewData && <div className="flex min-h-10 flex-wrap items-center gap-2 rounded-xl border border-sky-200 bg-sky-50/70 px-3 py-2 text-[12px] text-sky-950">
       <Badge variant="outline" className="border-sky-300 bg-white text-[10px] text-sky-800">Datos ficticios</Badge>
       <span className="hidden min-w-0 flex-1 sm:inline">Simulación local · nada se guarda en la base.</span>
@@ -427,6 +428,7 @@ export default function Flota({ previewData }: { previewData?: FleetPreviewSnaps
         <Button variant="outline" size="sm" onClick={() => query.refetch()}>Reintentar</Button>
       </div>
     </Panel> : query.isPending ? <p role="status" className="py-10 text-center text-sm text-muted-foreground">Cargando Flota.</p> : selectedVehicle ? <VehicleDetail
+      embedded={!!initialVehicleId}
       vehicle={selectedVehicle}
       latest={selectedLatest}
       status={selectedStatus}
@@ -435,7 +437,7 @@ export default function Flota({ previewData }: { previewData?: FleetPreviewSnaps
       responsibilityHistory={selectedResponsibilityHistory}
       rows={selectedRows}
       auditRows={auditRows}
-      onBack={() => setSelectedVehicleId(null)}
+      onBack={initialVehicleId ? undefined : () => setSelectedVehicleId(null)}
       onCorrect={setCorrecting}
       onEditResponsible={() => setResponsibilityDialogOpen(true)}
     /> : <>
@@ -572,7 +574,8 @@ export function FleetVehicleList({ vehicles, activeVehicleCount, readings, compa
   </Panel>;
 }
 
-export function VehicleDetail({ vehicle, latest, status, comparison, responsibility, responsibilityHistory, rows, auditRows, onBack, onCorrect, onEditResponsible }: {
+export function VehicleDetail({ embedded=false, vehicle, latest, status, comparison, responsibility, responsibilityHistory, rows, auditRows, onBack, onCorrect, onEditResponsible }: {
+  embedded?: boolean;
   vehicle: FleetVehicle;
   latest: FleetOdometerReading | null;
   status: { label: string; overdue: boolean };
@@ -581,15 +584,16 @@ export function VehicleDetail({ vehicle, latest, status, comparison, responsibil
   responsibilityHistory: FleetResponsibilityEvent[];
   rows: FleetPeriodReading[];
   auditRows: FleetOdometerReading[];
-  onBack: () => void;
+  onBack?: () => void;
   onCorrect: (reading: FleetOdometerReading) => void;
   onEditResponsible: () => void;
 }) {
   const referenceImage = fleetVehicleReferenceImage(vehicle);
   return <Panel className="overflow-hidden p-0">
     <div className="border-b px-4 py-3">
-      <Button variant="ghost" size="sm" className="-ml-2 mb-2 max-sm:min-h-11" onClick={onBack}><ArrowLeft className="h-4 w-4" /> Volver a la flota</Button>
-      <div className="flex min-w-0 items-start gap-3">
+      {onBack && <Button variant="ghost" size="sm" className="-ml-2 mb-2 max-sm:min-h-11" onClick={onBack}><ArrowLeft className="h-4 w-4" /> Volver a la flota</Button>}
+      {embedded && <Button variant="outline" size="sm" onClick={onEditResponsible}>Cambiar responsable</Button>}
+      {!embedded && <div className="flex min-w-0 items-start gap-3">
         {referenceImage && <div className="w-28 shrink-0 sm:w-36">
           <img src={referenceImage.imageUrl} alt={referenceImage.alt} className="h-16 w-full rounded-lg border bg-white object-contain sm:h-20" loading="lazy" />
         </div>}
@@ -603,6 +607,7 @@ export function VehicleDetail({ vehicle, latest, status, comparison, responsibil
           <Button variant="outline" size="sm" className="h-8 max-sm:h-11 max-sm:w-11 max-sm:p-0" aria-label="Cambiar responsable" onClick={onEditResponsible}><UserRoundPen className="h-3.5 w-3.5" /><span className="max-sm:sr-only">Cambiar responsable</span></Button>
         </div>
       </div>
+      }
       <dl className="mt-3 grid grid-cols-2 gap-x-4 gap-y-2 rounded-lg bg-muted/45 px-3 py-2 sm:grid-cols-4">
         <DetailDatum label="Último kilometraje" value={displayKm(latest?.odometer_km ?? null)} />
         <DetailDatum label="Fecha última lectura" value={latest ? displayDate(latest.reading_date) : "-"} />

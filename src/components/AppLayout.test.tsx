@@ -20,6 +20,7 @@ vi.mock("@/integrations/supabase/client", () => ({ supabase: {} }));
 beforeEach(() => {
   vi.stubGlobal("ResizeObserver", class { observe() {} unobserve() {} disconnect() {} });
   auth.isAdmin = true;
+  auth.roles = ["admin"];
   auth.isGerencia = false;
   auth.user = null;
   auth.hasModuloAccess.mockReturnValue(true);
@@ -32,6 +33,24 @@ function setup(path = "/parque-ventas") {
 }
 
 describe("shared mobile header", () => {
+  it.each(["jefatura", "operativo"])("shows only the Fleet actions allowed for %s", (role) => {
+    auth.roles = [role];
+    auth.isAdmin = false;
+    setup("/servicios/flota");
+    fireEvent.click(screen.getByRole("button", { name: "Abrir menú de módulos" }));
+    const nav=within(screen.getByRole("navigation", {name:"Módulos y secciones"}));
+    if(role === "jefatura") {
+      expect(nav.getByRole("button",{name:"Vehículos"})).toBeInTheDocument();
+      expect(nav.getByRole("button",{name:"Gastos de combustible"})).toBeInTheDocument();
+      expect(nav.getByRole("button",{name:"Gastos de mantenimiento"})).toBeInTheDocument();
+      expect(nav.queryByRole("button",{name:"Cargar factura"})).not.toBeInTheDocument();
+    } else {
+      expect(nav.getByRole("button",{name:"Cargar factura"})).toBeInTheDocument();
+      expect(nav.queryByRole("button",{name:"Vehículos"})).not.toBeInTheDocument();
+      expect(nav.queryByRole("button",{name:"Gastos de combustible"})).not.toBeInTheDocument();
+      expect(nav.queryByRole("button",{name:"Gastos de mantenimiento"})).not.toBeInTheDocument();
+    }
+  });
   it("keeps the former welcome out of the Panorama branch for authorized roles", async () => {
     auth.user = { id: "user-1" };
     auth.isAdmin = false;

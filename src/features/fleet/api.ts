@@ -34,20 +34,18 @@ export interface SetFleetResponsibleInput {
 }
 
 export async function loadFleetSnapshot(): Promise<FleetSnapshot> {
+  const fetchAll = async (table: string) => {
+    const data: any[] = [];
+    for (let offset = 0; ; offset += 500) {
+      const result = await (supabase.from(table as never) as any).select('*').order('id').range(offset, offset + 499);
+      if (result.error) return {data: [], error: result.error};
+      data.push(...result.data);
+      if (result.data.length < 500) return {data, error: null};
+    }
+  };
   const [vehiclesResult, readingsResult, responsibilityResult, candidatesResult] = await Promise.all([
-    (supabase.from("fleet_vehicles" as never) as any)
-      .select("id, brand, model, model_year, image_url, image_source_url, image_license, plate, plate_normalized, active, created_at, created_by, created_by_name")
-      .order("brand")
-      .order("plate"),
-    (supabase.from("fleet_odometer_readings" as never) as any)
-      .select("id, vehicle_id, reading_date, odometer_km, reading_kind, correction_of, created_at, created_by, created_by_name, voided_at, voided_by, voided_by_name, void_reason")
-      .order("reading_date", { ascending: false })
-      .order("created_at", { ascending: false }),
-    (supabase.from("fleet_vehicle_responsibility_events" as never) as any)
-      .select("id, vehicle_id, responsible_profile_id, responsible_name_snapshot, effective_date, recorded_at, recorded_by, recorded_by_name")
-      .order("effective_date", { ascending: false, nullsFirst: false })
-      .order("recorded_at", { ascending: false }),
-    (supabase.rpc as any)("fleet_list_responsible_candidates"),
+    fetchAll('fleet_vehicles'), fetchAll('fleet_odometer_readings'), fetchAll('fleet_vehicle_responsibility_events'),
+    (supabase.rpc as any)('fleet_list_responsible_candidates'),
   ]);
 
   if (vehiclesResult.error) throw vehiclesResult.error;
