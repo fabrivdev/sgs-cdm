@@ -1,3 +1,4 @@
+import { formatInvoiceNumber, guideInvoiceNumber } from "./invoiceNumber";
 import { SupplierFields } from "./SupplierFields";
 import {
   ResponsiveDrawerBody,
@@ -77,17 +78,19 @@ export default function InvoiceUpload({
       /* Storage may be unavailable; the form still works. */
     }
   }, [values, pending, draftKey]);
-  const errorField = /RUC/i.test(error)
-    ? "supplier_tax_id"
-    : /chapa/i.test(error)
-      ? "plate"
-      : /fecha/i.test(error)
-        ? "invoice_date"
-        : /clasificaci/i.test(error)
-          ? "classification"
-          : /archivo|PDF/i.test(error)
-            ? "file"
-            : null;
+  const errorField = /número|formato/i.test(error)
+    ? "invoice_number"
+    : /RUC/i.test(error)
+      ? "supplier_tax_id"
+      : /chapa/i.test(error)
+        ? "plate"
+        : /fecha/i.test(error)
+          ? "invoice_date"
+          : /clasificaci/i.test(error)
+            ? "classification"
+            : /archivo|PDF/i.test(error)
+              ? "file"
+              : null;
   useEffect(() => {
     if (errorField) document.getElementById("invoice-" + errorField)?.focus();
   }, [error, errorField]);
@@ -236,10 +239,34 @@ export default function InvoiceUpload({
                   type={key === "invoice_date" ? "date" : "text"}
                   required
                   maxLength={
-                    key === "plate" ? 20 : key === "invoice_number" ? 100 : 200
+                    key === "plate" ? 20 : key === "invoice_number" ? 15 : 200
                   }
+                  placeholder={
+                    key === "invoice_number" ? "001-001-0000001" : undefined
+                  }
+                  pattern={
+                    key === "invoice_number"
+                      ? "[0-9]{3}-[0-9]{3}-[0-9]{7}"
+                      : undefined
+                  }
+                  title={
+                    key === "invoice_number"
+                      ? "Completá el número: 001-001-0000001"
+                      : undefined
+                  }
+                  onBlur={() => {
+                    if (key === "invoice_number")
+                      change(key, formatInvoiceNumber(values[key]));
+                  }}
                   value={values[key]}
-                  onChange={(e) => change(key, e.target.value)}
+                  onChange={(e) =>
+                    change(
+                      key,
+                      key === "invoice_number"
+                        ? guideInvoiceNumber(e.target.value)
+                        : e.target.value,
+                    )
+                  }
                 />
               </div>
             ))}

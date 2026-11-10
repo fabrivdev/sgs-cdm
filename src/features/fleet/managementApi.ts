@@ -1,3 +1,4 @@
+import { completeInvoiceNumber } from "./invoiceNumber";
 /* eslint-disable @typescript-eslint/no-explicit-any -- Regenerate Supabase types after applying the reviewed local migration. */
 import { supabase } from "@/integrations/supabase/client";
 import { loadFleetSnapshot } from "./api";
@@ -13,6 +14,13 @@ export async function fleetRpc<T = string>(
   args: Record<string, unknown>,
 ): Promise<T> {
   const { data, error } = await client.rpc(name, args);
+  if (
+    error?.code === "23505" &&
+    /fleet_invoice_(complete_number_key|business_key)/.test(error.message ?? "")
+  )
+    throw Error(
+      "Ya existe una factura con ese RUC y número, aunque esté escrita con menos ceros.",
+    );
   if (error) throw error;
   return data as T;
 }
@@ -73,6 +81,10 @@ export async function submitInvoice(
   onReserved?: (id: string) => void,
   resume = false,
 ) {
+  if (!completeInvoiceNumber(String(input.invoice_number ?? "")))
+    throw Error(
+      "Completá el número de factura con el formato 001-001-0000001.",
+    );
   const path = await fleetRpc<string>(
     resume ? "fleet_update_reserved_invoice" : "fleet_reserve_invoice",
     {

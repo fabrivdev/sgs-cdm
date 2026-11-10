@@ -1,3 +1,8 @@
+import {
+  formatInvoiceNumber,
+  guideInvoiceNumber,
+  completeInvoiceNumber,
+} from "./invoiceNumber";
 import { SupplierFields } from "./SupplierFields";
 import { useEffect, useState, useRef } from "react";
 import { MoreVertical } from "lucide-react";
@@ -59,7 +64,10 @@ export function InvoiceActions({
   const [mode, setMode] = useState<"edit" | "file" | "void" | "audit" | null>(
     initialMode,
   );
-  const [data, setData] = useState(invoice),
+  const [data, setData] = useState({
+      ...invoice,
+      invoice_number: formatInvoiceNumber(invoice.invoice_number),
+    }),
     [reason, setReason] = useState(""),
     [file, setFile] = useState<File | null>(null);
   const [busy, setBusy] = useState(false),
@@ -89,6 +97,10 @@ export function InvoiceActions({
   async function save(e: React.FormEvent) {
     e.preventDefault();
     if (busy) return;
+    if (mode === "edit" && !completeInvoiceNumber(data.invoice_number)) {
+      setError("Completá el número de factura con el formato 001-001-0000001.");
+      return;
+    }
     if (mode === "edit" && !data.categories.length) {
       setError("Seleccioná una clasificación");
       return;
@@ -266,9 +278,35 @@ export function InvoiceActions({
                             id={"correction-" + k}
                             required
                             type={k === "invoice_date" ? "date" : "text"}
+                            placeholder={
+                              k === "invoice_number"
+                                ? "001-001-0000001"
+                                : undefined
+                            }
+                            pattern={
+                              k === "invoice_number"
+                                ? "[0-9]{3}-[0-9]{3}-[0-9]{7}"
+                                : undefined
+                            }
+                            maxLength={k === "invoice_number" ? 15 : undefined}
+                            onBlur={() => {
+                              if (k === "invoice_number")
+                                setData({
+                                  ...data,
+                                  invoice_number: formatInvoiceNumber(
+                                    data.invoice_number,
+                                  ),
+                                });
+                            }}
                             value={data[k]}
                             onChange={(e) =>
-                              setData({ ...data, [k]: e.target.value })
+                              setData({
+                                ...data,
+                                [k]:
+                                  k === "invoice_number"
+                                    ? guideInvoiceNumber(e.target.value)
+                                    : e.target.value,
+                              })
                             }
                           />
                         </div>

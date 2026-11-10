@@ -83,13 +83,14 @@ describe("Fleet calculations and input", () => {
     const input = {
       plate: "TEST123",
       supplier: "Test",
-      invoice_number: "001",
+      invoice_number: "001-001-0000001",
       invoice_date: "2026-13-99",
       categories: ["Filtros"],
       description: "Cambio de filtro",
     };
     const file = new File(["pdf"], "test.pdf", { type: "application/pdf" });
     expect(invoiceValidation(input, file)).toBe("Ingresá una fecha válida.");
+    expect(invoiceValidation({ ...input, invoice_number: "001-001-3996" }, file)).toMatch("formato 001-001-0000001");
     expect(
       invoiceValidation({ ...input, invoice_date: "2026-10-01" }, file),
     ).toBeNull();

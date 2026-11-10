@@ -123,11 +123,14 @@ describe("Fleet role journeys", () => {
     for (const [label, value] of [
       ["Chapa", "TEST123"],
       ["RUC del proveedor", "80000001-1"],
-      ["N.º de factura", "001"],
+      ["N.º de factura", "001-001-0000001"],
       ["Fecha de factura", "2026-10-01"],
       ["Descripción del trabajo", "Filtro"],
     ])
       fireEvent.change(screen.getByLabelText(label), { target: { value } });
+    fireEvent.change(screen.getByLabelText("N.º de factura"), { target: { value: "001-001-1" } });
+    fireEvent.blur(screen.getByLabelText("N.º de factura"));
+    expect(screen.getByLabelText("N.º de factura")).toHaveValue("001-001-0000001");
     fireEvent.focus(screen.getByLabelText("RUC del proveedor"));
     fireEvent.click(await screen.findByRole("option", { name: /Taller/ }));
     fireEvent.click(screen.getByRole("button", { name: "Clasificación" }));
@@ -154,7 +157,7 @@ describe("Fleet role journeys", () => {
           plate: "TEST123",
           supplier: "Taller",
           supplier_tax_id: "80000001-1",
-          invoice_number: "001",
+          invoice_number: "001-001-0000001",
           invoice_date: "2026-10-01",
           description: "Filtro",
           categories: ["Filtros"],
@@ -178,7 +181,7 @@ describe("Fleet role journeys", () => {
     fireEvent.submit(
       screen.getByRole("button", { name: "Reintentar carga" }).closest("form")!,
     );
-    await screen.findByText("Factura 001 · TEST123: carga completada");
+    await screen.findByText("Factura 001-001-0000001 · TEST123: carga completada");
     expect(mocks.submit).toHaveBeenCalledWith(
       "attempt",
       expect.objectContaining({

@@ -1,3 +1,4 @@
+import { formatInvoiceNumber } from "./invoiceNumber";
 import { workCategories, compactCategories } from "./maintenancePresentation";
 import { maintenanceCategories } from "./managementModel";
 import { moneyCell } from "./workspaceModel";
@@ -110,7 +111,7 @@ export function MaintenanceView({
           supplier: r.supplier,
           amount: null,
           currency: null,
-          invoice: r.invoice_number,
+          invoice: formatInvoiceNumber(r.invoice_number),
           status: null,
         })),
         ...invoices.map((r) => ({
@@ -124,7 +125,7 @@ export function MaintenanceView({
           supplier: r.supplier,
           amount: r.amount,
           currency: r.currency,
-          invoice: r.invoice_number,
+          invoice: formatInvoiceNumber(r.invoice_number),
           status:
             r.status === "uploaded"
               ? "Completa"

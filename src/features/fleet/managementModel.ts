@@ -1,3 +1,4 @@
+import { completeInvoiceNumber } from "./invoiceNumber";
 import { fuelOdometerIssues } from "./fuelOdometer";
 import type { FleetVehicle } from "./model";
 export const maintenanceCategories = [
@@ -118,6 +119,8 @@ export function invoiceValidation(
     !input.description.trim()
   )
     return "Completá proveedor, número y descripción.";
+  if (!completeInvoiceNumber(input.invoice_number))
+    return "Completá el número de factura con el formato 001-001-0000001.";
   if (
     !/^\d{4}-\d{2}-\d{2}$/.test(input.invoice_date) ||
     Number.isNaN(Date.parse(input.invoice_date)) ||

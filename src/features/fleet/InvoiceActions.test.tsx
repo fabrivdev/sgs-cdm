@@ -21,7 +21,7 @@ const invoice: Invoice = {
   plate: "TEST123",
   supplier: "Taller",
   supplier_tax_id: "80000001-1",
-  invoice_number: "001",
+  invoice_number: "001-001-0000001",
   invoice_date: "2026-10-01",
   description: "Original",
   categories: ["Filtros"],
