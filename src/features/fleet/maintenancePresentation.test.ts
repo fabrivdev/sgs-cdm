@@ -3,6 +3,7 @@ import {
   compactCategories,
   readableWork,
   workCategories,
+  workObservation,
 } from "./maintenancePresentation";
 
 it("classifies recorded names without interpreting comments or changing originals", () => {
@@ -28,4 +29,16 @@ it("classifies recorded names without interpreting comments or changing original
   expect(readableWork("Trabajo sin mapear")).toBe("Trabajo sin mapear");
   expect(compactCategories([])).toBe("Sin clasificar");
   expect(workCategories([])).toEqual([]);
+});
+
+it("omits spreadsheet check marks but preserves meaningful observations", () => {
+  expect(
+    workObservation({ work: "Filtro", value: "X", comment: null }),
+  ).toBeNull();
+  expect(
+    workObservation({ work: "Filtro", value: "x", comment: "Reemplazado" }),
+  ).toBe("Reemplazado");
+  expect(
+    workObservation({ work: "Cubiertas", value: 4, comment: "Delanteras" }),
+  ).toBe("4 · Delanteras");
 });

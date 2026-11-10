@@ -24,15 +24,15 @@ import {
 } from "./workspaceModel";
 const fields: GridField[] = [
   ["date", "Fecha", "date"],
+  ["invoice", "N.º de factura"],
+  ["supplier", "Proveedor"],
+  ["classification", "Descripción"],
+  ["amount", "Monto", "number"],
+  ["km", "Km", "number"],
   ["plate", "Chapa"],
   ["type", "Origen"],
-  ["km", "Km", "number"],
-  ["classification", "Trabajos"],
-  ["description", "Descripción original"],
-  ["supplier", "Proveedor"],
-  ["amount", "Importe", "number"],
+  ["description", "Detalle de trabajos"],
   ["currency", "Moneda"],
-  ["invoice", "Factura"],
   ["status", "Estado"],
 ];
 export function MaintenanceView({
@@ -150,6 +150,7 @@ export function MaintenanceView({
   );
   return (
     <>
+      {detailSummary}
       <FleetFilterBar
         secondaryActions={<div ref={setActionsTarget} />}
         filters={filters}
@@ -197,7 +198,6 @@ export function MaintenanceView({
           options={[...maintenanceCategories]}
         />
       </FleetFilterBar>
-      {detailSummary}
       {showSummary && (
         <SummaryCards
           items={[
@@ -212,6 +212,7 @@ export function MaintenanceView({
         />
       )}
       <ManagementTable
+        detailStyle={!!vehicleId}
         showRowCount={false}
         actionsTarget={actionsTarget}
         label="Mantenimiento"

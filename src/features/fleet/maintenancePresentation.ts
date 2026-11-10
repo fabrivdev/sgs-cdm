@@ -41,3 +41,18 @@ const workNames: Record<string, string> = {
   "SERVICIOS / VARIOS": "Servicios varios",
 };
 export const readableWork = (name: string) => workNames[name] ?? name;
+
+/** Keep meaningful recorded details; a spreadsheet check mark is not a quantity. */
+export function workObservation(work: WorkItem): string | null {
+  const value = work.value == null ? "" : String(work.value).trim();
+  return (
+    [
+      ...new Set(
+        [
+          /^(x|✓|✔)$/i.test(value) ? "" : value,
+          work.comment?.trim() ?? "",
+        ].filter(Boolean),
+      ),
+    ].join(" · ") || null
+  );
+}

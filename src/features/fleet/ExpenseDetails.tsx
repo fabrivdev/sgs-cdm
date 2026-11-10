@@ -1,4 +1,4 @@
-import { readableWork } from "./maintenancePresentation";
+import { readableWork, workObservation } from "./maintenancePresentation";
 import { moneyCell } from "./workspaceModel";
 import { useState } from "react";
 import { Button } from "@/components/ui/button";
@@ -30,7 +30,7 @@ const columns: GridField[] = [
   ["date", "Fecha"],
   ["plate", "Chapa"],
   ["type", "Origen"],
-  ["classification", "Clasificación"],
+  ["classification", "Descripción"],
   ["station", "Estación"],
   ["km", "Kilometraje"],
   ["liters", "Litros"],
@@ -286,7 +286,7 @@ export function ExpenseDetails({
                 actionsTarget={null}
                 render={{
                   work: (r) => (
-                    <span title={String(r.work)}>
+                    <span title={readableWork(String(r.work))}>
                       {readableWork(String(r.work))}
                     </span>
                   ),
@@ -298,33 +298,14 @@ export function ExpenseDetails({
                 }}
                 fields={[
                   ["work", "Trabajo"],
-                  ["value", "Registro original"],
-                  ["comment", "Observación original"],
+                  ["comment", "Observaciones"],
                 ]}
                 rows={selectedHistory.works.map((w, i) => ({
                   id: String(i),
                   work: w.work,
-                  value: show(w.value),
-                  comment: w.comment,
+                  comment: workObservation(w),
                 }))}
               />
-              <details>
-                <summary>Datos originales</summary>
-                <ManagementTable
-                  label="Datos originales"
-                  fields={[
-                    ["field", "Campo"],
-                    ["value", "Valor original"],
-                  ]}
-                  rows={Object.entries(selectedHistory.raw_data).map(
-                    ([field, value]) => ({
-                      id: field,
-                      field,
-                      value: show(value),
-                    }),
-                  )}
-                />
-              </details>
             </>
           )}
           {selectedFuel && (

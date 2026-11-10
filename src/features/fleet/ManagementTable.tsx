@@ -80,6 +80,7 @@ export function ManagementTable({
   omittedColumns = [],
   showRowCount = true,
   actionsTarget,
+  detailStyle = false,
 }: {
   rows: GridRow[];
   fields: GridField[];
@@ -90,6 +91,7 @@ export function ManagementTable({
   omittedColumns?: string[];
   showRowCount?: boolean;
   actionsTarget?: HTMLElement | null;
+  detailStyle?: boolean;
 }) {
   const { can } = useAuth();
   const omittedKey = omittedColumns.join("|");
@@ -151,9 +153,12 @@ export function ManagementTable({
         options.length > 0 &&
         createPortal(<SectionActionsMenu options={options} />, actionsTarget)}
       <TableScroll rows={ordered.length} className="overflow-x-auto">
-        <table aria-label={label} className="w-full whitespace-nowrap">
+        <table
+          aria-label={label}
+          className={`w-full whitespace-nowrap ${detailStyle ? "[&_tbody_tr:nth-child(even)]:bg-muted/40 table-fixed [&_td]:py-1.5" : ""}`}
+        >
           <thead
-            className={`${scrollHead} bg-muted text-[11px] font-medium text-muted-foreground`}
+            className={`${scrollHead} text-[11px] font-medium ${detailStyle ? "bg-primary text-primary-foreground [&_th]:py-3" : "bg-muted text-muted-foreground"}`}
           >
             <tr>
               {visible.map(([key, title, kind]) => (
@@ -166,7 +171,7 @@ export function ManagementTable({
                         : "descending"
                       : "none"
                   }
-                  className={`px-3 py-2 font-medium ${kind === "number" ? "text-right" : "text-left"}`}
+                  className={`px-3 py-2 font-medium ${kind === "number" || (detailStyle && key === "expense") ? "text-right" : "text-left"}`}
                 >
                   <button onClick={() => toggleSort(key)}>
                     {title}

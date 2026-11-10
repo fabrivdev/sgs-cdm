@@ -1,3 +1,13 @@
+import {
+  Gauge,
+  Route,
+  Droplets,
+  Coins,
+  TrendingUp,
+  CalendarDays,
+  Fuel,
+  Wrench,
+} from "lucide-react";
 import { useState } from "react";
 import {
   ResponsiveDrawer,
@@ -107,6 +117,22 @@ export function VehicleDetail({
     .at(-1);
   const detailSummary = (
     <SummaryCards
+      icons={
+        tab === "Combustible"
+          ? [
+              <Gauge size={18} />,
+              <Route size={18} />,
+              <Droplets size={18} />,
+              <Coins size={18} />,
+              <TrendingUp size={18} />,
+              <Gauge size={18} />,
+            ]
+          : [
+              <CalendarDays size={18} />,
+              <Wrench size={18} />,
+              <Coins size={18} />,
+            ]
+      }
       items={
         tab === "Mantenimiento"
           ? [
@@ -118,32 +144,34 @@ export function VehicleDetail({
               ["Gasto documentado del período", invoiceMoney(invoices)],
             ]
           : [
-              ["Gasto de combustible", fuelMoney(fuel)],
-              ["Litros cargados", fmt(fuel.reduce((n, r) => n + r.liters, 0))],
+              ["Km actuales", fmt(km.km)],
               [
                 "Km del período",
                 fmt(mileage(data.readings, vehicle.id, filters, data.fuel)),
               ],
+              ["Litros", fmt(fuel.reduce((n, r) => n + r.liters, 0))],
+              ["Gasto combustible", fuelMoney(fuel)],
               [
-                "Consumo estimado promedio (L/100 km)",
-                <div>
+                "Variación mensual",
+                trend && trend.trend !== "—" ? (
                   <span>
-                    {fmt(fleetConsumption(data.fuel, [vehicle], filters))}
-                  </span>
-                  {trend && trend.trend !== "—" && (
-                    <span className="mt-1 block text-[11px] font-normal text-muted-foreground">
-                      {trend.trend} ·{" "}
-                      {trend.date.slice(0, 7).split("-").reverse().join("/")}{" "}
-                      vs.{" "}
-                      {new Date(Date.parse(trend.date) - 86400000)
-                        .toISOString()
-                        .slice(0, 7)
-                        .split("-")
-                        .reverse()
-                        .join("/")}
+                    {trend.trend}
+                    <span className="ml-1 text-[11px] font-normal text-muted-foreground">
+                      ({trend.date.slice(0, 7).split("-").reverse().join("/")})
                     </span>
-                  )}
-                </div>,
+                  </span>
+                ) : (
+                  "—"
+                ),
+              ],
+              [
+                "Consumo promedio",
+                <span>
+                  {fmt(fleetConsumption(data.fuel, [vehicle], filters))}
+                  <span className="ml-1 text-[11px] font-normal text-muted-foreground">
+                    L/100 km
+                  </span>
+                </span>,
               ],
             ]
       }
@@ -161,6 +189,11 @@ export function VehicleDetail({
             <TabsList>
               {["Combustible", "Mantenimiento"].map((t) => (
                 <TabsTrigger key={t} value={t}>
+                  {t === "Combustible" ? (
+                    <Fuel className="mr-1.5 h-4 w-4" />
+                  ) : (
+                    <Wrench className="mr-1.5 h-4 w-4" />
+                  )}
                   {t}
                 </TabsTrigger>
               ))}
@@ -173,7 +206,7 @@ export function VehicleDetail({
           </Button>
         }
       />
-      <dl className="grid grid-cols-5 gap-3 border-y py-2 text-xs">
+      <dl className="grid grid-cols-4 gap-4 rounded-lg border bg-primary/5 px-4 py-3 text-xs">
         {[
           [
             "Marca/modelo",
@@ -182,7 +215,6 @@ export function VehicleDetail({
           ["Responsable", responsible(vehicle.id, data.responsibilityEvents)],
           ["Sucursal", vehicle.branch],
           ["Estado", vehicle.operational_status],
-          ["Km actuales", fmt(km.km)],
         ].map(([l, v]) => (
           <div key={l}>
             <dt className="text-[11px] text-muted-foreground">{l}</dt>

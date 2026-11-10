@@ -107,6 +107,7 @@ export function FuelView({
   );
   return (
     <>
+      {detailSummary}
       {!monthly && returnPeriod && (
         <Button
           variant="ghost"
@@ -135,7 +136,6 @@ export function FuelView({
           />
         )}
       </FleetFilterBar>
-      {detailSummary}
       {showSummary && (
         <SummaryCards
           items={[
@@ -165,6 +165,7 @@ export function FuelView({
         />
       )}
       <ManagementTable
+        detailStyle={!!vehicleId}
         showRowCount={false}
         actionsTarget={actionsTarget}
         label={monthly ? "Combustible por mes" : "Combustible"}
@@ -172,10 +173,12 @@ export function FuelView({
           monthly
             ? [
                 ["date", "Mes", "date"],
+                ["loads", "Cargas", "number"],
                 ["liters", "Litros", "number"],
-                ["expense", "Gasto"],
-                ["consumption", "Consumo estimado L/100 km", "number"],
-                ["trend", "Variación vs. mes anterior"],
+                ["expense", "Monto"],
+                ["km", "Km evaluados", "number"],
+                ["consumption", "L/100 km", "number"],
+                ["trend", "Variación mensual"],
               ]
             : fields
         }
@@ -200,11 +203,14 @@ export function FuelView({
         }
         omittedColumns={vehicleId ? ["plate", "currency"] : ["currency"]}
         render={{
+          expense: (r) => (
+            <span className="block text-right tabular-nums">{r.expense}</span>
+          ),
           ...(monthly
             ? {
                 date: (r: GridRow) => (
                   <button
-                    className="text-primary underline underline-offset-2"
+                    className="rounded-md bg-primary/10 px-2 py-0.5 font-medium text-primary focus-visible:ring-2 focus-visible:ring-ring"
                     onClick={(e) => {
                       e.stopPropagation();
                       openMonth(r);

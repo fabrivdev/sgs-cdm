@@ -11,12 +11,21 @@ import {
 export function SummaryCard({
   label,
   value,
+  icon,
 }: {
   label: string;
   value: ReactNode;
+  icon?: ReactNode;
 }) {
   return (
-    <Card className="rounded-lg shadow-none">
+    <Card
+      className={`rounded-lg shadow-none ${icon ? "flex items-center gap-1 px-2" : ""}`}
+    >
+      {icon && (
+        <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-primary/10 text-primary">
+          {icon}
+        </span>
+      )}
       <KpiItem
         label={<span className="text-[11px] normal-case">{label}</span>}
         value={value}
@@ -24,14 +33,25 @@ export function SummaryCard({
     </Card>
   );
 }
-export function SummaryCards({ items }: { items: [string, ReactNode][] }) {
+export function SummaryCards({
+  items,
+  icons,
+}: {
+  items: [string, ReactNode][];
+  icons?: ReactNode[];
+}) {
   return (
     <section
       aria-label="Resumen"
       className={`grid grid-cols-2 gap-2 ${items.length === 6 ? "lg:grid-cols-6" : items.length === 3 ? "lg:grid-cols-3" : "lg:grid-cols-4"}`}
     >
-      {items.map(([label, value]) => (
-        <SummaryCard key={label} label={label} value={value} />
+      {items.map(([label, value], index) => (
+        <SummaryCard
+          key={label}
+          label={label}
+          value={value}
+          icon={icons?.[index]}
+        />
       ))}
     </section>
   );

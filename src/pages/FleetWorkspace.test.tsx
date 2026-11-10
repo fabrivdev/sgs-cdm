@@ -362,6 +362,18 @@ it("shows linked maintenance from past years and undated originals, with indepen
   mount("/servicios/flota?vehicle=" + v.id + "&vehicleTab=Mantenimiento");
   await screen.findByText("Filtros", { selector: "span" });
   expect(
+    within(screen.getByRole("table", { name: "Mantenimiento" }))
+      .getAllByRole("columnheader")
+      .map((h) => h.textContent?.replace(/[↑↓]/g, "").trim()),
+  ).toEqual([
+    "Fecha",
+    "N.º de factura",
+    "Proveedor",
+    "Descripción",
+    "Monto",
+    "Km",
+  ]);
+  expect(
     screen.getByText("Aceites y fluidos", { selector: "span" }),
   ).toBeInTheDocument();
   expect(screen.queryByText("Original")).not.toBeInTheDocument();
@@ -372,8 +384,9 @@ it("shows linked maintenance from past years and undated originals, with indepen
   fireEvent.click(screen.getByRole("button", { name: "10/01/2024" }));
   expect(await screen.findByText("Filtro de combustible")).toBeInTheDocument();
   expect(screen.getByText("Original")).toBeInTheDocument();
-  expect(screen.getByText("X", { selector: "div" })).toBeInTheDocument();
-  fireEvent.click(screen.getByRole("button", { name: "Cerrar", exact: true }));
+  expect(screen.queryByText("Registro original")).not.toBeInTheDocument();
+  expect(screen.queryByText("X", { selector: "div" })).not.toBeInTheDocument();
+  fireEvent.click(screen.getByRole("button", { name: /^Cerrar$/ }));
   expect(screen.queryByText("AJENO")).not.toBeInTheDocument();
   expect(
     screen.queryByRole("tab", { name: "Lecturas" }),

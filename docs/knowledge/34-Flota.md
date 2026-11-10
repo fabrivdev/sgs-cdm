@@ -188,3 +188,12 @@ Mantenimiento: tres indicadores y seis columnas en la ficha (fecha, km, trabajos
 Al abrir el registro, el panel lateral conserva fecha, km, proveedor y factura, y separa cada trabajo con nombre legible, registro original y observación original. Nombres originales disponibles en el título de celda y datos originales. Marcas X no se interpretan como cantidades. No se agregan importes al historial. Corrección/recuperación de facturas sigue usando los flujos existentes.
 
 La lista de Vehículos no se modifica. No requiere SQL ni reimportación. Validación: TypeScript, ESLint, pruebas focalizadas de navegación/filtros y fidelidad de trabajos; revisión propia de escritorio con copia de las planillas. No acredita vínculos remotos ni publicación Lovable. Referencias: maintenancePresentation.ts, VehicleDetail.tsx, FuelView.tsx, MaintenanceView.tsx, ExpenseDetails.tsx.
+
+
+## Corrección de orden y referencia visual — 10/11/2026
+
+Reemplaza la disposición del apartado anterior por indicación del usuario: en la ficha, mantenimiento muestra exactamente Fecha, N.º de factura, Proveedor, Descripción, Monto y Km. Descripción conserva resumen breve por categorías y abre el desglose. El panel muestra Trabajo y Observaciones, sin Registro original, marcas X/✓/✔ ni bloque de datos crudos. Valores significativos y comentarios se conservan como observaciones sin inferir unidades; los originales permanecen en datos, sin escrituras ni borrado.
+
+Combustible sigue la composición del ejemplo aportado: encabezado compacto, seis indicadores con iconos, filtros en una fila y tabla mensual Mes/Cargas/Litros/Monto/Km evaluados/L por 100 km/Variación mensual. Cabecera verde del tema, filas alternadas compactas, anchos uniformes y monto alineado a la derecha. La variación es neutral. No se copian cifras ni se presenta una subida del consumo como mejora. Los estilos se activan solo en tablas de la ficha; la lista de Vehículos conserva sus componentes y aspecto. Se mantienen navegación, filtros y acciones existentes.
+
+Verificación: prueba del orden exacto de las seis columnas, ausencia de Registro original y X, conservación de observaciones; regresiones de navegación y consumo; TypeScript, ESLint y compilación. Revisión visual local de escritorio con copia de las planillas. No requiere SQL, no se ejecutan cambios remotos y no se publica en Lovable. Referencias: MaintenanceView.tsx, ExpenseDetails.tsx, VehicleDetail.tsx, FuelView.tsx, ManagementTable.tsx y maintenancePresentation.ts.
