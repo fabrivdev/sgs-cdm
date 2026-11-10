@@ -1,3 +1,4 @@
+import { SupplierFields } from "./SupplierFields";
 import { useEffect, useState, useRef } from "react";
 import { MoreVertical } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -90,6 +91,10 @@ export function InvoiceActions({
     if (busy) return;
     if (mode === "edit" && !data.categories.length) {
       setError("Seleccioná una clasificación");
+      return;
+    }
+    if (mode === "edit" && !data.supplier.trim()) {
+      setError("Seleccioná un RUC del maestro de proveedores");
       return;
     }
     setBusy(true);
@@ -249,23 +254,11 @@ export function InvoiceActions({
                   <>
                     <div className="grid grid-cols-2 gap-3">
                       {(
-                        [
-                          "plate",
-                          "supplier",
-                          "invoice_number",
-                          "invoice_date",
-                        ] as const
+                        ["plate", "invoice_number", "invoice_date"] as const
                       ).map((k, i) => (
                         <div key={k}>
                           <Label htmlFor={"correction-" + k}>
-                            {
-                              [
-                                "Chapa",
-                                "Proveedor",
-                                "N.º factura",
-                                "Fecha de factura",
-                              ][i]
-                            }
+                            {["Chapa", "N.º factura", "Fecha de factura"][i]}
                           </Label>
                           <Input
                             id={"correction-" + k}
@@ -316,16 +309,14 @@ export function InvoiceActions({
                         />
                       </div>
                     </div>
-                    <div>
-                      <Label htmlFor="correction-ruc">RUC del proveedor</Label>
-                      <Input
-                        id="correction-ruc"
-                        required
-                        pattern="[0-9][0-9 .-]{2,19}"
-                        maxLength={20}
-                        value={data.supplier_tax_id ?? ""}
-                        onChange={(e) =>
-                          setData({ ...data, supplier_tax_id: e.target.value })
+                    <div className="grid grid-cols-2 gap-3">
+                      <SupplierFields
+                        idPrefix="correction"
+                        ruc={data.supplier_tax_id ?? ""}
+                        name={data.supplier}
+                        disabled={busy}
+                        onChange={(supplier_tax_id, supplier) =>
+                          setData({ ...data, supplier_tax_id, supplier })
                         }
                       />
                     </div>

@@ -114,7 +114,7 @@ export function ManagementTable({
         (onSelect && key === fields[0][0]
           ? (r) => (
               <button
-                className="text-left text-primary underline"
+                className="rounded-sm text-left text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
                 onClick={(e) => {
                   e.stopPropagation();
                   onSelect(r);

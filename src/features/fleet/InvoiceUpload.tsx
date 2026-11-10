@@ -1,3 +1,4 @@
+import { SupplierFields } from "./SupplierFields";
 import {
   ResponsiveDrawerBody,
   ResponsiveDrawerFooter,
@@ -114,6 +115,10 @@ export default function InvoiceUpload({
       setError("Ingresá el RUC del proveedor");
       return;
     }
+    if (!values.supplier.trim()) {
+      setError("Seleccioná un RUC del maestro de proveedores");
+      return;
+    }
     const problem = invoiceValidation(values, file);
     if (problem) {
       setError(problem);
@@ -196,11 +201,20 @@ export default function InvoiceUpload({
             disabled={pending || reserved.current}
             className="grid gap-4 sm:grid-cols-2"
           >
+            <div className="sm:col-span-2 grid grid-cols-2 gap-3">
+              <SupplierFields
+                ruc={values.supplier_tax_id}
+                name={values.supplier}
+                disabled={pending || reserved.current}
+                onChange={(supplier_tax_id, supplier) => {
+                  setValues((v) => ({ ...v, supplier_tax_id, supplier }));
+                  setError("");
+                }}
+              />
+            </div>
             {(
               [
                 ["plate", "Chapa"],
-                ["supplier", "Proveedor"],
-                ["supplier_tax_id", "RUC del proveedor"],
                 ["invoice_number", "N.º de factura"],
                 ["invoice_date", "Fecha de factura"],
               ] as const

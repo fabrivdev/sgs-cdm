@@ -35,7 +35,9 @@ vi.mock("@/hooks/useAuth", () => ({
 vi.mock("@/features/fleet/managementApi", () => ({
   loadManagement: mocks.load,
   submitInvoice: mocks.submit,
-  fleetRpc: vi.fn(),
+  fleetRpc: vi
+    .fn()
+    .mockResolvedValue([{ ruc: "80000001-1", razon_social: "Taller" }]),
   invoiceUrl: vi.fn(),
 }));
 const data = {
@@ -129,13 +131,14 @@ describe("Fleet role journeys", () => {
     mount();
     for (const [label, value] of [
       ["Chapa", "TEST123"],
-      ["Proveedor", "Taller"],
       ["RUC del proveedor", "80000001-1"],
       ["N.º de factura", "001"],
       ["Fecha de factura", "2026-10-01"],
       ["Descripción del trabajo", "Filtro"],
     ])
       fireEvent.change(screen.getByLabelText(label), { target: { value } });
+    fireEvent.focus(screen.getByLabelText("RUC del proveedor"));
+    fireEvent.click(await screen.findByRole("option", { name: /Taller/ }));
     fireEvent.click(screen.getByRole("button", { name: "Clasificación" }));
     fireEvent.click(screen.getByLabelText("Filtros"));
     fireEvent.change(screen.getByLabelText("Archivo de factura"), {

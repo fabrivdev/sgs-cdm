@@ -1782,8 +1782,8 @@
       "id": "flota-recuperacion-facturas",
       "title": "Correcciones, recuperación y RUC",
       "module": "servicios",
-      "description": "Una chapa por factura. Identidad por RUC; Jefatura corrige, anula y reemplaza con motivo/versiones, sin borrar originales. Operativos solo carga y reintenta su borrador. Los cambios reales de chapa conservan alias e historial; una corrección retira el alias incorrecto sin perder vínculos existentes.",
-      "sources": ["src/features/fleet/InvoiceActions.tsx", "src/features/fleet/InvoiceUpload.tsx", "supabase/migrations/20261110150000_fleet_recovery.sql"]
+      "description": "Una chapa por factura. El RUC sugiere desde totvs_proveedores y completa razón social de solo lectura; RPC limitada a identidad y validación de proveedor al guardar, sin crear proveedores ni reescribir históricos. Identidad por RUC; Jefatura corrige, anula y reemplaza con motivo/versiones, sin borrar originales. Operativos solo carga y reintenta su borrador. Los cambios reales de chapa conservan alias e historial; una corrección retira el alias incorrecto sin perder vínculos existentes.",
+      "sources": ["src/features/fleet/InvoiceActions.tsx", "src/features/fleet/InvoiceUpload.tsx", "src/features/fleet/SupplierFields.tsx", "supabase/migrations/20261110150000_fleet_recovery.sql", "supabase/migrations/20261110180000_fleet_supplier_lookup.sql"]
     },
     {
       "id": "flota-sin-inferencias",

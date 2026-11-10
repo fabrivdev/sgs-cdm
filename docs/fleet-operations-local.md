@@ -1,3 +1,11 @@
+## Proveedores desde el maestro y fechas — 10/11/2026
+
+El RUC sugiere coincidencias del maestro TOTVS (totvs_proveedores) desde tres dígitos, con búsqueda por prefijo normalizado, espera de 250 ms y máximo de 15 opciones. Seleccionar completa la razón social en un campo separado de solo lectura; cambiar RUC limpia el nombre. No se crean proveedores desde Flota. Sin coincidencia o error, no se inventa identidad ni se permite una carga nueva sin proveedor seleccionado. Se conservan los valores de facturas históricas; el trigger valida nuevas identidades y cambios de proveedor, sin reescribir registros anteriores ni exigir maestro para recuperar solamente archivos.
+
+La RPC fleet_search_suppliers permite a quienes pueden cargar facturas consultar solo RUC y razón social. No habilita lectura del maestro completo ni de facturas a Operativos. La migración 20261110180000_fleet_supplier_lookup.sql valida la identidad al guardar y depende del maestro TOTVS y las migraciones anteriores de Flota; pendiente de aplicación. Los estados del maestro se conservan sin interpretar códigos no documentados.
+
+Las fechas estaban estilizadas como vínculos para abrir el detalle; ahora se muestran como texto normal y mantienen la apertura desde la fila y teclado. Sin acciones nuevas. Fuentes: SupplierFields.tsx, InvoiceUpload.tsx, InvoiceActions.tsx y ManagementTable.tsx. Validación: 11 pruebas focalizadas incluyendo SQL aislado, TypeScript, ESLint, build y render propio a 1280×800 con proveedores DEMO. No se consultó el maestro productivo ni se publicó; revisión visual independiente pendiente.
+
 ## Corrección del patrón de paneles — 10/11/2026
 
 Contrastada directamente la regla de la bóveda `C:/Users/Usuario/CDMSIG/SIG CDM/Generado/Reglas/visual-movil-transversal.md`: los formularios de varios campos usan ResponsiveDrawer lateral en escritorio, con cabecera, cuerpo desplazable y pie accesible. La entrega anterior introdujo Dialog centrales sin una excepción documentada; se corrigen en facturas (carga de Jefatura, corrección, archivo, anulación, auditoría e importe), detalles de gastos y revisión de combustible. Registrar importe cierra el detalle para evitar paneles superpuestos. No se agregan acciones ni se cambian permisos/RPC. Operativos conserva su formulario de página.
