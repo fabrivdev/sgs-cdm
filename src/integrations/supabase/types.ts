@@ -279,6 +279,119 @@ export type Database = {
           },
         ]
       }
+      campi_topic_notices: {
+        Row: {
+          created_at: string
+          id: string
+          owner_id: string
+          request_id: string
+          topic_id: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          owner_id: string
+          request_id: string
+          topic_id: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          owner_id?: string
+          request_id?: string
+          topic_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "campi_topic_notices_request_id_fkey"
+            columns: ["request_id"]
+            isOneToOne: true
+            referencedRelation: "campi_topic_requests"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "campi_topic_notices_topic_id_fkey"
+            columns: ["topic_id"]
+            isOneToOne: false
+            referencedRelation: "campi_topic_releases"
+            referencedColumns: ["topic_id"]
+          },
+        ]
+      }
+      campi_topic_releases: {
+        Row: {
+          published_at: string
+          release_ref: string
+          require_all: boolean
+          sections: string[]
+          title: string
+          topic_id: string
+        }
+        Insert: {
+          published_at: string
+          release_ref: string
+          require_all?: boolean
+          sections: string[]
+          title: string
+          topic_id: string
+        }
+        Update: {
+          published_at?: string
+          release_ref?: string
+          require_all?: boolean
+          sections?: string[]
+          title?: string
+          topic_id?: string
+        }
+        Relationships: []
+      }
+      campi_topic_requests: {
+        Row: {
+          client_key: string
+          created_at: string
+          id: string
+          owner_id: string
+          question: string
+          reason: string
+          status: string
+          topic_id: string | null
+          updated_at: string
+          updated_by: string | null
+        }
+        Insert: {
+          client_key: string
+          created_at?: string
+          id?: string
+          owner_id: string
+          question: string
+          reason?: string
+          status?: string
+          topic_id?: string | null
+          updated_at?: string
+          updated_by?: string | null
+        }
+        Update: {
+          client_key?: string
+          created_at?: string
+          id?: string
+          owner_id?: string
+          question?: string
+          reason?: string
+          status?: string
+          topic_id?: string | null
+          updated_at?: string
+          updated_by?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "campi_topic_requests_topic_id_fkey"
+            columns: ["topic_id"]
+            isOneToOne: false
+            referencedRelation: "campi_topic_releases"
+            referencedColumns: ["topic_id"]
+          },
+        ]
+      }
       clientes: {
         Row: {
           activo: boolean
@@ -911,6 +1024,151 @@ export type Database = {
             columns: ["cliente_id"]
             isOneToOne: false
             referencedRelation: "v_clientes_resumen"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      facturacion_archivo_3328: {
+        Row: {
+          archivado_en: string
+          ejecutado_por: string
+          estado: string
+          evidencia: Json
+          funciones_antes: Json
+          funciones_despues: Json | null
+          id: number
+          lineas_originales: Json
+          recuperacion: Json | null
+          repuestos_originales: Json
+          restaurado_en: string | null
+          restricciones_revisadas: Json
+          resumen_original: Json
+          vinculos_originales: Json
+        }
+        Insert: {
+          archivado_en?: string
+          ejecutado_por?: string
+          estado: string
+          evidencia: Json
+          funciones_antes: Json
+          funciones_despues?: Json | null
+          id: number
+          lineas_originales: Json
+          recuperacion?: Json | null
+          repuestos_originales: Json
+          restaurado_en?: string | null
+          restricciones_revisadas: Json
+          resumen_original: Json
+          vinculos_originales: Json
+        }
+        Update: {
+          archivado_en?: string
+          ejecutado_por?: string
+          estado?: string
+          evidencia?: Json
+          funciones_antes?: Json
+          funciones_despues?: Json | null
+          id?: number
+          lineas_originales?: Json
+          recuperacion?: Json | null
+          repuestos_originales?: Json
+          restaurado_en?: string | null
+          restricciones_revisadas?: Json
+          resumen_original?: Json
+          vinculos_originales?: Json
+        }
+        Relationships: []
+      }
+      facturacion_archivo_3328_cargas: {
+        Row: {
+          fila: Json
+          importacion_id: string
+          linea_id: string
+          sha256: string
+        }
+        Insert: {
+          fila: Json
+          importacion_id: string
+          linea_id: string
+          sha256: string
+        }
+        Update: {
+          fila?: Json
+          importacion_id?: string
+          linea_id?: string
+          sha256?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "facturacion_archivo_3328_cargas_importacion_id_fkey"
+            columns: ["importacion_id"]
+            isOneToOne: false
+            referencedRelation: "importaciones"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "facturacion_archivo_3328_cargas_linea_id_fkey"
+            columns: ["linea_id"]
+            isOneToOne: false
+            referencedRelation: "facturacion_archivo_3328_lineas"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      facturacion_archivo_3328_lineas: {
+        Row: {
+          archivo_id: number
+          fila: Json
+          id: string
+          identidad: string
+          sha256: string
+        }
+        Insert: {
+          archivo_id: number
+          fila: Json
+          id: string
+          identidad: string
+          sha256: string
+        }
+        Update: {
+          archivo_id?: number
+          fila?: Json
+          id?: string
+          identidad?: string
+          sha256?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "facturacion_archivo_3328_lineas_archivo_id_fkey"
+            columns: ["archivo_id"]
+            isOneToOne: false
+            referencedRelation: "facturacion_archivo_3328"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      facturacion_archivo_3328_repuestos: {
+        Row: {
+          fila: Json
+          linea_id: string
+          sha256: string
+        }
+        Insert: {
+          fila: Json
+          linea_id: string
+          sha256: string
+        }
+        Update: {
+          fila?: Json
+          linea_id?: string
+          sha256?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "facturacion_archivo_3328_repuestos_linea_id_fkey"
+            columns: ["linea_id"]
+            isOneToOne: true
+            referencedRelation: "facturacion_archivo_3328_lineas"
             referencedColumns: ["id"]
           },
         ]
@@ -1763,6 +2021,357 @@ export type Database = {
         }
         Relationships: []
       }
+      fleet_change_events: {
+        Row: {
+          actor: string
+          actor_name: string
+          after_data: Json
+          before_data: Json
+          id: string
+          occurred_at: string
+          reason: string | null
+          vehicle_id: string
+        }
+        Insert: {
+          actor?: string
+          actor_name?: string
+          after_data: Json
+          before_data: Json
+          id?: string
+          occurred_at?: string
+          reason?: string | null
+          vehicle_id: string
+        }
+        Update: {
+          actor?: string
+          actor_name?: string
+          after_data?: Json
+          before_data?: Json
+          id?: string
+          occurred_at?: string
+          reason?: string | null
+          vehicle_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "fleet_change_events_vehicle_id_fkey"
+            columns: ["vehicle_id"]
+            isOneToOne: false
+            referencedRelation: "fleet_vehicles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      fleet_fuel_entries: {
+        Row: {
+          currency: string | null
+          id: string
+          imported_at: string
+          imported_by: string
+          liters: number
+          net_amount: number
+          occurred_at: string
+          odometer_km: number | null
+          plate: string
+          previous_liters: number | null
+          previous_odometer_km: number | null
+          product: string
+          raw_data: Json
+          source_key: string
+          station: string
+          vehicle_id: string | null
+        }
+        Insert: {
+          currency?: string | null
+          id?: string
+          imported_at?: string
+          imported_by?: string
+          liters: number
+          net_amount: number
+          occurred_at: string
+          odometer_km?: number | null
+          plate: string
+          previous_liters?: number | null
+          previous_odometer_km?: number | null
+          product: string
+          raw_data: Json
+          source_key: string
+          station: string
+          vehicle_id?: string | null
+        }
+        Update: {
+          currency?: string | null
+          id?: string
+          imported_at?: string
+          imported_by?: string
+          liters?: number
+          net_amount?: number
+          occurred_at?: string
+          odometer_km?: number | null
+          plate?: string
+          previous_liters?: number | null
+          previous_odometer_km?: number | null
+          product?: string
+          raw_data?: Json
+          source_key?: string
+          station?: string
+          vehicle_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "fleet_fuel_entries_vehicle_id_fkey"
+            columns: ["vehicle_id"]
+            isOneToOne: false
+            referencedRelation: "fleet_vehicles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      fleet_initial_loads: {
+        Row: {
+          actor: string
+          checksum: string
+          kind: string
+          loaded_at: string
+          row_count: number
+          source_name: string
+        }
+        Insert: {
+          actor?: string
+          checksum: string
+          kind: string
+          loaded_at?: string
+          row_count: number
+          source_name: string
+        }
+        Update: {
+          actor?: string
+          checksum?: string
+          kind?: string
+          loaded_at?: string
+          row_count?: number
+          source_name?: string
+        }
+        Relationships: []
+      }
+      fleet_invoice_audit: {
+        Row: {
+          actor: string
+          actor_name: string | null
+          after_data: Json
+          before_data: Json
+          id: string
+          invoice_id: string
+          occurred_at: string
+          reason: string | null
+        }
+        Insert: {
+          actor?: string
+          actor_name?: string | null
+          after_data: Json
+          before_data: Json
+          id?: string
+          invoice_id: string
+          occurred_at?: string
+          reason?: string | null
+        }
+        Update: {
+          actor?: string
+          actor_name?: string | null
+          after_data?: Json
+          before_data?: Json
+          id?: string
+          invoice_id?: string
+          occurred_at?: string
+          reason?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "fleet_invoice_audit_invoice_id_fkey"
+            columns: ["invoice_id"]
+            isOneToOne: false
+            referencedRelation: "fleet_maintenance_invoices"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      fleet_invoice_files: {
+        Row: {
+          created_at: string
+          created_by: string
+          expected_version: number
+          filename: string
+          id: string
+          invoice_id: string
+          mime_type: string
+          reason: string
+          size_bytes: number
+          status: string
+          storage_path: string
+        }
+        Insert: {
+          created_at?: string
+          created_by?: string
+          expected_version: number
+          filename: string
+          id: string
+          invoice_id: string
+          mime_type: string
+          reason: string
+          size_bytes: number
+          status?: string
+          storage_path: string
+        }
+        Update: {
+          created_at?: string
+          created_by?: string
+          expected_version?: number
+          filename?: string
+          id?: string
+          invoice_id?: string
+          mime_type?: string
+          reason?: string
+          size_bytes?: number
+          status?: string
+          storage_path?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "fleet_invoice_files_invoice_id_fkey"
+            columns: ["invoice_id"]
+            isOneToOne: false
+            referencedRelation: "fleet_maintenance_invoices"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      fleet_maintenance_history: {
+        Row: {
+          id: string
+          invoice_number: string | null
+          occurred_on: string | null
+          odometer_km: number | null
+          plate: string
+          raw_data: Json
+          source_key: string
+          supplier: string | null
+          vehicle_id: string | null
+          works: Json
+        }
+        Insert: {
+          id?: string
+          invoice_number?: string | null
+          occurred_on?: string | null
+          odometer_km?: number | null
+          plate?: string
+          raw_data: Json
+          source_key: string
+          supplier?: string | null
+          vehicle_id?: string | null
+          works?: Json
+        }
+        Update: {
+          id?: string
+          invoice_number?: string | null
+          occurred_on?: string | null
+          odometer_km?: number | null
+          plate?: string
+          raw_data?: Json
+          source_key?: string
+          supplier?: string | null
+          vehicle_id?: string | null
+          works?: Json
+        }
+        Relationships: [
+          {
+            foreignKeyName: "fleet_maintenance_history_vehicle_id_fkey"
+            columns: ["vehicle_id"]
+            isOneToOne: false
+            referencedRelation: "fleet_vehicles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      fleet_maintenance_invoices: {
+        Row: {
+          amount: number | null
+          categories: string[]
+          created_at: string
+          created_by: string
+          currency: string | null
+          description: string
+          filename: string
+          id: string
+          invoice_date: string
+          invoice_number: string
+          mime_type: string
+          odometer_km: number | null
+          performed_on: string | null
+          plate: string
+          size_bytes: number
+          status: string
+          storage_path: string
+          supplier: string
+          supplier_tax_id: string | null
+          vehicle_id: string | null
+          version: number
+        }
+        Insert: {
+          amount?: number | null
+          categories: string[]
+          created_at?: string
+          created_by?: string
+          currency?: string | null
+          description: string
+          filename: string
+          id: string
+          invoice_date: string
+          invoice_number: string
+          mime_type: string
+          odometer_km?: number | null
+          performed_on?: string | null
+          plate: string
+          size_bytes: number
+          status?: string
+          storage_path: string
+          supplier: string
+          supplier_tax_id?: string | null
+          vehicle_id?: string | null
+          version?: number
+        }
+        Update: {
+          amount?: number | null
+          categories?: string[]
+          created_at?: string
+          created_by?: string
+          currency?: string | null
+          description?: string
+          filename?: string
+          id?: string
+          invoice_date?: string
+          invoice_number?: string
+          mime_type?: string
+          odometer_km?: number | null
+          performed_on?: string | null
+          plate?: string
+          size_bytes?: number
+          status?: string
+          storage_path?: string
+          supplier?: string
+          supplier_tax_id?: string | null
+          vehicle_id?: string | null
+          version?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "fleet_maintenance_invoices_vehicle_id_fkey"
+            columns: ["vehicle_id"]
+            isOneToOne: false
+            referencedRelation: "fleet_vehicles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       fleet_odometer_readings: {
         Row: {
           correction_of: string | null
@@ -1826,6 +2435,35 @@ export type Database = {
           },
         ]
       }
+      fleet_plate_aliases: {
+        Row: {
+          created_at: string
+          created_by: string | null
+          plate_normalized: string
+          vehicle_id: string
+        }
+        Insert: {
+          created_at?: string
+          created_by?: string | null
+          plate_normalized: string
+          vehicle_id: string
+        }
+        Update: {
+          created_at?: string
+          created_by?: string | null
+          plate_normalized?: string
+          vehicle_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "fleet_plate_aliases_vehicle_id_fkey"
+            columns: ["vehicle_id"]
+            isOneToOne: false
+            referencedRelation: "fleet_vehicles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       fleet_vehicle_responsibility_events: {
         Row: {
           effective_date: string | null
@@ -1877,48 +2515,78 @@ export type Database = {
       fleet_vehicles: {
         Row: {
           active: boolean
+          branch: string | null
           brand: string
+          chassis: string | null
+          color: string | null
           created_at: string
           created_by: string
           created_by_name: string
+          department: string | null
+          fuel_provider: string | null
           id: string
           image_license: string | null
           image_source_url: string | null
           image_url: string | null
+          lifecycle_status: string
           model: string | null
           model_year: number | null
+          notes: string | null
+          operational_status: string
           plate: string
           plate_normalized: string
+          source_data: Json | null
+          vehicle_type: string | null
         }
         Insert: {
           active?: boolean
+          branch?: string | null
           brand: string
+          chassis?: string | null
+          color?: string | null
           created_at?: string
           created_by: string
           created_by_name: string
+          department?: string | null
+          fuel_provider?: string | null
           id?: string
           image_license?: string | null
           image_source_url?: string | null
           image_url?: string | null
+          lifecycle_status?: string
           model?: string | null
           model_year?: number | null
+          notes?: string | null
+          operational_status?: string
           plate: string
           plate_normalized: string
+          source_data?: Json | null
+          vehicle_type?: string | null
         }
         Update: {
           active?: boolean
+          branch?: string | null
           brand?: string
+          chassis?: string | null
+          color?: string | null
           created_at?: string
           created_by?: string
           created_by_name?: string
+          department?: string | null
+          fuel_provider?: string | null
           id?: string
           image_license?: string | null
           image_source_url?: string | null
           image_url?: string | null
+          lifecycle_status?: string
           model?: string | null
           model_year?: number | null
+          notes?: string | null
+          operational_status?: string
           plate?: string
           plate_normalized?: string
+          source_data?: Json | null
+          vehicle_type?: string | null
         }
         Relationships: []
       }
@@ -8267,6 +8935,48 @@ export type Database = {
       }
     }
     Views: {
+      facturacion_fuente_archivo_3328_v1: {
+        Row: {
+          actualizado_en: string | null
+          cantidad: number | null
+          cliente_id: string | null
+          cod_mercaderia: string | null
+          codigo_fabricante: string | null
+          codigo_interno_factura: string | null
+          entidad_nombre: string | null
+          factura: string | null
+          fecha_factura: string | null
+          grupo_normalizado: string | null
+          id: string | null
+          importacion_id: string | null
+          importado_en: string | null
+          linea_hash: string | null
+          marca_normalizada: Database["public"]["Enums"]["marca"] | null
+          mercaderia: string | null
+          moneda: string | null
+          observacion: string | null
+          origen_sistema: string | null
+          raw_data: Json | null
+          subgrupo_original: string | null
+          sucursal: Database["public"]["Enums"]["sucursal"] | null
+          tipo_facturacion:
+            | Database["public"]["Enums"]["tipo_facturacion"]
+            | null
+          tipo_tiempo: string | null
+          total_venta: number | null
+          valor_unitario: number | null
+          vendedor: string | null
+        }
+        Relationships: []
+      }
+      facturacion_procedencia_archivo_3328_v1: {
+        Row: {
+          documento_fuente_sha256: string | null
+          importacion_id: string | null
+          linea_id: string | null
+        }
+        Relationships: []
+      }
       maquinaria_facturas_importacion_detalle: {
         Row: {
           actualizado_en: string | null
@@ -9748,6 +10458,32 @@ export type Database = {
         Args: { p_desde: string; p_hasta: string }
         Returns: Json
       }
+      campi_manage_topic_request: {
+        Args: {
+          p_id: string
+          p_reason?: string
+          p_status: string
+          p_topic?: string
+        }
+        Returns: {
+          client_key: string
+          created_at: string
+          id: string
+          owner_id: string
+          question: string
+          reason: string
+          status: string
+          topic_id: string | null
+          updated_at: string
+          updated_by: string | null
+        }
+        SetofOptions: {
+          from: "*"
+          to: "campi_topic_requests"
+          isOneToOne: true
+          isSetofReturn: false
+        }
+      }
       campi_os_abiertas_capturar_v1: { Args: never; Returns: undefined }
       campi_os_abiertas_detalle_v1: { Args: never; Returns: Json }
       campi_os_snapshot_numeros_v1: { Args: never; Returns: string[] }
@@ -9755,6 +10491,27 @@ export type Database = {
       campi_pedidos_con_stock_v1: { Args: never; Returns: Json }
       campi_repuestos_exposicion_v1: { Args: never; Returns: Json }
       campi_resolucion_os_v1: { Args: never; Returns: Json }
+      campi_submit_topic_request: {
+        Args: { p_key: string; p_question: string }
+        Returns: {
+          client_key: string
+          created_at: string
+          id: string
+          owner_id: string
+          question: string
+          reason: string
+          status: string
+          topic_id: string | null
+          updated_at: string
+          updated_by: string | null
+        }
+        SetofOptions: {
+          from: "*"
+          to: "campi_topic_requests"
+          isOneToOne: true
+          isSetofReturn: false
+        }
+      }
       campi_ventas_servicios_componentes_v1: {
         Args: { p_desde: string; p_hasta: string }
         Returns: Json
@@ -10036,6 +10793,18 @@ export type Database = {
         Returns: string
       }
       fleet_assert_write_access: { Args: never; Returns: string }
+      fleet_can_submit: { Args: never; Returns: boolean }
+      fleet_can_upload_path: { Args: { p_path: string }; Returns: boolean }
+      fleet_correct_invoice: {
+        Args: {
+          p_data: Json
+          p_id: string
+          p_reason: string
+          p_version: number
+          p_void?: boolean
+        }
+        Returns: undefined
+      }
       fleet_correct_odometer_reading: {
         Args: {
           p_odometer_km: number
@@ -10055,6 +10824,21 @@ export type Database = {
         }
         Returns: string
       }
+      fleet_edit_vehicle: {
+        Args: { p_data: Json; p_id: string }
+        Returns: string
+      }
+      fleet_edit_vehicle_internal: {
+        Args: { p_data: Json; p_id: string }
+        Returns: string
+      }
+      fleet_finalize_invoice: { Args: { p_id: string }; Returns: string }
+      fleet_finalize_invoice_file: {
+        Args: { p_id: string }
+        Returns: undefined
+      }
+      fleet_import_fuel_entries: { Args: { p_rows: Json }; Returns: number }
+      fleet_is_manager: { Args: never; Returns: boolean }
       fleet_list_responsible_candidates: {
         Args: never
         Returns: {
@@ -10064,7 +10848,55 @@ export type Database = {
           sucursal: Database["public"]["Enums"]["sucursal"]
         }[]
       }
+      fleet_list_responsible_candidates_internal: {
+        Args: never
+        Returns: {
+          es_tecnico: boolean
+          id: string
+          nombre: string
+          sucursal: Database["public"]["Enums"]["sucursal"]
+        }[]
+      }
+      fleet_load_initial: {
+        Args: {
+          p_checksum: string
+          p_kind: string
+          p_rows: Json
+          p_source: string
+        }
+        Returns: number
+      }
+      fleet_match_plate: { Args: { p_plate: string }; Returns: string }
       fleet_normalize_plate: { Args: { p_plate: string }; Returns: string }
+      fleet_reserve_invoice: {
+        Args: { p_data: Json; p_id: string }
+        Returns: string
+      }
+      fleet_reserve_invoice_file: {
+        Args: {
+          p_data: Json
+          p_id: string
+          p_invoice: string
+          p_reason: string
+          p_version: number
+        }
+        Returns: string
+      }
+      fleet_save_vehicle: {
+        Args: { p_data: Json; p_id: string }
+        Returns: string
+      }
+      fleet_search_suppliers: {
+        Args: { p_ruc: string }
+        Returns: {
+          razon_social: string
+          ruc: string
+        }[]
+      }
+      fleet_set_invoice_amount: {
+        Args: { p_amount: number; p_currency: string; p_id: string }
+        Returns: undefined
+      }
       fleet_set_vehicle_responsible: {
         Args: {
           p_effective_date: string
@@ -10072,6 +10904,13 @@ export type Database = {
           p_vehicle_id: string
         }
         Returns: string
+      }
+      fleet_supplier_identity: {
+        Args: { p_ruc: string }
+        Returns: {
+          razon_social: string
+          ruc: string
+        }[]
       }
       generar_notificacion_venta_maquina: {
         Args: { p_linea_id: string }
