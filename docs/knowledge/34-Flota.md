@@ -225,3 +225,8 @@ Validación: TypeScript, ESLint, pruebas de navegación y consumo ponderado/camb
 Mantenimiento muestra números en formato 000-000-0000000 en listado, detalle y exportación. Solo se rellenan ceros cuando existen los tres segmentos, o se separan 13 dígitos; no se inventan establecimiento ni punto de expedición faltantes. Originales importados permanecen intactos. Alta, reintento y corrección usan ejemplo de formato, separadores guiados, completado de ceros al salir y validación obligatoria de los tres bloques.
 
 Migración 20261110230000_fleet_invoice_number_format.sql: clave única adicional por RUC/proveedor y número equivalente con ceros; formato obligatorio en inserción o cambio de número. No reescribe filas anteriores. Si existen duplicados equivalentes, el índice falla y la transacción no se aplica; requiere revisión, sin fusiones automáticas. SQL entregado para aplicación manual, no ejecutado ni validado sobre base remota. Pruebas de formato, entrada, carga/reintento y corrección. Sin publicación Lovable.
+
+
+## Aprovechamiento horizontal del encabezado — 10/11/2026
+
+En escritorio, las pestañas Combustible/Mantenimiento comparten fila con volver, chapa y Editar; el contexto sigue debajo. Se elimina la fila exclusiva de pestañas y su separación vertical. Se conservan componentes nativos y tamaño de letra; no se modifica VehiclesList. Validación: pruebas existentes de navegación, TypeScript y ESLint.

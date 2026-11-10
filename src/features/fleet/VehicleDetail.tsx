@@ -155,7 +155,7 @@ export function VehicleDetail({
   return (
     <>
       <header className="space-y-1">
-        <div className="flex items-center justify-between gap-3">
+        <div className="flex flex-wrap items-center justify-between gap-x-3 gap-y-1">
           <div className="flex min-w-0 items-center gap-2">
             <Button variant="ghost" size="sm" className="px-0" onClick={onBack}>
               ← Vehículos
@@ -165,9 +165,20 @@ export function VehicleDetail({
             </span>
             <h1 className="text-lg font-semibold">{vehicle.plate}</h1>
           </div>
-          <Button variant="outline" size="sm" onClick={onEdit}>
-            Editar
-          </Button>
+          <div className="flex items-center gap-2">
+            <Tabs value={tab} onValueChange={onTab}>
+              <TabsList>
+                {["Combustible", "Mantenimiento"].map((t) => (
+                  <TabsTrigger key={t} value={t}>
+                    {t}
+                  </TabsTrigger>
+                ))}
+              </TabsList>
+            </Tabs>
+            <Button variant="outline" size="sm" onClick={onEdit}>
+              Editar
+            </Button>
+          </div>
         </div>
         <p className="flex flex-wrap items-center gap-x-2 text-xs text-muted-foreground">
           {[
@@ -192,15 +203,6 @@ export function VehicleDetail({
           ))}
         </p>
       </header>
-      <Tabs value={tab} onValueChange={onTab}>
-        <TabsList>
-          {["Combustible", "Mantenimiento"].map((t) => (
-            <TabsTrigger key={t} value={t}>
-              {t}
-            </TabsTrigger>
-          ))}
-        </TabsList>
-      </Tabs>
       {tab === "Mantenimiento" ? (
         <MaintenanceView
           data={data}
