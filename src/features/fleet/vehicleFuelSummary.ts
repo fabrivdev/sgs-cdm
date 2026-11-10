@@ -19,6 +19,7 @@ export function fuelMonthRows(
         .map((r) => r.occurred_at.slice(0, 7)),
     ),
   ].sort();
+  const average = estimatedConsumption(rows, f.from, f.to || "9999-12-31").l100;
   return months.map((month) => {
     const start = month + "-01";
     const end = new Date(
@@ -59,6 +60,8 @@ export function fuelMonthRows(
       coverageFrom: result.from,
       coverageTo: result.to,
       consumption: result.l100,
+      average,
+      trendValue: change,
       trend: change == null ? "—" : `${change > 0 ? "+" : ""}${fmt(change)} %`,
     };
   });

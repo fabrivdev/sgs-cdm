@@ -1,3 +1,4 @@
+import { ArrowUp, ArrowDown, TriangleAlert } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { fuelMonthRows, usesMonthlyFuel } from "./vehicleFuelSummary";
 import { moneyCell } from "./workspaceModel";
@@ -208,9 +209,52 @@ export function FuelView({
           ),
           ...(monthly
             ? {
+                consumption: (r: GridRow) => (
+                  <span className="inline-flex items-center justify-end gap-1 tabular-nums">
+                    {fmt(r.consumption as number | null)}
+                    {r.consumption != null &&
+                      r.average != null &&
+                      Number(r.consumption) > Number(r.average) && (
+                        <span
+                          className="text-destructive"
+                          role="img"
+                          aria-label="Supera el consumo promedio del período"
+                          title={
+                            "Supera el promedio del período: " +
+                            fmt(r.average as number) +
+                            " L/100 km"
+                          }
+                        >
+                          <TriangleAlert
+                            className="h-3.5 w-3.5"
+                            aria-hidden="true"
+                          />
+                        </span>
+                      )}
+                  </span>
+                ),
+                trend: (r: GridRow) => (
+                  <span
+                    className={
+                      "inline-flex items-center gap-1 tabular-nums " +
+                      (Number(r.trendValue) > 0
+                        ? "text-destructive"
+                        : Number(r.trendValue) < 0
+                          ? "text-primary"
+                          : "text-muted-foreground")
+                    }
+                  >
+                    {Number(r.trendValue) > 0 ? (
+                      <ArrowUp className="h-3.5 w-3.5" aria-hidden="true" />
+                    ) : Number(r.trendValue) < 0 ? (
+                      <ArrowDown className="h-3.5 w-3.5" aria-hidden="true" />
+                    ) : null}
+                    {r.trend}
+                  </span>
+                ),
                 date: (r: GridRow) => (
                   <button
-                    className="text-primary underline underline-offset-2 focus-visible:ring-2 focus-visible:ring-ring"
+                    className="text-foreground focus-visible:ring-2 focus-visible:ring-ring"
                     onClick={(e) => {
                       e.stopPropagation();
                       openMonth(r);

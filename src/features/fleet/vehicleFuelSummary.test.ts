@@ -34,6 +34,23 @@ describe("vehicle monthly consumption", () => {
     expect(months.map((r) => r.liters)).toEqual([80, 120]);
     expect(months.map((r) => r.consumption)).toEqual([10, 12]);
     expect(months[1].trend).toBe("+20 %");
+    expect(months[1].trendValue).toBeCloseTo(20);
+    expect(months[0].average).toBeCloseTo((100 / 900) * 100);
+    expect(
+      months.map(
+        (r) =>
+          r.consumption != null &&
+          r.average != null &&
+          r.consumption > r.average,
+      ),
+    ).toEqual([false, true]);
+    const february = fuelMonthRows(
+      entries,
+      { from: "2026-02-01", to: "2026-02-28" },
+      "2026-03-01",
+    );
+    expect(february[0].consumption).toBe(february[0].average);
+    expect(february[0].average).toBe(12);
     expect(estimatedConsumption(entries).l100).toBeCloseTo((100 / 900) * 100);
     expect(usesMonthlyFuel(f)).toBe(true);
     expect(usesMonthlyFuel({ from: months[0].from, to: months[0].to })).toBe(

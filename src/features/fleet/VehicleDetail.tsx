@@ -3,7 +3,6 @@ import {
   Route,
   Droplets,
   Coins,
-  TrendingUp,
   CalendarDays,
   Wrench,
 } from "lucide-react";
@@ -15,10 +14,8 @@ import {
 } from "@/components/ui/responsive-drawer";
 import { ReadingsView } from "./ReadingsView";
 import { initialFilters } from "./workspaceModel";
-import { todayInParaguay } from "./period";
 import { fuelMonthRows } from "./vehicleFuelSummary";
 import { currentVehicleMileage, maintenanceAlert } from "./maintenanceAlert";
-import { PageHeader } from "@/components/layout/AppPrimitives";
 import { Button } from "@/components/ui/button";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import type { ManagedVehicle } from "./managementModel";
@@ -97,12 +94,6 @@ export function VehicleDetail({
   );
   const km = currentVehicleMileage(vehicle, data.readings, data.fuel);
   const alert = maintenanceAlert(vehicle, km, data.history, data.invoices);
-  const trend = fuelMonthRows(
-    data.fuel.filter((r) => r.vehicle_id === vehicle.id),
-    filters,
-  )
-    .filter((r) => r.to < todayInParaguay())
-    .at(-1);
   const lastWork = [
     ...data.history
       .filter((r) => r.vehicle_id === vehicle.id)
@@ -120,11 +111,9 @@ export function VehicleDetail({
       icons={
         tab === "Combustible"
           ? [
-              <Gauge size={18} />,
               <Route size={18} />,
               <Droplets size={18} />,
               <Coins size={18} />,
-              <TrendingUp size={18} />,
               <Gauge size={18} />,
             ]
           : [
@@ -144,26 +133,12 @@ export function VehicleDetail({
               ["Gasto documentado del período", invoiceMoney(invoices)],
             ]
           : [
-              ["Km actuales", fmt(km.km)],
               [
                 "Km del período",
                 fmt(mileage(data.readings, vehicle.id, filters, data.fuel)),
               ],
               ["Litros", fmt(fuel.reduce((n, r) => n + r.liters, 0))],
               ["Gasto combustible", fuelMoney(fuel)],
-              [
-                "Variación mensual",
-                trend && trend.trend !== "—" ? (
-                  <span>
-                    {trend.trend}
-                    <span className="ml-1 text-[11px] font-normal text-muted-foreground">
-                      ({trend.date.slice(0, 7).split("-").reverse().join("/")})
-                    </span>
-                  </span>
-                ) : (
-                  "—"
-                ),
-              ],
               [
                 "Consumo promedio",
                 <span>
@@ -179,44 +154,53 @@ export function VehicleDetail({
   );
   return (
     <>
-      <Button variant="ghost" size="sm" onClick={onBack}>
-        ← Vehículos
-      </Button>
-      <PageHeader
-        title={vehicle.plate}
-        tabs={
-          <Tabs value={tab} onValueChange={onTab}>
-            <TabsList>
-              {["Combustible", "Mantenimiento"].map((t) => (
-                <TabsTrigger key={t} value={t}>
-                  {t}
-                </TabsTrigger>
-              ))}
-            </TabsList>
-          </Tabs>
-        }
-        actions={
+      <header className="space-y-1">
+        <div className="flex items-center justify-between gap-3">
+          <div className="flex min-w-0 items-center gap-2">
+            <Button variant="ghost" size="sm" className="px-0" onClick={onBack}>
+              ← Vehículos
+            </Button>
+            <span aria-hidden="true" className="text-muted-foreground">
+              /
+            </span>
+            <h1 className="text-lg font-semibold">{vehicle.plate}</h1>
+          </div>
           <Button variant="outline" size="sm" onClick={onEdit}>
             Editar
           </Button>
-        }
-      />
-      <dl className="grid grid-cols-4 gap-3 border-y py-2 text-xs">
-        {[
-          [
-            "Marca/modelo",
-            [vehicle.brand, vehicle.model].filter(Boolean).join(" "),
-          ],
-          ["Responsable", responsible(vehicle.id, data.responsibilityEvents)],
-          ["Sucursal", vehicle.branch],
-          ["Estado", vehicle.operational_status],
-        ].map(([l, v]) => (
-          <div key={l}>
-            <dt className="text-[11px] text-muted-foreground">{l}</dt>
-            <dd>{v || "—"}</dd>
-          </div>
-        ))}
-      </dl>
+        </div>
+        <p className="flex flex-wrap items-center gap-x-2 text-xs text-muted-foreground">
+          {[
+            [
+              "Marca/modelo",
+              [vehicle.brand, vehicle.model].filter(Boolean).join(" "),
+            ],
+            ["Responsable", responsible(vehicle.id, data.responsibilityEvents)],
+            ["Sucursal", vehicle.branch],
+            ["Estado", vehicle.operational_status],
+            ["Km actuales", km.km == null ? "—" : fmt(km.km) + " km"],
+          ].map(([label, value], index) => (
+            <span key={label} title={label}>
+              {index > 0 && (
+                <span aria-hidden="true" className="mr-2">
+                  ·
+                </span>
+              )}
+              <span className="sr-only">{label}: </span>
+              {value || "—"}
+            </span>
+          ))}
+        </p>
+      </header>
+      <Tabs value={tab} onValueChange={onTab}>
+        <TabsList>
+          {["Combustible", "Mantenimiento"].map((t) => (
+            <TabsTrigger key={t} value={t}>
+              {t}
+            </TabsTrigger>
+          ))}
+        </TabsList>
+      </Tabs>
       {tab === "Mantenimiento" ? (
         <MaintenanceView
           data={data}
