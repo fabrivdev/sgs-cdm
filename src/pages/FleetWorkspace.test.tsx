@@ -335,7 +335,10 @@ it("shows linked maintenance from past years and undated originals, with indepen
         odometer_km: 10000,
         supplier: "Taller",
         invoice_number: "1",
-        works: [{ work: "Filtro", value: "X", comment: "Original" }],
+        works: [
+          { work: "MOTOR / Filtro.Comb.", value: "X", comment: "Original" },
+        ],
+        raw_data: {},
       },
       {
         id: "h2",
@@ -357,18 +360,37 @@ it("shows linked maintenance from past years and undated originals, with indepen
     ],
   });
   mount("/servicios/flota?vehicle=" + v.id + "&vehicleTab=Mantenimiento");
-  await screen.findByText("Filtro: Original");
-  expect(screen.getByText("Aceite: 5")).toBeInTheDocument();
+  await screen.findByText("Filtros", { selector: "span" });
+  expect(
+    screen.getByText("Aceites y fluidos", { selector: "span" }),
+  ).toBeInTheDocument();
+  expect(screen.queryByText("Original")).not.toBeInTheDocument();
+  fireEvent.change(screen.getByRole("combobox", { name: "Clasificación" }), {
+    target: { value: "Filtros" },
+  });
+  expect(screen.queryByText("Otro")).not.toBeInTheDocument();
+  fireEvent.click(screen.getByRole("button", { name: "10/01/2024" }));
+  expect(await screen.findByText("Filtro de combustible")).toBeInTheDocument();
+  expect(screen.getByText("Original")).toBeInTheDocument();
+  expect(screen.getByText("X", { selector: "div" })).toBeInTheDocument();
+  fireEvent.click(screen.getByRole("button", { name: "Cerrar", exact: true }));
   expect(screen.queryByText("AJENO")).not.toBeInTheDocument();
   expect(
     screen.queryByRole("tab", { name: "Lecturas" }),
   ).not.toBeInTheDocument();
   expect(document.querySelector('input[type="date"]')).toHaveValue("");
-  fireEvent.keyDown(screen.getByRole("button", {name:"Acciones de la sección"}), {key:"Enter"});
+  fireEvent.keyDown(
+    screen.getByRole("button", { name: "Acciones de la sección" }),
+    { key: "Enter" },
+  );
   fireEvent.click(
     await screen.findByRole("menuitem", { name: "Kilometraje y responsable" }),
   );
   expect(
-    (await screen.findAllByRole("heading", { name: "Kilometraje y responsable" }))[0],
+    (
+      await screen.findAllByRole("heading", {
+        name: "Kilometraje y responsable",
+      })
+    )[0],
   ).toBeInTheDocument();
 });

@@ -54,6 +54,10 @@ export function fuelMonthRows(
       liters: items.reduce((n, r) => n + r.liters, 0),
       expense: fuelMoney(items),
       km: result.km || null,
+      evaluatedLiters: result.intervals ? result.liters : null,
+      intervals: result.intervals,
+      coverageFrom: result.from,
+      coverageTo: result.to,
       consumption: result.l100,
       trend: change == null ? "—" : `${change > 0 ? "+" : ""}${fmt(change)} %`,
     };

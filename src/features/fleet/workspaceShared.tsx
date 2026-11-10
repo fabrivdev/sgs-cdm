@@ -28,7 +28,7 @@ export function SummaryCards({ items }: { items: [string, ReactNode][] }) {
   return (
     <section
       aria-label="Resumen"
-      className={`grid grid-cols-2 gap-2 ${items.length === 6 ? "lg:grid-cols-6" : "lg:grid-cols-4"}`}
+      className={`grid grid-cols-2 gap-2 ${items.length === 6 ? "lg:grid-cols-6" : items.length === 3 ? "lg:grid-cols-3" : "lg:grid-cols-4"}`}
     >
       {items.map(([label, value]) => (
         <SummaryCard key={label} label={label} value={value} />

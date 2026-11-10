@@ -1,6 +1,7 @@
+import { Button } from "@/components/ui/button";
 import { fuelMonthRows, usesMonthlyFuel } from "./vehicleFuelSummary";
 import { moneyCell } from "./workspaceModel";
-import { useMemo, useState } from "react";
+import { useMemo, useState, type ReactNode } from "react";
 import {
   ManagementTable,
   type GridField,
@@ -30,6 +31,7 @@ const fields: GridField[] = [
   ["liters", "Litros", "number"],
   ["amount", "Importe", "number"],
   ["currency", "Moneda"],
+  ["station", "Estación"],
 ];
 export function FuelView({
   data,
@@ -39,6 +41,7 @@ export function FuelView({
   onSelect,
   onImport,
   showSummary = true,
+  detailSummary,
   vehicleActions = [],
 }: {
   data: ManagementData;
@@ -48,6 +51,7 @@ export function FuelView({
   onSelect: (r: GridRow) => void;
   onImport: () => void;
   showSummary?: boolean;
+  detailSummary?: ReactNode;
   vehicleActions?: { id: string; label: string; onSelect: () => void }[];
 }) {
   const [actionsTarget, setActionsTarget] = useState<HTMLDivElement | null>(
@@ -80,9 +84,18 @@ export function FuelView({
         liters: r.liters,
         amount: r.net_amount,
         currency: r.currency,
+        station: r.station,
       })),
     [visible],
   );
+  const [returnPeriod, setReturnPeriod] = useState<{
+    from: string;
+    to: string;
+  } | null>(null);
+  const openMonth = (r: GridRow) => {
+    setReturnPeriod({ from: filters.from, to: filters.to });
+    onChange("period", String(r.from), String(r.to));
+  };
   const monthly = !!vehicleId && usesMonthlyFuel(filters);
   const monthRows = useMemo(
     () =>
@@ -94,6 +107,19 @@ export function FuelView({
   );
   return (
     <>
+      {!monthly && returnPeriod && (
+        <Button
+          variant="ghost"
+          size="sm"
+          className="self-start"
+          onClick={() => {
+            onChange("period", returnPeriod.from, returnPeriod.to);
+            setReturnPeriod(null);
+          }}
+        >
+          ← Volver al período anterior
+        </Button>
+      )}
       <FleetFilterBar
         secondaryActions={<div ref={setActionsTarget} />}
         filters={filters}
@@ -109,6 +135,7 @@ export function FuelView({
           />
         )}
       </FleetFilterBar>
+      {detailSummary}
       {showSummary && (
         <SummaryCards
           items={[
@@ -145,12 +172,10 @@ export function FuelView({
           monthly
             ? [
                 ["date", "Mes", "date"],
-                ["loads", "Cargas", "number"],
                 ["liters", "Litros", "number"],
-                ["expense", "Importe"],
-                ["km", "Km evaluados", "number"],
-                ["consumption", "L/100 km", "number"],
-                ["trend", "Variación mensual"],
+                ["expense", "Gasto"],
+                ["consumption", "Consumo estimado L/100 km", "number"],
+                ["trend", "Variación vs. mes anterior"],
               ]
             : fields
         }
@@ -182,7 +207,7 @@ export function FuelView({
                     className="text-primary underline underline-offset-2"
                     onClick={(e) => {
                       e.stopPropagation();
-                      onChange("period", String(r.from), String(r.to));
+                      openMonth(r);
                     }}
                   >
                     {String(r.date).slice(0, 7).split("-").reverse().join("/")}
@@ -193,11 +218,7 @@ export function FuelView({
           amount: (r) =>
             moneyCell(r.amount as number | null, r.currency as string | null),
         }}
-        onSelect={
-          monthly
-            ? (r) => onChange("period", String(r.from), String(r.to))
-            : onSelect
-        }
+        onSelect={monthly ? openMonth : onSelect}
         actions={[
           ...vehicleActions,
           { id: "import", label: "Importar combustible", onSelect: onImport },

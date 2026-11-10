@@ -14,7 +14,8 @@ import { Button } from "@/components/ui/button";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import type { ManagedVehicle } from "./managementModel";
 import type { ManagementData } from "./VehiclesList";
-import type { GridRow } from "./ManagementTable";
+import { ManagementTable, type GridRow } from "./ManagementTable";
+import { estimatedConsumption } from "./managementModel";
 import { FuelView } from "./FuelView";
 import { MaintenanceView } from "./MaintenanceView";
 import { SummaryCards } from "./workspaceShared";
@@ -54,6 +55,7 @@ export function VehicleDetail({
   onImport: () => void;
   onSaved: () => Promise<void>;
 }) {
+  const [calculation, setCalculation] = useState(false);
   const [administration, setAdministration] = useState(false);
   const [adminFilters, setAdminFilters] = useState({ ...initialFilters });
   const adminChange: FilterChange = (key, value, to) =>
@@ -79,6 +81,11 @@ export function VehicleDetail({
         r.vehicle_id === vehicle.id &&
         within(r.performed_on ?? r.invoice_date, filters),
     );
+  const consumption = estimatedConsumption(
+    data.fuel.filter((r) => r.vehicle_id === vehicle.id),
+    filters.from,
+    filters.to || "9999-12-31",
+  );
   const km = currentVehicleMileage(vehicle, data.readings, data.fuel);
   const alert = maintenanceAlert(vehicle, km, data.history, data.invoices);
   const trend = fuelMonthRows(
@@ -98,6 +105,50 @@ export function VehicleDetail({
     .filter((d): d is string => !!d)
     .sort()
     .at(-1);
+  const detailSummary = (
+    <SummaryCards
+      items={
+        tab === "Mantenimiento"
+          ? [
+              [
+                "Último mantenimiento",
+                lastWork?.split("-").reverse().join("/") ?? "—",
+              ],
+              ["Próximo mantenimiento", alert.label],
+              ["Gasto documentado del período", invoiceMoney(invoices)],
+            ]
+          : [
+              ["Gasto de combustible", fuelMoney(fuel)],
+              ["Litros cargados", fmt(fuel.reduce((n, r) => n + r.liters, 0))],
+              [
+                "Km del período",
+                fmt(mileage(data.readings, vehicle.id, filters, data.fuel)),
+              ],
+              [
+                "Consumo estimado promedio (L/100 km)",
+                <div>
+                  <span>
+                    {fmt(fleetConsumption(data.fuel, [vehicle], filters))}
+                  </span>
+                  {trend && trend.trend !== "—" && (
+                    <span className="mt-1 block text-[11px] font-normal text-muted-foreground">
+                      {trend.trend} ·{" "}
+                      {trend.date.slice(0, 7).split("-").reverse().join("/")}{" "}
+                      vs.{" "}
+                      {new Date(Date.parse(trend.date) - 86400000)
+                        .toISOString()
+                        .slice(0, 7)
+                        .split("-")
+                        .reverse()
+                        .join("/")}
+                    </span>
+                  )}
+                </div>,
+              ],
+            ]
+      }
+    />
+  );
   return (
     <>
       <Button variant="ghost" size="sm" onClick={onBack}>
@@ -122,7 +173,7 @@ export function VehicleDetail({
           </Button>
         }
       />
-      <dl className="grid grid-cols-4 gap-3 border-y py-2 text-xs">
+      <dl className="grid grid-cols-5 gap-3 border-y py-2 text-xs">
         {[
           [
             "Marca/modelo",
@@ -131,6 +182,7 @@ export function VehicleDetail({
           ["Responsable", responsible(vehicle.id, data.responsibilityEvents)],
           ["Sucursal", vehicle.branch],
           ["Estado", vehicle.operational_status],
+          ["Km actuales", fmt(km.km)],
         ].map(([l, v]) => (
           <div key={l}>
             <dt className="text-[11px] text-muted-foreground">{l}</dt>
@@ -138,49 +190,6 @@ export function VehicleDetail({
           </div>
         ))}
       </dl>
-      <SummaryCards
-        items={
-          tab === "Mantenimiento"
-            ? [
-                [
-                  "Último mantenimiento registrado",
-                  lastWork?.split("-").reverse().join("/") ?? "—",
-                ],
-                ["Km actuales", fmt(km.km)],
-                ["Próximo mantenimiento", alert.label],
-                ["Gasto mantenimiento", invoiceMoney(invoices)],
-              ]
-            : [
-                [
-                  "Km actuales",
-                  <span title={km.source ?? undefined}>{fmt(km.km)}</span>,
-                ],
-                [
-                  "Km del período",
-                  fmt(mileage(data.readings, vehicle.id, filters, data.fuel)),
-                ],
-                ["Litros", fmt(fuel.reduce((n, r) => n + r.liters, 0))],
-                ["Gasto combustible", fuelMoney(fuel)],
-                [
-                  "Variación mensual",
-                  trend && trend.trend !== "—" ? (
-                    <span title="Variación de L/100 km frente al mes anterior completo">
-                      {trend.trend}{" "}
-                      <span className="text-xs text-muted-foreground">
-                        ({trend.date.slice(5, 7)}/{trend.date.slice(0, 4)})
-                      </span>
-                    </span>
-                  ) : (
-                    "—"
-                  ),
-                ],
-                [
-                  "Consumo promedio (L/100 km)",
-                  fmt(fleetConsumption(data.fuel, [vehicle], filters)),
-                ],
-              ]
-        }
-      />
       {tab === "Mantenimiento" ? (
         <MaintenanceView
           data={data}
@@ -189,6 +198,7 @@ export function VehicleDetail({
           onChange={onChange}
           onSelect={onSelect}
           showSummary={false}
+          detailSummary={detailSummary}
           vehicleActions={vehicleActions}
         />
       ) : (
@@ -200,9 +210,70 @@ export function VehicleDetail({
           onSelect={onSelect}
           onImport={onImport}
           showSummary={false}
-          vehicleActions={vehicleActions}
+          detailSummary={detailSummary}
+          vehicleActions={[
+            ...vehicleActions,
+            {
+              id: "consumption-calculation",
+              label: "Detalle del cálculo de consumo",
+              onSelect: () => setCalculation(true),
+            },
+          ]}
         />
       )}
+      <ResponsiveDrawer
+        title="Cálculo de consumo"
+        size="xl"
+        open={calculation}
+        onOpenChange={setCalculation}
+      >
+        <ResponsiveDrawerHeader>
+          <h2>Cálculo de consumo</h2>
+        </ResponsiveDrawerHeader>
+        <ResponsiveDrawerBody className="space-y-3">
+          <dl className="grid grid-cols-3 gap-3 text-sm">
+            {[
+              [
+                "Litros evaluados",
+                consumption.intervals ? fmt(consumption.liters) : "—",
+              ],
+              [
+                "Km evaluados",
+                consumption.intervals ? fmt(consumption.km) : "—",
+              ],
+              ["Consumo estimado L/100 km", fmt(consumption.l100)],
+            ].map(([label, value]) => (
+              <div key={label}>
+                <dt className="text-[11px] text-muted-foreground">{label}</dt>
+                <dd>{value}</dd>
+              </div>
+            ))}
+          </dl>
+          <p className="text-xs text-muted-foreground">
+            Litros evaluados ÷ kilómetros evaluados × 100. Se usan intervalos
+            válidos; se excluyen lecturas inconsistentes. Los litros cargados y
+            los importes conservan todos los movimientos.
+          </p>
+          <ManagementTable
+            label="Cálculo por mes"
+            showRowCount={false}
+            actionsTarget={null}
+            fields={[
+              ["date", "Mes", "date"],
+              ["evaluatedLiters", "Litros evaluados", "number"],
+              ["km", "Km evaluados", "number"],
+              ["intervals", "Intervalos", "number"],
+              ["coverageFrom", "Desde", "date"],
+              ["coverageTo", "Hasta", "date"],
+              ["consumption", "L/100 km", "number"],
+            ]}
+            rows={fuelMonthRows(
+              data.fuel.filter((r) => r.vehicle_id === vehicle.id),
+              filters,
+            )}
+          />
+        </ResponsiveDrawerBody>
+      </ResponsiveDrawer>
       <ResponsiveDrawer
         title="Kilometraje y responsable"
         size="xl"

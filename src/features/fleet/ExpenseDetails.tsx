@@ -1,3 +1,4 @@
+import { readableWork } from "./maintenancePresentation";
 import { moneyCell } from "./workspaceModel";
 import { useState } from "react";
 import { Button } from "@/components/ui/button";
@@ -28,7 +29,9 @@ const show = (v: unknown) =>
 const columns: GridField[] = [
   ["date", "Fecha"],
   ["plate", "Chapa"],
-  ["type", "Tipo"],
+  ["type", "Origen"],
+  ["classification", "Clasificación"],
+  ["station", "Estación"],
   ["km", "Kilometraje"],
   ["liters", "Litros"],
   ["amount", "Importe"],
@@ -117,7 +120,14 @@ export function ExpenseDetails({
                     !(
                       selectedHistory &&
                       (k.startsWith("work") ||
-                        ["invoice_date", "performed"].includes(k))
+                        [
+                          "invoice_date",
+                          "performed",
+                          "description",
+                          "status",
+                          "amount",
+                          "km",
+                        ].includes(k))
                     ),
                 )
                 .map(([key, value]) => (
@@ -272,10 +282,24 @@ export function ExpenseDetails({
               </dl>
               <ManagementTable
                 label="Trabajos"
+                showRowCount={false}
+                actionsTarget={null}
+                render={{
+                  work: (r) => (
+                    <span title={String(r.work)}>
+                      {readableWork(String(r.work))}
+                    </span>
+                  ),
+                  comment: (r) => (
+                    <span className="block whitespace-normal">
+                      {r.comment || "—"}
+                    </span>
+                  ),
+                }}
                 fields={[
                   ["work", "Trabajo"],
                   ["value", "Registro original"],
-                  ["comment", "Comentario original"],
+                  ["comment", "Observación original"],
                 ]}
                 rows={selectedHistory.works.map((w, i) => ({
                   id: String(i),

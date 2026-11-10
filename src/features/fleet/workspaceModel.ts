@@ -20,6 +20,7 @@ export interface FleetFilters {
   supplier: string;
   type: string;
   invoiceState: string;
+  category?: string;
 }
 export const initialFilters: FleetFilters = {
   search: "",
@@ -33,6 +34,7 @@ export const initialFilters: FleetFilters = {
   supplier: "",
   type: "",
   invoiceState: "",
+  category: "",
 };
 export type FilterChange = (
   key: keyof FleetFilters | "period" | "reset",

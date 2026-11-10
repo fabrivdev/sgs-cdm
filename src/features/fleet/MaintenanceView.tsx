@@ -1,5 +1,7 @@
+import { workCategories, compactCategories } from "./maintenancePresentation";
+import { maintenanceCategories } from "./managementModel";
 import { moneyCell } from "./workspaceModel";
-import { useMemo, useState } from "react";
+import { useMemo, useState, type ReactNode } from "react";
 import {
   ManagementTable,
   type GridField,
@@ -25,7 +27,8 @@ const fields: GridField[] = [
   ["plate", "Chapa"],
   ["type", "Origen"],
   ["km", "Km", "number"],
-  ["description", "Descripción"],
+  ["classification", "Trabajos"],
+  ["description", "Descripción original"],
   ["supplier", "Proveedor"],
   ["amount", "Importe", "number"],
   ["currency", "Moneda"],
@@ -39,6 +42,7 @@ export function MaintenanceView({
   onChange,
   onSelect,
   showSummary = true,
+  detailSummary,
   vehicleActions = [],
 }: {
   data: ManagementData;
@@ -47,6 +51,7 @@ export function MaintenanceView({
   onChange: FilterChange;
   onSelect: (r: GridRow) => void;
   showSummary?: boolean;
+  detailSummary?: ReactNode;
   vehicleActions?: { id: string; label: string; onSelect: () => void }[];
 }) {
   const [actionsTarget, setActionsTarget] = useState<HTMLDivElement | null>(
@@ -89,6 +94,7 @@ export function MaintenanceView({
           date: r.occurred_on,
           plate: r.plate,
           type: "Historial",
+          classification: workCategories(r.works).join(" · "),
           km: r.odometer_km,
           description: r.works
             .map((w) =>
@@ -112,6 +118,7 @@ export function MaintenanceView({
           date: r.performed_on ?? r.invoice_date,
           plate: r.plate,
           type: "Factura",
+          classification: (r.categories ?? []).join(" · "),
           km: r.odometer_km,
           description: r.description,
           supplier: r.supplier,
@@ -128,15 +135,18 @@ export function MaintenanceView({
       ].filter(
         (r) =>
           (!filters.type || r.type === filters.type) &&
+          (!filters.category ||
+            r.classification.split(" · ").includes(filters.category)) &&
           matches(
             filters.search,
             r.plate,
             r.description,
+            r.classification,
             r.supplier,
             r.invoice,
           ),
       ),
-    [history, invoices, filters.type, filters.search],
+    [history, invoices, filters.type, filters.category, filters.search],
   );
   return (
     <>
@@ -146,6 +156,12 @@ export function MaintenanceView({
         onChange={onChange}
         more={
           <>
+            <Choice
+              label="Origen"
+              value={filters.type}
+              onChange={(v) => onChange("type", v)}
+              options={["Historial", "Factura"]}
+            />
             <Choice
               label="Proveedor"
               value={filters.supplier}
@@ -175,12 +191,13 @@ export function MaintenanceView({
           />
         )}
         <Choice
-          label="Origen"
-          value={filters.type}
-          onChange={(v) => onChange("type", v)}
-          options={["Historial", "Factura"]}
+          label="Clasificación"
+          value={filters.category ?? ""}
+          onChange={(v) => onChange("category", v)}
+          options={[...maintenanceCategories]}
         />
       </FleetFilterBar>
+      {detailSummary}
       {showSummary && (
         <SummaryCards
           items={[
@@ -200,11 +217,15 @@ export function MaintenanceView({
         label="Mantenimiento"
         fields={fields}
         rows={rows}
-        omittedColumns={vehicleId ? ["plate", "currency"] : ["currency"]}
+        omittedColumns={
+          vehicleId
+            ? ["plate", "currency", "description", "type", "status"]
+            : ["currency", "description"]
+        }
         render={{
-          description: (r) => (
-            <span className="block max-w-[440px] whitespace-normal leading-5">
-              {r.description || "—"}
+          classification: (r) => (
+            <span title={String(r.classification || "Sin clasificar")}>
+              {compactCategories(String(r.classification || "").split(" · "))}
             </span>
           ),
           amount: (r) =>
