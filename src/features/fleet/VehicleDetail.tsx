@@ -1,9 +1,8 @@
+import { currentVehicleMileage } from "./maintenanceAlert";
 import { PageHeader } from "@/components/layout/AppPrimitives";
 import { Button } from "@/components/ui/button";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import type { ManagedVehicle } from "./managementModel";
-import { vehicleMileageDisplay } from "./managementModel";
-import { vehicleLatestReading } from "./model";
 import type { ManagementData } from "./VehiclesList";
 import type { GridRow } from "./ManagementTable";
 import { FuelView } from "./FuelView";
@@ -54,10 +53,7 @@ export function VehicleDetail({
         r.vehicle_id === vehicle.id &&
         within(r.performed_on ?? r.invoice_date, filters),
     );
-  const km = vehicleMileageDisplay(
-    vehicle,
-    vehicleLatestReading(vehicle.id, data.readings),
-  );
+  const km = currentVehicleMileage(vehicle, data.readings, data.fuel);
   return (
     <>
       <Button variant="ghost" size="sm" onClick={onBack}>

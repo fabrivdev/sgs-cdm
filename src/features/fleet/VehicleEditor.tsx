@@ -36,6 +36,7 @@ export function VehicleEditor({
         "color",
         "vehicle_type",
         "fuel_provider",
+        "maintenance_interval_km",
         "notes",
         "operational_status",
         "lifecycle_status",
@@ -65,10 +66,20 @@ export function VehicleEditor({
     ["color", "Color"],
     ["vehicle_type", "Tipo"],
     ["fuel_provider", "Proveedor de combustible"],
+    ["maintenance_interval_km", "Intervalo de mantenimiento (km)"],
     ["notes", "Observaciones"],
   ];
   async function save(e: React.FormEvent) {
     e.preventDefault();
+    if (
+      data.maintenance_interval_km &&
+      (!Number.isInteger(Number(data.maintenance_interval_km)) ||
+        Number(data.maintenance_interval_km) <= 0 ||
+        Number(data.maintenance_interval_km) > 2147483647)
+    ) {
+      setError("El intervalo debe ser un número entero mayor que cero");
+      return;
+    }
     setPending(true);
     setError("");
     try {
@@ -106,9 +117,25 @@ export function VehicleEditor({
                 <Input
                   id={"vehicle-" + k}
                   required={["plate", "brand"].includes(k)}
-                  type={k === "model_year" ? "number" : "text"}
-                  min={k === "model_year" ? 1900 : undefined}
-                  max={k === "model_year" ? 2100 : undefined}
+                  type={
+                    ["model_year", "maintenance_interval_km"].includes(k)
+                      ? "number"
+                      : "text"
+                  }
+                  min={
+                    k === "model_year"
+                      ? 1900
+                      : k === "maintenance_interval_km"
+                        ? 1
+                        : undefined
+                  }
+                  max={
+                    k === "model_year"
+                      ? 2100
+                      : k === "maintenance_interval_km"
+                        ? 2147483647
+                        : undefined
+                  }
                   value={data[k]}
                   onChange={(e) => setData({ ...data, [k]: e.target.value })}
                 />

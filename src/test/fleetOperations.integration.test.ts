@@ -665,7 +665,13 @@ it.each([false, true])(
           "Edición simultánea",
         ]),
       ).rejects.toThrow("cambió");
-      await call("fleet_set_invoice_amount_v2", [id, 3, 150, "PYG", "Corrección"]);
+      await call("fleet_set_invoice_amount_v2", [
+        id,
+        3,
+        150,
+        "PYG",
+        "Corrección",
+      ]);
       expect(
         (
           await db.query(
@@ -702,3 +708,67 @@ it.each([false, true])(
   },
   30000,
 );
+
+it("stores and audits the maintenance interval only for managers and preserves it on older payloads", async () => {
+  const db = new PGlite({ extensions: { pgcrypto } });
+  try {
+    await fixture(db);
+    await db.exec("RESET ROLE");
+    await db.exec(
+      readFileSync(
+        "supabase/migrations/20261110210000_fleet_maintenance_interval.sql",
+        "utf8",
+      ),
+    );
+    await db.exec("SET ROLE authenticated");
+    const save = async (id: string | null, data: Record<string, unknown>) =>
+      (
+        await db.query<{ value: string }>(
+          "SELECT fleet_save_vehicle($1,$2::jsonb) AS value",
+          [id, JSON.stringify(data)],
+        )
+      ).rows[0].value;
+    const id = await save(null, {
+      ...vehicle,
+      maintenance_interval_km: "10000",
+    });
+    await save(id, { ...vehicle, maintenance_interval_km: "15000" });
+    await save(id, vehicle);
+    expect(
+      (
+        await db.query<{ maintenance_interval_km: number }>(
+          "SELECT maintenance_interval_km FROM fleet_vehicles WHERE id=$1",
+          [id],
+        )
+      ).rows[0].maintenance_interval_km,
+    ).toBe(15000);
+    expect(
+      (
+        await db.query(
+          "SELECT 1 FROM fleet_change_events WHERE vehicle_id=$1 AND before_data->>'maintenance_interval_km'='10000' AND after_data->>'maintenance_interval_km'='15000'",
+          [id],
+        )
+      ).rows,
+    ).toHaveLength(1);
+    for (const value of ["0", "-1", "1.5", "NaN"])
+      await expect(
+        save(id, { ...vehicle, maintenance_interval_km: value }),
+      ).rejects.toThrow();
+    await db.query("SELECT set_config('test.role','operativo',false)");
+    await expect(
+      save(id, { ...vehicle, maintenance_interval_km: "20000" }),
+    ).rejects.toThrow();
+    await db.query("SELECT set_config('test.role','jefatura',false)");
+    await save(id, { ...vehicle, maintenance_interval_km: "" });
+    expect(
+      (
+        await db.query<{ maintenance_interval_km: number | null }>(
+          "SELECT maintenance_interval_km FROM fleet_vehicles WHERE id=$1",
+          [id],
+        )
+      ).rows[0].maintenance_interval_km,
+    ).toBeNull();
+  } finally {
+    await db.close();
+  }
+});

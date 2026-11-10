@@ -1,9 +1,9 @@
+import { currentVehicleMileage, maintenanceAlert } from "./maintenanceAlert";
 import { useMemo, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { PageHeader } from "@/components/layout/AppPrimitives";
 import { ManagementTable, type GridField } from "./ManagementTable";
-import { type ManagedVehicle, vehicleMileageDisplay } from "./managementModel";
-import { vehicleLatestReading } from "./model";
+import { type ManagedVehicle } from "./managementModel";
 import type { loadManagement } from "./managementApi";
 import {
   Choice,
@@ -32,6 +32,7 @@ const fields: GridField[] = [
   ["state", "Estado"],
   ["km", "Última lectura (km)", "number"],
   ["distance", "Km del período", "number"],
+  ["maintenance", "Próximo mantenimiento"],
 ];
 export function VehiclesList({
   data,
@@ -76,8 +77,13 @@ export function VehiclesList({
         responsible: responsible(v.id, data.responsibilityEvents),
         branch: v.branch,
         state: v.operational_status,
-        km: vehicleMileageDisplay(v, vehicleLatestReading(v.id, data.readings))
-          .km,
+        km: currentVehicleMileage(v, data.readings, data.fuel).km,
+        maintenance: maintenanceAlert(
+          v,
+          currentVehicleMileage(v, data.readings, data.fuel),
+          data.history,
+          data.invoices,
+        ).label,
         distance: mileage(data.readings, v.id, filters, data.fuel),
       })),
     [vehicles, data, filters],
@@ -169,6 +175,20 @@ export function VehiclesList({
         actionsTarget={actionsTarget}
         fields={fields}
         rows={rows}
+        render={{
+          maintenance: (r) => (
+            <span
+              className={
+                String(r.maintenance).startsWith("Vencido") ||
+                r.maintenance === "Corresponde ahora"
+                  ? "text-destructive font-medium"
+                  : undefined
+              }
+            >
+              {r.maintenance}
+            </span>
+          ),
+        }}
         onSelect={(r) => onOpen(r.id)}
       />
     </>

@@ -676,7 +676,7 @@
       "id": "vehiculo-flota",
       "title": "Vehículo de flota",
       "module": "servicios",
-      "description": "Unidad identificada por chapa normalizada única. Padrón inicial una sola vez; Jefatura administra datos, estado y responsable manualmente. Lecturas fechadas y correcciones conservan auditoría.",
+      "description": "Unidad identificada por chapa normalizada única. Padrón inicial una sola vez; Jefatura administra datos, estado y responsable manualmente. Lecturas fechadas y correcciones conservan auditoría. Intervalo de mantenimiento opcional por vehículo; alerta por último trabajo fechado y lectura actual válida, independiente del filtro de fechas.",
       "tables": [
         "fleet_vehicles",
         "fleet_odometer_readings",

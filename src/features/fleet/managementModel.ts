@@ -16,6 +16,7 @@ export const operationalStates = [
 ] as const;
 export const lifecycleStates = ["Activa", "Vendida", "Baja"] as const;
 export interface ManagedVehicle extends FleetVehicle {
+  maintenance_interval_km?: number | null;
   chassis: string | null;
   department: string | null;
   branch: string | null;

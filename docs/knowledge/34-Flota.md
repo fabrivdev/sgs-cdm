@@ -16,6 +16,16 @@ Validación: pruebas aisladas de PostgreSQL, parser, permisos, caché vacía, re
 
 ---
 
+## Próximo mantenimiento — 10/11/2026
+
+Vehículos agrega una sola columna Próximo mantenimiento. Jefatura configura maintenance_interval_km en el drawer existente de alta/edición; entero positivo opcional, sin valor inferido y sin botones nuevos. Migración 20261110210000_fleet_maintenance_interval.sql agrega el campo y amplía fleet_save_vehicle conservando permisos, cambio de chapa y auditoría del antes/después. Payload antiguo sin el campo conserva la configuración; vacío la desactiva. SQL entregado para aplicación manual, no aplicado remotamente.
+
+La alerta toma el último trabajo fechado del historial o de facturas uploaded con performed_on, independientemente del período visible. Una factura sin fecha de trabajo no reinicia el ciclo; pendientes y anuladas no intervienen. Si el último trabajo no tiene km, no se usa uno anterior para ocultar la ausencia. Conflictos de km en la misma fecha requieren revisión. Objetivo = km del último mantenimiento + intervalo. La columna muestra Faltan N km, Corresponde ahora o Vencido por N km; no se inventa un umbral de cercanía. Configuración/datos insuficientes se muestran en esa misma celda.
+
+Km actuales y última lectura usan la fuente fechada más reciente entre combustible válido y lecturas manuales vigentes (manual tiene prioridad en la misma fecha); conserva planilla inicial únicamente como respaldo sin fecha. Para calcular alerta se requiere lectura igual o posterior al mantenimiento y no inferior a su odómetro. Combustible inconsistente, ajustes, lubricantes y fechas futuras no acreditan lectura actual. No altera ni elimina originales.
+
+Validación local: fórmulas, límites, fuentes, ausencia/ambigüedad, estados de factura y PostgreSQL aislado para permisos, intervalo positivo, auditoría y compatibilidad de payloads. No acredita base productiva ni publicación.
+
 ## Período visible — 10/11/2026
 
 Flota reutiliza QuickPeriodFilter y FilterDate dentro de FiltersBar, como las otras secciones. Al entrar sin fechas explícitas selecciona Este año (1 de enero a 31 de diciembre del año actual). Período rápido y calendarios Desde/Hasta se muestran en la fila principal de escritorio; Sucursal y Departamento pasan a Más filtros en Vehículos. El cambio rápido actualiza las dos fechas de forma atómica; editar fechas conserva un rango personalizado, incluso un extremo vacío. Limpiar vuelve al año actual. La primera apertura de la ficha hereda las fechas del listado y volver conserva el período del listado. Fechas filtran recorrido y gastos, no eliminan vehículos del padrón.
