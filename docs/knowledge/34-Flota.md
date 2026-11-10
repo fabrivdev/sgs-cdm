@@ -204,3 +204,10 @@ Verificación: prueba del orden exacto de las seis columnas, ausencia de Registr
 La ficha conserva la estructura y el orden de columnas aprobados, pero reutiliza KpiStrip/KpiItem de AppPrimitives (como Ventas), pestañas nativas sin iconos añadidos, metadatos con separadores y cabeceras de tabla neutras. Se retiran el encabezado verde, los círculos decorativos de los indicadores y las etiquetas coloreadas de los meses. Esta decisión reemplaza el tratamiento visual particular descrito en la revisión anterior. VehiclesList mantiene su presentación sin cambios.
 
 Referencias: src/features/fleet/VehicleDetail.tsx, workspaceShared.tsx, FuelView.tsx y ManagementTable.tsx; src/pages/Ventas.tsx y docs/knowledge/24-Condiciones-visuales-ventas.md. Validación: 10 pruebas de FleetWorkspace, TypeScript, ESLint, build y revisión visual de ambas pestañas en escritorio con copia local de datos, sin escrituras remotas. No requiere SQL ni publicación en Lovable.
+
+
+## Orden de filtros en la ficha — 10/11/2026
+
+Combustible y Mantenimiento muestran encabezado/datos, barra de filtros, indicadores y tabla, siguiendo el orden de Ventas. Se mueve únicamente detailSummary debajo de FleetFilterBar en FuelView y MaintenanceView. La lista de Vehículos y los cálculos permanecen sin cambios. No requiere SQL ni publicación en Lovable.
+
+Validación de esta corrección: 10 pruebas existentes de FleetWorkspace, TypeScript y ESLint correctos; revisión del orden JSX. Sin nueva captura de navegador para este cambio de posición.

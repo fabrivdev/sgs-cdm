@@ -107,7 +107,6 @@ export function FuelView({
   );
   return (
     <>
-      {detailSummary}
       {!monthly && returnPeriod && (
         <Button
           variant="ghost"
@@ -136,6 +135,7 @@ export function FuelView({
           />
         )}
       </FleetFilterBar>
+      {detailSummary}
       {showSummary && (
         <SummaryCards
           items={[

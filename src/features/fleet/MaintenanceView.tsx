@@ -150,7 +150,6 @@ export function MaintenanceView({
   );
   return (
     <>
-      {detailSummary}
       <FleetFilterBar
         secondaryActions={<div ref={setActionsTarget} />}
         filters={filters}
@@ -198,6 +197,7 @@ export function MaintenanceView({
           options={[...maintenanceCategories]}
         />
       </FleetFilterBar>
+      {detailSummary}
       {showSummary && (
         <SummaryCards
           items={[
