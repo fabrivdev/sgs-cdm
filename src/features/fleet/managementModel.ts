@@ -240,3 +240,26 @@ export function monthlyFuel(rows: readonly FuelEntry[]) {
       amount: items.reduce((s, r) => s + r.net_amount, 0),
     }));
 }
+
+/** Imported mileage has no date: expose it without creating a dated reading. */
+export function vehicleMileageDisplay(
+  vehicle: ManagedVehicle,
+  reading?: { odometer_km: number; reading_date: string } | null,
+) {
+  if (reading)
+    return {
+      km: reading.odometer_km,
+      date: reading.reading_date,
+      source: "Lectura",
+    };
+  const raw = vehicle.source_data?.raw_data?.Kilometraje;
+  return {
+    km:
+      typeof raw === "number" && Number.isFinite(raw) && raw >= 0 ? raw : null,
+    date: null,
+    source:
+      typeof raw === "number" && Number.isFinite(raw) && raw >= 0
+        ? "Planilla inicial"
+        : null,
+  };
+}

@@ -110,14 +110,9 @@ describe("Fleet role journeys", () => {
       button: 0,
       ctrlKey: false,
     });
-    await waitFor(() =>
-      expect(
-        screen.getByRole("tab", { name: "Historial" }),
-      ).toBeInTheDocument(),
-    );
-    fireEvent.mouseDown(screen.getByRole("tab", { name: "Facturas" }), {
-      button: 0,
-      ctrlKey: false,
+    expect(await screen.findAllByRole("tab")).toHaveLength(3);
+    fireEvent.change(await screen.findByLabelText("Ver"), {
+      target: { value: "Facturas" },
     });
     expect(
       screen.getByRole("button", { name: "Cargar factura" }),

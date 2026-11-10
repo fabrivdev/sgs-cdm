@@ -1789,7 +1789,7 @@
       "id": "flota-sin-inferencias",
       "title": "Vínculos y métricas con evidencia",
       "module": "servicios",
-      "description": "Chapa normalizada exacta, nunca crear vehículos por gasto. Conservar ausencias, signos, marcas y comentarios. L/100 km estimado solo con intervalos continuos del mismo mes; no inferir moneda ni importe histórico.",
+      "description": "Chapa normalizada exacta, nunca crear vehículos por gasto. Conservar ausencias, signos, marcas y comentarios. L/100 km estimado solo con intervalos continuos del mismo mes; no inferir moneda ni importe histórico. Listado: última lectura registrada o, si falta, Kilometraje de la planilla inicial con origen explícito y fecha ausente; ese dato sin fecha no genera recorridos.",
       "sources": [
         "src/features/fleet/managementModel.ts",
         "src/features/fleet/workbookImports.mjs"

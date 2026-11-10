@@ -32,6 +32,7 @@ import {
   canSubmitInvoice,
   maintenanceCategories,
   monthlyFuel,
+  vehicleMileageDisplay,
   estimatedConsumption,
   type Invoice,
   type ManagedVehicle,
@@ -45,7 +46,7 @@ import {
   currentFleetResponsibility,
   vehicleLatestReading,
 } from "@/features/fleet/model";
-import { periodMileage, todayInParaguay } from "@/features/fleet/period";
+import { todayInParaguay } from "@/features/fleet/period";
 import Flota from "./Flota";
 
 export default function FleetWorkspace() {
@@ -197,8 +198,8 @@ export function ManagementWorkspace() {
     );
   const vehicle = data?.vehicles.find((v) => v.id === params.get("vehicle"));
   const search = get("search"),
-    from = get("from"),
-    to = get("to"),
+    from = !vehicle && section === "vehicles" ? "" : get("from"),
+    to = !vehicle && section === "vehicles" ? "" : get("to"),
     category = get("category"),
     supplier = get("supplier"),
     association = get("association"),
@@ -408,11 +409,10 @@ export function ManagementWorkspace() {
       ["brand", "Marca"],
       ["model", "Modelo"],
       ["responsible", "Responsable"],
-      ["status", "Estado operativo"],
-      ["lifecycle", "Situación patrimonial"],
-      ["km", "Último km", "number"],
-      ["date", "Fecha lectura", "date"],
-      ["distance", "Km período", "number"],
+      ["status", "Estado"],
+      ["km", "Kilometraje", "number"],
+      ["kmSource", "Origen km"],
+      ["date", "Fecha km", "date"],
     );
     rows = data!.vehicles
       .filter(
@@ -424,14 +424,10 @@ export function ManagementWorkspace() {
           (!get("branch") || v.branch === get("branch")),
       )
       .map((v) => {
-        const reading = vehicleLatestReading(v.id, data!.readings),
-          distance =
-            from && to
-              ? periodMileage(
-                  data!.readings.filter((r) => r.vehicle_id === v.id),
-                  { from, to, valid: from <= to },
-                )
-              : null;
+        const mileage = vehicleMileageDisplay(
+          v,
+          vehicleLatestReading(v.id, data!.readings),
+        );
         return {
           id: v.id,
           plate: v.plate,
@@ -440,9 +436,9 @@ export function ManagementWorkspace() {
           responsible: responsible(v.id),
           status: v.operational_status,
           lifecycle: v.lifecycle_status,
-          km: reading?.odometer_km,
-          date: reading?.reading_date,
-          distance: distance?.coverageFrom ? distance.exactKm : null,
+          km: mileage.km,
+          date: mileage.date,
+          kmSource: mileage.source,
         };
       });
   } else if (fuelView) {
@@ -450,6 +446,7 @@ export function ManagementWorkspace() {
       columns.push(
         ["date", "Fecha", "date"],
         ["plate", "Chapa"],
+        ["km", "Kilometraje", "number"],
         ["station", "Estación"],
         ["product", "Producto"],
         ["liters", "Litros", "number"],
@@ -460,6 +457,7 @@ export function ManagementWorkspace() {
         id: r.id,
         date: r.occurred_at,
         plate: r.plate,
+        km: r.odometer_km,
         station: r.station,
         product: r.product,
         liters: r.liters,
@@ -489,11 +487,10 @@ export function ManagementWorkspace() {
     }
   } else if (activityView) {
     columns.push(
-      ["date", "Fecha de referencia", "date"],
+      ["date", "Fecha", "date"],
       ["plate", "Chapa"],
       ["origin", "Origen"],
-      ["invoice_date", "Fecha de factura", "date"],
-      ["performed", "Fecha del trabajo", "date"],
+
       ["km", "Kilometraje", "number"],
       ["supplier", "Proveedor"],
       ["invoice", "N.º factura"],
@@ -510,7 +507,9 @@ export function ManagementWorkspace() {
         km: r.odometer_km,
         supplier: r.supplier,
         invoice: r.invoice_number,
-        description: null,
+        description: r.works
+          .map((w) => workLabelsForDisplay[w.work] ?? w.work)
+          .join(", "),
       })),
       ...invoices
         .filter((r) => r.status === "uploaded")
@@ -612,7 +611,7 @@ export function ManagementWorkspace() {
   const opts = (values: (string | null | undefined)[]) =>
     [...new Set(values.filter((v): v is string => !!v))].sort();
   return (
-    <PageShell>
+    <PageShell className="mx-auto max-w-[1440px]">
       {vehicle && (
         <Button
           variant="ghost"
@@ -640,6 +639,10 @@ export function ManagementWorkspace() {
             >
               <Plus className="h-4 w-4 sm:mr-1.5" />
               <span className="hidden sm:inline">Nuevo vehículo</span>
+            </Button>
+          ) : invoiceView ? (
+            <Button size="sm" onClick={() => setUpload(true)}>
+              Cargar factura
             </Button>
           ) : undefined
         }
@@ -673,10 +676,10 @@ export function ManagementWorkspace() {
             }}
           >
             <TabsList>
-              {["Combustible", "Mantenimiento", "Datos e historial"].map(
+              {["Datos e historial", "Combustible", "Mantenimiento"].map(
                 (t) => (
                   <TabsTrigger key={t} value={t}>
-                    {t}
+                    {t === "Datos e historial" ? "Datos" : t}
                   </TabsTrigger>
                 ),
               )}
@@ -704,7 +707,11 @@ export function ManagementWorkspace() {
               ["Observaciones", vehicle.notes],
               [
                 "Km de planilla inicial",
-                vehicle.source_data?.raw_data?.Kilometraje,
+                typeof vehicle.source_data?.raw_data?.Kilometraje === "number"
+                  ? vehicle.source_data.raw_data.Kilometraje.toLocaleString(
+                      "es-PY",
+                    )
+                  : vehicle.source_data?.raw_data?.Kilometraje,
               ],
               [
                 "Cargo de planilla inicial",
@@ -717,77 +724,50 @@ export function ManagementWorkspace() {
               </div>
             ))}
           </dl>
-          <Flota key={vehicle.id} initialVehicleId={vehicle.id} />
-          <ManagementTable
-            label="Cambios del vehículo"
-            fields={[
-              ["date", "Fecha", "date"],
-              ["field", "Campo"],
-              ["before", "Anterior"],
-              ["after", "Nuevo"],
-              ["actor", "Autor"],
-              ["reason", "Motivo"],
-            ]}
-            rows={data!.changes
-              .filter((c) => c.vehicle_id === vehicle.id)
-              .flatMap((c) =>
-                Object.keys(c.after_data)
-                  .filter(
-                    (k) =>
-                      show(c.before_data[k]) !== show(c.after_data[k]) &&
-                      !!vehicleLabels[k],
-                  )
-                  .map((k) => ({
-                    id: c.id + k,
-                    date: c.occurred_at,
-                    field: vehicleLabels[k],
-                    before: show(c.before_data[k]),
-                    after: show(c.after_data[k]),
-                    actor: c.actor_name,
-                    reason: c.reason,
-                  })),
-              )}
-          />
+          <details className="border-t py-2">
+            <summary className="cursor-pointer text-sm font-medium">
+              Lecturas y responsables
+            </summary>
+            <Flota key={vehicle.id} initialVehicleId={vehicle.id} />
+          </details>
+          <details className="border-t py-2">
+            <summary className="cursor-pointer text-sm font-medium">
+              Cambios del vehículo
+            </summary>
+            <ManagementTable
+              label="Cambios del vehículo"
+              fields={[
+                ["date", "Fecha", "date"],
+                ["field", "Campo"],
+                ["before", "Anterior"],
+                ["after", "Nuevo"],
+                ["actor", "Autor"],
+                ["reason", "Motivo"],
+              ]}
+              rows={data!.changes
+                .filter((c) => c.vehicle_id === vehicle.id)
+                .flatMap((c) =>
+                  Object.keys(c.after_data)
+                    .filter(
+                      (k) =>
+                        show(c.before_data[k]) !== show(c.after_data[k]) &&
+                        !!vehicleLabels[k],
+                    )
+                    .map((k) => ({
+                      id: c.id + k,
+                      date: c.occurred_at,
+                      field: vehicleLabels[k],
+                      before: show(c.before_data[k]),
+                      after: show(c.after_data[k]),
+                      actor: c.actor_name,
+                      reason: c.reason,
+                    })),
+                )}
+            />
+          </details>
         </>
       ) : (
         <>
-          {(fuelView || invoiceView) && (
-            <Tabs
-              value={
-                fuelView
-                  ? view === "Cargas"
-                    ? "Cargas"
-                    : "Mensual"
-                  : view === "Facturas"
-                    ? "Facturas"
-                    : view === "Historial"
-                      ? "Historial"
-                      : "Actividad"
-              }
-              onValueChange={(v) => {
-                set("view", v);
-                setDetail(null);
-              }}
-            >
-              <div className="flex items-center justify-between">
-                <TabsList>
-                  {(fuelView
-                    ? ["Mensual", "Cargas"]
-                    : ["Actividad", "Historial", "Facturas"]
-                  ).map((t) => (
-                    <TabsTrigger key={t} value={t}>
-                      {t}
-                    </TabsTrigger>
-                  ))}
-                </TabsList>
-                {invoiceView && !historyView && !activityView && (
-                  <Button size="sm" onClick={() => setUpload(true)}>
-                    Cargar factura
-                  </Button>
-                )}
-              </div>
-            </Tabs>
-          )}
           {fuelView && (
             <div className="flex flex-wrap gap-6 border-y py-2 text-sm">
               <span>
@@ -809,34 +789,37 @@ export function ManagementWorkspace() {
               ))}
               {consume && (
                 <>
-                  <span>Km evaluados: {consume.km || "—"}</span>
-                  <details>
+                  <details className="relative">
                     <summary className="cursor-pointer">
                       L/100 km estimado:{" "}
                       {consume.l100?.toLocaleString("es-PY", {
                         maximumFractionDigits: 2,
                       }) ?? "—"}
                     </summary>
-                    <dl className="grid grid-cols-2 gap-2 py-2">
-                      <dt>Intervalos válidos</dt>
-                      <dd>{consume.intervals}</dd>
-                      <dt>Litros evaluados</dt>
-                      <dd>{consume.liters.toLocaleString("es-PY")}</dd>
-                      <dt>Desde</dt>
-                      <dd>
-                        {consume.from?.split("-").reverse().join("/") ?? "—"}
-                      </dd>
-                      <dt>Hasta</dt>
-                      <dd>
-                        {consume.to?.split("-").reverse().join("/") ?? "—"}
-                      </dd>
-                    </dl>
-                    <p className="max-w-md text-xs">
-                      Se usan intervalos consecutivos dentro del mes, con
-                      kilometraje creciente y cargas compatibles. Se excluyen
-                      ajustes, discontinuidades y lecturas ambiguas. Sin
-                      intervalos válidos no se calcula consumo.
-                    </p>
+                    <div className="absolute right-0 top-full z-20 w-80 rounded-md border bg-background p-3 shadow-md">
+                      <dl className="grid grid-cols-2 gap-2 py-2">
+                        <dt>Km evaluados</dt>
+                        <dd>{consume.km.toLocaleString("es-PY")}</dd>
+                        <dt>Intervalos válidos</dt>
+                        <dd>{consume.intervals}</dd>
+                        <dt>Litros evaluados</dt>
+                        <dd>{consume.liters.toLocaleString("es-PY")}</dd>
+                        <dt>Desde</dt>
+                        <dd>
+                          {consume.from?.split("-").reverse().join("/") ?? "—"}
+                        </dd>
+                        <dt>Hasta</dt>
+                        <dd>
+                          {consume.to?.split("-").reverse().join("/") ?? "—"}
+                        </dd>
+                      </dl>
+                      <p className="max-w-md text-xs">
+                        Se usan intervalos consecutivos dentro del mes, con
+                        kilometraje creciente y cargas compatibles. Se excluyen
+                        ajustes, discontinuidades y lecturas ambiguas. Sin
+                        intervalos válidos no se calcula consumo.
+                      </p>
+                    </div>
                   </details>
                 </>
               )}
@@ -885,6 +868,7 @@ export function ManagementWorkspace() {
             }
             rows={from && to && from > to ? [] : rows}
             fields={columns.length ? columns : [["id", "Registro"]]}
+            omittedColumns={vehicle ? ["plate"] : []}
             onReset={() =>
               setParams(
                 (previous) => {
@@ -906,7 +890,33 @@ export function ManagementWorkspace() {
             onSearch={(v) => set("search", v)}
             filters={
               <>
-                {dates}
+                {!vehicle && section === "vehicles" ? null : dates}
+                {(fuelView || invoiceView) && (
+                  <label className="flex flex-col gap-1 text-xs">
+                    Ver
+                    <select
+                      aria-label="Ver"
+                      className="h-8 rounded-md border bg-background px-2"
+                      value={view}
+                      onChange={(e) => set("view", e.target.value)}
+                    >
+                      {(fuelView
+                        ? ["Mensual", "Cargas"]
+                        : ["Actividad", "Historial", "Facturas"]
+                      ).map((v) => (
+                        <option key={v} value={v}>
+                          {v === "Actividad"
+                            ? "Todos los mantenimientos"
+                            : v === "Historial"
+                              ? "Desglose de planilla"
+                              : v === "Mensual"
+                                ? "Resumen mensual"
+                                : v}
+                        </option>
+                      ))}
+                    </select>
+                  </label>
+                )}
                 {!vehicle && section === "vehicles" ? (
                   <Choice
                     label="Estado"
@@ -1208,41 +1218,55 @@ export function ManagementWorkspace() {
                       selectedInvoice &&
                       ["classification", "description"].includes(k)
                     ) &&
-                    !(selectedHistory && k.startsWith("work")),
+                    !(
+                      selectedHistory &&
+                      (k.startsWith("work") ||
+                        ["invoice_date", "performed"].includes(k))
+                    ),
                 )
                 .map(([key, value]) => (
                   <div key={key}>
                     <dt className="text-muted-foreground">
-                      {columns.find((c) => c[0] === key)?.[1] ?? key}
+                      {columns.find((c) => c[0] === key)?.[1] ??
+                        (
+                          {
+                            invoice_date: "Fecha de factura",
+                            performed: "Fecha del trabajo",
+                          } as Record<string, string>
+                        )[key] ??
+                        key}
                     </dt>
                     <dd>
-                      {key === "date"
+                      {["date", "invoice_date", "performed"].includes(key)
                         ? show(value)
                             .slice(0, 10)
                             .split("-")
                             .reverse()
                             .join("/")
-                        : show(value)}
+                        : typeof value === "number"
+                          ? value.toLocaleString("es-PY")
+                          : show(value)}
                     </dd>
                   </div>
                 ))}
           </dl>
-          {(selectedInvoice?.vehicle_id ||
-            selectedHistory?.vehicle_id ||
-            selectedFuel?.vehicle_id) && (
-            <Button
-              variant="link"
-              onClick={() =>
-                openVehicle(
-                  (selectedInvoice?.vehicle_id ||
-                    selectedHistory?.vehicle_id ||
-                    selectedFuel?.vehicle_id)!,
-                )
-              }
-            >
-              Ver vehículo
-            </Button>
-          )}
+          {!vehicle &&
+            (selectedInvoice?.vehicle_id ||
+              selectedHistory?.vehicle_id ||
+              selectedFuel?.vehicle_id) && (
+              <Button
+                variant="link"
+                onClick={() =>
+                  openVehicle(
+                    (selectedInvoice?.vehicle_id ||
+                      selectedHistory?.vehicle_id ||
+                      selectedFuel?.vehicle_id)!,
+                  )
+                }
+              >
+                Ver vehículo
+              </Button>
+            )}
           {selectedInvoice && (
             <>
               <dl className="grid grid-cols-2 gap-3">

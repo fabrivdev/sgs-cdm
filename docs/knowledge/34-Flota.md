@@ -107,3 +107,12 @@ La pantalla principal queda limitada a una lista de ancho completo y filtros. No
 El detalle es compacto y contiene únicamente identidad, imagen cuando existe, responsable editable, último kilometraje, fecha de última lectura, kilómetros del período, cobertura, lecturas, correcciones e historial de responsables. Los contadores de Vehículos, Lecturas, Correcciones y Responsables comparten la fila del encabezado; no se presentan como subtítulo. Distinguir siempre el odómetro acumulado del recorrido del período. Una ausencia se muestra como `-` o `Sin intervalo`; no se convierte en cero. En teléfono se permite la agrupación compacta prevista por la regla transversal, sin convertir cada registro en una tarjeta grande.
 
 Esta presentación reemplaza la comparación visual global y los gráficos documentados anteriormente. No cambia fórmulas, fuentes ni permisos. La aplicación de las migraciones fue declarada por el usuario y su verificación autenticada sigue pendiente.
+
+
+## Simplificación de escritorio y KM importados — 10/11/2026
+
+El listado toma la última lectura registrada; si no existe, muestra el Kilometraje numérico de source_data.raw_data de la importación inicial. Origen y fecha van en columnas separadas; la planilla sin fecha no se convierte en lectura ni se usa para inventar recorridos. Se preserva cero válido y ausencias. No requiere SQL ni reimportación.
+
+La ficha usa una única fila Datos / Combustible / Mantenimiento. Resumen mensual y cargas, o mantenimiento integrado/desglose/facturas, se eligen en Ver dentro de los filtros. El mantenimiento integrado resume los trabajos originales y conserva su desglose al abrir la fila. Se retiran la chapa repetida de la ficha y las fechas duplicadas del listado; la exportación conserva chapa. Cargas incluye kilometraje original. Lecturas, responsables y auditoría se despliegan a demanda. Ancho máximo de 1440 px y sin filtros de fecha en el padrón.
+
+Verificación: revisión local de escritorio a 1280 px con copia de las planillas, sin escrituras; pruebas de permisos, navegación y prioridad de fuentes de KM. No equivale a validar despliegue ni transacciones autenticadas de producción. Referencias: src/pages/FleetWorkspace.tsx, src/features/fleet/ManagementTable.tsx y src/features/fleet/managementModel.ts.

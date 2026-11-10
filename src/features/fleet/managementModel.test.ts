@@ -1,5 +1,7 @@
 import { describe, it, expect } from "vitest";
 import {
+  vehicleMileageDisplay,
+  type ManagedVehicle,
   estimatedConsumption,
   monthlyFuel,
   invoiceValidation,
@@ -94,5 +96,30 @@ describe("Fleet calculations and input", () => {
     expect(
       invoiceValidation({ ...input, invoice_date: "2026-10-01" }, null),
     ).toMatch("Seleccioná un PDF");
+  });
+});
+
+describe("Vehicle mileage source", () => {
+  const vehicle = (km: unknown) =>
+    ({
+      source_data: { raw_data: { Kilometraje: km } },
+    }) as unknown as ManagedVehicle;
+  it("shows undated imported mileage without manufacturing a reading", () => {
+    expect(vehicleMileageDisplay(vehicle(150959))).toEqual({
+      km: 150959,
+      date: null,
+      source: "Planilla inicial",
+    });
+    expect(vehicleMileageDisplay(vehicle(0)).km).toBe(0);
+    for (const value of [null, undefined, "", "sin dato", -1, NaN])
+      expect(vehicleMileageDisplay(vehicle(value)).km).toBeNull();
+  });
+  it("keeps registered readings authoritative", () => {
+    expect(
+      vehicleMileageDisplay(vehicle(150959), {
+        odometer_km: 159137,
+        reading_date: "2026-10-07",
+      }),
+    ).toEqual({ km: 159137, date: "2026-10-07", source: "Lectura" });
   });
 });

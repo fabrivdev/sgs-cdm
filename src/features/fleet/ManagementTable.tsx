@@ -20,6 +20,8 @@ export interface GridRow {
 // Desktop widths follow the information, not an equal split of every column.
 const fieldWidths: Record<string, number> = {
   plate: 100,
+  kmSource: 125,
+  origin: 120,
   brand: 115,
   model: 190,
   responsible: 180,
@@ -71,9 +73,11 @@ export function ManagementTable({
   render,
   onReset,
   activeFilters = 0,
+  omittedColumns = [],
 }: {
   onReset?: () => void;
   activeFilters?: number;
+  omittedColumns?: string[];
   rows: GridRow[];
   fields: [string, string, ("text" | "number" | "date")?][];
   label: string;
@@ -126,9 +130,11 @@ export function ManagementTable({
           : (r) => formatCell(r[key], kind)),
     }),
   );
-  const visibleColumns = columns.filter((c) => !hiddenColumns.includes(c.key));
+  const visibleColumns = columns.filter(
+    (c) => !hiddenColumns.includes(c.key) && !omittedColumns.includes(c.key),
+  );
   const tableWidth = fields
-    .filter(([k]) => !hiddenColumns.includes(k))
+    .filter(([k]) => !hiddenColumns.includes(k) && !omittedColumns.includes(k))
     .reduce((sum, [key]) => sum + (fieldWidths[key] ?? 160), 0);
   const mobileKeys =
     fields[0][0] === "plate"
@@ -209,17 +215,27 @@ export function ManagementTable({
           </div>
         </DialogContent>
       </Dialog>
-      <FiltersBar
-        search={
-          onSearch
-            ? { value: search ?? "", onChange: onSearch, placeholder: "Buscar" }
-            : undefined
-        }
-        expanded={expanded}
-        secondaryActions={<SectionActionsMenu options={options} />}
-      >
-        {filters}
-      </FiltersBar>
+      {onSearch || filters || expanded ? (
+        <FiltersBar
+          search={
+            onSearch
+              ? {
+                  value: search ?? "",
+                  onChange: onSearch,
+                  placeholder: "Buscar",
+                }
+              : undefined
+          }
+          expanded={expanded}
+          secondaryActions={<SectionActionsMenu options={options} />}
+        >
+          {filters}
+        </FiltersBar>
+      ) : options.length > 0 ? (
+        <div className="flex justify-end">
+          <SectionActionsMenu options={options} />
+        </div>
+      ) : null}
       {onSearch && (
         <div className="flex justify-between text-xs text-muted-foreground">
           <span>

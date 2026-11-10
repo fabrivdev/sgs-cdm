@@ -93,3 +93,12 @@ Revisión de los archivos proporcionados, solo lectura: Base General produce 36 
 Pruebas locales: PostgreSQL aislado con las migraciones reales de Flota y esquemas mínimos de auth/storage; modelos, parsers, permisos, navegación, filtros y componentes de lectura/responsables. Revisión de navegador local en 320/390/639/640/768/1280 px. No equivale a verificar hardware real o la infraestructura remota de Storage.
 
 Prioridad final indicada por el usuario: escritorio. Se ajustaron anchos según campo, encabezados legibles de trabajos (con etiquetas originales en el detalle) y fecha/chapa fijas al recorrer horizontalmente el historial. Se revisaron las vistas de escritorio a 1280 y 1440 px; no se siguió ampliando el trabajo móvil después de esa indicación.
+
+
+## Simplificación de escritorio y KM importados — 10/11/2026
+
+El listado toma la última lectura registrada; si no existe, muestra el Kilometraje numérico de source_data.raw_data de la importación inicial. Origen y fecha van en columnas separadas; la planilla sin fecha no se convierte en lectura ni se usa para inventar recorridos. Se preserva cero válido y ausencias. No requiere SQL ni reimportación.
+
+La ficha usa una única fila Datos / Combustible / Mantenimiento. Resumen mensual y cargas, o mantenimiento integrado/desglose/facturas, se eligen en Ver dentro de los filtros. El mantenimiento integrado resume los trabajos originales y conserva su desglose al abrir la fila. Se retiran la chapa repetida de la ficha y las fechas duplicadas del listado; la exportación conserva chapa. Cargas incluye kilometraje original. Lecturas, responsables y auditoría se despliegan a demanda. Ancho máximo de 1440 px y sin filtros de fecha en el padrón.
+
+Verificación: revisión local de escritorio a 1280 px con copia de las planillas, sin escrituras; pruebas de permisos, navegación y prioridad de fuentes de KM. No equivale a validar despliegue ni transacciones autenticadas de producción. Referencias: src/pages/FleetWorkspace.tsx, src/features/fleet/ManagementTable.tsx y src/features/fleet/managementModel.ts.
