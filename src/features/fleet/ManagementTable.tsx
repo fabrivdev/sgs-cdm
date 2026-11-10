@@ -1,3 +1,4 @@
+import { createPortal } from "react-dom";
 import { memo, useMemo, type ReactNode } from "react";
 import {
   TableScroll,
@@ -77,6 +78,8 @@ export function ManagementTable({
   render,
   actions = [],
   omittedColumns = [],
+  showRowCount = true,
+  actionsTarget,
 }: {
   rows: GridRow[];
   fields: GridField[];
@@ -85,6 +88,8 @@ export function ManagementTable({
   render?: Record<string, (r: GridRow) => ReactNode>;
   actions?: SectionAction[];
   omittedColumns?: string[];
+  showRowCount?: boolean;
+  actionsTarget?: HTMLElement | null;
 }) {
   const { can } = useAuth();
   const omittedKey = omittedColumns.join("|");
@@ -133,10 +138,18 @@ export function ManagementTable({
   ];
   return (
     <section aria-label={label} className="min-w-0 rounded-lg border bg-card">
-      <div className="flex items-center justify-end px-2">
-        <RowCount rows={rows.length} className="border-0" />
-        {options.length > 0 && <SectionActionsMenu options={options} />}
-      </div>
+      {(showRowCount ||
+        (actionsTarget === undefined && options.length > 0)) && (
+        <div className="flex items-center justify-end px-2">
+          {showRowCount && <RowCount rows={rows.length} className="border-0" />}
+          {actionsTarget === undefined && options.length > 0 && (
+            <SectionActionsMenu options={options} />
+          )}
+        </div>
+      )}
+      {actionsTarget &&
+        options.length > 0 &&
+        createPortal(<SectionActionsMenu options={options} />, actionsTarget)}
       <TableScroll rows={ordered.length} className="overflow-x-auto">
         <table aria-label={label} className="w-full whitespace-nowrap">
           <thead

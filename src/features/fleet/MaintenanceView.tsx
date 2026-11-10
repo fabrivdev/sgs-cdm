@@ -1,5 +1,5 @@
 import { moneyCell } from "./workspaceModel";
-import { useMemo } from "react";
+import { useMemo, useState } from "react";
 import {
   ManagementTable,
   type GridField,
@@ -46,6 +46,9 @@ export function MaintenanceView({
   onSelect: (r: GridRow) => void;
   showSummary?: boolean;
 }) {
+  const [actionsTarget, setActionsTarget] = useState<HTMLDivElement | null>(
+    null,
+  );
   const invoices = useMemo(
     () =>
       data.invoices.filter(
@@ -123,6 +126,7 @@ export function MaintenanceView({
   return (
     <>
       <FleetFilterBar
+        secondaryActions={<div ref={setActionsTarget} />}
         filters={filters}
         onChange={onChange}
         more={
@@ -176,6 +180,8 @@ export function MaintenanceView({
         />
       )}
       <ManagementTable
+        showRowCount={false}
+        actionsTarget={actionsTarget}
         label="Mantenimiento"
         fields={fields}
         rows={rows}

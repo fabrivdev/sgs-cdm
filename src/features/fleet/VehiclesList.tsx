@@ -1,4 +1,4 @@
-import { useMemo } from "react";
+import { useMemo, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { PageHeader } from "@/components/layout/AppPrimitives";
 import { ManagementTable, type GridField } from "./ManagementTable";
@@ -46,6 +46,9 @@ export function VehiclesList({
   onOpen: (id: string) => void;
   onCreate: () => void;
 }) {
+  const [actionsTarget, setActionsTarget] = useState<HTMLDivElement | null>(
+    null,
+  );
   const vehicles = useMemo(
     () =>
       data.vehicles.filter(
@@ -94,6 +97,7 @@ export function VehiclesList({
         }
       />
       <FleetFilterBar
+        secondaryActions={<div ref={setActionsTarget} />}
         filters={filters}
         onChange={onChange}
         more={
@@ -160,6 +164,8 @@ export function VehiclesList({
       />
       <ManagementTable
         label="Vehículos"
+        showRowCount={false}
+        actionsTarget={actionsTarget}
         fields={fields}
         rows={rows}
         onSelect={(r) => onOpen(r.id)}

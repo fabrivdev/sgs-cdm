@@ -47,6 +47,9 @@ export function ReadingsView({
   onChange: FilterChange;
   onSaved: () => Promise<void>;
 }) {
+  const [actionsTarget, setActionsTarget] = useState<HTMLDivElement | null>(
+    null,
+  );
   const [mode, setMode] = useState<
       "reading" | "responsible" | "correction" | null
     >(null),
@@ -99,7 +102,11 @@ export function ReadingsView({
   }
   return (
     <>
-      <FleetFilterBar filters={filters} onChange={onChange}>
+      <FleetFilterBar
+        secondaryActions={<div ref={setActionsTarget} />}
+        filters={filters}
+        onChange={onChange}
+      >
         <PeriodFields filters={filters} onChange={onChange} />
       </FleetFilterBar>
       <ManagementTable

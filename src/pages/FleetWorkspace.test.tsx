@@ -246,7 +246,11 @@ it("opens a vehicle from an empty cache and keeps consumption independent of sea
     target: { value: "Coincidencia" },
   });
   await waitFor(() =>
-    expect(screen.getByText("1 registros")).toBeInTheDocument(),
+    expect(
+      within(screen.getByRole("table", { name: "Combustible" })).getAllByRole(
+        "row",
+      ),
+    ).toHaveLength(2),
   );
   expect(
     within(screen.getByRole("region", { name: "Resumen" })).getByText("10"),
@@ -258,4 +262,24 @@ it("reports invalid date ranges without presenting an unexplained empty result",
   mount("/servicios/flota?vehicles%3Afrom=2026-11-30&vehicles%3Ato=2026-11-01");
   await screen.findByRole("alert");
   expect(screen.getByRole("button", { name: "DEMO-001" })).toBeInTheDocument();
+});
+
+it("locates vehicle actions immediately after More filters, not in the table or header", async () => {
+  mocks.load.mockResolvedValue(data);
+  mount();
+  const menu = await screen.findByRole("button", {
+    name: "Acciones de la sección",
+  });
+  const filters = screen.getByRole("button", { name: "Más filtros" });
+  expect(filters.nextElementSibling).toContainElement(menu);
+  expect(
+    screen.getAllByRole("button", { name: "Acciones de la sección" }),
+  ).toHaveLength(1);
+  expect(
+    within(screen.getByRole("region", { name: "Vehículos" })).queryByRole(
+      "button",
+      { name: "Acciones de la sección" },
+    ),
+  ).not.toBeInTheDocument();
+  expect(screen.queryByText(/\d+ registros/)).not.toBeInTheDocument();
 });

@@ -91,11 +91,13 @@ export function FleetFilterBar({
   onChange,
   children,
   more,
+  secondaryActions,
 }: {
   filters: FleetFilters;
   onChange: FilterChange;
   children?: ReactNode;
   more?: ReactNode;
+  secondaryActions?: ReactNode;
 }) {
   return (
     <>
@@ -112,6 +114,7 @@ export function FleetFilterBar({
           )
         }
         expanded={more}
+        secondaryActions={secondaryActions}
       >
         {children}
       </FiltersBar>

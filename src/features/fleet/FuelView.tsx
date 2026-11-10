@@ -1,5 +1,5 @@
 import { moneyCell } from "./workspaceModel";
-import { useMemo } from "react";
+import { useMemo, useState } from "react";
 import {
   ManagementTable,
   type GridField,
@@ -47,6 +47,9 @@ export function FuelView({
   onImport: () => void;
   showSummary?: boolean;
 }) {
+  const [actionsTarget, setActionsTarget] = useState<HTMLDivElement | null>(
+    null,
+  );
   const scope = useMemo(
     () =>
       data.fuel.filter(
@@ -79,7 +82,11 @@ export function FuelView({
   );
   return (
     <>
-      <FleetFilterBar filters={filters} onChange={onChange}>
+      <FleetFilterBar
+        secondaryActions={<div ref={setActionsTarget} />}
+        filters={filters}
+        onChange={onChange}
+      >
         <PeriodFields filters={filters} onChange={onChange} />
         {!vehicleId && (
           <Choice
@@ -119,6 +126,8 @@ export function FuelView({
         />
       )}
       <ManagementTable
+        showRowCount={false}
+        actionsTarget={actionsTarget}
         label="Combustible"
         fields={fields}
         rows={rows}
