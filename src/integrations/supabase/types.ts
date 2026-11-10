@@ -10824,6 +10824,10 @@ export type Database = {
         }
         Returns: string
       }
+      fleet_discard_pending_invoice: {
+        Args: { p_id: string }
+        Returns: undefined
+      }
       fleet_edit_vehicle: {
         Args: { p_data: Json; p_id: string }
         Returns: string
@@ -10897,6 +10901,16 @@ export type Database = {
         Args: { p_amount: number; p_currency: string; p_id: string }
         Returns: undefined
       }
+      fleet_set_invoice_amount_v2: {
+        Args: {
+          p_amount: number
+          p_currency: string
+          p_id: string
+          p_reason: string
+          p_version: number
+        }
+        Returns: number
+      }
       fleet_set_vehicle_responsible: {
         Args: {
           p_effective_date: string
@@ -10911,6 +10925,10 @@ export type Database = {
           razon_social: string
           ruc: string
         }[]
+      }
+      fleet_update_pending_invoice: {
+        Args: { p_data: Json; p_id: string }
+        Returns: string
       }
       generar_notificacion_venta_maquina: {
         Args: { p_linea_id: string }
