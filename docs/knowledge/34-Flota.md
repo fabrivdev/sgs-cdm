@@ -197,3 +197,10 @@ Reemplaza la disposición del apartado anterior por indicación del usuario: en 
 Combustible sigue la composición del ejemplo aportado: encabezado compacto, seis indicadores con iconos, filtros en una fila y tabla mensual Mes/Cargas/Litros/Monto/Km evaluados/L por 100 km/Variación mensual. Cabecera verde del tema, filas alternadas compactas, anchos uniformes y monto alineado a la derecha. La variación es neutral. No se copian cifras ni se presenta una subida del consumo como mejora. Los estilos se activan solo en tablas de la ficha; la lista de Vehículos conserva sus componentes y aspecto. Se mantienen navegación, filtros y acciones existentes.
 
 Verificación: prueba del orden exacto de las seis columnas, ausencia de Registro original y X, conservación de observaciones; regresiones de navegación y consumo; TypeScript, ESLint y compilación. Revisión visual local de escritorio con copia de las planillas. No requiere SQL, no se ejecutan cambios remotos y no se publica en Lovable. Referencias: MaintenanceView.tsx, ExpenseDetails.tsx, VehicleDetail.tsx, FuelView.tsx, ManagementTable.tsx y maintenancePresentation.ts.
+
+
+## Alineación visual con la app — 10/11/2026
+
+La ficha conserva la estructura y el orden de columnas aprobados, pero reutiliza KpiStrip/KpiItem de AppPrimitives (como Ventas), pestañas nativas sin iconos añadidos, metadatos con separadores y cabeceras de tabla neutras. Se retiran el encabezado verde, los círculos decorativos de los indicadores y las etiquetas coloreadas de los meses. Esta decisión reemplaza el tratamiento visual particular descrito en la revisión anterior. VehiclesList mantiene su presentación sin cambios.
+
+Referencias: src/features/fleet/VehicleDetail.tsx, workspaceShared.tsx, FuelView.tsx y ManagementTable.tsx; src/pages/Ventas.tsx y docs/knowledge/24-Condiciones-visuales-ventas.md. Validación: 10 pruebas de FleetWorkspace, TypeScript, ESLint, build y revisión visual de ambas pestañas en escritorio con copia local de datos, sin escrituras remotas. No requiere SQL ni publicación en Lovable.

@@ -210,7 +210,7 @@ export function FuelView({
             ? {
                 date: (r: GridRow) => (
                   <button
-                    className="rounded-md bg-primary/10 px-2 py-0.5 font-medium text-primary focus-visible:ring-2 focus-visible:ring-ring"
+                    className="text-primary underline underline-offset-2 focus-visible:ring-2 focus-visible:ring-ring"
                     onClick={(e) => {
                       e.stopPropagation();
                       openMonth(r);

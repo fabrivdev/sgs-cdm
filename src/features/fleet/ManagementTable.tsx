@@ -155,10 +155,10 @@ export function ManagementTable({
       <TableScroll rows={ordered.length} className="overflow-x-auto">
         <table
           aria-label={label}
-          className={`w-full whitespace-nowrap ${detailStyle ? "[&_tbody_tr:nth-child(even)]:bg-muted/40 table-fixed [&_td]:py-1.5" : ""}`}
+          className={`w-full whitespace-nowrap ${detailStyle ? "table-fixed" : ""}`}
         >
           <thead
-            className={`${scrollHead} text-[11px] font-medium ${detailStyle ? "bg-primary text-primary-foreground [&_th]:py-3" : "bg-muted text-muted-foreground"}`}
+            className={`${scrollHead} text-[11px] font-medium bg-muted text-muted-foreground`}
           >
             <tr>
               {visible.map(([key, title, kind]) => (

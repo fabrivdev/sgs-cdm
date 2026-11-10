@@ -1,7 +1,7 @@
 import { QuickPeriodFilter } from "@/components/filters/QuickPeriodFilter";
 import type { ReactNode } from "react";
 import { Card } from "@/components/ui/card";
-import { KpiItem } from "@/components/layout/AppPrimitives";
+import { KpiItem, KpiStrip } from "@/components/layout/AppPrimitives";
 import { FilterDate, FiltersBar } from "@/components/filters/FiltersBar";
 import {
   rangeError,
@@ -36,10 +36,27 @@ export function SummaryCard({
 export function SummaryCards({
   items,
   icons,
+  native = false,
 }: {
   items: [string, ReactNode][];
   icons?: ReactNode[];
+  native?: boolean;
 }) {
+  if (native)
+    return (
+      <section aria-label="Resumen">
+        <KpiStrip>
+          {items.map(([label, value], index) => (
+            <KpiItem
+              key={label}
+              label={<span className="text-[11px] normal-case">{label}</span>}
+              value={value}
+              icon={icons?.[index]}
+            />
+          ))}
+        </KpiStrip>
+      </section>
+    );
   return (
     <section
       aria-label="Resumen"

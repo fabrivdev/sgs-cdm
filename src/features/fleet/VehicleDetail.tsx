@@ -5,7 +5,6 @@ import {
   Coins,
   TrendingUp,
   CalendarDays,
-  Fuel,
   Wrench,
 } from "lucide-react";
 import { useState } from "react";
@@ -117,6 +116,7 @@ export function VehicleDetail({
     .at(-1);
   const detailSummary = (
     <SummaryCards
+      native
       icons={
         tab === "Combustible"
           ? [
@@ -189,11 +189,6 @@ export function VehicleDetail({
             <TabsList>
               {["Combustible", "Mantenimiento"].map((t) => (
                 <TabsTrigger key={t} value={t}>
-                  {t === "Combustible" ? (
-                    <Fuel className="mr-1.5 h-4 w-4" />
-                  ) : (
-                    <Wrench className="mr-1.5 h-4 w-4" />
-                  )}
                   {t}
                 </TabsTrigger>
               ))}
@@ -206,7 +201,7 @@ export function VehicleDetail({
           </Button>
         }
       />
-      <dl className="grid grid-cols-4 gap-4 rounded-lg border bg-primary/5 px-4 py-3 text-xs">
+      <dl className="grid grid-cols-4 gap-3 border-y py-2 text-xs">
         {[
           [
             "Marca/modelo",
