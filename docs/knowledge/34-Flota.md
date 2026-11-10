@@ -242,3 +242,6 @@ Agrupación de presentación, sin cambios en datos: correas y baterías en Repue
 ## Títulos de indicadores — 10/11/2026
 
 Por indicación del usuario, los indicadores de mantenimiento en la ficha se titulan Último servicio, Próximo servicio y Gasto total. Solo cambian etiquetas en VehicleDetail.tsx: Gasto total conserva el cálculo de facturas del período filtrado; las fechas, el intervalo y VehiclesList no cambian. Verificación por diff; no requiere SQL ni publicación Lovable.
+
+
+El encabezado de la columna de mantenimiento pasa de Km a Kilometraje por pedido del usuario (10/11/2026). Cambio de etiqueta únicamente; datos, cálculos y lista de vehículos intactos.

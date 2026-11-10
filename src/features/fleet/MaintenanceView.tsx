@@ -34,7 +34,7 @@ const fields: GridField[] = [
   ["date", "Fecha", "date"],
   ["invoice", "N.º de factura"],
   ["supplier", "Proveedor"],
-  ["km", "Km", "number"],
+  ["km", "Kilometraje", "number"],
   ...maintenanceGroups.map((group): GridField => ["group" + group, group]),
   ["amount", "Monto", "number"],
   ["classification", "Clasificación"],

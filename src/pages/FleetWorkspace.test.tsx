@@ -378,7 +378,7 @@ it("shows linked maintenance from past years and undated originals, with indepen
     "Fecha",
     "N.º de factura",
     "Proveedor",
-    "Km",
+    "Kilometraje",
     "Aceites",
     "Filtros",
     "Cubiertas",
