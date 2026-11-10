@@ -1,3 +1,24 @@
+export function fuelCurrency(value, fallback = null) {
+  const raw = String(value ?? "")
+    .trim()
+    .toUpperCase();
+  const aliases = {
+    GS: "PYG",
+    "GS.": "PYG",
+    GUARANIES: "PYG",
+    GUARANÍES: "PYG",
+    "₲": "PYG",
+    US$: "USD",
+    DÓLARES: "USD",
+    DOLARES: "USD",
+  };
+  const currency = aliases[raw] ?? raw;
+  if (currency && !/^[A-Z]{3}$/.test(currency))
+    throw Error("Moneda del archivo no reconocida");
+  if (currency) return currency;
+  if (fallback && !/^[A-Z]{3}$/.test(fallback)) throw Error("Moneda inválida");
+  return fallback || null;
+}
 import * as XLSX from "xlsx/xlsx.mjs";
 const text = (v) => (v == null ? "" : String(v).trim());
 const number = (v) => (typeof v === "number" && Number.isFinite(v) ? v : null);
@@ -20,7 +41,7 @@ function date(v, date1904 = false) {
     ? result
     : null;
 }
-export function parseFuel(workbook) {
+export function parseFuel(workbook, defaultCurrency = null) {
   const s = workbook.Sheets["Detalle Descuento"];
   if (!s) throw Error("No se encuentra Detalle Descuento.");
   const rows = XLSX.utils.sheet_to_json(s, {
@@ -95,7 +116,7 @@ export function parseFuel(workbook) {
       occurred_at: `${d}T${time.length === 4 ? "0" + time : time}${time.split(":").length === 2 ? ":00" : ""}`,
       liters,
       net_amount,
-      currency: null,
+      currency: fuelCurrency(get("Moneda") ?? get("Currency"), defaultCurrency),
       odometer_km: number(get("Km Actual")),
       previous_odometer_km: number(get("Km Anterior")),
       previous_liters: number(get("Cant. Ant.")),

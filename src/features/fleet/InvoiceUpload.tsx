@@ -17,7 +17,7 @@ import {
 } from "@/components/ui/popover";
 import { toast } from "sonner";
 import { maintenanceCategories, invoiceValidation } from "./managementModel";
-import { submitInvoice } from "./managementApi";
+import { submitInvoice, fleetRpc } from "./managementApi";
 const empty = {
   plate: "",
   supplier: "",
@@ -129,27 +129,34 @@ export default function InvoiceUpload({
     setPending(true);
     setError("");
     try {
-      await submitInvoice(request.current, values, file!, () => {
-        reserved.current = true;
-        expectedFile.current = {
-          name: file!.name,
-          size: file!.size,
-          type: file!.type,
-        };
-        try {
-          sessionStorage.setItem(
-            draftKey,
-            JSON.stringify({
-              values,
-              id: request.current,
-              reserved: true,
-              file: expectedFile.current,
-            }),
-          );
-        } catch {
-          /* unavailable storage */
-        }
-      });
+      await submitInvoice(
+        request.current,
+        values,
+        file!,
+        (reservedId) => {
+          request.current = reservedId || request.current;
+          reserved.current = true;
+          expectedFile.current = {
+            name: file!.name,
+            size: file!.size,
+            type: file!.type,
+          };
+          try {
+            sessionStorage.setItem(
+              draftKey,
+              JSON.stringify({
+                values,
+                id: request.current,
+                reserved: true,
+                file: expectedFile.current,
+              }),
+            );
+          } catch {
+            /* unavailable storage */
+          }
+        },
+        reserved.current,
+      );
       toast.success("Factura cargada");
       setConfirmation(
         `Factura ${values.invoice_number} · ${values.plate}: carga completada`,
@@ -199,15 +206,12 @@ export default function InvoiceUpload({
               {confirmation}
             </p>
           )}
-          <fieldset
-            disabled={pending || reserved.current}
-            className="grid gap-4 sm:grid-cols-2"
-          >
+          <fieldset disabled={pending} className="grid gap-4 sm:grid-cols-2">
             <div className="sm:col-span-2 grid grid-cols-2 gap-3">
               <SupplierFields
                 ruc={values.supplier_tax_id}
                 name={values.supplier}
-                disabled={pending || reserved.current}
+                disabled={pending}
                 onChange={(supplier_tax_id, supplier) => {
                   setValues((v) => ({ ...v, supplier_tax_id, supplier }));
                   setError("");
@@ -244,7 +248,7 @@ export default function InvoiceUpload({
               <Popover>
                 <PopoverTrigger asChild>
                   <Button
-                    disabled={pending || reserved.current}
+                    disabled={pending}
                     type="button"
                     variant="outline"
                     className="w-full justify-start"
@@ -342,17 +346,28 @@ export default function InvoiceUpload({
               disabled={pending}
               type="button"
               variant="outline"
-              onClick={() => {
-                reserved.current = false;
-                expectedFile.current = null;
-                request.current = crypto.randomUUID();
-                setValues({ ...empty, plate });
-                setFile(null);
+              onClick={async () => {
+                setPending(true);
                 setError("");
-                if (input.current) input.current.value = "";
+                try {
+                  await fleetRpc("fleet_discard_reserved_invoice", {
+                    p_id: request.current,
+                  });
+                  reserved.current = false;
+                  expectedFile.current = null;
+                  request.current = crypto.randomUUID();
+                  sessionStorage.removeItem(draftKey);
+                  setValues({ ...empty, plate });
+                  setFile(null);
+                  if (input.current) input.current.value = "";
+                } catch (e) {
+                  setError(String((e as { message?: string }).message ?? e));
+                } finally {
+                  setPending(false);
+                }
               }}
             >
-              Nueva carga
+              Descartar intento
             </Button>
           )}
           <Button disabled={pending} type="submit">

@@ -581,3 +581,124 @@ it("limits supplier lookup to invoice submitters and validates master identity o
     await db.close();
   }
 }, 30000);
+it.each([false, true])(
+  "saves edited retries, audits amounts and preserves discarded rows (legacy=%s)",
+  async (legacy) => {
+    const db = new PGlite({ extensions: { pgcrypto } });
+    try {
+      await fixture(db);
+      await db.exec("RESET ROLE");
+      if (legacy)
+        await db.exec(
+          readFileSync(
+            "drizzle/migrations/0011_fleet_invoice_integrity.sql",
+            "utf8",
+          ),
+        );
+      await db.exec(
+        readFileSync(
+          "supabase/migrations/20261110200000_fleet_invoice_integrity.sql",
+          "utf8",
+        ),
+      );
+      await db.exec(
+        "SET ROLE authenticated; SELECT set_config('test.role','operativo',false)",
+      );
+      const id = "00000000-0000-4000-8000-000000000081",
+        id2 = "00000000-0000-4000-8000-000000000082";
+      const input = {
+        plate: "TEST123",
+        supplier: "Taller",
+        supplier_tax_id: "99900001-1",
+        invoice_number: "TEST01",
+        invoice_date: "2026-10-01",
+        description: "Anterior",
+        categories: ["Filtros"],
+        filename: "test.pdf",
+        mime_type: "application/pdf",
+        size_bytes: 10,
+      };
+      const call = (name: string, args: unknown[]) =>
+        db.query<{ value: string }>(
+          `select ${name}(${args.map((_, i) => "$" + (i + 1)).join(",")}) as value`,
+          args,
+        );
+      const path = (await call("fleet_reserve_invoice", [id, input])).rows[0]
+        .value;
+      await call("fleet_update_pending_invoice", [
+        id,
+        { ...input, description: "Editada", plate: "TEST456" },
+      ]);
+      await expect(
+        call("fleet_reserve_invoice", [id2, input]),
+      ).rejects.toThrow();
+      await db.query(
+        "INSERT INTO storage.objects(bucket_id,name,metadata) VALUES('fleet-invoices',$1,$2)",
+        [path, { size: 10, mimetype: "application/pdf" }],
+      );
+      await call("fleet_finalize_invoice", [id]);
+      await db.exec("SELECT set_config('test.role','jefatura',false)");
+      expect(
+        (
+          await db.query(
+            "SELECT description,plate,version FROM fleet_maintenance_invoices WHERE id=$1",
+            [id],
+          )
+        ).rows[0],
+      ).toMatchObject({ description: "Editada", plate: "TEST456", version: 2 });
+      await expect(
+        call("fleet_set_invoice_amount", [id, -1, "PYG", 2, "Error"]),
+      ).rejects.toThrow("cero");
+      await call("fleet_set_invoice_amount", [
+        id,
+        100,
+        "PYG",
+        2,
+        "Carga inicial",
+      ]);
+      await expect(
+        call("fleet_set_invoice_amount", [
+          id,
+          200,
+          "PYG",
+          2,
+          "Edición simultánea",
+        ]),
+      ).rejects.toThrow("cambió");
+      await call("fleet_set_invoice_amount_v2", [id, 3, 150, "PYG", "Corrección"]);
+      expect(
+        (
+          await db.query(
+            "SELECT before_data->>'amount' AS amount FROM fleet_invoice_audit WHERE invoice_id=$1 AND reason='Corrección'",
+            [id],
+          )
+        ).rows,
+      ).toEqual([{ amount: "100" }]);
+      await db.exec("SELECT set_config('test.role','operativo',false)");
+      await call("fleet_reserve_invoice", [
+        id2,
+        { ...input, invoice_number: "TEST02" },
+      ]);
+      await call("fleet_discard_pending_invoice", [id2]);
+      await expect(call("fleet_finalize_invoice", [id2])).rejects.toThrow();
+      await expect(
+        call("fleet_discard_reserved_invoice", [id]),
+      ).rejects.toThrow();
+      await db.exec("SELECT set_config('test.role','jefatura',false)");
+      expect(
+        (
+          await db.query(
+            "SELECT status FROM fleet_maintenance_invoices WHERE id=$1",
+            [id2],
+          )
+        ).rows,
+      ).toEqual([{ status: "void" }]);
+      await expect(
+        call("fleet_import_fuel_entries", [[{ currency: null }]]),
+      ).rejects.toThrow("moneda");
+    } finally {
+      await db.close();
+    }
+  },
+  30000,
+);

@@ -18,7 +18,10 @@ const FLEET_QUERY_KEY = "fleet-snapshot";
 export function useFleet(previewData?: FleetSnapshot) {
   const { user } = useAuth();
   return useQuery({
-    queryKey: [FLEET_QUERY_KEY, user?.id],
+    queryKey: [
+      previewData ? "fleet-preview-snapshot" : FLEET_QUERY_KEY,
+      user?.id,
+    ],
     enabled: Boolean(user) && !previewData,
     queryFn: loadFleetSnapshot,
     initialData: previewData,
@@ -28,12 +31,17 @@ export function useFleet(previewData?: FleetSnapshot) {
   });
 }
 
-function useFleetMutation<TInput>(mutationFn: (input: TInput) => Promise<string>) {
+function useFleetMutation<TInput>(
+  mutationFn: (input: TInput) => Promise<string>,
+) {
   const queryClient = useQueryClient();
   return useMutation({
     mutationFn,
     onSuccess: async () => {
-      await Promise.all([queryClient.invalidateQueries({ queryKey: [FLEET_QUERY_KEY] }), queryClient.invalidateQueries({ queryKey: ["fleet-management"] })]);
+      await Promise.all([
+        queryClient.invalidateQueries({ queryKey: [FLEET_QUERY_KEY] }),
+        queryClient.invalidateQueries({ queryKey: ["fleet-management"] }),
+      ]);
     },
   });
 }

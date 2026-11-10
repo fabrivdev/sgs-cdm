@@ -102,3 +102,22 @@ El listado toma la última lectura registrada; si no existe, muestra el Kilometr
 La ficha usa una única fila Datos / Combustible / Mantenimiento. Resumen mensual y cargas, o mantenimiento integrado/desglose/facturas, se eligen en Ver dentro de los filtros. El mantenimiento integrado resume los trabajos originales y conserva su desglose al abrir la fila. Se retiran la chapa repetida de la ficha y las fechas duplicadas del listado; la exportación conserva chapa. Cargas incluye kilometraje original. Lecturas, responsables y auditoría se despliegan a demanda. Ancho máximo de 1440 px y sin filtros de fecha en el padrón.
 
 Verificación: revisión local de escritorio a 1280 px con copia de las planillas, sin escrituras; pruebas de permisos, navegación y prioridad de fuentes de KM. No equivale a validar despliegue ni transacciones autenticadas de producción. Referencias: src/pages/FleetWorkspace.tsx, src/features/fleet/ManagementTable.tsx y src/features/fleet/managementModel.ts.
+
+
+# Flota: reconstrucción de escritorio — 10/11/2026
+
+Este bloque reemplaza las decisiones visuales anteriores. Vehículos, Combustible, Mantenimiento y Cargar factura son el menú de Jefatura; Operativos solo carga. Filtros nativos en una fila y Más filtros lateral. Tarjetas con componentes base del tema (no existía SummaryCard). TableScroll/RowCount/scrollHead, filas memoizadas, sin paginación que reinicie al renderizar. No hay selector de vistas, diálogo de columnas, auditoría de vehículo visible ni Flota.tsx embebido.
+
+FleetWorkspace es solo control de acceso/ruta. ManagementWorkspace usa una consulta completa y estable por usuario; VehicleDetail no depende de una caché previa. VehiclesList, VehicleDetail, FuelView, MaintenanceView y ReadingsView viven en src/features/fleet. La demostración tiene caché fleet-preview-snapshot. Se conservan edición, correcciones de lecturas, responsables, archivo e importaciones; las acciones secundarias quedan en el menú de tabla. Los detalles conservan trabajos, marcas, cantidades, comentarios y campos originales. No se infieren importes del historial.
+
+Consumo: se calcula por vehículo con las cargas del período, antes de aplicar búsqueda; suma ponderada de intervalos válidos para el total de flota. KM del período conserva la regla de intervalos fechados, sin convertir el km importado sin fecha en recorrido. Las fechas inválidas generan aviso y no una tabla vacía silenciosa.
+
+Migración 20261110200000_fleet_invoice_integrity.sql: importe con versión/motivo, bloqueo de fila y auditoría completa anterior/nueva; CHECK no negativo para facturas. Reintento actualiza la reserva propia y preserva duplicados/RUC; una modificación de Jefatura impide sobrescribirla. Descartar anula la reserva propia pendiente y conserva datos/archivo/auditoría. Nueva importación de combustible exige moneda: del Excel o selección explícita; conserva ajustes negativos originales.
+
+El usuario confirmó PYG para el histórico de combustible. Su SQL privado de corrección está en la entrega, fuera del repositorio, limitado a las claves y valores del archivo. No se ejecutó SQL remoto; aplicar antes de publicar el frontend. Commit/push no acredita publicación en Lovable.
+
+Validación: pruebas aisladas de PostgreSQL, parser, permisos, caché vacía, recuperación editada, conflicto de versión, negativos y consumo independiente de búsqueda. Revisión visual de escritorio 1280 px con copia local de las planillas; no acredita sesión productiva ni escrituras reales.
+
+---
+
+Compatibilidad con main remoto ea10124c: conserva los seis commits concurrentes. La migración nueva reemplaza también fleet_update_pending_invoice, fleet_discard_pending_invoice y fleet_set_invoice_amount_v2 de Drizzle 0011 por delegaciones a las RPC auditadas. Su descarte anterior borraba la reserva; el nuevo la anula. Probada con y sin 0011 previamente aplicado. Aplicar la entrega nueva después de 0011 si esa migración se usa; no ejecutar 0011 posteriormente para sobrescribir estas correcciones. No se infiere que el SQL remoto haya sido aplicado.

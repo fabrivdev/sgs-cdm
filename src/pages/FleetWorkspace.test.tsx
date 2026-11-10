@@ -5,6 +5,7 @@ import {
   fireEvent,
   cleanup,
   waitFor,
+  within,
 } from "@testing-library/react";
 import { MemoryRouter } from "react-router-dom";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
@@ -111,12 +112,7 @@ describe("Fleet role journeys", () => {
       ctrlKey: false,
     });
     expect(await screen.findAllByRole("tab")).toHaveLength(3);
-    fireEvent.change(await screen.findByLabelText("Ver"), {
-      target: { value: "Facturas" },
-    });
-    expect(
-      screen.getByRole("button", { name: "Cargar factura" }),
-    ).toBeInTheDocument();
+    expect(screen.queryByLabelText("Ver")).not.toBeInTheDocument();
     fireEvent.click(screen.getByRole("button", { name: "← Vehículos" }));
     expect((await screen.findAllByRole("searchbox"))[0]).toHaveValue("MAXUS");
   });
@@ -169,7 +165,10 @@ describe("Fleet role journeys", () => {
     mocks.submit.mockResolvedValue(undefined);
     mount();
     expect(screen.getByLabelText("Chapa")).toHaveValue("TEST123");
-    expect(screen.getByLabelText("Chapa")).toBeDisabled();
+    expect(screen.getByLabelText("Chapa")).not.toBeDisabled();
+    fireEvent.change(screen.getByLabelText("Descripción del trabajo"), {
+      target: { value: "Trabajo corregido" },
+    });
     expect(screen.getByLabelText("Archivo de factura")).not.toBeDisabled();
     fireEvent.change(screen.getByLabelText("Archivo de factura"), {
       target: {
@@ -182,9 +181,13 @@ describe("Fleet role journeys", () => {
     await screen.findByText("Factura 001 · TEST123: carga completada");
     expect(mocks.submit).toHaveBeenCalledWith(
       "attempt",
-      expect.objectContaining({ plate: "TEST123" }),
+      expect.objectContaining({
+        plate: "TEST123",
+        description: "Trabajo corregido",
+      }),
       expect.any(File),
       expect.any(Function),
+      true,
     );
     expect(mocks.load).not.toHaveBeenCalled();
   });
@@ -209,7 +212,50 @@ describe("Fleet role journeys", () => {
     mount("/servicios/flota/mantenimientos?maintenance%3Aview=Facturas");
     await screen.findByText("PEND001");
     expect(screen.getAllByText("Incompleta").length).toBeGreaterThan(0);
-    expect(screen.getByText("Cargas incompletas: 1")).toBeInTheDocument();
+    expect(screen.getByText("Cargas incompletas")).toBeInTheDocument();
     expect(screen.queryByText(/Importe documentado/)).not.toBeInTheDocument();
   });
+});
+
+it("opens a vehicle from an empty cache and keeps consumption independent of search", async () => {
+  const v = data.vehicles[0];
+  mocks.load.mockResolvedValue({
+    ...data,
+    fuel: [0, 1, 2].map((n) => ({
+      id: "f" + n,
+      vehicle_id: v.id,
+      plate: v.plate,
+      occurred_at: "2026-10-0" + (n + 1) + "T10:00:00",
+      liters: 40,
+      net_amount: 100,
+      currency: "PYG",
+      odometer_km: 1000 + n * 400,
+      previous_odometer_km: 600 + n * 400,
+      previous_liters: 40,
+      product: "Diesel",
+      station: n === 1 ? "Coincidencia" : "Otra",
+      raw_data: {},
+    })),
+  });
+  mount("/servicios/flota?vehicle=" + v.id);
+  await screen.findByRole("heading", { name: v.plate });
+  expect(
+    within(screen.getByRole("region", { name: "Resumen" })).getByText("10"),
+  ).toBeInTheDocument();
+  fireEvent.change(screen.getAllByRole("searchbox")[0], {
+    target: { value: "Coincidencia" },
+  });
+  await waitFor(() =>
+    expect(screen.getByText("1 registros")).toBeInTheDocument(),
+  );
+  expect(
+    within(screen.getByRole("region", { name: "Resumen" })).getByText("10"),
+  ).toBeInTheDocument();
+  expect(screen.getAllByRole("tab")).toHaveLength(3);
+});
+it("reports invalid date ranges without presenting an unexplained empty result", async () => {
+  mocks.load.mockResolvedValue(data);
+  mount("/servicios/flota?vehicles%3Afrom=2026-11-30&vehicles%3Ato=2026-11-01");
+  await screen.findByRole("alert");
+  expect(screen.getByRole("button", { name: "DEMO-001" })).toBeInTheDocument();
 });

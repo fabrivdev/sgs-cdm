@@ -131,3 +131,44 @@ describe("source-preserving fleet imports", () => {
     ).toThrow("concilian");
   });
 });
+it("reads currency from the sheet or uses an explicit fallback", () => {
+  const headers = [
+    "Tarjeta",
+    "N° Compro.",
+    "N° Boleta",
+    "Fecha",
+    "Hora",
+    "Cant.",
+    "Total Neto",
+    "Km Actual",
+    "Km Anterior",
+    "Cant. Ant.",
+    "Producto",
+    "Nombre",
+    "Moneda",
+  ];
+  const row = [
+    "Tarjeta: 123 - Placa: TEST123 - Marca: X",
+    "001",
+    "002",
+    "01/10/2026",
+    "10:00",
+    10,
+    100,
+    1000,
+    900,
+    20,
+    "Diesel",
+    "Test",
+    "USD",
+  ];
+  expect(
+    parseFuel(book("Detalle Descuento", [headers, row]), "PYG")[0].currency,
+  ).toBe("USD");
+  expect(
+    parseFuel(
+      book("Detalle Descuento", [headers, [...row.slice(0, -1), null]]),
+      "PYG",
+    )[0].currency,
+  ).toBe("PYG");
+});

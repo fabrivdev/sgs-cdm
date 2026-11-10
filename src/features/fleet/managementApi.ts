@@ -33,29 +33,20 @@ async function readAll<T>(table: string, order = "id"): Promise<T[]> {
   return rows;
 }
 export async function loadManagement(
-  scope: "fuel" | "maintenance" | "vehicles" = "vehicles",
+  scope: "fuel" | "maintenance" | "vehicles" | "all" = "all",
 ) {
   const [base, fuel, history, invoices, changes] = await Promise.all([
     loadFleetSnapshot(),
-    scope === "fuel"
+    scope === "fuel" || scope === "all"
       ? readAll<FuelEntry>("fleet_fuel_entries")
       : Promise.resolve([] as FuelEntry[]),
-    scope === "maintenance"
+    scope === "maintenance" || scope === "all"
       ? readAll<MaintenanceEntry>("fleet_maintenance_history")
       : Promise.resolve([] as MaintenanceEntry[]),
-    scope === "maintenance"
+    scope === "maintenance" || scope === "all"
       ? readAll<Invoice>("fleet_maintenance_invoices")
       : Promise.resolve([] as Invoice[]),
-    readAll<{
-      id: string;
-      vehicle_id: string;
-      occurred_at: string;
-      actor: string;
-      actor_name: string;
-      reason: string | null;
-      before_data: Record<string, unknown>;
-      after_data: Record<string, unknown>;
-    }>("fleet_change_events"),
+    Promise.resolve([]),
   ]);
   return {
     ...base,
@@ -79,18 +70,22 @@ export async function submitInvoice(
   id: string,
   input: Record<string, unknown>,
   file: File,
-  onReserved?: () => void,
+  onReserved?: (id: string) => void,
+  resume = false,
 ) {
-  const path = await fleetRpc<string>("fleet_reserve_invoice", {
-    p_id: id,
-    p_data: {
-      ...input,
-      filename: file.name,
-      mime_type: file.type,
-      size_bytes: file.size,
+  const path = await fleetRpc<string>(
+    resume ? "fleet_update_reserved_invoice" : "fleet_reserve_invoice",
+    {
+      p_id: id,
+      p_data: {
+        ...input,
+        filename: file.name,
+        mime_type: file.type,
+        size_bytes: file.size,
+      },
     },
-  });
-  onReserved?.();
+  );
+  onReserved?.(path.split("/").at(-1)!);
   const { error } = await supabase.storage
     .from("fleet-invoices")
     .upload(path, file, { upsert: false, contentType: file.type });

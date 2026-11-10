@@ -1782,14 +1782,14 @@
       "id": "flota-recuperacion-facturas",
       "title": "Correcciones, recuperación y RUC",
       "module": "servicios",
-      "description": "Una chapa por factura. El RUC sugiere desde totvs_proveedores y completa razón social de solo lectura si existe. Ausencia exacta confirmada habilita nombre manual y factura sin aprobación ni alta de proveedor. RPC limitada a identidad; error no equivale a ausencia. Se conserva duplicidad por RUC y número, sin reescribir históricos. Identidad por RUC; Jefatura corrige, anula y reemplaza con motivo/versiones, sin borrar originales. Operativos solo carga y reintenta su borrador. Los cambios reales de chapa conservan alias e historial; una corrección retira el alias incorrecto sin perder vínculos existentes.",
-      "sources": ["src/features/fleet/InvoiceActions.tsx", "src/features/fleet/InvoiceUpload.tsx", "src/features/fleet/SupplierFields.tsx", "supabase/migrations/20261110150000_fleet_recovery.sql", "supabase/migrations/20261110180000_fleet_supplier_lookup.sql", "supabase/migrations/20261110190000_fleet_manual_supplier.sql"]
+      "description": "Una chapa por factura. Importe con versión y motivo obligatorios; CHECK no negativo, auditoría anterior/nueva y conflicto sin sobrescritura. Reintento actualiza reserva propia; descarte anula sin borrar. El RUC sugiere desde totvs_proveedores y completa razón social de solo lectura si existe. Ausencia exacta confirmada habilita nombre manual y factura sin aprobación ni alta de proveedor. RPC limitada a identidad; error no equivale a ausencia. Se conserva duplicidad por RUC y número, sin reescribir históricos. Identidad por RUC; Jefatura corrige, anula y reemplaza con motivo/versiones, sin borrar originales. Operativos solo carga y reintenta su borrador. Los cambios reales de chapa conservan alias e historial; una corrección retira el alias incorrecto sin perder vínculos existentes.",
+      "sources": ["supabase/migrations/20261110200000_fleet_invoice_integrity.sql", "src/features/fleet/ManagementWorkspace.tsx", "src/features/fleet/VehicleDetail.tsx", "src/features/fleet/InvoiceActions.tsx", "src/features/fleet/InvoiceUpload.tsx", "src/features/fleet/SupplierFields.tsx", "supabase/migrations/20261110150000_fleet_recovery.sql", "supabase/migrations/20261110180000_fleet_supplier_lookup.sql", "supabase/migrations/20261110190000_fleet_manual_supplier.sql"]
     },
     {
       "id": "flota-sin-inferencias",
       "title": "Vínculos y métricas con evidencia",
       "module": "servicios",
-      "description": "Chapa normalizada exacta, nunca crear vehículos por gasto. Conservar ausencias, signos, marcas y comentarios. L/100 km estimado solo con intervalos continuos del mismo mes; no inferir moneda ni importe histórico. Listado: última lectura registrada o, si falta, Kilometraje de la planilla inicial con origen explícito y fecha ausente; ese dato sin fecha no genera recorridos.",
+      "description": "Chapa normalizada exacta, nunca crear vehículos por gasto. Conservar ausencias, signos, marcas y comentarios. L/100 km estimado solo con intervalos continuos del mismo mes; no inferir moneda ni importe histórico. UI separada en VehiclesList/VehicleDetail/FuelView/MaintenanceView; consumo del período antes de búsqueda. Listado: última lectura registrada o, si falta, Kilometraje de la planilla inicial con origen explícito y fecha ausente; ese dato sin fecha no genera recorridos.",
       "sources": [
         "src/features/fleet/managementModel.ts",
         "src/features/fleet/workbookImports.mjs"
