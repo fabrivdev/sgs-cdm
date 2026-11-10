@@ -237,3 +237,8 @@ En escritorio, las pestañas Combustible/Mantenimiento comparten fila con volver
 Mantenimiento reemplaza la descripción resumida y +N por Fecha, N.º de factura, Proveedor, Km, Aceites, Filtros, Cubiertas, Repuestos, Otros y Monto. Cada grupo presente muestra una marca consultable por hover, foco o clic, con todos sus trabajos y observaciones. Grupos sin registro muestran raya. Se reutiliza Popover nativo, sin abrir la ficha al pulsar la marca. La fila sigue abriendo el detalle completo. Anchos proporcionales solo en ficha; Vehículos conserva su configuración.
 
 Agrupación de presentación, sin cambios en datos: correas y baterías en Repuestos; trabajos desconocidos en Otros. Facturas muestran categorías declaradas y descripción común identificada como descripción de factura, sin atribuir piezas no registradas. La búsqueda, filtros originales, desglose y exportación conservan la información completa. Importes ausentes permanecen sin importe. No requiere SQL. Validación de grupos, navegación, interacción de marcas y revisión visual de escritorio con copia local, sin escrituras remotas ni publicación Lovable.
+
+
+## Títulos de indicadores — 10/11/2026
+
+Por indicación del usuario, los indicadores de mantenimiento en la ficha se titulan Último servicio, Próximo servicio y Gasto total. Solo cambian etiquetas en VehicleDetail.tsx: Gasto total conserva el cálculo de facturas del período filtrado; las fechas, el intervalo y VehiclesList no cambian. Verificación por diff; no requiere SQL ni publicación Lovable.

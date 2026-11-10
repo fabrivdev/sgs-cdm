@@ -126,11 +126,11 @@ export function VehicleDetail({
         tab === "Mantenimiento"
           ? [
               [
-                "Último mantenimiento",
+                "Último servicio",
                 lastWork?.split("-").reverse().join("/") ?? "—",
               ],
-              ["Próximo mantenimiento", alert.label],
-              ["Gasto documentado del período", invoiceMoney(invoices)],
+              ["Próximo servicio", alert.label],
+              ["Gasto total", invoiceMoney(invoices)],
             ]
           : [
               [
