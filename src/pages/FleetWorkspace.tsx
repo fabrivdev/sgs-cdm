@@ -12,7 +12,12 @@ import { PageShell, PageHeader } from "@/components/layout/AppPrimitives";
 import { Button } from "@/components/ui/button";
 import { FilterDate } from "@/components/filters/FiltersBar";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Dialog, DialogContent, DialogTitle } from "@/components/ui/dialog";
+import {
+  ResponsiveDrawer,
+  ResponsiveDrawerHeader,
+  ResponsiveDrawerBody,
+  ResponsiveDrawerFooter,
+} from "@/components/ui/responsive-drawer";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { toast } from "sonner";
@@ -1062,14 +1067,17 @@ export function ManagementWorkspace() {
           />
         </>
       )}
-      <Dialog
+      <ResponsiveDrawer
+        title="Importar combustible"
         open={!!fuelImport}
         onOpenChange={(open) => {
           if (!open && !importing) setFuelImport(null);
         }}
       >
-        <DialogContent closeLabel="Cerrar">
-          <DialogTitle>Importar combustible</DialogTitle>
+        <ResponsiveDrawerHeader>
+          <h2 className="font-semibold">Importar combustible</h2>
+        </ResponsiveDrawerHeader>
+        <ResponsiveDrawerBody className="space-y-4">
           {fuelImport && (
             <>
               <dl className="grid grid-cols-2 gap-3 text-sm">
@@ -1114,18 +1122,15 @@ export function ManagementWorkspace() {
                   {importError}
                 </p>
               )}
-              <div className="flex justify-end">
-                <Button
-                  disabled={importing}
-                  onClick={() => void confirmFuelImport()}
-                >
-                  {importing ? "Importando…" : "Importar archivo"}
-                </Button>
-              </div>
             </>
           )}
-        </DialogContent>
-      </Dialog>
+        </ResponsiveDrawerBody>
+        <ResponsiveDrawerFooter>
+          <Button disabled={importing} onClick={() => void confirmFuelImport()}>
+            {importing ? "Importando…" : "Importar archivo"}
+          </Button>
+        </ResponsiveDrawerFooter>
+      </ResponsiveDrawer>
       <input
         ref={fileRef}
         hidden
@@ -1151,39 +1156,48 @@ export function ManagementWorkspace() {
           }}
         />
       )}
-      <Dialog open={upload} onOpenChange={setUpload}>
-        <DialogContent
-          closeLabel="Cerrar"
-          className="max-h-[90vh] max-w-4xl overflow-auto"
-        >
-          <DialogTitle>Cargar factura</DialogTitle>
-          <InvoiceUpload
-            embedded
-            plate={vehicle?.plate}
-            onDone={() => {
-              setUpload(false);
-              void refresh();
-            }}
-          />
-        </DialogContent>
-      </Dialog>
-      <Dialog
+      <ResponsiveDrawer
+        title="Cargar factura"
+        size="xl"
+        open={upload}
+        onOpenChange={setUpload}
+      >
+        <ResponsiveDrawerHeader>
+          <h2 className="font-semibold">Cargar factura</h2>
+        </ResponsiveDrawerHeader>
+        <InvoiceUpload
+          embedded
+          plate={vehicle?.plate}
+          onDone={() => {
+            setUpload(false);
+            void refresh();
+          }}
+        />
+      </ResponsiveDrawer>
+      <ResponsiveDrawer
+        title={
+          selectedInvoice
+            ? "Factura"
+            : selectedHistory
+              ? "Mantenimiento"
+              : "Carga de combustible"
+        }
+        size="xl"
         open={!!detail}
         onOpenChange={(open) => {
           if (!open) setDetail(null);
         }}
       >
-        <DialogContent
-          closeLabel="Cerrar"
-          className="max-h-[90vh] max-w-4xl overflow-auto"
-        >
-          <DialogTitle>
+        <ResponsiveDrawerHeader>
+          <h2 className="font-semibold">
             {selectedInvoice
               ? "Factura"
               : selectedHistory
                 ? "Mantenimiento"
                 : "Carga de combustible"}
-          </DialogTitle>
+          </h2>
+        </ResponsiveDrawerHeader>
+        <ResponsiveDrawerBody className="space-y-4">
           <dl className="grid grid-cols-2 gap-3 text-sm">
             {detail &&
               Object.entries(detail)
@@ -1279,6 +1293,7 @@ export function ManagementWorkspace() {
                   }
                   onClick={() => {
                     setAmountInvoice(selectedInvoice);
+                    setDetail(null);
                     setAmount(
                       selectedInvoice.amount == null
                         ? ""
@@ -1339,36 +1354,39 @@ export function ManagementWorkspace() {
               )}
             />
           )}
-        </DialogContent>
-      </Dialog>
-      <Dialog
+        </ResponsiveDrawerBody>
+      </ResponsiveDrawer>
+      <ResponsiveDrawer
+        title="Importe de factura"
         open={!!amountInvoice}
         onOpenChange={(open) => {
           if (!open && !saving) setAmountInvoice(null);
         }}
       >
-        <DialogContent closeLabel="Cerrar">
-          <DialogTitle>Importe de factura</DialogTitle>
-          <form
-            className="space-y-3"
-            onSubmit={async (e) => {
-              e.preventDefault();
-              setSaving(true);
-              try {
-                await fleetRpc("fleet_set_invoice_amount", {
-                  p_id: amountInvoice!.id,
-                  p_amount: Number(amount),
-                  p_currency: currency,
-                });
-                await refresh();
-                setAmountInvoice(null);
-              } catch (e) {
-                toast.error(show((e as { message?: string }).message));
-              } finally {
-                setSaving(false);
-              }
-            }}
-          >
+        <ResponsiveDrawerHeader>
+          <h2 className="font-semibold">Importe de factura</h2>
+        </ResponsiveDrawerHeader>
+        <form
+          className="flex min-h-0 flex-1 flex-col"
+          onSubmit={async (e) => {
+            e.preventDefault();
+            setSaving(true);
+            try {
+              await fleetRpc("fleet_set_invoice_amount", {
+                p_id: amountInvoice!.id,
+                p_amount: Number(amount),
+                p_currency: currency,
+              });
+              await refresh();
+              setAmountInvoice(null);
+            } catch (e) {
+              toast.error(show((e as { message?: string }).message));
+            } finally {
+              setSaving(false);
+            }
+          }}
+        >
+          <ResponsiveDrawerBody className="space-y-3">
             <Label htmlFor="amount">Importe</Label>
             <Input
               id="amount"
@@ -1387,10 +1405,12 @@ export function ManagementWorkspace() {
               value={currency}
               onChange={(e) => setCurrency(e.target.value.toUpperCase())}
             />
+          </ResponsiveDrawerBody>
+          <ResponsiveDrawerFooter>
             <Button disabled={saving}>Guardar</Button>
-          </form>
-        </DialogContent>
-      </Dialog>
+          </ResponsiveDrawerFooter>
+        </form>
+      </ResponsiveDrawer>
     </PageShell>
   );
 }

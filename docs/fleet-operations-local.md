@@ -1,3 +1,11 @@
+## Corrección del patrón de paneles — 10/11/2026
+
+Contrastada directamente la regla de la bóveda `C:/Users/Usuario/CDMSIG/SIG CDM/Generado/Reglas/visual-movil-transversal.md`: los formularios de varios campos usan ResponsiveDrawer lateral en escritorio, con cabecera, cuerpo desplazable y pie accesible. La entrega anterior introdujo Dialog centrales sin una excepción documentada; se corrigen en facturas (carga de Jefatura, corrección, archivo, anulación, auditoría e importe), detalles de gastos y revisión de combustible. Registrar importe cierra el detalle para evitar paneles superpuestos. No se agregan acciones ni se cambian permisos/RPC. Operativos conserva su formulario de página.
+
+Fuentes: InvoiceActions.tsx, InvoiceUpload.tsx y FleetWorkspace.tsx. Se consultaron también la guía 25 de la bóveda, 00-Inicio, 34-Flota, mapa-negocio y el componente ResponsiveDrawer vigente. La bóveda consultada no contiene una nota 34-Flota; se usó la nota versionada del repositorio para ese módulo. Este checkout no tiene obsidian-sync.local: no se acredita sincronización ni se modifica la bóveda desde otra copia.
+
+Validación local: siete pruebas de recorridos/recuperación, TypeScript y ESLint; revisión propia del render de escritorio con datos DEMO. La revisión visual independiente y producción permanecen pendientes. Sin push, publicación ni SQL remoto.
+
 ## Mejoras locales de recuperación y escritorio — 10/11/2026
 
 Este bloque actualiza el comportamiento local descrito debajo. No hay push, publicación ni SQL remoto.

@@ -4,7 +4,12 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
-import { Dialog, DialogContent, DialogTitle } from "@/components/ui/dialog";
+import {
+  ResponsiveDrawer,
+  ResponsiveDrawerHeader,
+  ResponsiveDrawerBody,
+  ResponsiveDrawerFooter,
+} from "@/components/ui/responsive-drawer";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -111,17 +116,24 @@ export function InvoiceActions({
   }
   return (
     <>
-      <Dialog
+      <ResponsiveDrawer
+        title={
+          mode === "edit"
+            ? "Corregir factura"
+            : mode === "file"
+              ? "Completar o reemplazar archivo"
+              : mode === "void"
+                ? "Anular factura"
+                : "Cambios de factura"
+        }
+        size="xl"
         open={!!mode}
         onOpenChange={(v) => {
           if (!v && !busy) onClose();
         }}
       >
-        <DialogContent
-          closeLabel="Cerrar"
-          className="max-w-2xl max-h-[90vh] overflow-auto"
-        >
-          <DialogTitle>
+        <ResponsiveDrawerHeader>
+          <h2 className="font-semibold">
             {mode === "edit"
               ? "Corregir factura"
               : mode === "file"
@@ -129,106 +141,109 @@ export function InvoiceActions({
                 : mode === "void"
                   ? "Anular factura"
                   : "Cambios de factura"}
-          </DialogTitle>
-          {mode === "audit" ? (
-            <div className="space-y-3">
-              {busy
-                ? "Cargando…"
-                : audit.length
-                  ? audit.map((a) => (
-                      <div key={a.id} className="border-b py-2 text-sm">
-                        <p>
-                          {new Date(a.occurred_at).toLocaleString("es-PY")} ·{" "}
-                          {a.actor_name ?? "—"} ·{" "}
-                          {a.reason ?? "Registro de importe"}
-                        </p>
-                        <dl className="grid grid-cols-3 gap-2">
-                          <dt>Campo</dt>
-                          <dt>Anterior</dt>
-                          <dt>Nuevo</dt>
-                          {Object.keys(a.after_data)
-                            .filter(
-                              (k) =>
-                                [
-                                  "performed_on",
-                                  "odometer_km",
-                                  "supplier_tax_id",
-                                  "plate",
-                                  "supplier",
-                                  "invoice_number",
-                                  "invoice_date",
-                                  "description",
-                                  "categories",
-                                  "amount",
-                                  "currency",
-                                  "status",
-                                  "filename",
-                                ].includes(k) &&
-                                JSON.stringify(a.before_data[k]) !==
-                                  JSON.stringify(a.after_data[k]),
-                            )
-                            .map((k) => (
-                              <div key={k} className="contents">
-                                <dt>
-                                  {
-                                    (
-                                      {
-                                        performed_on: "Fecha del trabajo",
-                                        odometer_km: "Kilometraje del trabajo",
-                                        supplier_tax_id: "RUC",
-                                        plate: "Chapa",
-                                        supplier: "Proveedor",
-                                        invoice_number: "N.º factura",
-                                        invoice_date: "Fecha",
-                                        description: "Descripción",
-                                        categories: "Clasificación",
-                                        amount: "Importe",
-                                        currency: "Moneda",
-                                        status: "Estado",
-                                        filename: "Archivo",
-                                      } as Record<string, string>
-                                    )[k]
-                                  }
-                                </dt>
-                                <dd className="break-words">
-                                  {auditValue(k, a.before_data[k])}
-                                </dd>
-                                <dd className="break-words">
-                                  {auditValue(k, a.after_data[k])}
-                                </dd>
-                              </div>
-                            ))}
-                        </dl>
-                        {a.before_data.storage_path && (
-                          <Button
-                            variant="link"
-                            onClick={async () => {
-                              const win = window.open("about:blank", "_blank");
-                              if (!win) return;
-                              win.opener = null;
-                              try {
-                                win.location.replace(
-                                  await invoiceUrl({
-                                    storage_path: String(
-                                      a.before_data.storage_path,
-                                    ),
-                                  }),
-                                );
-                              } catch {
-                                win.close();
-                                setError("No se pudo abrir el archivo");
-                              }
-                            }}
-                          >
-                            Archivo anterior
-                          </Button>
-                        )}
-                      </div>
-                    ))
-                  : "Sin cambios registrados"}
-            </div>
-          ) : (
-            <form onSubmit={save} className="space-y-4">
+          </h2>
+        </ResponsiveDrawerHeader>
+        {mode === "audit" ? (
+          <ResponsiveDrawerBody className="space-y-3">
+            {busy
+              ? "Cargando…"
+              : audit.length
+                ? audit.map((a) => (
+                    <div key={a.id} className="border-b py-2 text-sm">
+                      <p>
+                        {new Date(a.occurred_at).toLocaleString("es-PY")} ·{" "}
+                        {a.actor_name ?? "—"} ·{" "}
+                        {a.reason ?? "Registro de importe"}
+                      </p>
+                      <dl className="grid grid-cols-3 gap-2">
+                        <dt>Campo</dt>
+                        <dt>Anterior</dt>
+                        <dt>Nuevo</dt>
+                        {Object.keys(a.after_data)
+                          .filter(
+                            (k) =>
+                              [
+                                "performed_on",
+                                "odometer_km",
+                                "supplier_tax_id",
+                                "plate",
+                                "supplier",
+                                "invoice_number",
+                                "invoice_date",
+                                "description",
+                                "categories",
+                                "amount",
+                                "currency",
+                                "status",
+                                "filename",
+                              ].includes(k) &&
+                              JSON.stringify(a.before_data[k]) !==
+                                JSON.stringify(a.after_data[k]),
+                          )
+                          .map((k) => (
+                            <div key={k} className="contents">
+                              <dt>
+                                {
+                                  (
+                                    {
+                                      performed_on: "Fecha del trabajo",
+                                      odometer_km: "Kilometraje del trabajo",
+                                      supplier_tax_id: "RUC",
+                                      plate: "Chapa",
+                                      supplier: "Proveedor",
+                                      invoice_number: "N.º factura",
+                                      invoice_date: "Fecha",
+                                      description: "Descripción",
+                                      categories: "Clasificación",
+                                      amount: "Importe",
+                                      currency: "Moneda",
+                                      status: "Estado",
+                                      filename: "Archivo",
+                                    } as Record<string, string>
+                                  )[k]
+                                }
+                              </dt>
+                              <dd className="break-words">
+                                {auditValue(k, a.before_data[k])}
+                              </dd>
+                              <dd className="break-words">
+                                {auditValue(k, a.after_data[k])}
+                              </dd>
+                            </div>
+                          ))}
+                      </dl>
+                      {a.before_data.storage_path && (
+                        <Button
+                          variant="link"
+                          onClick={async () => {
+                            const win = window.open("about:blank", "_blank");
+                            if (!win) return;
+                            win.opener = null;
+                            try {
+                              win.location.replace(
+                                await invoiceUrl({
+                                  storage_path: String(
+                                    a.before_data.storage_path,
+                                  ),
+                                }),
+                              );
+                            } catch {
+                              win.close();
+                              setError("No se pudo abrir el archivo");
+                            }
+                          }}
+                        >
+                          Archivo anterior
+                        </Button>
+                      )}
+                    </div>
+                  ))
+                : "Sin cambios registrados"}
+            {error && <p role="alert">{error}</p>}
+          </ResponsiveDrawerBody>
+        ) : (
+          <form onSubmit={save} className="flex min-h-0 flex-1 flex-col">
+            <ResponsiveDrawerBody className="space-y-4">
               <fieldset disabled={busy} className="space-y-4">
                 {mode === "edit" && (
                   <>
@@ -381,20 +396,19 @@ export function InvoiceActions({
                   {error}
                 </p>
               )}
-              <div className="flex justify-end">
-                <Button disabled={busy} type="submit">
-                  {busy
-                    ? "Guardando…"
-                    : mode === "void"
-                      ? "Anular factura"
-                      : "Guardar"}
-                </Button>
-              </div>
-            </form>
-          )}
-          {mode === "audit" && error && <p role="alert">{error}</p>}
-        </DialogContent>
-      </Dialog>
+            </ResponsiveDrawerBody>
+            <ResponsiveDrawerFooter>
+              <Button disabled={busy} type="submit">
+                {busy
+                  ? "Guardando…"
+                  : mode === "void"
+                    ? "Anular factura"
+                    : "Guardar"}
+              </Button>
+            </ResponsiveDrawerFooter>
+          </form>
+        )}
+      </ResponsiveDrawer>
     </>
   );
 }

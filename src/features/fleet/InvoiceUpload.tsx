@@ -1,3 +1,7 @@
+import {
+  ResponsiveDrawerBody,
+  ResponsiveDrawerFooter,
+} from "@/components/ui/responsive-drawer";
 import { useAuth } from "@/hooks/useAuth";
 import { useEffect, useRef, useState } from "react";
 import { PageHeader, PageShell } from "@/components/layout/AppPrimitives";
@@ -168,141 +172,155 @@ export default function InvoiceUpload({
       setPending(false);
     }
   }
+  const Container = embedded ? "div" : PageShell;
+  const Body = embedded ? ResponsiveDrawerBody : "div";
+  const Footer = embedded ? ResponsiveDrawerFooter : "div";
   return (
-    <PageShell>
+    <Container
+      className={embedded ? "flex min-h-0 flex-1 flex-col" : undefined}
+    >
       {!embedded && <PageHeader title="Cargar factura de mantenimiento" />}
-      <form onSubmit={submit} className="max-w-3xl space-y-5">
-        {confirmation && (
-          <p role="status" className="text-sm">
-            {confirmation}
-          </p>
-        )}
-        <fieldset
-          disabled={pending || reserved.current}
-          className="grid gap-4 sm:grid-cols-2"
-        >
-          {(
-            [
-              ["plate", "Chapa"],
-              ["supplier", "Proveedor"],
-              ["supplier_tax_id", "RUC del proveedor"],
-              ["invoice_number", "N.º de factura"],
-              ["invoice_date", "Fecha de factura"],
-            ] as const
-          ).map(([key, label]) => (
-            <div key={key} className="space-y-1">
-              <Label htmlFor={"invoice-" + key}>{label}</Label>
-              <Input
-                id={"invoice-" + key}
-                aria-invalid={errorField === key || undefined}
-                aria-describedby={
-                  errorField === key ? "invoice-error" : undefined
-                }
-                type={key === "invoice_date" ? "date" : "text"}
+      <form
+        onSubmit={submit}
+        className={
+          embedded ? "flex min-h-0 flex-1 flex-col" : "max-w-3xl space-y-5"
+        }
+      >
+        <Body className="space-y-5">
+          {confirmation && (
+            <p role="status" className="text-sm">
+              {confirmation}
+            </p>
+          )}
+          <fieldset
+            disabled={pending || reserved.current}
+            className="grid gap-4 sm:grid-cols-2"
+          >
+            {(
+              [
+                ["plate", "Chapa"],
+                ["supplier", "Proveedor"],
+                ["supplier_tax_id", "RUC del proveedor"],
+                ["invoice_number", "N.º de factura"],
+                ["invoice_date", "Fecha de factura"],
+              ] as const
+            ).map(([key, label]) => (
+              <div key={key} className="space-y-1">
+                <Label htmlFor={"invoice-" + key}>{label}</Label>
+                <Input
+                  id={"invoice-" + key}
+                  aria-invalid={errorField === key || undefined}
+                  aria-describedby={
+                    errorField === key ? "invoice-error" : undefined
+                  }
+                  type={key === "invoice_date" ? "date" : "text"}
+                  required
+                  maxLength={
+                    key === "plate" ? 20 : key === "invoice_number" ? 100 : 200
+                  }
+                  value={values[key]}
+                  onChange={(e) => change(key, e.target.value)}
+                />
+              </div>
+            ))}
+            <div className="space-y-1">
+              <Label>Clasificación</Label>
+              <Popover>
+                <PopoverTrigger asChild>
+                  <Button
+                    disabled={pending || reserved.current}
+                    type="button"
+                    variant="outline"
+                    className="w-full justify-start"
+                    id="invoice-classification"
+                    aria-describedby={
+                      errorField === "classification"
+                        ? "invoice-error"
+                        : undefined
+                    }
+                    aria-label="Clasificación"
+                  >
+                    <span
+                      className="truncate"
+                      title={values.categories.join(", ")}
+                    >
+                      {values.categories.length
+                        ? values.categories.join(", ")
+                        : "Seleccionar"}
+                    </span>
+                  </Button>
+                </PopoverTrigger>
+                <PopoverContent className="space-y-2">
+                  {maintenanceCategories.map((c) => (
+                    <label key={c} className="flex items-center gap-2 text-sm">
+                      <input
+                        type="checkbox"
+                        checked={values.categories.includes(c)}
+                        onChange={(e) =>
+                          change(
+                            "categories",
+                            e.target.checked
+                              ? [...values.categories, c]
+                              : values.categories.filter((v) => v !== c),
+                          )
+                        }
+                      />
+                      {c}
+                    </label>
+                  ))}
+                </PopoverContent>
+              </Popover>
+            </div>
+            <div className="space-y-1 sm:col-span-2">
+              <Label htmlFor="invoice-description">
+                Descripción del trabajo
+              </Label>
+              <Textarea
+                id="invoice-description"
                 required
-                maxLength={
-                  key === "plate" ? 20 : key === "invoice_number" ? 100 : 200
-                }
-                value={values[key]}
-                onChange={(e) => change(key, e.target.value)}
+                maxLength={4000}
+                rows={3}
+                value={values.description}
+                onChange={(e) => change("description", e.target.value)}
               />
             </div>
-          ))}
+          </fieldset>
           <div className="space-y-1">
-            <Label>Clasificación</Label>
-            <Popover>
-              <PopoverTrigger asChild>
-                <Button
-                  disabled={pending || reserved.current}
-                  type="button"
-                  variant="outline"
-                  className="w-full justify-start"
-                  id="invoice-classification"
-                  aria-describedby={
-                    errorField === "classification"
-                      ? "invoice-error"
-                      : undefined
-                  }
-                  aria-label="Clasificación"
-                >
-                  <span
-                    className="truncate"
-                    title={values.categories.join(", ")}
-                  >
-                    {values.categories.length
-                      ? values.categories.join(", ")
-                      : "Seleccionar"}
-                  </span>
-                </Button>
-              </PopoverTrigger>
-              <PopoverContent className="space-y-2">
-                {maintenanceCategories.map((c) => (
-                  <label key={c} className="flex items-center gap-2 text-sm">
-                    <input
-                      type="checkbox"
-                      checked={values.categories.includes(c)}
-                      onChange={(e) =>
-                        change(
-                          "categories",
-                          e.target.checked
-                            ? [...values.categories, c]
-                            : values.categories.filter((v) => v !== c),
-                        )
-                      }
-                    />
-                    {c}
-                  </label>
-                ))}
-              </PopoverContent>
-            </Popover>
-          </div>
-          <div className="space-y-1 sm:col-span-2">
-            <Label htmlFor="invoice-description">Descripción del trabajo</Label>
-            <Textarea
-              id="invoice-description"
+            <Label htmlFor="invoice-file">Archivo de factura</Label>
+            <Input
+              ref={input}
+              id="invoice-file"
+              aria-invalid={errorField === "file" || undefined}
+              aria-describedby={
+                errorField === "file" ? "invoice-error" : undefined
+              }
+              disabled={pending}
+              type="file"
+              accept="application/pdf,image/jpeg,image/png"
               required
-              maxLength={4000}
-              rows={3}
-              value={values.description}
-              onChange={(e) => change("description", e.target.value)}
+              onChange={(e) => {
+                setFile(e.target.files?.[0] ?? null);
+                setError("");
+              }}
             />
           </div>
-        </fieldset>
-        <div className="space-y-1">
-          <Label htmlFor="invoice-file">Archivo de factura</Label>
-          <Input
-            ref={input}
-            id="invoice-file"
-            aria-invalid={errorField === "file" || undefined}
-            aria-describedby={
-              errorField === "file" ? "invoice-error" : undefined
-            }
-            disabled={pending}
-            type="file"
-            accept="application/pdf,image/jpeg,image/png"
-            required
-            onChange={(e) => {
-              setFile(e.target.files?.[0] ?? null);
-              setError("");
-            }}
-          />
-        </div>
-        {reserved.current && (
-          <p role="status" className="text-sm">
-            Carga pendiente: {expectedFile.current?.name}. Seleccioná el archivo
-            para reintentar.
-          </p>
-        )}
-        {error && (
-          <p
-            id="invoice-error"
-            role="alert"
-            className="text-sm text-destructive"
-          >
-            {error}
-          </p>
-        )}
-        <div className="flex justify-end gap-2">
+          {reserved.current && (
+            <p role="status" className="text-sm">
+              Carga pendiente: {expectedFile.current?.name}. Seleccioná el
+              archivo para reintentar.
+            </p>
+          )}
+          {error && (
+            <p
+              id="invoice-error"
+              role="alert"
+              className="text-sm text-destructive"
+            >
+              {error}
+            </p>
+          )}
+        </Body>
+        <Footer className="flex justify-end gap-2">
           {reserved.current && (
             <Button
               disabled={pending}
@@ -328,8 +346,8 @@ export default function InvoiceUpload({
                 ? "Reintentar carga"
                 : "Cargar factura"}
           </Button>
-        </div>
+        </Footer>
       </form>
-    </PageShell>
+    </Container>
   );
 }
