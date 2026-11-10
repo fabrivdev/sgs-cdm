@@ -471,22 +471,113 @@ describe("fleet operations / isolated PostgreSQL", () => {
 });
 
 it("limits supplier lookup to invoice submitters and validates master identity on reservation", async () => {
- const db = new PGlite({extensions:{pgcrypto}});
- try {
-  await fixture(db);
-  await db.exec(`RESET ROLE; CREATE TABLE public.totvs_proveedores(codigo text,tienda text,ruc text,razon_social text);
+  const db = new PGlite({ extensions: { pgcrypto } });
+  try {
+    await fixture(db);
+    await db.exec(`RESET ROLE; CREATE TABLE public.totvs_proveedores(codigo text,tienda text,ruc text,razon_social text);
    INSERT INTO public.totvs_proveedores VALUES ('1','1','80000001-1','Taller maestro'),('1','2','80000001-1','Taller maestro');
    ALTER TABLE public.totvs_proveedores ENABLE ROW LEVEL SECURITY;`);
-  await db.exec(readFileSync("supabase/migrations/20261110180000_fleet_supplier_lookup.sql","utf8"));
-  await db.exec("SET ROLE authenticated; SELECT set_config('test.role','operativo',false)");
-  expect((await db.query("SELECT * FROM fleet_search_suppliers('800')")).rows).toEqual([{ruc:"80000001-1",razon_social:"Taller maestro"}]);
-  expect((await db.query("SELECT * FROM fleet_search_suppliers('80')")).rows).toEqual([]);
-  await expect(db.query("SELECT * FROM totvs_proveedores")).rejects.toThrow();
-  const data={plate:"NO123",supplier:"Nombre inventado",supplier_tax_id:"80000001-1",invoice_number:"001",invoice_date:"2026-10-01",categories:["Filtros"],description:"Prueba",filename:"prueba.pdf",mime_type:"application/pdf",size_bytes:10};
-  const id="00000000-0000-4000-8000-000000000091";
-  await expect(db.query("SELECT fleet_reserve_invoice($1,$2)",[id,JSON.stringify(data)])).rejects.toThrow("maestro");
-  await db.query("SELECT fleet_reserve_invoice($1,$2)",[id,JSON.stringify({...data,supplier:"Taller maestro"})]);
-  await db.exec("SELECT set_config('test.access','no',false)");
-  await expect(db.query("SELECT * FROM fleet_search_suppliers('800')")).rejects.toThrow("Sin acceso");
- } finally { await db.close(); }
-},30000);
+    await db.exec(
+      readFileSync(
+        "supabase/migrations/20261110180000_fleet_supplier_lookup.sql",
+        "utf8",
+      ),
+    );
+    await db.exec(
+      readFileSync(
+        "supabase/migrations/20261110190000_fleet_manual_supplier.sql",
+        "utf8",
+      ),
+    );
+    await db.exec(
+      "SET ROLE authenticated; SELECT set_config('test.role','operativo',false)",
+    );
+    expect(
+      (await db.query("SELECT * FROM fleet_search_suppliers('800')")).rows,
+    ).toEqual([{ ruc: "80000001-1", razon_social: "Taller maestro" }]);
+    expect(
+      (await db.query("SELECT * FROM fleet_search_suppliers('80')")).rows,
+    ).toEqual([]);
+    await expect(db.query("SELECT * FROM totvs_proveedores")).rejects.toThrow();
+    const data = {
+      plate: "NO123",
+      supplier: "Nombre inventado",
+      supplier_tax_id: "80000001-1",
+      invoice_number: "001",
+      invoice_date: "2026-10-01",
+      categories: ["Filtros"],
+      description: "Prueba",
+      filename: "prueba.pdf",
+      mime_type: "application/pdf",
+      size_bytes: 10,
+    };
+    const id = "00000000-0000-4000-8000-000000000091";
+    await expect(
+      db.query("SELECT fleet_reserve_invoice($1,$2)", [
+        id,
+        JSON.stringify(data),
+      ]),
+    ).rejects.toThrow("maestro");
+    await db.query("SELECT fleet_reserve_invoice($1,$2)", [
+      id,
+      JSON.stringify({ ...data, supplier: "Taller maestro" }),
+    ]);
+
+    expect(
+      (await db.query("SELECT * FROM fleet_supplier_identity('800000011')"))
+        .rows,
+    ).toHaveLength(1);
+    expect(
+      (await db.query("SELECT * FROM fleet_supplier_identity('99900001-1')"))
+        .rows,
+    ).toEqual([]);
+    const manual = {
+      ...data,
+      supplier_tax_id: "99900001-1",
+      supplier: "Taller manual",
+    };
+    const manualId = "00000000-0000-4000-8000-000000000092";
+    const reserved = await db.query<{ path: string }>(
+      "SELECT fleet_reserve_invoice($1,$2) AS path",
+      [manualId, JSON.stringify(manual)],
+    );
+    await db.query(
+      "INSERT INTO storage.objects(bucket_id,name,metadata) VALUES ('fleet-invoices',$1,$2)",
+      [
+        reserved.rows[0].path,
+        JSON.stringify({ size: 10, mimetype: "application/pdf" }),
+      ],
+    );
+    await db.query("SELECT fleet_finalize_invoice($1)", [manualId]);
+    await expect(
+      db.query("SELECT fleet_reserve_invoice($1,$2)", [
+        "00000000-0000-4000-8000-000000000093",
+        JSON.stringify({
+          ...manual,
+          supplier: "Otro nombre",
+          supplier_tax_id: "999000011",
+          invoice_number: "0-01",
+        }),
+      ]),
+    ).rejects.toThrow();
+    await db.exec("RESET ROLE");
+    expect(
+      (await db.query("SELECT count(*)::int AS n FROM totvs_proveedores")).rows,
+    ).toEqual([{ n: 2 }]);
+    expect(
+      (
+        await db.query(
+          "SELECT supplier,status FROM fleet_maintenance_invoices WHERE id=$1",
+          [manualId],
+        )
+      ).rows,
+    ).toEqual([{ supplier: "Taller manual", status: "uploaded" }]);
+    await db.exec("SET ROLE authenticated");
+    await db.exec("SELECT set_config('test.access','no',false)");
+    await expect(
+      db.query("SELECT * FROM fleet_search_suppliers('800')"),
+    ).rejects.toThrow("Sin acceso");
+  } finally {
+    await db.close();
+  }
+}, 30000);

@@ -94,7 +94,9 @@ export function InvoiceActions({
       return;
     }
     if (mode === "edit" && !data.supplier.trim()) {
-      setError("Seleccioná un RUC del maestro de proveedores");
+      setError(
+        "Completá el proveedor: seleccioná una coincidencia o ingresá el nombre si el RUC no está en el maestro",
+      );
       return;
     }
     setBusy(true);

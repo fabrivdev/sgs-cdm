@@ -24,18 +24,29 @@ export function SupplierFields({
   const [open, setOpen] = useState(false);
   const [active, setActive] = useState(-1);
   const [status, setStatus] = useState("");
+  const [manualRuc, setManualRuc] = useState<string | null>(null);
+  const manual = manualRuc === ruc && /^[0-9][0-9 .-]{2,19}$/.test(ruc);
   useEffect(() => {
     let current = true;
+    setManualRuc(null);
     setRows([]);
     setActive(-1);
     setStatus("");
-    if (!open || disabled || ruc.replace(/\D/g, "").length < 3) return;
+    if (disabled || ruc.replace(/\D/g, "").length < 3) return;
     setStatus("Buscando…");
     const timer = setTimeout(() => {
-      fleetRpc<SupplierSuggestion[]>("fleet_search_suppliers", { p_ruc: ruc })
-        .then((result) => {
+      Promise.all([
+        fleetRpc<SupplierSuggestion[]>("fleet_search_suppliers", {
+          p_ruc: ruc,
+        }),
+        fleetRpc<SupplierSuggestion[]>("fleet_supplier_identity", {
+          p_ruc: ruc,
+        }),
+      ])
+        .then(([result, exact]) => {
           if (current) {
             setRows(result);
+            setManualRuc(exact.length === 0 ? ruc : null);
             setStatus(result.length ? "" : "Sin coincidencias en el maestro");
           }
         })
@@ -50,7 +61,7 @@ export function SupplierFields({
       current = false;
       clearTimeout(timer);
     };
-  }, [ruc, open, disabled]);
+  }, [ruc, disabled]);
   function select(row: SupplierSuggestion) {
     onChange(row.ruc, row.razon_social);
     setOpen(false);
@@ -125,7 +136,7 @@ export function SupplierFields({
             ))}
           </ul>
         )}
-        {open && status && (
+        {(open || status.startsWith("No se pudo")) && status && (
           <p role="status" className="text-sm text-muted-foreground">
             {status}
           </p>
@@ -136,9 +147,12 @@ export function SupplierFields({
         <Input
           id={idPrefix + "-supplier"}
           value={name}
-          readOnly
+          readOnly={!manual}
+          disabled={disabled}
+          onChange={(e) => onChange(ruc, e.target.value)}
           required
-          className="bg-muted/30"
+          maxLength={200}
+          className={manual ? undefined : "bg-muted/30"}
         />
       </div>
     </>

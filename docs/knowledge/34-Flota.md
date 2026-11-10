@@ -1,3 +1,11 @@
+## Proveedor fuera del maestro — 10/11/2026
+
+Corrección autorizada: si una consulta exacta confirma que el RUC no está en totvs_proveedores, se habilita el campo Proveedor para escribir el nombre y cargar la factura normalmente. No se crea proveedor, no se agrega aprobación ni botones. Si existe, conserva selección y razón social del maestro. La consulta exacta es independiente del límite de 15 sugerencias por prefijo; salir del campo RUC no cancela la verificación. Cambiar RUC limpia el nombre y vuelve a verificar. Un error de consulta no se interpreta como ausencia.
+
+La migración incremental 20261110190000_fleet_manual_supplier.sql habilita esa identidad manual en el trigger de facturas y agrega fleet_supplier_identity, con los mismos permisos limitados de carga. Conserva el índice y la reserva que controlan duplicados por RUC y número normalizados, aun con nombres distintos. No modifica registros previos ni el maestro. Requiere aplicar antes fleet_supplier_lookup; ambas permanecen pendientes.
+
+Validación local: 13 pruebas de componentes, recorridos y PostgreSQL aislado, incluyendo carga finalizada por Operativos, maestro sin nuevas filas, rechazo de identidad inventada para RUC existente y rechazo del duplicado manual. TypeScript/ESLint y build se informan en la entrega. Sin SQL remoto ni publicación. Este bloque reemplaza la restricción de proveedor obligatorio del maestro de la sección anterior.
+
 ## Proveedores desde el maestro y fechas — 10/11/2026
 
 El RUC sugiere coincidencias del maestro TOTVS (totvs_proveedores) desde tres dígitos, con búsqueda por prefijo normalizado, espera de 250 ms y máximo de 15 opciones. Seleccionar completa la razón social en un campo separado de solo lectura; cambiar RUC limpia el nombre. No se crean proveedores desde Flota. Sin coincidencia o error, no se inventa identidad ni se permite una carga nueva sin proveedor seleccionado. Se conservan los valores de facturas históricas; el trigger valida nuevas identidades y cambios de proveedor, sin reescribir registros anteriores ni exigir maestro para recuperar solamente archivos.
