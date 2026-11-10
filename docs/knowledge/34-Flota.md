@@ -16,6 +16,10 @@ Validación: pruebas aisladas de PostgreSQL, parser, permisos, caché vacía, re
 
 ---
 
+## Período visible — 10/11/2026
+
+Flota reutiliza QuickPeriodFilter y FilterDate dentro de FiltersBar, como las otras secciones. Al entrar sin fechas explícitas selecciona Este año (1 de enero a 31 de diciembre del año actual). Período rápido y calendarios Desde/Hasta se muestran en la fila principal de escritorio; Sucursal y Departamento pasan a Más filtros en Vehículos. El cambio rápido actualiza las dos fechas de forma atómica; editar fechas conserva un rango personalizado, incluso un extremo vacío. Limpiar vuelve al año actual. La primera apertura de la ficha hereda las fechas del listado y volver conserva el período del listado. Fechas filtran recorrido y gastos, no eliminan vehículos del padrón.
+
 ## Odómetros inconsistentes — decisión confirmada el 10/11/2026
 
 El usuario indicó conservar los valores originales y excluir inconsistencias, sin reemplazar kilometrajes. fuelOdometerIssues diagnostica por vehículo: retrocesos aislados que recuperan la secuencia y tramos altos que luego retroceden. Una lectura baja aislada no invalida las anteriores correctas. Se excluyen intervalos con un extremo observado inconsistente, sin unir artificialmente los extremos a través de la carga descartada. Litros, importes, registros y exportaciones originales permanecen intactos.

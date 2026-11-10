@@ -34,7 +34,11 @@ export const initialFilters: FleetFilters = {
   type: "",
   invoiceState: "",
 };
-export type FilterChange = (key: keyof FleetFilters, value: string) => void;
+export type FilterChange = (
+  key: keyof FleetFilters | "period" | "reset",
+  value: string,
+  to?: string,
+) => void;
 export const options = (values: (string | null | undefined)[]) =>
   [...new Set(values.filter((v): v is string => !!v))].sort();
 export function rangeError(f: Pick<FleetFilters, "from" | "to">) {

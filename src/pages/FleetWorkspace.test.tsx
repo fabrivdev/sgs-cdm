@@ -283,3 +283,33 @@ it("locates vehicle actions immediately after More filters, not in the table or 
   ).not.toBeInTheDocument();
   expect(screen.queryByText(/\d+ registros/)).not.toBeInTheDocument();
 });
+import { quickPeriodPresets } from "@/components/filters/quickPeriodPresets";
+it("defaults to this year and changes both dates atomically using the shared shortcut", async () => {
+  mocks.load.mockResolvedValue(data);
+  const { container } = mount();
+  const selector = await screen.findByRole("combobox", {
+    name: "Período rápido",
+  });
+  const presets = quickPeriodPresets(new Date());
+  const year = presets.find((p) => p.key === "current-year")!;
+  const month = presets.find((p) => p.key === "current-month")!;
+  const dates = () =>
+    Array.from(
+      container.querySelectorAll<HTMLInputElement>('input[type="date"]'),
+    ).map((x) => x.value);
+  expect(selector).toHaveValue("current-year");
+  expect(dates()).toEqual([year.from, year.to]);
+  fireEvent.change(selector, { target: { value: "current-month" } });
+  expect(dates()).toEqual([month.from, month.to]);
+  fireEvent.click(screen.getByRole("button", { name: "DEMO-001" }));
+  expect(dates()).toEqual([month.from, month.to]);
+  fireEvent.click(screen.getByRole("button", { name: "← Vehículos" }));
+  expect(dates()).toEqual([month.from, month.to]);
+  fireEvent.change(container.querySelector('input[type="date"]')!, {
+    target: { value: "2025-02-01" },
+  });
+  expect(screen.getByRole("combobox", { name: "Período rápido" })).toHaveValue(
+    "",
+  );
+  expect(dates()[0]).toBe("2025-02-01");
+});

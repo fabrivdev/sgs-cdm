@@ -1,3 +1,4 @@
+import { quickPeriodPresets } from "@/components/filters/quickPeriodPresets";
 import { useState, useMemo } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useLocation, useSearchParams } from "react-router-dom";
@@ -14,7 +15,11 @@ import { ExpenseDetails } from "./ExpenseDetails";
 import { FuelImport } from "./FuelImport";
 import type { ManagedVehicle } from "./managementModel";
 import type { GridRow } from "./ManagementTable";
-import { initialFilters, type FleetFilters } from "./workspaceModel";
+import {
+  initialFilters,
+  type FleetFilters,
+  type FilterChange,
+} from "./workspaceModel";
 export function ManagementWorkspace() {
   const { user } = useAuth(),
     cache = useQueryClient(),
@@ -34,22 +39,36 @@ export function ManagementWorkspace() {
   const [editor, setEditor] = useState<ManagedVehicle | "new" | null>(null),
     [detail, setDetail] = useState<GridRow | null>(null),
     [importing, setImporting] = useState(false);
+  const [defaultPeriod] = useState(() =>
+    quickPeriodPresets(new Date()).find((p) => p.key === "current-year")!,
+  );
   const prefix = vehicleId ? `vehicle:${vehicleId}:` : section + ":";
   const filters = useMemo(
     () =>
       Object.fromEntries(
         Object.keys(initialFilters).map((k) => [
           k,
-          params.get(prefix + k) ?? "",
+          params.get(prefix + k) ??
+            (k === "from"
+              ? defaultPeriod.from
+              : k === "to"
+                ? defaultPeriod.to
+                : ""),
         ]),
       ) as unknown as FleetFilters,
-    [params, prefix],
+    [params, prefix, defaultPeriod],
   );
-  const change = (key: keyof FleetFilters, value: string) =>
+  const change: FilterChange = (key, value, to) =>
     setParams(
       (old) => {
         const p = new URLSearchParams(old);
-        if (value) p.set(prefix + key, value);
+        if (key === "period") {
+          p.set(prefix + "from", value);
+          p.set(prefix + "to", to ?? "");
+        } else if (key === "reset") {
+          Object.keys(initialFilters).forEach((k) => p.delete(prefix + k));
+        } else if (value || key === "from" || key === "to")
+          p.set(prefix + key, value);
         else p.delete(prefix + key);
         return p;
       },
@@ -60,6 +79,10 @@ export function ManagementWorkspace() {
     setParams((old) => {
       const p = new URLSearchParams(old);
       p.set("vehicle", id);
+      if (!p.has(`vehicle:${id}:from`) && !p.has(`vehicle:${id}:to`)) {
+        p.set(`vehicle:${id}:from`, filters.from);
+        p.set(`vehicle:${id}:to`, filters.to);
+      }
       p.set(
         "vehicleTab",
         section === "maintenance" ? "Mantenimiento" : "Combustible",

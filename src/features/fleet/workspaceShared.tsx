@@ -1,9 +1,9 @@
+import { QuickPeriodFilter } from "@/components/filters/QuickPeriodFilter";
 import type { ReactNode } from "react";
 import { Card } from "@/components/ui/card";
 import { KpiItem } from "@/components/layout/AppPrimitives";
 import { FilterDate, FiltersBar } from "@/components/filters/FiltersBar";
 import {
-  initialFilters,
   rangeError,
   type FleetFilters,
   type FilterChange,
@@ -73,6 +73,11 @@ export function PeriodFields({
 }) {
   return (
     <>
+      <QuickPeriodFilter
+        from={filters.from}
+        to={filters.to}
+        onChange={(from, to) => onChange("period", from, to)}
+      />
       <FilterDate
         label="Desde"
         value={filters.from}
@@ -108,11 +113,7 @@ export function FleetFilterBar({
           placeholder: "Buscar",
         }}
         activeCount={Object.values(filters).filter(Boolean).length}
-        onClear={() =>
-          Object.keys(initialFilters).forEach((k) =>
-            onChange(k as keyof FleetFilters, ""),
-          )
-        }
+        onClear={() => onChange("reset", "")}
         expanded={more}
         secondaryActions={secondaryActions}
       >

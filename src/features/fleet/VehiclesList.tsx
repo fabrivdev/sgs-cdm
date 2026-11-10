@@ -102,7 +102,19 @@ export function VehiclesList({
         onChange={onChange}
         more={
           <>
-            <PeriodFields filters={filters} onChange={onChange} />
+            <Choice
+              label="Sucursal"
+              value={filters.branch}
+              onChange={(v) => onChange("branch", v)}
+              options={options(data.vehicles.map((v) => v.branch))}
+            />
+            <Choice
+              label="Departamento"
+              value={filters.department}
+              onChange={(v) => onChange("department", v)}
+              options={options(data.vehicles.map((v) => v.department))}
+            />
+
             <Choice
               label="Marca"
               value={filters.brand}
@@ -112,23 +124,12 @@ export function VehiclesList({
           </>
         }
       >
+        <PeriodFields filters={filters} onChange={onChange} />
         <Choice
           label="Estado"
           value={filters.state}
           onChange={(v) => onChange("state", v)}
           options={options(data.vehicles.map((v) => v.operational_status))}
-        />
-        <Choice
-          label="Sucursal"
-          value={filters.branch}
-          onChange={(v) => onChange("branch", v)}
-          options={options(data.vehicles.map((v) => v.branch))}
-        />
-        <Choice
-          label="Departamento"
-          value={filters.department}
-          onChange={(v) => onChange("department", v)}
-          options={options(data.vehicles.map((v) => v.department))}
         />
       </FleetFilterBar>
       <SummaryCards
