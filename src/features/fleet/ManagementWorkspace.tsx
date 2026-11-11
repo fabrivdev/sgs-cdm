@@ -191,6 +191,8 @@ export function ManagementWorkspace() {
       {editor && (
         <VehicleEditor
           vehicle={editor === "new" ? undefined : editor}
+          responsibleCandidates={data.responsibleCandidates}
+          responsibilityEvents={data.responsibilityEvents}
           onClose={() => setEditor(null)}
           onSaved={() => void refresh()}
         />

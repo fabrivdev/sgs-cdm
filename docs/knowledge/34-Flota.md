@@ -248,3 +248,10 @@ El encabezado de la columna de mantenimiento pasa de Km a Kilometraje por pedido
 
 
 11/11/2026: la tabla de cargas de combustible también usa Kilometraje en lugar de Km. Solo cambia la etiqueta; cálculos y lista de vehículos intactos. Verificación por diff, sin SQL ni publicación Lovable.
+
+
+## Responsable integrado en Editar vehículo — 11/11/2026
+
+El panel existente muestra Responsable y Fecha de asignación al inicio. Precarga la asignación vigente, incluyendo nombres importados sin perfil o fecha, sin inventarlos. Al cambiar de persona (o seleccionar Sin responsable), habilita la fecha y propone hoy; no admite una fecha anterior a la asignación vigente ni futura. Guardar sin cambiar responsable sigue usando fleet_save_vehicle y no crea eventos. La vista de historial sigue disponible, sin modificar VehiclesList.
+
+Al cambiar responsable, fleet_save_vehicle_assignment guarda datos y agrega el evento mediante fleet_set_vehicle_responsible en una transacción. Verifica el evento vigente bajo bloqueo del vehículo para detectar cambios concurrentes; no borra ni reescribe eventos anteriores. Error conserva el formulario. Migración 20261111120000_fleet_vehicle_assignment_editor.sql entregada para aplicación manual; no ejecutada ni validada en la base remota. Sin publicación Lovable. Validación: cinco pruebas del editor (sin cambios, cambio, conflicto, nombre histórico, fecha inválida), diez regresiones de Flota y revisión visual de escritorio sin guardar datos.

@@ -1,3 +1,9 @@
+import {
+  currentFleetResponsibility,
+  type FleetResponsibleCandidate,
+  type FleetResponsibilityEvent,
+} from "./model";
+import { todayInParaguay } from "./period";
 import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -16,13 +22,34 @@ import {
 } from "./managementModel";
 export function VehicleEditor({
   vehicle,
+  responsibleCandidates = [],
+  responsibilityEvents = [],
   onClose,
   onSaved,
 }: {
   vehicle?: ManagedVehicle;
+  responsibleCandidates?: FleetResponsibleCandidate[];
+  responsibilityEvents?: FleetResponsibilityEvent[];
   onClose: () => void;
   onSaved: () => void;
 }) {
+  const [originalAssignment] = useState(() =>
+    vehicle
+      ? currentFleetResponsibility(
+          vehicle.id,
+          responsibilityEvents,
+          todayInParaguay(),
+        )
+      : null,
+  );
+  const originalResponsible =
+    originalAssignment?.responsible_profile_id ??
+    (originalAssignment?.responsible_name_snapshot ? "__current__" : "");
+  const [responsibleId, setResponsibleId] = useState(originalResponsible);
+  const [assignmentDate, setAssignmentDate] = useState(
+    originalAssignment?.effective_date ?? "",
+  );
+  const assignmentChanged = !!vehicle && responsibleId !== originalResponsible;
   const [data, setData] = useState<Record<string, string>>(() =>
     Object.fromEntries(
       [
@@ -71,6 +98,22 @@ export function VehicleEditor({
   ];
   async function save(e: React.FormEvent) {
     e.preventDefault();
+    if (pending) return;
+    if (
+      assignmentChanged &&
+      (!/^\d{4}-\d{2}-\d{2}$/.test(assignmentDate) ||
+        Number.isNaN(Date.parse(assignmentDate)) ||
+        new Date(assignmentDate).toISOString().slice(0, 10) !==
+          assignmentDate ||
+        assignmentDate > todayInParaguay() ||
+        (originalAssignment?.effective_date &&
+          assignmentDate < originalAssignment.effective_date))
+    ) {
+      setError(
+        "Ingresá una fecha de asignación válida, no anterior a la actual ni posterior a hoy.",
+      );
+      return;
+    }
     if (
       data.maintenance_interval_km &&
       (!Number.isInteger(Number(data.maintenance_interval_km)) ||
@@ -83,10 +126,20 @@ export function VehicleEditor({
     setPending(true);
     setError("");
     try {
-      await fleetRpc("fleet_save_vehicle", {
-        p_id: vehicle?.id ?? null,
-        p_data: data,
-      });
+      if (assignmentChanged) {
+        await fleetRpc("fleet_save_vehicle_assignment", {
+          p_id: vehicle!.id,
+          p_data: data,
+          p_responsible_profile_id: responsibleId || null,
+          p_effective_date: assignmentDate,
+          p_expected_assignment_id: originalAssignment?.id ?? null,
+        });
+      } else {
+        await fleetRpc("fleet_save_vehicle", {
+          p_id: vehicle?.id ?? null,
+          p_data: data,
+        });
+      }
       onSaved();
       onClose();
     } catch (e) {
@@ -111,6 +164,59 @@ export function VehicleEditor({
         </ResponsiveDrawerHeader>
         <ResponsiveDrawerBody>
           <fieldset disabled={pending} className="grid gap-3 sm:grid-cols-2">
+            {vehicle && (
+              <>
+                <div>
+                  <Label htmlFor="vehicle-responsible">Responsable</Label>
+                  <select
+                    id="vehicle-responsible"
+                    className="h-10 w-full rounded-md border bg-background px-2"
+                    value={responsibleId}
+                    onChange={(e) => {
+                      const next = e.target.value;
+                      setResponsibleId(next);
+                      setAssignmentDate(
+                        next === originalResponsible
+                          ? (originalAssignment?.effective_date ?? "")
+                          : todayInParaguay(),
+                      );
+                      setError("");
+                    }}
+                  >
+                    <option value="">Sin responsable</option>
+                    {originalResponsible &&
+                      !responsibleCandidates.some(
+                        (p) => p.id === originalResponsible,
+                      ) && (
+                        <option value={originalResponsible}>
+                          {originalAssignment?.responsible_name_snapshot ??
+                            "Responsable actual"}
+                        </option>
+                      )}
+                    {responsibleCandidates.map((p) => (
+                      <option key={p.id} value={p.id}>
+                        {p.nombre}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+                <div>
+                  <Label htmlFor="vehicle-assignment-date">
+                    Fecha de asignación
+                  </Label>
+                  <Input
+                    id="vehicle-assignment-date"
+                    type="date"
+                    value={assignmentDate}
+                    required={assignmentChanged}
+                    disabled={!assignmentChanged}
+                    min={originalAssignment?.effective_date ?? undefined}
+                    max={todayInParaguay()}
+                    onChange={(e) => setAssignmentDate(e.target.value)}
+                  />
+                </div>
+              </>
+            )}
             {fields.map(([k, label]) => (
               <div key={k}>
                 <Label htmlFor={"vehicle-" + k}>{label}</Label>
