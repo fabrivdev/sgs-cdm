@@ -1,0 +1,30 @@
+import { shortPersonName } from "@/lib/personName";
+const reviewed: Record<string, string> = {
+  "ANIBAL VILLALBA ROLON": "ANIBAL VILLALBA",
+};
+export function fleetResponsibleName(
+  full: string | null | undefined,
+  short?: string | null,
+) {
+  if (short?.trim()) return short.trim();
+  const name = (full ?? "").trim().replace(/\s+/g, " ");
+  if (name.split(" ").length <= 2) return name;
+  return reviewed[name.toUpperCase()] ?? shortPersonName(name);
+}
+export const personKey = (value: string) =>
+  value
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .toLocaleLowerCase()
+    .replace(/\s+/g, " ")
+    .trim();
+
+export function structuredResponsibleName(names: string, surnames: string) {
+  const first = names.trim().split(/\s+/)[0];
+  const surname =
+    surnames
+      .trim()
+      .match(/^(?:(?:de|del|la|las|los|da|das|do|dos|van|von)\s+)*\S+/i)?.[0] ??
+    "";
+  return [first, surname].filter(Boolean).join(" ");
+}

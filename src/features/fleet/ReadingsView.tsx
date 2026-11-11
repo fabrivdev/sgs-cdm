@@ -1,3 +1,6 @@
+import { fleetResponsibleName } from "./responsibleNames";
+import { fleetRpc } from "./managementApi";
+import { currentFleetResponsibility } from "./model";
 import { useMemo, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -12,11 +15,7 @@ import {
   type GridField,
   type GridRow,
 } from "./ManagementTable";
-import {
-  addFleetReading,
-  correctFleetReading,
-  setFleetResponsible,
-} from "./api";
+import { addFleetReading, correctFleetReading } from "./api";
 import type { ManagementData } from "./VehiclesList";
 import { FleetFilterBar, PeriodFields } from "./workspaceShared";
 import {
@@ -115,6 +114,19 @@ export function ReadingsView({
         showRowCount={false}
         fields={fields}
         rows={rows}
+        render={{
+          responsible: (r) => {
+            const e = data.responsibilityEvents.find((e) => e.id === r.id);
+            return (
+              <span title={String(r.responsible ?? "")}>
+                {fleetResponsibleName(
+                  e?.responsible_name_snapshot,
+                  e?.responsible_short_name_snapshot,
+                ) || "—"}
+              </span>
+            );
+          },
+        }}
         actions={[
           {
             id: "reading",
@@ -168,10 +180,23 @@ export function ReadingsView({
             setError("");
             try {
               if (mode === "responsible")
-                await setFleetResponsible({
-                  vehicleId,
-                  responsibleProfileId: profile || null,
-                  effectiveDate: date,
+                await fleetRpc("fleet_save_vehicle_responsible", {
+                  p_id: vehicleId,
+                  p_data: null,
+                  p_responsible_id: profile || null,
+                  p_source: profile
+                    ? (data.responsibleCandidates.find((p) => p.id === profile)
+                        ?.source ?? "profile")
+                    : "none",
+                  p_names: null,
+                  p_surnames: null,
+                  p_effective_date: date,
+                  p_expected_assignment_id:
+                    currentFleetResponsibility(
+                      vehicleId,
+                      data.responsibilityEvents,
+                      todayInParaguay(),
+                    )?.id ?? null,
                 });
               else if (mode === "correction")
                 await correctFleetReading({
@@ -219,7 +244,7 @@ export function ReadingsView({
                     <option value="">Sin responsable</option>
                     {data.responsibleCandidates.map((p) => (
                       <option key={p.id} value={p.id}>
-                        {p.nombre}
+                        {fleetResponsibleName(p.nombre, p.short_name)}
                       </option>
                     ))}
                   </select>

@@ -1,3 +1,4 @@
+import { ResponsiblePicker } from "./ResponsiblePicker";
 import {
   currentFleetResponsibility,
   type FleetResponsibleCandidate,
@@ -43,9 +44,13 @@ export function VehicleEditor({
       : null,
   );
   const originalResponsible =
+    originalAssignment?.responsible_contact_id ??
     originalAssignment?.responsible_profile_id ??
     (originalAssignment?.responsible_name_snapshot ? "__current__" : "");
   const [responsibleId, setResponsibleId] = useState(originalResponsible);
+  const [newNames, setNewNames] = useState("");
+  const [newSurnames, setNewSurnames] = useState("");
+  const [unselectedQuery, setUnselectedQuery] = useState(false);
   const [assignmentDate, setAssignmentDate] = useState(
     originalAssignment?.effective_date ?? "",
   );
@@ -99,6 +104,17 @@ export function VehicleEditor({
   async function save(e: React.FormEvent) {
     e.preventDefault();
     if (pending) return;
+    if (unselectedQuery) {
+      setError("Seleccioná un responsable o Agregar nuevo responsable.");
+      return;
+    }
+    if (
+      responsibleId === "__new__" &&
+      (!newNames.trim() || !newSurnames.trim())
+    ) {
+      setError("Completá nombres y apellidos del responsable.");
+      return;
+    }
     if (
       assignmentChanged &&
       (!/^\d{4}-\d{2}-\d{2}$/.test(assignmentDate) ||
@@ -127,10 +143,20 @@ export function VehicleEditor({
     setError("");
     try {
       if (assignmentChanged) {
-        await fleetRpc("fleet_save_vehicle_assignment", {
+        await fleetRpc("fleet_save_vehicle_responsible", {
           p_id: vehicle!.id,
           p_data: data,
-          p_responsible_profile_id: responsibleId || null,
+          p_responsible_id:
+            responsibleId === "__new__" ? null : responsibleId || null,
+          p_source:
+            responsibleId === "__new__"
+              ? "new"
+              : responsibleId
+                ? (responsibleCandidates.find((p) => p.id === responsibleId)
+                    ?.source ?? "profile")
+                : "none",
+          p_names: responsibleId === "__new__" ? newNames.trim() : null,
+          p_surnames: responsibleId === "__new__" ? newSurnames.trim() : null,
           p_effective_date: assignmentDate,
           p_expected_assignment_id: originalAssignment?.id ?? null,
         });
@@ -166,40 +192,41 @@ export function VehicleEditor({
           <fieldset disabled={pending} className="grid gap-3 sm:grid-cols-2">
             {vehicle && (
               <>
-                <div>
-                  <Label htmlFor="vehicle-responsible">Responsable</Label>
-                  <select
-                    id="vehicle-responsible"
-                    className="h-10 w-full rounded-md border bg-background px-2"
-                    value={responsibleId}
-                    onChange={(e) => {
-                      const next = e.target.value;
-                      setResponsibleId(next);
-                      setAssignmentDate(
-                        next === originalResponsible
-                          ? (originalAssignment?.effective_date ?? "")
-                          : todayInParaguay(),
-                      );
-                      setError("");
-                    }}
-                  >
-                    <option value="">Sin responsable</option>
-                    {originalResponsible &&
-                      !responsibleCandidates.some(
-                        (p) => p.id === originalResponsible,
-                      ) && (
-                        <option value={originalResponsible}>
-                          {originalAssignment?.responsible_name_snapshot ??
-                            "Responsable actual"}
-                        </option>
-                      )}
-                    {responsibleCandidates.map((p) => (
-                      <option key={p.id} value={p.id}>
-                        {p.nombre}
-                      </option>
-                    ))}
-                  </select>
-                </div>
+                <ResponsiblePicker
+                  value={responsibleId}
+                  candidates={
+                    originalResponsible &&
+                    !responsibleCandidates.some(
+                      (p) => p.id === originalResponsible,
+                    )
+                      ? [
+                          ...responsibleCandidates,
+                          {
+                            id: originalResponsible,
+                            nombre:
+                              originalAssignment?.responsible_name_snapshot ??
+                              "Responsable actual",
+                            short_name:
+                              originalAssignment?.responsible_short_name_snapshot,
+                            sucursal: null,
+                            es_tecnico: false,
+                          },
+                        ]
+                      : responsibleCandidates
+                  }
+                  newNames={newNames}
+                  newSurnames={newSurnames}
+                  onQueryState={setUnselectedQuery}
+                  onChange={(next) => {
+                    setResponsibleId(next);
+                    setAssignmentDate(
+                      next === originalResponsible
+                        ? (originalAssignment?.effective_date ?? "")
+                        : todayInParaguay(),
+                    );
+                    setError("");
+                  }}
+                />
                 <div>
                   <Label htmlFor="vehicle-assignment-date">
                     Fecha de asignación
@@ -215,6 +242,30 @@ export function VehicleEditor({
                     onChange={(e) => setAssignmentDate(e.target.value)}
                   />
                 </div>
+                {responsibleId === "__new__" && (
+                  <div className="grid grid-cols-2 gap-3 sm:col-span-2">
+                    <div>
+                      <Label htmlFor="responsible-names">Nombres</Label>
+                      <Input
+                        id="responsible-names"
+                        required
+                        maxLength={100}
+                        value={newNames}
+                        onChange={(e) => setNewNames(e.target.value)}
+                      />
+                    </div>
+                    <div>
+                      <Label htmlFor="responsible-surnames">Apellidos</Label>
+                      <Input
+                        id="responsible-surnames"
+                        required
+                        maxLength={100}
+                        value={newSurnames}
+                        onChange={(e) => setNewSurnames(e.target.value)}
+                      />
+                    </div>
+                  </div>
+                )}
               </>
             )}
             {fields.map(([k, label]) => (

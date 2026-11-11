@@ -28,7 +28,7 @@ import { SummaryCards } from "./workspaceShared";
 import {
   fmt,
   mileage,
-  responsible,
+  responsibleDisplay,
   within,
   fuelMoney,
   invoiceMoney,
@@ -186,7 +186,10 @@ export function VehicleDetail({
               "Marca/modelo",
               [vehicle.brand, vehicle.model].filter(Boolean).join(" "),
             ],
-            ["Responsable", responsible(vehicle.id, data.responsibilityEvents)],
+            [
+              "Responsable",
+              responsibleDisplay(vehicle.id, data.responsibilityEvents),
+            ],
             ["Sucursal", vehicle.branch],
             ["Estado", vehicle.operational_status],
             ["Km actuales", km.km == null ? "—" : fmt(km.km) + " km"],

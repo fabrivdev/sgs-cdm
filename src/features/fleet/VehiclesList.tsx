@@ -16,6 +16,7 @@ import {
   matches,
   mileage,
   responsible,
+  responsibleDisplay,
   within,
   fmt,
   fuelMoney,
@@ -176,6 +177,11 @@ export function VehiclesList({
         fields={fields}
         rows={rows}
         render={{
+          responsible: (r) => (
+            <span title={String(r.responsible ?? "")}>
+              {responsibleDisplay(r.id, data.responsibilityEvents) ?? "—"}
+            </span>
+          ),
           maintenance: (r) => (
             <span
               className={

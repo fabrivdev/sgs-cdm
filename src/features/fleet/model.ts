@@ -33,6 +33,8 @@ export interface FleetOdometerReading {
 }
 
 export interface FleetResponsibleCandidate {
+  source?: "profile" | "fleet";
+  short_name?: string | null;
   id: string;
   nombre: string;
   sucursal: string | null;
@@ -40,6 +42,8 @@ export interface FleetResponsibleCandidate {
 }
 
 export interface FleetResponsibilityEvent {
+  responsible_contact_id?: string | null;
+  responsible_short_name_snapshot?: string | null;
   id: string;
   vehicle_id: string;
   responsible_profile_id: string | null;

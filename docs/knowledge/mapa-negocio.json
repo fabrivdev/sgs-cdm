@@ -2499,7 +2499,8 @@
         "Elegir y preparar hojas autorizadas del padrón e historial.",
         "Realizar una única carga por tipo con cierre transaccional.",
         "Jefatura da de alta y edita vehículos, estados y responsables manualmente.",
-        "Consultar combustible mensual y mantenimiento desde gastos o la ficha; conservar historial."
+        "Consultar combustible mensual y mantenimiento desde gastos o la ficha; conservar historial.",
+        "Jefatura busca o agrega responsables de Flota desde Editar vehículo, sin crear acceso; guarda fecha e historial en una transacción."
       ],
       "entities": [
         "vehiculo-flota",
@@ -2512,7 +2513,10 @@
       ],
       "sources": [
         "src/pages/FleetWorkspace.tsx",
-        "docs/fleet-operations-local.md"
+        "docs/fleet-operations-local.md",
+        "src/features/fleet/VehicleEditor.tsx",
+        "src/features/fleet/ResponsiblePicker.tsx",
+        "supabase/migrations/20261111140000_fleet_responsible_contacts.sql"
       ]
     },
     {

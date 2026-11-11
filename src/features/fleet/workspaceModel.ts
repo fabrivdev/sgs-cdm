@@ -1,3 +1,4 @@
+import { fleetResponsibleName } from "./responsibleNames";
 import type { ManagedVehicle, FuelEntry, Invoice } from "./managementModel";
 import { estimatedConsumption, fuelIntervals } from "./managementModel";
 import { periodMileage, todayInParaguay } from "./period";
@@ -143,4 +144,17 @@ export function fleetConsumption(
   const km = intervals.reduce((n, r) => n + r.km, 0),
     liters = intervals.reduce((n, r) => n + r.liters, 0);
   return km > 0 ? (liters / km) * 100 : null;
+}
+
+export function responsibleDisplay(
+  id: string,
+  events: FleetResponsibilityEvent[],
+) {
+  const e = currentFleetResponsibility(id, events, todayInParaguay());
+  return (
+    fleetResponsibleName(
+      e?.responsible_name_snapshot,
+      e?.responsible_short_name_snapshot,
+    ) || null
+  );
 }

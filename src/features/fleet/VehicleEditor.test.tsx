@@ -55,7 +55,7 @@ beforeEach(() => {
 afterEach(cleanup);
 it("shows the current assignment and saves ordinary edits without appending history", async () => {
   mount();
-  expect(screen.getByLabelText("Responsable")).toHaveValue("p1");
+  expect(screen.getByLabelText("Responsable")).toHaveValue("Actual");
   expect(screen.getByLabelText("Fecha de asignación")).toHaveValue(
     "2026-10-01",
   );
@@ -67,9 +67,7 @@ it("shows the current assignment and saves ordinary edits without appending hist
 });
 it("sends the new assignment and vehicle together with the original event as conflict guard", async () => {
   mount();
-  fireEvent.change(screen.getByLabelText("Responsable"), {
-    target: { value: "p2" },
-  });
+  choose("Nuevo");
   fireEvent.change(screen.getByLabelText("Fecha de asignación"), {
     target: { value: "2026-10-15" },
   });
@@ -77,10 +75,10 @@ it("sends the new assignment and vehicle together with the original event as con
   await waitFor(() => expect(saved).toHaveBeenCalled());
   expect(rpc).toHaveBeenCalledTimes(1);
   expect(rpc).toHaveBeenCalledWith(
-    "fleet_save_vehicle_assignment",
+    "fleet_save_vehicle_responsible",
     expect.objectContaining({
       p_id: "v",
-      p_responsible_profile_id: "p2",
+      p_responsible_id: "p2",
       p_effective_date: "2026-10-15",
       p_expected_assignment_id: "old",
     }),
@@ -89,9 +87,7 @@ it("sends the new assignment and vehicle together with the original event as con
 it("retains edits on failure and supports explicitly unassigning a vehicle", async () => {
   rpc.mockRejectedValue(Error("El responsable cambió"));
   mount();
-  fireEvent.change(screen.getByLabelText("Responsable"), {
-    target: { value: "" },
-  });
+  choose("Sin responsable");
   submit();
   expect(await screen.findByRole("alert")).toHaveTextContent(
     "El responsable cambió",
@@ -99,8 +95,8 @@ it("retains edits on failure and supports explicitly unassigning a vehicle", asy
   expect(close).not.toHaveBeenCalled();
   expect(saved).not.toHaveBeenCalled();
   expect(rpc).toHaveBeenCalledWith(
-    "fleet_save_vehicle_assignment",
-    expect.objectContaining({ p_responsible_profile_id: null }),
+    "fleet_save_vehicle_responsible",
+    expect.objectContaining({ p_responsible_id: null }),
   );
 });
 it("preserves imported names without a linked profile or date when untouched", async () => {
@@ -110,20 +106,113 @@ it("preserves imported names without a linked profile or date when untouched", a
     effective_date: null,
     responsible_name_snapshot: "Histórico",
   });
-  expect(screen.getByRole("option", { name: "Histórico" })).toBeInTheDocument();
+  expect(screen.getByLabelText("Responsable")).toHaveValue("Histórico");
   submit();
   await waitFor(() => expect(saved).toHaveBeenCalled());
   expect(rpc).toHaveBeenCalledWith("fleet_save_vehicle", expect.anything());
 });
 it("rejects a date before the current assignment without sending a write", () => {
   mount();
-  fireEvent.change(screen.getByLabelText("Responsable"), {
-    target: { value: "p2" },
-  });
+  choose("Nuevo");
   fireEvent.change(screen.getByLabelText("Fecha de asignación"), {
     target: { value: "2026-09-01" },
   });
   submit();
   expect(screen.getByRole("alert")).toBeInTheDocument();
   expect(rpc).not.toHaveBeenCalled();
+});
+
+function choose(name: string) {
+  fireEvent.focus(screen.getByLabelText("Responsable"));
+  fireEvent.click(screen.getByRole("option", { name }));
+}
+it("creates a fleet-only contact with assignment on Save, never on selection", async () => {
+  mount();
+  choose("Agregar nuevo responsable");
+  fireEvent.change(screen.getByLabelText("Nombres"), {
+    target: { value: "Maria Elena" },
+  });
+  fireEvent.change(screen.getByLabelText("Apellidos"), {
+    target: { value: "De la Cruz Lopez" },
+  });
+  expect(rpc).not.toHaveBeenCalled();
+  submit();
+  await waitFor(() => expect(saved).toHaveBeenCalled());
+  expect(rpc).toHaveBeenCalledWith(
+    "fleet_save_vehicle_responsible",
+    expect.objectContaining({
+      p_source: "new",
+      p_names: "Maria Elena",
+      p_surnames: "De la Cruz Lopez",
+      p_expected_assignment_id: "old",
+    }),
+  );
+});
+it("searches full names and does not save unselected text", () => {
+  mount();
+  fireEvent.focus(screen.getByLabelText("Responsable"));
+  fireEvent.change(screen.getByLabelText("Responsable"), {
+    target: { value: "Nue" },
+  });
+  expect(screen.getByRole("option", { name: "Nuevo" })).toBeInTheDocument();
+  expect(
+    screen.queryByRole("option", { name: "Actual" }),
+  ).not.toBeInTheDocument();
+  fireEvent.blur(screen.getByLabelText("Responsable"));
+  submit();
+  expect(rpc).not.toHaveBeenCalled();
+  expect(screen.getByRole("alert")).toHaveTextContent("Seleccioná");
+});
+it("supports contacts without auth profiles", async () => {
+  render(
+    <VehicleEditor
+      vehicle={vehicle}
+      responsibleCandidates={[
+        {
+          id: "c1",
+          nombre: "Maria Elena De la Cruz",
+          short_name: "Maria De la Cruz",
+          source: "fleet",
+          sucursal: null,
+          es_tecnico: false,
+        },
+      ]}
+      responsibilityEvents={[event]}
+      onClose={close}
+      onSaved={saved}
+    />,
+  );
+  choose("Maria De la Cruz");
+  submit();
+  await waitFor(() => expect(saved).toHaveBeenCalled());
+  expect(rpc).toHaveBeenCalledWith(
+    "fleet_save_vehicle_responsible",
+    expect.objectContaining({ p_source: "fleet", p_responsible_id: "c1" }),
+  );
+});
+it("finds a reviewed short name while retaining the full identity", () => {
+  render(
+    <VehicleEditor
+      vehicle={vehicle}
+      responsibleCandidates={[
+        {
+          id: "p3",
+          nombre: "CARLOS JAVIER BENITEZ ZARZA",
+          sucursal: null,
+          es_tecnico: false,
+        },
+      ]}
+      responsibilityEvents={[event]}
+      onClose={close}
+      onSaved={saved}
+    />,
+  );
+  const input = screen.getByLabelText("Responsable");
+  fireEvent.change(input, { target: { value: "carlos benitez" } });
+  fireEvent.click(screen.getByRole("option", { name: "CARLOS BENITEZ" }));
+  expect(input).toHaveValue("CARLOS BENITEZ");
+  fireEvent.click(input);
+  expect(
+    screen.getByRole("option", { name: "CARLOS BENITEZ" }),
+  ).toHaveAttribute("title", "CARLOS JAVIER BENITEZ ZARZA");
 });

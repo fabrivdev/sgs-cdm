@@ -45,7 +45,7 @@ export async function loadFleetSnapshot(): Promise<FleetSnapshot> {
   };
   const [vehiclesResult, readingsResult, responsibilityResult, candidatesResult] = await Promise.all([
     fetchAll('fleet_vehicles'), fetchAll('fleet_odometer_readings'), fetchAll('fleet_vehicle_responsibility_events'),
-    (supabase.rpc as any)('fleet_list_responsible_candidates'),
+    (supabase.rpc as any)('fleet_list_responsible_options'),
   ]);
 
   if (vehiclesResult.error) throw vehiclesResult.error;
