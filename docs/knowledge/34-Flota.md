@@ -245,3 +245,6 @@ Por indicación del usuario, los indicadores de mantenimiento en la ficha se tit
 
 
 El encabezado de la columna de mantenimiento pasa de Km a Kilometraje por pedido del usuario (10/11/2026). Cambio de etiqueta únicamente; datos, cálculos y lista de vehículos intactos.
+
+
+11/11/2026: la tabla de cargas de combustible también usa Kilometraje en lugar de Km. Solo cambia la etiqueta; cálculos y lista de vehículos intactos. Verificación por diff, sin SQL ni publicación Lovable.

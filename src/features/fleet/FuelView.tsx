@@ -28,7 +28,7 @@ import {
 const fields: GridField[] = [
   ["date", "Fecha", "date"],
   ["plate", "Chapa"],
-  ["km", "Km", "number"],
+  ["km", "Kilometraje", "number"],
   ["liters", "Litros", "number"],
   ["amount", "Importe", "number"],
   ["currency", "Moneda"],
