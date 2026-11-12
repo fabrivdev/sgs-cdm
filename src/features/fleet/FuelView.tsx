@@ -1,3 +1,4 @@
+import { fuelOdometerIssues } from "./fuelOdometer";
 import { fuelPeriodSegments } from "./fuelPeriodSegments";
 import { fuelIntervals } from "./managementModel";
 import { normalizePlate } from "./model";
@@ -191,6 +192,10 @@ export function FuelView({
     );
     return distances;
   }, [data.fuel]);
+  const odometerIssues = useMemo(
+    () => fuelOdometerIssues(data.fuel, fuelIdentity),
+    [data.fuel],
+  );
   const rows = useMemo(
     () =>
       visible.map((r) => ({
@@ -201,14 +206,16 @@ export function FuelView({
         responsible: r.vehicle_id
           ? responsibleDisplay(r.vehicle_id, data.responsibilityEvents)
           : null,
-        km: r.odometer_km,
+        km: odometerIssues.has(r) ? null : r.odometer_km,
+        originalKm: r.odometer_km,
+        odometerIssue: odometerIssues.get(r),
         distance: distanceByLoad.get(r.id) ?? null,
         liters: r.liters,
         amount: r.net_amount,
         currency: r.currency,
         station: r.station,
       })),
-    [visible, data.responsibilityEvents, distanceByLoad],
+    [visible, data.responsibilityEvents, distanceByLoad, odometerIssues],
   );
   const totalRows = vehicleId
     ? scope
@@ -393,6 +400,25 @@ export function FuelView({
         }
         omittedColumns={vehicleId ? ["plate", "currency"] : ["currency"]}
         render={{
+          ...(!byVehicle && !monthly
+            ? {
+                km: (row: GridRow) =>
+                  row.odometerIssue ? (
+                    <span
+                      className="text-muted-foreground"
+                      title={
+                        fmt(row.originalKm as number | null) +
+                        " km en el comprobante. " +
+                        row.odometerIssue
+                      }
+                    >
+                      Por verificar
+                    </span>
+                  ) : (
+                    fmt(row.km as number | null)
+                  ),
+              }
+            : {}),
           expense: (r) => (
             <span className="block text-right tabular-nums">
               {r.expenseLabel ?? r.expense}
