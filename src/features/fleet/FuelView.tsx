@@ -298,7 +298,7 @@ export function FuelView({
               ["vehicles", "Vehículos que cargaron", "number"],
               ["loads", "Cargas", "number"],
               ["distance", "Kilómetros recorridos", "number"],
-              ["consumption", "Consumo promedio (L/100 km)", "number"],
+              ["consumption", "Consumo promedio", "number"],
               ["liters", "Litros", "number"],
             ]}
             metrics={monthlyFuelMetrics}

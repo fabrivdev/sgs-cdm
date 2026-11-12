@@ -1,3 +1,4 @@
+import { LoadingScreen } from "@/components/LoadingScreen";
 import { SalesSectionExportsProvider } from "@/components/ventas/SalesSectionExports";
 import { quickPeriodPresets } from "@/components/filters/quickPeriodPresets";
 import { useState, useMemo } from "react";
@@ -101,12 +102,7 @@ export function ManagementWorkspace() {
     await cache.invalidateQueries({ queryKey: ["fleet-management"] });
     await cache.invalidateQueries({ queryKey: ["fleet-snapshot"] });
   };
-  if (query.isPending)
-    return (
-      <PageShell>
-        <p role="status">Cargando Flota…</p>
-      </PageShell>
-    );
+  if (query.isPending) return <LoadingScreen />;
   if (query.isError)
     return (
       <PageShell>
