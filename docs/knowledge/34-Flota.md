@@ -1,5 +1,9 @@
 # Flota: reconstrucción de escritorio — 10/11/2026
 
+## Consulta de Gerencia — 12/11/2026
+
+Gerencia con módulo Servicios y sección Flota asignados puede consultar Vehículos, Combustible, Mantenimiento y documentos. No recibe altas, edición, importación ni carga/corrección de facturas. Se mantienen los permisos asignables de Administración; no se copian accesos ni se conceden secciones automáticamente. La consulta omite candidatos de responsables, cuya RPC sigue reservada a administración de Flota. Predicados separados en managementModel y políticas de lectura del servidor; validación y límites en la entrega del cambio.
+
 Este bloque reemplaza las decisiones visuales anteriores. Vehículos, Combustible, Mantenimiento y Cargar factura son el menú de Jefatura; Operativos solo carga. Filtros nativos en una fila y Más filtros lateral. Tarjetas con componentes base del tema (no existía SummaryCard). TableScroll/RowCount/scrollHead, filas memoizadas, sin paginación que reinicie al renderizar. No hay selector de vistas, diálogo de columnas, auditoría de vehículo visible ni Flota.tsx embebido.
 
 Vehículos, Combustible, Mantenimiento y Lecturas no muestran contador de registros ni barra vacía sobre la tabla. Un solo menú de tres puntos se ubica en FiltersBar.secondaryActions, inmediatamente después de Más filtros cuando ese disparador existe, conforme a docs/acciones-de-seccion.md. Conserva exportación, importación y acciones existentes, permisos y filas filtradas/ordenadas. No va en PageHeader ni dentro de la tabla. Nuevo vehículo y Editar conservan su ubicación principal.

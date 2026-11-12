@@ -16,7 +16,7 @@ import { MaintenanceView } from "./MaintenanceView";
 import { VehicleEditor } from "./VehicleEditor";
 import { ExpenseDetails } from "./ExpenseDetails";
 import { FuelImport } from "./FuelImport";
-import type { ManagedVehicle } from "./managementModel";
+import { canManageFleet, type ManagedVehicle } from "./managementModel";
 import type { GridRow } from "./ManagementTable";
 import {
   initialFilters,
@@ -24,10 +24,11 @@ import {
   type FilterChange,
 } from "./workspaceModel";
 export function ManagementWorkspace() {
-  const { user } = useAuth(),
+  const { user, roles, hasSectionAccess } = useAuth(),
     cache = useQueryClient(),
     location = useLocation(),
     [params, setParams] = useSearchParams();
+  const editable = canManageFleet(roles, hasSectionAccess("servicios.flota"));
   const section = location.pathname.endsWith("/combustible")
     ? "fuel"
     : location.pathname.endsWith("/mantenimientos")
@@ -35,8 +36,8 @@ export function ManagementWorkspace() {
       : "vehicles";
   const vehicleId = params.get("vehicle") ?? undefined;
   const query = useQuery({
-    queryKey: ["fleet-management", user?.id, "all"],
-    queryFn: () => loadManagement("all"),
+    queryKey: ["fleet-management", user?.id, "all", editable],
+    queryFn: () => loadManagement("all", editable),
     retry: false,
   });
   const [editor, setEditor] = useState<ManagedVehicle | "new" | null>(null),
@@ -131,6 +132,7 @@ export function ManagementWorkspace() {
     <PageShell>
       {vehicle ? (
         <VehicleDetail
+          readOnly={!editable}
           vehicle={vehicle}
           data={data}
           filters={filters}
@@ -161,7 +163,7 @@ export function ManagementWorkspace() {
           filters={filters}
           onChange={change}
           onOpen={open}
-          onCreate={() => setEditor("new")}
+          onCreate={editable ? () => setEditor("new") : undefined}
         />
       ) : (
         <>
@@ -175,7 +177,7 @@ export function ManagementWorkspace() {
                 filters={filters}
                 onChange={change}
                 onSelect={setDetail}
-                onImport={() => setImporting(true)}
+                onImport={editable ? () => setImporting(true) : undefined}
               />
             ) : (
               <MaintenanceView
@@ -188,7 +190,7 @@ export function ManagementWorkspace() {
           </SalesSectionExportsProvider>
         </>
       )}
-      {editor && (
+      {editable && editor && (
         <VehicleEditor
           vehicle={editor === "new" ? undefined : editor}
           responsibleCandidates={data.responsibleCandidates}
@@ -198,6 +200,7 @@ export function ManagementWorkspace() {
         />
       )}
       <ExpenseDetails
+        readOnly={!editable}
         data={data}
         detail={detail}
         onClose={() => setDetail(null)}
@@ -206,7 +209,7 @@ export function ManagementWorkspace() {
         onVehicle={open}
       />
       <StoredDocumentViewer bucket="fleet-invoices" />
-      {importing && (
+      {editable && importing && (
         <FuelImport onClose={() => setImporting(false)} onSaved={refresh} />
       )}
     </PageShell>

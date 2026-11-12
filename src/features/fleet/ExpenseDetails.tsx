@@ -49,6 +49,7 @@ export function ExpenseDetails({
   refresh,
   vehicle,
   onVehicle: openVehicle,
+  readOnly = false,
 }: {
   data: ManagementData;
   detail: GridRow | null;
@@ -56,6 +57,7 @@ export function ExpenseDetails({
   refresh: () => Promise<void>;
   vehicle?: string;
   onVehicle: (id: string) => void;
+  readOnly?: boolean;
 }) {
   const selectedInvoice = data.invoices.find((r) => r.id === detail?.id),
     selectedHistory = data.history.find((r) => r.id === detail?.id),
@@ -223,13 +225,13 @@ export function ExpenseDetails({
                 </div>
               </dl>
               <div className="flex gap-3">
-                <InvoiceActionMenu
+                {!readOnly && <InvoiceActionMenu
                   invoice={selectedInvoice}
                   onSelect={(mode) => {
                     setInvoiceAction({ invoice: selectedInvoice, mode });
                     setDetail(null);
                   }}
-                />
+                />}
                 <Button
                   className={
                     selectedInvoice.status !== "uploaded" ? "hidden" : undefined
@@ -244,7 +246,7 @@ export function ExpenseDetails({
                 >
                   Abrir factura
                 </Button>
-                <Button
+                {!readOnly && <Button
                   variant="outline"
                   className={
                     selectedInvoice.status !== "uploaded" ? "hidden" : undefined
@@ -262,7 +264,7 @@ export function ExpenseDetails({
                   }}
                 >
                   Registrar importe
-                </Button>
+                </Button>}
               </div>
             </>
           )}

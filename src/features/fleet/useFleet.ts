@@ -23,7 +23,7 @@ export function useFleet(previewData?: FleetSnapshot) {
       user?.id,
     ],
     enabled: Boolean(user) && !previewData,
-    queryFn: loadFleetSnapshot,
+    queryFn: () => loadFleetSnapshot(),
     initialData: previewData,
     retry: false,
     staleTime: 30_000,

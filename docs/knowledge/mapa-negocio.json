@@ -1772,7 +1772,7 @@
       "id": "flota-operativos-solo-carga",
       "title": "Operativos solo carga facturas",
       "module": "servicios",
-      "description": "Rol más acceso de sección. Operativos no consulta vehículos, historial, facturas ni archivos, incluso mediante RPC/Storage. Jefatura administra; admin/superadmin mantienen soporte técnico. No hay aprobación manual.",
+      "description": "Rol más acceso de sección. Operativos no consulta vehículos, historial, facturas ni archivos, incluso mediante RPC/Storage. Gerencia consulta Flota asignada sin edición ni carga. Jefatura administra; admin/superadmin mantienen soporte técnico. No hay aprobación manual.",
       "sources": [
         "src/features/fleet/managementModel.ts",
         "supabase/migrations/20261110120000_fleet_operations.sql"

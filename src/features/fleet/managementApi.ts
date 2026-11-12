@@ -43,9 +43,10 @@ async function readAll<T>(table: string, order = "id"): Promise<T[]> {
 }
 export async function loadManagement(
   scope: "fuel" | "maintenance" | "vehicles" | "all" = "all",
+  includeCandidates = true,
 ) {
   const [base, fuel, history, invoices, changes] = await Promise.all([
-    loadFleetSnapshot(),
+    loadFleetSnapshot(includeCandidates),
     scope === "fuel" || scope === "all"
       ? readAll<FuelEntry>("fleet_fuel_entries")
       : Promise.resolve([] as FuelEntry[]),

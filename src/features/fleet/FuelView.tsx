@@ -136,7 +136,7 @@ export function FuelView({
   filters: FleetFilters;
   onChange: FilterChange;
   onSelect: (r: GridRow) => void;
-  onImport: () => void;
+  onImport?: () => void;
   showSummary?: boolean;
   detailSummary?: ReactNode;
   vehicleActions?: { id: string; label: string; onSelect: () => void }[];
@@ -583,7 +583,7 @@ export function FuelView({
         }
         actions={[
           ...vehicleActions,
-          { id: "import", label: "Importar combustible", onSelect: onImport },
+          ...(onImport ? [{ id: "import", label: "Importar combustible", onSelect: onImport }] : []),
         ]}
       />
     </>

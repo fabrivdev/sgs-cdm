@@ -6,6 +6,7 @@ import {
   monthlyFuel,
   invoiceValidation,
   canManageFleet,
+  canViewFleet,
   canSubmitInvoice,
   type FuelEntry,
 } from "./managementModel";
@@ -26,6 +27,13 @@ const row = (id: string, date: string, km: number, liters = 40): FuelEntry => ({
   raw_data: {},
 });
 describe("Fleet calculations and input", () => {
+  it("lets Gerencia view assigned Fleet without granting management or submission", () => {
+    expect(canViewFleet(["gerencia"], true)).toBe(true);
+    expect(canViewFleet(["gerencia"], false)).toBe(false);
+    expect(canManageFleet(["gerencia"], true)).toBe(false);
+    expect(canSubmitInvoice(["gerencia"], true)).toBe(false);
+    expect(canViewFleet(["operativo"], true)).toBe(false);
+  });
   it("requires both role and section and keeps operators upload-only", () => {
     expect(canManageFleet(["operativo"], true)).toBe(false);
     expect(canSubmitInvoice(["operativo"], true)).toBe(true);

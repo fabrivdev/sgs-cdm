@@ -48,6 +48,7 @@ export function VehicleDetail({
   onSelect,
   onImport,
   onSaved,
+  readOnly = false,
 }: {
   vehicle: ManagedVehicle;
   data: ManagementData;
@@ -60,6 +61,7 @@ export function VehicleDetail({
   onSelect: (r: GridRow) => void;
   onImport: () => void;
   onSaved: () => Promise<void>;
+  readOnly?: boolean;
 }) {
   const [calculation, setCalculation] = useState(false);
   const [administration, setAdministration] = useState(false);
@@ -72,7 +74,7 @@ export function VehicleDetail({
           ? { ...f, from: value, to: to ?? "" }
           : { ...f, [key]: value },
     );
-  const vehicleActions = [
+  const vehicleActions = readOnly ? [] : [
     {
       id: "vehicle-administration",
       label: "Kilometraje y responsable",
@@ -175,9 +177,9 @@ export function VehicleDetail({
                 ))}
               </TabsList>
             </Tabs>
-            <Button variant="outline" size="sm" onClick={onEdit}>
+            {!readOnly && <Button variant="outline" size="sm" onClick={onEdit}>
               Editar
-            </Button>
+            </Button>}
           </div>
         </div>
         <p className="flex flex-wrap items-center gap-x-2 text-xs text-muted-foreground">
@@ -223,7 +225,7 @@ export function VehicleDetail({
           filters={filters}
           onChange={onChange}
           onSelect={onSelect}
-          onImport={onImport}
+          onImport={readOnly ? undefined : onImport}
           showSummary={false}
           detailSummary={detailSummary}
           vehicleActions={[

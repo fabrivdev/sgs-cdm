@@ -91,6 +91,19 @@ afterEach(() => {
   mocks.roles = ["jefatura"];
 });
 describe("Fleet role journeys", () => {
+  it("lets Gerencia consult vehicles and a vehicle detail without edit or create actions", async () => {
+    mocks.roles = ["gerencia"];
+    mocks.load.mockResolvedValue(data);
+    mount();
+    await screen.findByRole("heading", { name: "Vehículos" });
+    expect(mocks.load).toHaveBeenCalledWith("all", false);
+    expect(screen.queryByRole("button", { name: "Nuevo vehículo" })).not.toBeInTheDocument();
+    fireEvent.click(screen.getByText(data.vehicles[0].plate));
+    await screen.findByRole("heading", { name: data.vehicles[0].plate });
+    expect(screen.queryByRole("button", { name: "Editar" })).not.toBeInTheDocument();
+    expect(screen.getByRole("tab", { name: "Combustible" })).toBeInTheDocument();
+    expect(screen.getByRole("tab", { name: "Mantenimiento" })).toBeInTheDocument();
+  });
   it("shows operators only the submission form, without loading fleet data even on an expense URL", () => {
     mocks.roles = ["operativo"];
     mount("/servicios/flota/combustible?vehicle=private");

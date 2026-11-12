@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { NavLink, Outlet, useLocation, useNavigate } from "react-router-dom";
-import { canManageFleet, canSubmitInvoice } from "@/features/fleet/managementModel";
+import { canViewFleet, canSubmitInvoice } from "@/features/fleet/managementModel";
 import { useAuth } from "@/hooks/useAuth";
 import {
   BriefcaseBusiness,
@@ -195,12 +195,12 @@ export function AppLayout({ children, preview }: { children?: React.ReactNode; p
 
   // Un grupo solo aparece si el usuario tiene acceso a ese modulo; las vistas
   // ejecutivas exigen ademas la capacidad correspondiente.
-  const fleetManager = canManageFleet(roles, hasSectionAccess("servicios.flota"));
+  const fleetManager = canViewFleet(roles, hasSectionAccess("servicios.flota"));
   const fleetItems: NavItem[] = fleetManager ? [
     {to:"/servicios/flota",label:"Vehículos",icon:CarFront,section:"servicios.flota",end:true},
     {to:"/servicios/flota/combustible",label:"Combustible",icon:BadgeDollarSign,section:"servicios.flota"},
     {to:"/servicios/flota/mantenimientos",label:"Mantenimiento",icon:Wrench,section:"servicios.flota"},
-    {to:"/servicios/flota/cargar-factura",label:"Cargar factura",icon:ClipboardList,section:"servicios.flota"},
+    ...(canSubmitInvoice(roles, hasSectionAccess("servicios.flota")) ? [{to:"/servicios/flota/cargar-factura",label:"Cargar factura",icon:ClipboardList,section:"servicios.flota" as const}] : []),
   ] : canSubmitInvoice(roles, hasSectionAccess("servicios.flota")) ? [{to:"/servicios/flota",label:"Cargar factura",icon:ClipboardList,section:"servicios.flota"}] : [];
   const visibleGroups = [...navGroups, {id:"flota",modulo:"servicios",label:"Flota",icon:CarFront,items:fleetItems}]
     .filter((group) => preview ? group.modulo === preview.modulo : hasModuloAccess(group.modulo))

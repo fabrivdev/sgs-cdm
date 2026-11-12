@@ -82,6 +82,9 @@ export interface FuelEntry {
   source_key: string;
   raw_data: Record<string, unknown>;
 }
+export function canViewFleet(roles: readonly string[], sectionAccess: boolean) {
+  return sectionAccess && (roles.includes("gerencia") || canManageFleet(roles, sectionAccess));
+}
 export function canManageFleet(
   roles: readonly string[],
   sectionAccess: boolean,

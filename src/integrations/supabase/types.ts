@@ -10844,6 +10844,7 @@ export type Database = {
       fleet_assert_write_access: { Args: never; Returns: string }
       fleet_can_submit: { Args: never; Returns: boolean }
       fleet_can_upload_path: { Args: { p_path: string }; Returns: boolean }
+      fleet_can_view: { Args: never; Returns: boolean }
       fleet_correct_invoice: {
         Args: {
           p_data: Json

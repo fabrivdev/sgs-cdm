@@ -46,7 +46,7 @@ export function VehiclesList({
   filters: FleetFilters;
   onChange: FilterChange;
   onOpen: (id: string) => void;
-  onCreate: () => void;
+  onCreate?: () => void;
 }) {
   const [actionsTarget, setActionsTarget] = useState<HTMLDivElement | null>(
     null,
@@ -98,7 +98,7 @@ export function VehiclesList({
       <PageHeader
         title="Vehículos"
         actions={
-          <Button size="sm" onClick={onCreate}>
+          onCreate && <Button size="sm" onClick={onCreate}>
             Nuevo vehículo
           </Button>
         }

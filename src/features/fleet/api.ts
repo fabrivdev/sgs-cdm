@@ -33,7 +33,7 @@ export interface SetFleetResponsibleInput {
   effectiveDate: string;
 }
 
-export async function loadFleetSnapshot(): Promise<FleetSnapshot> {
+export async function loadFleetSnapshot(includeCandidates = true): Promise<FleetSnapshot> {
   const fetchAll = async (table: string) => {
     const data: any[] = [];
     for (let offset = 0; ; offset += 500) {
@@ -45,7 +45,7 @@ export async function loadFleetSnapshot(): Promise<FleetSnapshot> {
   };
   const [vehiclesResult, readingsResult, responsibilityResult, candidatesResult] = await Promise.all([
     fetchAll('fleet_vehicles'), fetchAll('fleet_odometer_readings'), fetchAll('fleet_vehicle_responsibility_events'),
-    (supabase.rpc as any)('fleet_list_responsible_options'),
+    includeCandidates ? (supabase.rpc as any)('fleet_list_responsible_options') : Promise.resolve({ data: [], error: null }),
   ]);
 
   if (vehiclesResult.error) throw vehiclesResult.error;
