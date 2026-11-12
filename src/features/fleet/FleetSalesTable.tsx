@@ -33,12 +33,17 @@ export function FleetSalesTable({
           : kind === "number"
             ? "right"
             : "left",
-        weight:
-          key === "supplier" || key === "responsible"
-            ? 1.7
-            : key.startsWith("group")
-              ? 0.75
-              : 1,
+        weight: [
+          "supplier",
+          "responsible",
+          "station",
+          "vehicles",
+          "distance",
+        ].includes(key)
+          ? 1.7
+          : key.startsWith("group")
+            ? 0.75
+            : 1,
         value,
         exportValue:
           key === "expense" ? (row) => row.expenseLabel ?? value(row) : value,
@@ -65,25 +70,27 @@ export function FleetSalesTable({
           <SalesSectionExportMenu extraActions={actions} />,
           actionsTarget,
         )}
-      <SalesDataTable
-        title={label}
-        hideDesktopTitle={hideTitle}
-        rows={rows}
-        columns={mapped.filter(
-          (column) => !omittedColumns.includes(column.key),
-        )}
-        exportColumns={mapped}
-        initialSort={{
-          key: fields[0][0],
-          direction: fields[0][2] === "date" ? "desc" : "asc",
-        }}
-        rowKey={(row) => row.id}
-        fileName={label + ".xlsx"}
-        sheetName="Flota"
-        empty="Sin registros"
-        onRowClick={onSelect}
-        desktopBreakpoint={640}
-      />
+      <div className="min-w-0 [&_[role=row]]:gap-x-4">
+        <SalesDataTable
+          title={label}
+          hideDesktopTitle={hideTitle}
+          rows={rows}
+          columns={mapped.filter(
+            (column) => !omittedColumns.includes(column.key),
+          )}
+          exportColumns={mapped}
+          initialSort={{
+            key: fields[0][0],
+            direction: fields[0][2] === "date" ? "desc" : "asc",
+          }}
+          rowKey={(row) => row.id}
+          fileName={label + ".xlsx"}
+          sheetName="Flota"
+          empty="Sin registros"
+          onRowClick={onSelect}
+          desktopBreakpoint={640}
+        />
+      </div>
     </>
   );
 }

@@ -125,6 +125,17 @@ export function expenseMoneyValue(
     : null;
 }
 
+const shortMonth = new Intl.DateTimeFormat("es-PY", {
+  month: "short",
+  timeZone: "UTC",
+});
+function monthLabel(value: string) {
+  const month = shortMonth
+    .format(new Date(value + "T00:00:00Z"))
+    .replace(/\.$/, "");
+  return month + ". " + value.slice(0, 4);
+}
+
 export function ExpensePeriods<T>({
   rows,
   date,
@@ -160,9 +171,7 @@ export function ExpensePeriods<T>({
         }))}
         render={{
           date: (row) =>
-            row.date
-              ? String(row.date).slice(0, 7).split("-").reverse().join("/")
-              : "Sin fecha",
+            row.date ? monthLabel(String(row.date)) : "Sin fecha",
           expense: (row) => row.expenseLabel,
         }}
       />

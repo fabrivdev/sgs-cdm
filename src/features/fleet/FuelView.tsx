@@ -1,3 +1,5 @@
+import { fuelIntervals } from "./managementModel";
+import { normalizePlate } from "./model";
 import {
   ExpensePeriods,
   expenseIdentityFields,
@@ -39,6 +41,29 @@ const fields: GridField[] = [
   ["currency", "Moneda"],
   ["station", "Estación"],
 ];
+function monthlyFuelMetrics(rows: ManagementData["fuel"]) {
+  const identity = (row: ManagementData["fuel"][number]) =>
+    row.vehicle_id || normalizePlate(row.plate) ? expenseGroupKey(row) : null;
+  const vehicles = new Set(
+    rows
+      .filter(
+        (row) =>
+          row.liters > 0 &&
+          row.net_amount >= 0 &&
+          /diesel|nafta|gasolina|gasoil/i.test(row.product) &&
+          !/aceite|lubricante/i.test(row.product),
+      )
+      .map(identity)
+      .filter(Boolean),
+  );
+  const distance = fuelIntervals(rows, true, undefined, undefined, identity);
+  return {
+    ...fuelMetrics(rows),
+    vehicles: vehicles.size,
+    distance: distance.intervals ? distance.km : null,
+  };
+}
+
 function fuelMetrics(rows: ManagementData["fuel"]) {
   return {
     loads: rows.length,
@@ -198,10 +223,12 @@ export function FuelView({
             rows={visible}
             date={(row) => row.occurred_at}
             fields={[
+              ["vehicles", "Vehículos que cargaron", "number"],
               ["loads", "Cargas", "number"],
+              ["distance", "Kilómetros recorridos", "number"],
               ["liters", "Litros", "number"],
             ]}
-            metrics={fuelMetrics}
+            metrics={monthlyFuelMetrics}
           />
         </>
       )}

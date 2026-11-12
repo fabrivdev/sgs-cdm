@@ -161,16 +161,17 @@ export function fuelIntervals(
   sameMonth: boolean,
   from = "",
   to = "9999-12-31",
+  identity: (row: FuelEntry) => string | null = (row) => row.vehicle_id,
 ) {
   const ordered = [...rows].sort(
     (a, b) =>
-      (a.vehicle_id ?? "").localeCompare(b.vehicle_id ?? "") ||
+      (identity(a) ?? "").localeCompare(identity(b) ?? "") ||
       a.occurred_at.localeCompare(b.occurred_at),
   );
-  const issues = fuelOdometerIssues(ordered);
+  const issues = fuelOdometerIssues(ordered, identity);
   const occurrences = new Map<string, number>();
   for (const r of rows) {
-    const key = r.vehicle_id + "|" + r.occurred_at;
+    const key = identity(r) + "|" + r.occurred_at;
     occurrences.set(key, (occurrences.get(key) ?? 0) + 1);
   }
   let intervals = 0;
@@ -180,16 +181,17 @@ export function fuelIntervals(
   for (let i = 1; i < ordered.length; i++) {
     const a = ordered[i - 1],
       b = ordered[i];
+    const group = identity(a);
     if (
-      !a.vehicle_id ||
-      a.vehicle_id !== b.vehicle_id ||
+      !group ||
+      group !== identity(b) ||
       a.occurred_at === b.occurred_at ||
       (sameMonth && a.occurred_at.slice(0, 7) !== b.occurred_at.slice(0, 7))
     )
       continue;
     if (
-      occurrences.get(a.vehicle_id + "|" + a.occurred_at) !== 1 ||
-      occurrences.get(b.vehicle_id + "|" + b.occurred_at) !== 1
+      occurrences.get(group + "|" + a.occurred_at) !== 1 ||
+      occurrences.get(group + "|" + b.occurred_at) !== 1
     )
       continue;
     if (/aceite|lubricante/i.test(a.product + " " + b.product)) continue;

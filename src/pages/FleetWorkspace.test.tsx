@@ -220,7 +220,7 @@ describe("Fleet role journeys", () => {
     });
     mount("/servicios/flota/mantenimientos?maintenance%3Aview=Facturas");
     const periods = await screen.findByRole("table", { name: "Por período" });
-    expect(within(periods).getByText("10/2026")).toBeInTheDocument();
+    expect(within(periods).getByText("oct. 2026")).toBeInTheDocument();
     fireEvent.click(screen.getByRole("button", { name: "Sucursales" }));
     expect(
       within(
