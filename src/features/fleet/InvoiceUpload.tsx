@@ -90,7 +90,7 @@ export default function InvoiceUpload({
     if (!file || reserved.current) return;
     let current = true;
     const controller = new AbortController();
-    const timeout = window.setTimeout(() => controller.abort(), 45_000);
+    const timeout = window.setTimeout(() => controller.abort(), 90_000);
     setReading(true);
     setReadingMessage("");
 

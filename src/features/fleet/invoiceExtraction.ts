@@ -22,7 +22,21 @@ export function readInvoiceFields(data: unknown) {
     /^\d{3,18}-\d$/.test(ruc) &&
     !isFleetBuyerRuc(ruc) &&
     digits(ruc) !== digits(fields.buyer_tax_id);
-  const km = fields.odometer_km;
+  const description = text(fields.description);
+  const explicitKm =
+    typeof fields.odometer_km === "number"
+      ? String(fields.odometer_km)
+      : text(fields.odometer_km);
+  const labeledKm = [
+    ...description.matchAll(
+      /\b(?:km|kilometraje)\s*[:=]?\s*(\d{1,3}(?:[.,]\d{3})+|\d+)(?![\d.,])/gi,
+    ),
+  ].map((match) => match[1].replace(/[.,]/g, ""));
+  const candidateKm =
+    explicitKm || (new Set(labeledKm).size === 1 ? labeledKm[0] : "");
+  const km = /^(?:\d{1,15}|\d{1,3}(?:[.,]\d{3}){1,4})$/.test(candidateKm)
+    ? candidateKm.replace(/[.,]/g, "")
+    : "";
   const workDate = text(fields.performed_on);
   const validWorkDate =
     /^\d{4}-\d{2}-\d{2}$/.test(workDate) &&
@@ -35,14 +49,11 @@ export function readInvoiceFields(data: unknown) {
     plate: plate.length >= 3 && plate.length <= 12 ? plate : "",
     supplier_tax_id: validSupplier ? ruc : "",
     supplier: validSupplier ? text(fields.supplier).slice(0, 200) : "",
-    odometer_km:
-      typeof km === "number" && Number.isSafeInteger(km) && km >= 0
-        ? String(km)
-        : "",
+    odometer_km: km,
     performed_on: validWorkDate ? workDate : "",
     invoice_number: completeInvoiceNumber(number) ? number : "",
     invoice_date: validDate ? date : "",
-    description: text(fields.description).slice(0, 4000),
+    description: description.slice(0, 4000),
     categories: maintenanceCategories.filter((category) =>
       categories.includes(category),
     ),
@@ -65,22 +76,42 @@ export async function extractFleetInvoice(file: File, signal: AbortSignal) {
     reader.onerror = () => reject(reader.error);
     reader.readAsDataURL(file);
   });
-  const { data, error } = await supabase.functions.invoke(
-    "machine-document-extractor",
-    {
-      signal,
-      body: { documentType: "FACTURA_FLOTA", dataUrl, mimeType: file.type },
-    },
-  );
-  if (
-    error ||
-    data?.error ||
-    data?.documentType !== "FACTURA_FLOTA" ||
-    !data?.data
-  ) {
-    throw new Error(
-      "No se pudo leer la factura. Podés completar los datos manualmente.",
+  async function read(details = false) {
+    const { data, error } = await supabase.functions.invoke(
+      "machine-document-extractor",
+      {
+        signal,
+        body: {
+          documentType: "FACTURA_FLOTA",
+          dataUrl,
+          mimeType: file.type,
+          details,
+        },
+      },
     );
+    if (
+      error ||
+      data?.error ||
+      data?.documentType !== "FACTURA_FLOTA" ||
+      !data?.data
+    ) {
+      throw new Error(
+        "No se pudo leer la factura. Podés completar los datos manualmente.",
+      );
+    }
+    return readInvoiceFields(data.data);
   }
-  return readInvoiceFields(data.data);
+
+  const first = await read();
+  if ((first.supplier_tax_id && first.odometer_km) || signal.aborted)
+    return first;
+
+  const details = await read(true).catch(() => null);
+  if (!details) return first;
+  return {
+    ...first,
+    supplier_tax_id: first.supplier_tax_id || details.supplier_tax_id,
+    supplier: first.supplier_tax_id ? first.supplier : details.supplier,
+    odometer_km: first.odometer_km || details.odometer_km,
+  };
 }

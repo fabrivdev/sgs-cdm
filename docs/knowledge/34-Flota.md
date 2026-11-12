@@ -300,3 +300,5 @@ La importación de combustible es incremental por clave de comprobante. La migra
 Cargar factura lee el PDF o la imagen al adjuntarla mediante el extractor de documentos existente (Gemini). Completa campos disponibles y conserva los ya ingresados, valida la identidad con el maestro cuando encuentra el RUC y deja la revisión y confirmación al usuario. La ruta de Flota comprueba fleet_can_submit y requiere desplegar la versión actualizada de machine-document-extractor.
 
 La carga de facturas permite ingresar kilometraje y fecha del trabajo como campos opcionales. El lector extrae ambos cuando están explícitos y descarta el RUC de Campos del Mañana o el RUC identificado como comprador antes de consultar el maestro. La migración 20261112170000_fleet_invoice_work_details.sql guarda ambos campos en la carga inicial y los reintentos.
+
+Si la primera lectura no identifica el RUC del emisor o el kilometraje, se consulta una segunda vez enfocando el encabezado fiscal y las observaciones del vehículo. Si esa consulta falla, se conservan los campos de la primera lectura.
