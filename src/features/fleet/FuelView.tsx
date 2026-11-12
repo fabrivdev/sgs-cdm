@@ -39,14 +39,16 @@ const fields: GridField[] = [
   ["plate", "Chapa"],
   ["responsible", "Responsable"],
   ["km", "Kilometraje", "number"],
+  ["distance", "Km recorrido", "number"],
   ["liters", "Litros", "number"],
   ["amount", "Importe", "number"],
   ["currency", "Moneda"],
   ["station", "Estación"],
 ];
+const fuelIdentity = (row: ManagementData["fuel"][number]) =>
+  row.vehicle_id || normalizePlate(row.plate) ? expenseGroupKey(row) : null;
+
 function monthlyFuelMetrics(rows: ManagementData["fuel"]) {
-  const identity = (row: ManagementData["fuel"][number]) =>
-    row.vehicle_id || normalizePlate(row.plate) ? expenseGroupKey(row) : null;
   const vehicles = new Set(
     rows
       .filter(
@@ -56,10 +58,16 @@ function monthlyFuelMetrics(rows: ManagementData["fuel"]) {
           /diesel|nafta|gasolina|gasoil/i.test(row.product) &&
           !/aceite|lubricante/i.test(row.product),
       )
-      .map(identity)
+      .map(fuelIdentity)
       .filter(Boolean),
   );
-  const distance = fuelIntervals(rows, true, undefined, undefined, identity);
+  const distance = fuelIntervals(
+    rows,
+    true,
+    undefined,
+    undefined,
+    fuelIdentity,
+  );
   return {
     ...fuelMetrics(rows),
     vehicles: vehicles.size,
@@ -137,6 +145,12 @@ export function FuelView({
       ),
     [scope, filters.search],
   );
+  const distanceByLoad = useMemo(
+    () =>
+      fuelIntervals(data.fuel, false, undefined, undefined, fuelIdentity)
+        .distanceByLoad,
+    [data.fuel],
+  );
   const rows = useMemo(
     () =>
       visible.map((r) => ({
@@ -148,12 +162,13 @@ export function FuelView({
           ? responsibleDisplay(r.vehicle_id, data.responsibilityEvents)
           : null,
         km: r.odometer_km,
+        distance: distanceByLoad.get(r.id) ?? null,
         liters: r.liters,
         amount: r.net_amount,
         currency: r.currency,
         station: r.station,
       })),
-    [visible, data.responsibilityEvents],
+    [visible, data.responsibilityEvents, distanceByLoad],
   );
   const totalRows = vehicleId
     ? scope
