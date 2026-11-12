@@ -1,3 +1,4 @@
+import { fuelPeriodSegments } from "./fuelPeriodSegments";
 import { fuelIntervals } from "./managementModel";
 import { normalizePlate } from "./model";
 import {
@@ -48,7 +49,10 @@ const fields: GridField[] = [
 const fuelIdentity = (row: ManagementData["fuel"][number]) =>
   row.vehicle_id || normalizePlate(row.plate) ? expenseGroupKey(row) : null;
 
-function monthlyFuelMetrics(rows: ManagementData["fuel"]) {
+function monthlyFuelMetrics(
+  rows: ManagementData["fuel"],
+  segments: ReturnType<typeof fuelPeriodSegments>,
+) {
   const vehicles = new Set(
     rows
       .filter(
@@ -61,18 +65,19 @@ function monthlyFuelMetrics(rows: ManagementData["fuel"]) {
       .map(fuelIdentity)
       .filter(Boolean),
   );
-  const distance = fuelIntervals(
-    rows,
-    true,
-    undefined,
-    undefined,
-    fuelIdentity,
-  );
+  let km = 0;
+  let liters = 0;
+  for (const row of rows) {
+    const segment = segments.get(row.id);
+    if (!segment) continue;
+    km += segment.km;
+    liters += segment.liters;
+  }
   return {
     ...fuelMetrics(rows),
     vehicles: vehicles.size,
-    distance: distance.intervals ? distance.km : null,
-    consumption: distance.l100,
+    distance: km || null,
+    consumption: km > 0 ? (liters / km) * 100 : null,
   };
 }
 
@@ -170,6 +175,10 @@ export function FuelView({
     if (!movementFilters.to || movementFilters.to > last)
       movementFilters.to = last;
   }
+  const periodSegments = useMemo(
+    () => (vehicleId ? new Map() : fuelPeriodSegments(data.fuel, fuelIdentity)),
+    [data.fuel, vehicleId],
+  );
   const distanceByLoad = useMemo(() => {
     const distances = new Map<string, number>();
     fuelIntervals(
@@ -290,6 +299,7 @@ export function FuelView({
           <ExpensePeriods
             title="Gasto en combustible por periodo"
             chronological
+            description="Los tramos se contabilizan en el mes de la carga que los cierra."
             rows={periodRows}
             selectedMonth={activeMonth}
             onSelectMonth={setSelectedMonth}
@@ -301,7 +311,7 @@ export function FuelView({
               ["consumption", "Consumo promedio", "number"],
               ["liters", "Litros", "number"],
             ]}
-            metrics={monthlyFuelMetrics}
+            metrics={(rows) => monthlyFuelMetrics(rows, periodSegments)}
           />
         </>
       )}

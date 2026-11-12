@@ -146,11 +146,13 @@ export function ExpensePeriods<T>({
   fields,
   title = "Por período",
   chronological = false,
+  description,
   selectedMonth,
   onSelectMonth,
 }: {
   title?: string;
   chronological?: boolean;
+  description?: string;
   selectedMonth?: string | null;
   onSelectMonth?: (month: string | null) => void;
   rows: T[];
@@ -179,6 +181,9 @@ export function ExpensePeriods<T>({
           </button>
         )}
       </div>
+      {description && (
+        <p className="text-xs text-muted-foreground">{description}</p>
+      )}
       <FleetSalesTable
         label={title}
         chronological={chronological}
