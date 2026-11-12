@@ -72,6 +72,7 @@ function monthlyFuelMetrics(rows: ManagementData["fuel"]) {
     ...fuelMetrics(rows),
     vehicles: vehicles.size,
     distance: distance.intervals ? distance.km : null,
+    consumption: distance.l100,
   };
 }
 
@@ -271,6 +272,7 @@ export function FuelView({
               ["vehicles", "Vehículos que cargaron", "number"],
               ["loads", "Cargas", "number"],
               ["distance", "Kilómetros recorridos", "number"],
+              ["consumption", "Consumo promedio (L/100 km)", "number"],
               ["liters", "Litros", "number"],
             ]}
             metrics={monthlyFuelMetrics}
