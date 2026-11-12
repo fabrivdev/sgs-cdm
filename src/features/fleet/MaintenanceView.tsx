@@ -1,3 +1,4 @@
+import { expensePlate, matchesExpensePlate } from "./expenseViews";
 import { MaintenanceGroupCell } from "./MaintenanceGroupCell";
 import {
   maintenanceGroups,
@@ -59,12 +60,16 @@ export function MaintenanceView({
   const [actionsTarget, setActionsTarget] = useState<HTMLDivElement | null>(
     null,
   );
+  const vehicles = useMemo(
+    () => new Map(data.vehicles.map((vehicle) => [vehicle.id, vehicle])),
+    [data.vehicles],
+  );
   const invoices = useMemo(
     () =>
       data.invoices.filter(
         (r) =>
           (!vehicleId || r.vehicle_id === vehicleId) &&
-          (!filters.plate || r.plate === filters.plate) &&
+          matchesExpensePlate(expensePlate(r, vehicles), filters.plate) &&
           (!filters.supplier || r.supplier === filters.supplier) &&
           (!filters.invoiceState
             ? r.status !== "void"
@@ -74,19 +79,19 @@ export function MaintenanceView({
               ]) &&
           within(r.performed_on ?? r.invoice_date, filters),
       ),
-    [data.invoices, vehicleId, filters],
+    [data.invoices, vehicleId, filters, vehicles],
   );
   const history = useMemo(
     () =>
       data.history.filter(
         (r) =>
           (!vehicleId || r.vehicle_id === vehicleId) &&
-          (!filters.plate || r.plate === filters.plate) &&
+          matchesExpensePlate(expensePlate(r, vehicles), filters.plate) &&
           (!filters.supplier || r.supplier === filters.supplier) &&
           !filters.invoiceState &&
           within(r.occurred_on, filters),
       ),
-    [data.history, vehicleId, filters],
+    [data.history, vehicleId, filters, vehicles],
   );
   const groupsById = useMemo(
     () =>
@@ -115,7 +120,8 @@ export function MaintenanceView({
           ...exportWorkGroups(groupHistoryWorks(r.works)),
           id: r.id,
           date: r.occurred_on,
-          plate: r.plate,
+          plate: expensePlate(r, vehicles),
+          sourcePlate: r.plate,
           type: "Historial",
           classification: workCategories(r.works).join(" · "),
           km: r.odometer_km,
@@ -140,7 +146,8 @@ export function MaintenanceView({
           ...exportWorkGroups(groupInvoiceWorks(r)),
           id: r.id,
           date: r.performed_on ?? r.invoice_date,
-          plate: r.plate,
+          plate: expensePlate(r, vehicles),
+          sourcePlate: r.plate,
           type: "Factura",
           classification: (r.categories ?? []).join(" · "),
           km: r.odometer_km,
@@ -164,13 +171,21 @@ export function MaintenanceView({
           matches(
             filters.search,
             r.plate,
+            r.sourcePlate,
             r.description,
             r.classification,
             r.supplier,
             r.invoice,
           ),
       ),
-    [history, invoices, filters.type, filters.category, filters.search],
+    [
+      history,
+      invoices,
+      vehicles,
+      filters.type,
+      filters.category,
+      filters.search,
+    ],
   );
   const Table = vehicleId ? ManagementTable : FleetSalesTable;
   return (
@@ -211,7 +226,9 @@ export function MaintenanceView({
             value={filters.plate}
             onChange={(v) => onChange("plate", v)}
             options={options(
-              [...data.history, ...data.invoices].map((r) => r.plate),
+              [...data.history, ...data.invoices].map((r) =>
+                expensePlate(r, vehicles),
+              ),
             )}
           />
         )}

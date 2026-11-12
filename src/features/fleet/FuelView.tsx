@@ -7,6 +7,8 @@ import {
   expenseIdentityFields,
   expenseMoneyValue,
   expenseGroupKey,
+  expensePlate,
+  matchesExpensePlate,
   groupExpenses,
   useExpenseView,
 } from "./expenseViews";
@@ -168,14 +170,20 @@ export function FuelView({
         if (vehicleId)
           return (
             row.vehicle_id === vehicleId &&
-            (!filters.plate || row.plate === filters.plate)
+            matchesExpensePlate(
+              expensePlate(row, vehicleMetadata),
+              filters.plate,
+            )
           );
         const vehicle = row.vehicle_id
           ? vehicleMetadata.get(row.vehicle_id)
           : undefined;
         const ownership = vehicle ? "Propio" : "Terceros";
         return (
-          (!filters.plate || row.plate === filters.plate) &&
+          matchesExpensePlate(
+            expensePlate(row, vehicleMetadata),
+            filters.plate,
+          ) &&
           (!filters.ownership ||
             ((vehicle || normalizePlate(row.plate)) &&
               filters.ownership === ownership)) &&
@@ -191,9 +199,16 @@ export function FuelView({
   const periodRows = useMemo(
     () =>
       scope.filter((r) =>
-        matches(filters.search, r.plate, r.station, r.product, r.raw_data),
+        matches(
+          filters.search,
+          expensePlate(r, vehicleMetadata),
+          r.plate,
+          r.station,
+          r.product,
+          r.raw_data,
+        ),
       ),
-    [scope, filters.search],
+    [scope, filters.search, vehicleMetadata],
   );
   const activeMonth =
     !vehicleId &&
@@ -244,7 +259,7 @@ export function FuelView({
         id: r.id,
         group: expenseGroupKey(r),
         date: r.occurred_at,
-        plate: r.plate,
+        plate: expensePlate(r, vehicleMetadata),
         responsible: r.vehicle_id
           ? responsibleDisplay(r.vehicle_id, data.responsibilityEvents)
           : null,
@@ -257,7 +272,13 @@ export function FuelView({
         currency: r.currency,
         station: r.station,
       })),
-    [visible, data.responsibilityEvents, distanceByLoad, odometerIssues],
+    [
+      visible,
+      vehicleMetadata,
+      data.responsibilityEvents,
+      distanceByLoad,
+      odometerIssues,
+    ],
   );
   const totalRows = vehicleId
     ? scope
@@ -329,7 +350,9 @@ export function FuelView({
             label="Chapa"
             value={filters.plate}
             onChange={(v) => onChange("plate", v)}
-            options={options(data.fuel.map((v) => v.plate))}
+            options={options(
+              data.fuel.map((row) => expensePlate(row, vehicleMetadata)),
+            )}
           />
         )}
       </FleetFilterBar>

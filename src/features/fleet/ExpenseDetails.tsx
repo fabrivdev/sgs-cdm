@@ -112,6 +112,7 @@ export function ExpenseDetails({
                 .filter(
                   ([k]) =>
                     k !== "id" &&
+                    k !== "sourcePlate" &&
                     !k.startsWith("group") &&
                     k !== "currency" &&
                     !(

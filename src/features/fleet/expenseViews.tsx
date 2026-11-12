@@ -8,6 +8,17 @@ import { currentVehicleMileage, latestFuelMileage } from "./maintenanceAlert";
 import { responsibleDisplay } from "./workspaceModel";
 import { type GridField, type GridRow } from "./ManagementTable";
 
+export function expensePlate(
+  row: { vehicle_id: string | null; plate: string },
+  vehicles: ReadonlyMap<string, { plate: string }>,
+) {
+  return (row.vehicle_id && vehicles.get(row.vehicle_id)?.plate) || row.plate;
+}
+
+export function matchesExpensePlate(plate: string, selected: string) {
+  return !selected || normalizePlate(plate) === normalizePlate(selected);
+}
+
 export function expenseGroupKey(row: {
   vehicle_id: string | null;
   plate: string;
