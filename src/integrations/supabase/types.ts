@@ -2308,6 +2308,7 @@ export type Database = {
           odometer_km: number | null
           performed_on: string | null
           plate: string
+          reservation_version: number
           size_bytes: number
           status: string
           storage_path: string
@@ -2331,6 +2332,7 @@ export type Database = {
           odometer_km?: number | null
           performed_on?: string | null
           plate: string
+          reservation_version?: number
           size_bytes: number
           status?: string
           storage_path: string
@@ -2354,6 +2356,7 @@ export type Database = {
           odometer_km?: number | null
           performed_on?: string | null
           plate?: string
+          reservation_version?: number
           size_bytes?: number
           status?: string
           storage_path?: string
@@ -2464,6 +2467,39 @@ export type Database = {
           },
         ]
       }
+      fleet_responsible_contacts: {
+        Row: {
+          active: boolean
+          created_at: string
+          created_by: string | null
+          full_name: string
+          given_names: string | null
+          id: string
+          short_name: string | null
+          surnames: string | null
+        }
+        Insert: {
+          active?: boolean
+          created_at?: string
+          created_by?: string | null
+          full_name: string
+          given_names?: string | null
+          id?: string
+          short_name?: string | null
+          surnames?: string | null
+        }
+        Update: {
+          active?: boolean
+          created_at?: string
+          created_by?: string | null
+          full_name?: string
+          given_names?: string | null
+          id?: string
+          short_name?: string | null
+          surnames?: string | null
+        }
+        Relationships: []
+      }
       fleet_vehicle_responsibility_events: {
         Row: {
           effective_date: string | null
@@ -2471,8 +2507,10 @@ export type Database = {
           recorded_at: string
           recorded_by: string
           recorded_by_name: string
+          responsible_contact_id: string | null
           responsible_name_snapshot: string | null
           responsible_profile_id: string | null
+          responsible_short_name_snapshot: string | null
           vehicle_id: string
         }
         Insert: {
@@ -2481,8 +2519,10 @@ export type Database = {
           recorded_at?: string
           recorded_by: string
           recorded_by_name: string
+          responsible_contact_id?: string | null
           responsible_name_snapshot?: string | null
           responsible_profile_id?: string | null
+          responsible_short_name_snapshot?: string | null
           vehicle_id: string
         }
         Update: {
@@ -2491,11 +2531,20 @@ export type Database = {
           recorded_at?: string
           recorded_by?: string
           recorded_by_name?: string
+          responsible_contact_id?: string | null
           responsible_name_snapshot?: string | null
           responsible_profile_id?: string | null
+          responsible_short_name_snapshot?: string | null
           vehicle_id?: string
         }
         Relationships: [
+          {
+            foreignKeyName: "fleet_vehicle_responsibility_events_responsible_contact_id_fkey"
+            columns: ["responsible_contact_id"]
+            isOneToOne: false
+            referencedRelation: "fleet_responsible_contacts"
+            referencedColumns: ["id"]
+          },
           {
             foreignKeyName: "fleet_vehicle_responsibility_events_responsible_profile_id_fkey"
             columns: ["responsible_profile_id"]
@@ -10828,6 +10877,10 @@ export type Database = {
         Args: { p_id: string }
         Returns: undefined
       }
+      fleet_discard_reserved_invoice: {
+        Args: { p_id: string }
+        Returns: undefined
+      }
       fleet_edit_vehicle: {
         Args: { p_data: Json; p_id: string }
         Returns: string
@@ -10842,6 +10895,11 @@ export type Database = {
         Returns: undefined
       }
       fleet_import_fuel_entries: { Args: { p_rows: Json }; Returns: number }
+      fleet_import_fuel_entries_original: {
+        Args: { p_rows: Json }
+        Returns: number
+      }
+      fleet_invoice_number_key: { Args: { value: string }; Returns: string }
       fleet_is_manager: { Args: never; Returns: boolean }
       fleet_list_responsible_candidates: {
         Args: never
@@ -10858,6 +10916,17 @@ export type Database = {
           es_tecnico: boolean
           id: string
           nombre: string
+          sucursal: Database["public"]["Enums"]["sucursal"]
+        }[]
+      }
+      fleet_list_responsible_options: {
+        Args: never
+        Returns: {
+          es_tecnico: boolean
+          id: string
+          nombre: string
+          short_name: string
+          source: string
           sucursal: Database["public"]["Enums"]["sucursal"]
         }[]
       }
@@ -10886,9 +10955,42 @@ export type Database = {
         }
         Returns: string
       }
+      fleet_reserve_invoice_original: {
+        Args: { p_data: Json; p_id: string }
+        Returns: string
+      }
       fleet_save_vehicle: {
         Args: { p_data: Json; p_id: string }
         Returns: string
+      }
+      fleet_save_vehicle_assignment: {
+        Args: {
+          p_data: Json
+          p_effective_date: string
+          p_expected_assignment_id: string
+          p_id: string
+          p_responsible_profile_id: string
+        }
+        Returns: string
+      }
+      fleet_save_vehicle_responsible: {
+        Args: {
+          p_data: Json
+          p_effective_date: string
+          p_expected_assignment_id: string
+          p_id: string
+          p_names: string
+          p_responsible_id: string
+          p_source: string
+          p_surnames: string
+        }
+        Returns: string
+      }
+      fleet_search_invoice_plates: {
+        Args: { p_plate: string }
+        Returns: {
+          plate: string
+        }[]
       }
       fleet_search_suppliers: {
         Args: { p_ruc: string }
@@ -10898,7 +11000,13 @@ export type Database = {
         }[]
       }
       fleet_set_invoice_amount: {
-        Args: { p_amount: number; p_currency: string; p_id: string }
+        Args: {
+          p_amount: number
+          p_currency: string
+          p_id: string
+          p_reason: string
+          p_version: number
+        }
         Returns: undefined
       }
       fleet_set_invoice_amount_v2: {
@@ -10927,6 +11035,10 @@ export type Database = {
         }[]
       }
       fleet_update_pending_invoice: {
+        Args: { p_data: Json; p_id: string }
+        Returns: string
+      }
+      fleet_update_reserved_invoice: {
         Args: { p_data: Json; p_id: string }
         Returns: string
       }
