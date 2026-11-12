@@ -227,7 +227,7 @@ describe("Fleet role journeys", () => {
         screen.getByRole("table", { name: "Mantenimiento por sucursal" }),
       ).getByText("Sin sucursal"),
     ).toBeInTheDocument();
-    fireEvent.click(screen.getByRole("button", { name: "Por vehículo" }));
+    fireEvent.click(screen.getByRole("button", { name: "Vehículo" }));
     const vehicles = screen.getByRole("table", {
       name: "Mantenimiento por vehículo",
     });

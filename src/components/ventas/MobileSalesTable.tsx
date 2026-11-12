@@ -28,7 +28,7 @@ export function MobileSalesTable<T>({ title, rows, columns, rowKey, sort, toggle
   footer, onRowClick, onDetailClick, selected, embedded = false, empty = "Sin registros para los filtros seleccionados.",
 }: {
   title: string; rows: readonly T[]; columns: readonly Column<T>[]; rowKey: (row: T) => string;
-  sort: SalesSort; toggleSort: (key: string) => void; primaryKey?: string; metricKey?: string;
+  sort: SalesSort; toggleSort?: (key: string) => void; primaryKey?: string; metricKey?: string;
   countKey?: string; countLabel?: string; primaryLabel?: string; metricLabel?: string;
   embedded?: boolean; onDetailClick?: (row: T) => void;
   footer?: T; onRowClick?: (row: T) => void; selected?: (row: T) => boolean; empty?: string;
@@ -61,15 +61,15 @@ export function MobileSalesTable<T>({ title, rows, columns, rowKey, sort, toggle
           {columns.filter(c => c.key !== primary.key).map(c => <option key={c.key} value={c.key}>{c.label}</option>)}
         </select>
       </label>
-      <label htmlFor={`${id}-sort`} className="min-w-0 text-[11px] text-muted-foreground">Ordenar
+      {toggleSort && <label htmlFor={`${id}-sort`} className="min-w-0 text-[11px] text-muted-foreground">Ordenar
         <select id={`${id}-sort`} value={sort.key} onChange={e => toggleSort(e.target.value)} className="mt-1 h-11 w-full min-w-0 rounded-md border bg-background px-2 text-base text-foreground">
           {columns.map(c => <option key={c.key} value={c.key}>{c.label}</option>)}
         </select>
-      </label>
+      </label>}
     </div>
-    <button type="button" aria-label={`Invertir orden: ${sort.direction === "asc" ? "ascendente" : "descendente"}`} onClick={()=>toggleSort(sort.key)} className="flex min-h-11 w-full items-center justify-end gap-2 border-b px-3 text-[12px] text-muted-foreground">
+    {toggleSort && <button type="button" aria-label={`Invertir orden: ${sort.direction === "asc" ? "ascendente" : "descendente"}`} onClick={()=>toggleSort(sort.key)} className="flex min-h-11 w-full items-center justify-end gap-2 border-b px-3 text-[12px] text-muted-foreground">
       {sort.direction === "asc" ? "Orden ascendente" : "Orden descendente"}{sort.direction === "asc" ? <ArrowUp className="h-4 w-4" /> : <ArrowDown className="h-4 w-4" />}
-    </button>
+    </button>}
     </PopoverContent></Popover>;
   return <section aria-label={title} className={cn("min-w-0 overflow-hidden", !embedded && "rounded-md border", mobile.active && "sales-flat-table")}>
     {!embedded && <div className="flex items-center justify-between gap-2 border-b pl-3"><h3 className="text-[13px] font-semibold">{title}</h3>{controls}</div>}
@@ -77,7 +77,7 @@ export function MobileSalesTable<T>({ title, rows, columns, rowKey, sort, toggle
     <table className="w-full table-fixed text-[13px] [&_th_button]:min-h-11 [&_th_span]:whitespace-normal [&_th_span]:overflow-visible" aria-label={title}>
       <colgroup><col />{hasCount && <col className="w-11" />}<col className={hasCount ? "w-[46%]" : "w-[42%]"} /><col className={mobile.active ? "w-8" : "w-11"} /></colgroup>
       <thead className="sticky top-0 z-10 bg-muted/40 text-[11px] text-muted-foreground"><tr>{shown.map(c => <th key={c.key} className={cn("py-0", c === count ? "px-1" : "px-2")} aria-sort={sort.key === c.key ? sort.direction === "asc" ? "ascending" : "descending" : "none"}>
-        <SalesSortButton label={c === primary ? primaryLabel ?? c.label : c === count ? countLabel ?? c.label : metricLabel && c.key === (metricKey ?? "total") ? metricLabel : c.label} kind={c.kind} align={c === amount ? amountAlign : c === count ? "center" : "left"} active={sort.key === c.key} direction={sort.direction} onClick={() => toggleSort(c.key)} />
+        {toggleSort ? <SalesSortButton label={c === primary ? primaryLabel ?? c.label : c === count ? countLabel ?? c.label : metricLabel && c.key === (metricKey ?? "total") ? metricLabel : c.label} kind={c.kind} align={c === amount ? amountAlign : c === count ? "center" : "left"} active={sort.key === c.key} direction={sort.direction} onClick={() => toggleSort(c.key)} /> : <span className="block py-2">{c.label}</span>}
       </th>)}<th className="relative p-0"><span className="sr-only left-0 top-0">Detalle</span>{embedded && controls}</th></tr></thead>
       <tbody>{rows.length ? rows.map(row => renderRow(row)) : <tr><td colSpan={shown.length + 1} className="p-4 text-center text-muted-foreground">{empty}</td></tr>}</tbody>
       {footer && rows.length > 0 && <tfoot>{renderRow(footer, true)}</tfoot>}

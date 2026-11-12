@@ -14,13 +14,14 @@ export type SalesDisplayColumn<T> = SalesColumn<T> & {
 export function SalesDataTable<T>({ title, rows, columns, initialSort, rowKey, fileName, sheetName = "Ventas Servicios",
   empty = "Sin facturación en el período.", footer, onRowClick, onDetailClick, selected, countLabel = "filas",
   mobileIdentity, mobileEmbedded = false, mobileCountKey, mobileCountLabel, mobilePrimaryLabel, mobileMetricLabel, desktopBreakpoint = 1024,
-  hideDesktopTitle = false, exportColumns,
+  hideDesktopTitle = false, exportColumns, fixedSort = false,
 }: {
   title: string; rows: readonly T[]; columns: readonly SalesDisplayColumn<T>[];
   initialSort: SalesSort; rowKey: (row: T) => string; fileName: string; sheetName?: string;
   empty?: string; footer?: T; onRowClick?: (row: T) => void; selected?: (row: T) => boolean; countLabel?: string;
   mobileEmbedded?: boolean; onDetailClick?: (row: T) => void; desktopBreakpoint?: number;
   hideDesktopTitle?: boolean;
+  fixedSort?: boolean;
   mobileCountKey?: string; mobileCountLabel?: string; mobilePrimaryLabel?: string; mobileMetricLabel?: string;
   mobileIdentity?: (row: T) => string;
   exportColumns?: readonly SalesColumn<T>[];
@@ -33,7 +34,7 @@ export function SalesDataTable<T>({ title, rows, columns, initialSort, rowKey, f
     const { exportSalesTable } = await import("./salesTableExport");
     exportSalesTable({ rows: snapshot, columns: exportColumns ?? columns, fileName, sheetName });
   } }, can("datos:exportar"));
-  if (isMobile) return <><MobileSalesTable embedded={mobileEmbedded} countKey={mobileCountKey} countLabel={mobileCountLabel} primaryLabel={mobilePrimaryLabel} metricLabel={mobileMetricLabel} title={title} rows={ordered} columns={mobileIdentity ? columns.map((c,index)=>index===0?{...c,render:(row:T)=><span className="truncate">{mobileIdentity(row)}</span>}:c) : columns} rowKey={rowKey} sort={sort} toggleSort={toggleSort} footer={footer} onRowClick={onRowClick} onDetailClick={onDetailClick} selected={selected} empty={empty} />{!mobileCountKey && <RowCount rows={ordered.length} label={countLabel} />}</>;
+  if (isMobile) return <><MobileSalesTable embedded={mobileEmbedded} countKey={mobileCountKey} countLabel={mobileCountLabel} primaryLabel={mobilePrimaryLabel} metricLabel={mobileMetricLabel} title={title} rows={ordered} columns={mobileIdentity ? columns.map((c,index)=>index===0?{...c,render:(row:T)=><span className="truncate">{mobileIdentity(row)}</span>}:c) : columns} rowKey={rowKey} sort={sort} toggleSort={fixedSort ? undefined : toggleSort} footer={footer} onRowClick={onRowClick} onDetailClick={onDetailClick} selected={selected} empty={empty} />{!mobileCountKey && <RowCount rows={ordered.length} label={countLabel} />}</>;
   const grid = { gridTemplateColumns: columns.map(column => `minmax(0,${column.weight ?? 1}fr)`).join(" ") };
   const cells = (row: T, interactive = false) => columns.map((column, index) => {
     const value = column.value(row);
@@ -52,7 +53,7 @@ export function SalesDataTable<T>({ title, rows, columns, initialSort, rowKey, f
         <div role="row" style={grid} className={`grid gap-x-2 bg-muted/60 px-3 py-2 text-[11px] font-medium text-muted-foreground ${scrollHead} ${salesHeader}`}>
           {columns.map(column => <div role="columnheader" key={column.key} className="min-w-0 truncate"
             aria-sort={sort.key === column.key ? sort.direction === "asc" ? "ascending" : "descending" : "none"}>
-            <SalesSortButton label={column.label} kind={column.kind} align={column.align} active={sort.key === column.key} direction={sort.direction} onClick={() => toggleSort(column.key)} />
+            {fixedSort ? <span className={cn("block", column.align === "right" && "text-right", column.align === "center" && "text-center")}>{column.label}</span> : <SalesSortButton label={column.label} kind={column.kind} align={column.align} active={sort.key === column.key} direction={sort.direction} onClick={() => toggleSort(column.key)} />}
           </div>)}
         </div>
         {!ordered.length ? <div className="py-10 text-center text-[12px] text-muted-foreground">{empty}</div>

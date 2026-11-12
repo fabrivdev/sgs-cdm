@@ -29,12 +29,15 @@ import {
   fmt,
   fuelMoney,
   fleetConsumption,
+  responsibleDisplay,
+  rangeError,
   type FleetFilters,
   type FilterChange,
 } from "./workspaceModel";
 const fields: GridField[] = [
   ["date", "Fecha", "date"],
   ["plate", "Chapa"],
+  ["responsible", "Responsable"],
   ["km", "Kilometraje", "number"],
   ["liters", "Litros", "number"],
   ["amount", "Importe", "number"],
@@ -74,6 +77,22 @@ function fuelMetrics(rows: ManagementData["fuel"]) {
     ),
   };
 }
+function expenseConsumption(
+  rows: ManagementData["fuel"],
+  filters: FleetFilters,
+) {
+  if (rangeError(filters)) return null;
+  const args = [
+    filters.from,
+    filters.to || undefined,
+    expenseGroupKey,
+  ] as const;
+  return (
+    fuelIntervals(rows, true, ...args).l100 ??
+    fuelIntervals(rows, false, ...args).l100
+  );
+}
+
 export function FuelView({
   data,
   vehicleId,
@@ -125,13 +144,16 @@ export function FuelView({
         group: expenseGroupKey(r),
         date: r.occurred_at,
         plate: r.plate,
+        responsible: r.vehicle_id
+          ? responsibleDisplay(r.vehicle_id, data.responsibilityEvents)
+          : null,
         km: r.odometer_km,
         liters: r.liters,
         amount: r.net_amount,
         currency: r.currency,
         station: r.station,
       })),
-    [visible],
+    [visible, data.responsibilityEvents],
   );
   const totalRows = vehicleId
     ? scope
@@ -220,6 +242,8 @@ export function FuelView({
       {!vehicleId && (
         <>
           <ExpensePeriods
+            title="Gasto en combustible por periodo"
+            chronological
             rows={visible}
             date={(row) => row.occurred_at}
             fields={[
@@ -281,15 +305,8 @@ export function FuelView({
                 ...fuelMetrics(g.rows),
                 consumption: byBranch
                   ? null
-                  : fleetConsumption(
-                      data.fuel,
-                      data.vehicles.filter(
-                        (v) =>
-                          expenseGroupKey({
-                            vehicle_id: v.id,
-                            plate: v.plate,
-                          }) === g.id,
-                      ),
+                  : expenseConsumption(
+                      data.fuel.filter((row) => expenseGroupKey(row) === g.id),
                       filters,
                     ),
               }))

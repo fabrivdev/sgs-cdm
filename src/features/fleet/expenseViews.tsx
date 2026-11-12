@@ -93,7 +93,7 @@ export function useExpenseView() {
       <SalesViewSwitcher
         value={view}
         options={[
-          ["summary", "Por vehículo"],
+          ["summary", "Vehículo"],
           ["branch", "Sucursales"],
           ["detail", group ? "Detalle · " + group.plate : "Detalle"],
         ]}
@@ -141,7 +141,11 @@ export function ExpensePeriods<T>({
   date,
   metrics,
   fields,
+  title = "Por período",
+  chronological = false,
 }: {
+  title?: string;
+  chronological?: boolean;
   rows: T[];
   date: (row: T) => string | null;
   metrics: (rows: T[]) => Omit<GridRow, "id">;
@@ -156,9 +160,10 @@ export function ExpensePeriods<T>({
   }
   return (
     <Panel className="sales-periods space-y-2 p-3">
-      <h2 className="text-[13px] font-semibold">Por período</h2>
+      <h2 className="text-[13px] font-semibold">{title}</h2>
       <FleetSalesTable
-        label="Por período"
+        label={title}
+        chronological={chronological}
         fields={[
           ["date", "Mes", "date"],
           ...fields,

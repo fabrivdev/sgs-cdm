@@ -19,7 +19,11 @@ export function FleetSalesTable({
   actionsTarget,
   actions = [],
   hideTitle = true,
-}: ComponentProps<typeof ManagementTable> & { hideTitle?: boolean }) {
+  chronological = false,
+}: ComponentProps<typeof ManagementTable> & {
+  hideTitle?: boolean;
+  chronological?: boolean;
+}) {
   const mapped: SalesDisplayColumn<GridRow>[] = fields.map(
     ([key, title, kind]) => {
       const value = (row: GridRow) =>
@@ -81,7 +85,8 @@ export function FleetSalesTable({
           exportColumns={mapped}
           initialSort={{
             key: fields[0][0],
-            direction: fields[0][2] === "date" ? "desc" : "asc",
+            direction:
+              !chronological && fields[0][2] === "date" ? "desc" : "asc",
           }}
           rowKey={(row) => row.id}
           fileName={label + ".xlsx"}
@@ -89,6 +94,7 @@ export function FleetSalesTable({
           empty="Sin registros"
           onRowClick={onSelect}
           desktopBreakpoint={640}
+          fixedSort={chronological}
         />
       </div>
     </>
