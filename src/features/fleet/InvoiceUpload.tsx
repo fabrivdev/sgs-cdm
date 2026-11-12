@@ -1,6 +1,7 @@
 import { formatInvoiceNumber, guideInvoiceNumber } from "./invoiceNumber";
 import { InvoicePlateField } from "./InvoicePlateField";
-import { SupplierFields } from "./SupplierFields";
+import { SupplierFields, type SupplierSuggestion } from "./SupplierFields";
+import { extractFleetInvoice } from "./invoiceExtraction";
 import {
   ResponsiveDrawerBody,
   ResponsiveDrawerFooter,
@@ -58,6 +59,11 @@ export default function InvoiceUpload({
   const request = useRef(draft?.id ?? crypto.randomUUID()),
     reserved = useRef(draft?.reserved ?? false),
     input = useRef<HTMLInputElement>(null);
+  const [reading, setReading] = useState(false);
+  const [readingMessage, setReadingMessage] = useState("");
+  const extracted = useRef<Partial<typeof empty>>({});
+  const latestValues = useRef(values);
+  latestValues.current = values;
   const expectedFile = useRef(draft?.file ?? null);
   useEffect(() => {
     try {
@@ -74,6 +80,75 @@ export default function InvoiceUpload({
       /* Storage may be unavailable; the form still works. */
     }
   }, [values, pending, draftKey]);
+  useEffect(() => {
+    if (!file || reserved.current) return;
+    let current = true;
+    const controller = new AbortController();
+    const timeout = window.setTimeout(() => controller.abort(), 45_000);
+    setReading(true);
+    setReadingMessage("");
+
+    async function read(selected: File) {
+      try {
+        const fields = await extractFleetInvoice(selected, controller.signal);
+        if (!current) return;
+        if (fields.supplier_tax_id) {
+          const [match] = await fleetRpc<SupplierSuggestion[]>(
+            "fleet_supplier_identity",
+            {
+              p_ruc: fields.supplier_tax_id,
+            },
+          ).catch(() => []);
+          if (match) {
+            fields.supplier_tax_id = match.ruc;
+            fields.supplier = match.razon_social;
+          }
+        }
+        if (!current) return;
+        const previous = latestValues.current;
+        const applied: Partial<typeof empty> = {};
+        for (const key of [
+          "plate",
+          "invoice_number",
+          "invoice_date",
+          "description",
+        ] as const) {
+          if (!previous[key] && fields[key]) applied[key] = fields[key];
+        }
+        if (
+          !previous.supplier_tax_id &&
+          !previous.supplier &&
+          fields.supplier_tax_id
+        ) {
+          applied.supplier_tax_id = fields.supplier_tax_id;
+          applied.supplier = fields.supplier;
+        }
+        if (!previous.categories.length && fields.categories.length)
+          applied.categories = fields.categories;
+        extracted.current = applied;
+        setValues((previous) => ({ ...previous, ...applied }));
+        setReadingMessage(
+          Object.keys(applied).length
+            ? "Revisá los datos completados y los campos que falten."
+            : "No se agregaron datos automáticamente. Revisá el formulario.",
+        );
+      } catch {
+        if (current)
+          setReadingMessage(
+            "No se pudo leer la factura. Podés completar los datos manualmente.",
+          );
+      } finally {
+        window.clearTimeout(timeout);
+        if (current) setReading(false);
+      }
+    }
+    void read(file);
+    return () => {
+      current = false;
+      window.clearTimeout(timeout);
+      controller.abort();
+    };
+  }, [file]);
   const errorField = /número|formato/i.test(error)
     ? "invoice_number"
     : /RUC/i.test(error)
@@ -96,7 +171,7 @@ export default function InvoiceUpload({
   };
   async function submit(e: React.FormEvent) {
     e.preventDefault();
-    if (pending) return;
+    if (pending || reading) return;
     if (
       reserved.current &&
       expectedFile.current &&
@@ -168,6 +243,8 @@ export default function InvoiceUpload({
       }
       request.current = crypto.randomUUID();
       reserved.current = false;
+      extracted.current = {};
+      setReadingMessage("");
       setValues({ ...empty, plate });
       setFile(null);
       if (input.current) input.current.value = "";
@@ -205,6 +282,63 @@ export default function InvoiceUpload({
               {confirmation}
             </p>
           )}
+          <div className="space-y-1">
+            <Label htmlFor="invoice-file">Archivo de factura</Label>
+            <Input
+              ref={input}
+              id="invoice-file"
+              aria-invalid={errorField === "file" || undefined}
+              aria-describedby={
+                errorField === "file" ? "invoice-error" : undefined
+              }
+              disabled={pending}
+              type="file"
+              accept="application/pdf,image/jpeg,image/png"
+              required
+              onChange={(e) => {
+                const previousExtraction = extracted.current;
+                extracted.current = {};
+                setReading(false);
+                setReadingMessage("");
+                setValues((previous) => {
+                  const next = { ...previous };
+                  for (const key of [
+                    "plate",
+                    "invoice_number",
+                    "invoice_date",
+                    "description",
+                  ] as const) {
+                    if (previous[key] === previousExtraction[key])
+                      next[key] = empty[key];
+                  }
+                  if (
+                    previous.supplier_tax_id ===
+                      previousExtraction.supplier_tax_id &&
+                    previous.supplier === previousExtraction.supplier
+                  ) {
+                    next.supplier_tax_id = "";
+                    next.supplier = "";
+                  }
+                  if (previous.categories === previousExtraction.categories)
+                    next.categories = [];
+                  return next;
+                });
+                setFile(e.target.files?.[0] ?? null);
+                setError("");
+              }}
+            />
+            {!file && (
+              <p className="text-sm text-muted-foreground">
+                Al adjuntar el archivo, Gemini lee la factura para completar los
+                campos.
+              </p>
+            )}
+            {(reading || readingMessage) && (
+              <p role="status" className="text-sm text-muted-foreground">
+                {reading ? "Leyendo factura…" : readingMessage}
+              </p>
+            )}
+          </div>
           <fieldset disabled={pending} className="grid gap-4 sm:grid-cols-2">
             <div className="sm:col-span-2 grid grid-cols-2 gap-3">
               <SupplierFields
@@ -342,25 +476,6 @@ export default function InvoiceUpload({
               />
             </div>
           </fieldset>
-          <div className="space-y-1">
-            <Label htmlFor="invoice-file">Archivo de factura</Label>
-            <Input
-              ref={input}
-              id="invoice-file"
-              aria-invalid={errorField === "file" || undefined}
-              aria-describedby={
-                errorField === "file" ? "invoice-error" : undefined
-              }
-              disabled={pending}
-              type="file"
-              accept="application/pdf,image/jpeg,image/png"
-              required
-              onChange={(e) => {
-                setFile(e.target.files?.[0] ?? null);
-                setError("");
-              }}
-            />
-          </div>
           {reserved.current && (
             <p role="status" className="text-sm">
               Carga pendiente: {expectedFile.current?.name}. Seleccioná el
@@ -407,7 +522,7 @@ export default function InvoiceUpload({
               Descartar intento
             </Button>
           )}
-          <Button disabled={pending} type="submit">
+          <Button disabled={pending || reading} type="submit">
             {pending
               ? "Cargando…"
               : reserved.current

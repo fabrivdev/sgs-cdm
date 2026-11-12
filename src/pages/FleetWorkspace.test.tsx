@@ -33,6 +33,17 @@ vi.mock("@/hooks/useAuth", () => ({
     can: () => true,
   }),
 }));
+vi.mock("@/features/fleet/invoiceExtraction", () => ({
+  extractFleetInvoice: vi.fn(async () => ({
+    plate: "AUTO123",
+    supplier_tax_id: "80000001-1",
+    supplier: "Nombre leído",
+    invoice_number: "001-002-0000123",
+    invoice_date: "2026-10-02",
+    description: "Cambio de cubiertas",
+    categories: ["Cubiertas"],
+  })),
+}));
 vi.mock("@/features/fleet/managementApi", () => ({
   loadManagement: mocks.load,
   submitInvoice: mocks.submit,
@@ -120,6 +131,31 @@ describe("Fleet role journeys", () => {
     fireEvent.click(screen.getByRole("button", { name: "← Vehículos" }));
     expect((await screen.findAllByRole("searchbox"))[0]).toHaveValue("MAXUS");
   });
+  it("fills invoice fields on attachment and keeps manual input", async () => {
+    mocks.roles = ["operativo"];
+    mount();
+    fireEvent.change(screen.getByLabelText("Chapa"), {
+      target: { value: "MANUAL123" },
+    });
+    fireEvent.change(screen.getByLabelText("Archivo de factura"), {
+      target: {
+        files: [new File(["pdf"], "factura.pdf", { type: "application/pdf" })],
+      },
+    });
+    await screen.findByText(
+      "Revisá los datos completados y los campos que falten.",
+    );
+    expect(screen.getByLabelText("Chapa")).toHaveValue("MANUAL123");
+    expect(screen.getByLabelText("Proveedor")).toHaveValue("Taller");
+    expect(screen.getByLabelText("N.º de factura")).toHaveValue(
+      "001-002-0000123",
+    );
+    expect(screen.getByLabelText("Fecha de factura")).toHaveValue("2026-10-02");
+    expect(
+      screen.getByRole("button", { name: "Quitar Cubiertas" }),
+    ).toBeInTheDocument();
+    expect(mocks.submit).not.toHaveBeenCalled();
+  });
   it("keeps a failed reservation editable so an operator can correct the input", async () => {
     mocks.roles = ["operativo"];
     mocks.submit.mockRejectedValue(Error("Factura duplicada"));
@@ -154,6 +190,9 @@ describe("Fleet role journeys", () => {
         files: [new File(["pdf"], "factura.pdf", { type: "application/pdf" })],
       },
     });
+    await screen.findByText(
+      "No se agregaron datos automáticamente. Revisá el formulario.",
+    );
     fireEvent.submit(
       screen.getByRole("button", { name: "Cargar factura" }).closest("form")!,
     );

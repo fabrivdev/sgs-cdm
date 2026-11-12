@@ -296,3 +296,5 @@ Formato único de chapa: mayúsculas sin espacios ni guiones. Las vistas y suger
 La corrección de formato del maestro se ejecuta en una transacción que pausa únicamente vehicle_audit durante la actualización inicial. El editor SQL no tiene usuario de aplicación para ese registro de auditoría. El disparador se reactiva antes de confirmar la migración y conserva la auditoría de las ediciones normales.
 
 La importación de combustible es incremental por clave de comprobante. La migración 20261112160000_fleet_import_only_new_fuel.sql omite las claves existentes aunque cambien sus datos y conserva las correcciones previas. La aplicación informa cuántos comprobantes agregó y cuántos ya estaban registrados.
+
+Cargar factura lee el PDF o la imagen al adjuntarla mediante el extractor de documentos existente (Gemini). Completa campos disponibles y conserva los ya ingresados, valida la identidad con el maestro cuando encuentra el RUC y deja la revisión y confirmación al usuario. La ruta de Flota comprueba fleet_can_submit y requiere desplegar la versión actualizada de machine-document-extractor.
