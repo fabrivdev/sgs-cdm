@@ -219,8 +219,14 @@ describe("Fleet role journeys", () => {
       ],
     });
     mount("/servicios/flota/mantenimientos?maintenance%3Aview=Facturas");
+    fireEvent.click(await screen.findByRole("button", { name: "TEST123" }));
     await screen.findByText("PEND001");
-    expect(screen.getAllByText("Incompleta").length).toBeGreaterThan(0);
+    expect(
+      screen.getByRole("button", { name: "Detalle · TEST123" }),
+    ).toHaveAttribute("aria-pressed", "true");
+    expect(
+      screen.queryByRole("columnheader", { name: /Origen|Estado/ }),
+    ).not.toBeInTheDocument();
     expect(screen.getByText("Cargas incompletas")).toBeInTheDocument();
     expect(screen.queryByText(/Importe documentado/)).not.toBeInTheDocument();
   });

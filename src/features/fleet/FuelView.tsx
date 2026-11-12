@@ -1,3 +1,4 @@
+import { expenseGroupKey, groupExpenses, useExpenseView } from "./expenseViews";
 import { ArrowUp, ArrowDown, TriangleAlert } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { fuelMonthRows, usesMonthlyFuel } from "./vehicleFuelSummary";
@@ -55,6 +56,8 @@ export function FuelView({
   detailSummary?: ReactNode;
   vehicleActions?: { id: string; label: string; onSelect: () => void }[];
 }) {
+  const view = useExpenseView();
+  const byVehicle = !vehicleId && view.summary;
   const [actionsTarget, setActionsTarget] = useState<HTMLDivElement | null>(
     null,
   );
@@ -79,6 +82,7 @@ export function FuelView({
     () =>
       visible.map((r) => ({
         id: r.id,
+        group: expenseGroupKey(r),
         date: r.occurred_at,
         plate: r.plate,
         km: r.odometer_km,
@@ -89,6 +93,11 @@ export function FuelView({
       })),
     [visible],
   );
+  const totalRows = vehicleId
+    ? scope
+    : visible.filter(
+        (row) => !view.group || expenseGroupKey(row) === view.group.id,
+      );
   const [returnPeriod, setReturnPeriod] = useState<{
     from: string;
     to: string;
@@ -140,9 +149,9 @@ export function FuelView({
       {showSummary && (
         <SummaryCards
           items={[
-            ["Litros", fmt(scope.reduce((n, r) => n + r.liters, 0))],
-            ["Gasto combustible", fuelMoney(scope)],
-            ["Cargas", scope.length],
+            ["Litros", fmt(totalRows.reduce((n, r) => n + r.liters, 0))],
+            ["Gasto combustible", fuelMoney(totalRows)],
+            ["Cargas", totalRows.length],
             [
               "Consumo estimado (L/100 km)",
               fmt(
@@ -150,6 +159,9 @@ export function FuelView({
                   data.fuel,
                   data.vehicles
                     .filter((v) => !vehicleId || v.id === vehicleId)
+                    .filter(
+                      (v) => !view.group || "vehicle:" + v.id === view.group.id,
+                    )
                     .filter(
                       (v) =>
                         !filters.plate ||
@@ -165,42 +177,78 @@ export function FuelView({
           ]}
         />
       )}
+      {!vehicleId && view.switcher}
       <ManagementTable
+        key={byVehicle ? "summary" : "detail"}
         detailStyle={!!vehicleId}
         showRowCount={false}
         actionsTarget={actionsTarget}
-        label={monthly ? "Combustible por mes" : "Combustible"}
+        label={
+          byVehicle
+            ? "Combustible por vehículo"
+            : monthly
+              ? "Combustible por mes"
+              : "Combustible"
+        }
         fields={
-          monthly
+          byVehicle
             ? [
-                ["date", "Mes", "date"],
+                ["plate", "Chapa"],
                 ["loads", "Cargas", "number"],
                 ["liters", "Litros", "number"],
                 ["expense", "Monto"],
-                ["km", "Km evaluados", "number"],
                 ["consumption", "L/100 km", "number"],
-                ["trend", "Variación mensual"],
               ]
-            : fields
+            : monthly
+              ? [
+                  ["date", "Mes", "date"],
+                  ["loads", "Cargas", "number"],
+                  ["liters", "Litros", "number"],
+                  ["expense", "Monto"],
+                  ["km", "Km evaluados", "number"],
+                  ["consumption", "L/100 km", "number"],
+                  ["trend", "Variación mensual"],
+                ]
+              : fields
         }
         rows={
-          monthly
-            ? monthRows.filter(
-                (m) =>
-                  !filters.search ||
-                  scope.some(
-                    (r) =>
-                      r.occurred_at.startsWith(m.id) &&
-                      matches(
-                        filters.search,
-                        m.id,
-                        r.station,
-                        r.product,
-                        r.raw_data,
-                      ),
+          byVehicle
+            ? groupExpenses(visible, data.vehicles).map((g) => ({
+                id: g.id,
+                plate: g.plate,
+                loads: g.rows.length,
+                liters: g.rows.reduce((sum, row) => sum + row.liters, 0),
+                expense: fuelMoney(g.rows),
+                consumption: fleetConsumption(
+                  data.fuel,
+                  data.vehicles.filter(
+                    (v) =>
+                      expenseGroupKey({ vehicle_id: v.id, plate: v.plate }) ===
+                      g.id,
                   ),
-              )
-            : rows
+                  filters,
+                ),
+              }))
+            : monthly
+              ? monthRows.filter(
+                  (m) =>
+                    !filters.search ||
+                    scope.some(
+                      (r) =>
+                        r.occurred_at.startsWith(m.id) &&
+                        matches(
+                          filters.search,
+                          m.id,
+                          r.station,
+                          r.product,
+                          r.raw_data,
+                        ),
+                    ),
+                )
+              : rows.filter(
+                  (row) =>
+                    vehicleId || !view.group || row.group === view.group.id,
+                )
         }
         omittedColumns={vehicleId ? ["plate", "currency"] : ["currency"]}
         render={{
@@ -268,7 +316,13 @@ export function FuelView({
           amount: (r) =>
             moneyCell(r.amount as number | null, r.currency as string | null),
         }}
-        onSelect={monthly ? openMonth : onSelect}
+        onSelect={
+          byVehicle
+            ? (row) => view.open(row.id, String(row.plate))
+            : monthly
+              ? openMonth
+              : onSelect
+        }
         actions={[
           ...vehicleActions,
           { id: "import", label: "Importar combustible", onSelect: onImport },

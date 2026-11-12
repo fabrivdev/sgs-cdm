@@ -53,7 +53,7 @@ export function ManagementWorkspace() {
         Object.keys(initialFilters).map((k) => [
           k,
           params.get(prefix + k) ??
-            (maintenanceDetail
+            (maintenanceDetail || (!vehicleId && section === "maintenance")
               ? ""
               : k === "from"
                 ? defaultPeriod.from
@@ -62,7 +62,7 @@ export function ManagementWorkspace() {
                   : ""),
         ]),
       ) as unknown as FleetFilters,
-    [params, prefix, defaultPeriod, maintenanceDetail],
+    [params, prefix, defaultPeriod, maintenanceDetail, vehicleId, section],
   );
   const change: FilterChange = (key, value, to) =>
     setParams(

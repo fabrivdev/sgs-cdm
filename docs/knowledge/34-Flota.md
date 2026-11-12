@@ -266,3 +266,9 @@ La migración 20261111140000_fleet_responsible_contacts.sql incorpora contactos 
 Presentación: primer nombre y primer apellido en selector, ficha y tablas. Se conservan apellidos con partículas; nombres antiguos se abrevian únicamente con correspondencias explícitas revisadas en el código y material disponible. No se aplica una regla posicional indiscriminada ni se afirma haber consultado todos los perfiles remotos. Ambiguos quedan completos; nombre original sigue disponible para búsqueda y exportación. VehiclesList solo cambia el texto renderizado de Responsable, sin disposición, filtros ni cálculos.
 
 Validación local: 20 pruebas de interfaz/nombres/regresión, TypeScript, ESLint, build, revisión visual de escritorio y script PGlite de contactos, historial, conflicto, duplicado, rollback, fecha, permiso y desasignación. PGlite usa funciones auxiliares simuladas; no acredita funcionamiento contra la base remota. Sin publicación Lovable.
+
+## Resumen y detalle de gastos por vehículo
+
+Combustible y Mantenimiento generales usan el selector de vistas de Ventas. Resumen agrupa los registros filtrados por vehículo vinculado (incluidas chapas anteriores) o por chapa normalizada cuando no existe vínculo. Abrir una fila muestra su detalle en la misma sección; el selector permite volver al resumen o consultar todos los registros. Se conserva el panel de cada gasto y los filtros de recuperación de facturas. Origen y Estado quedan fuera de la tabla de mantenimiento, pero siguen disponibles para filtrar y exportar.
+
+Mantenimiento general abre sin fechas para mostrar el historial; Combustible conserva el período inicial. Los montos solo suman importes documentados por moneda; el consumo usa la serie del vehículo en el período y no se recalcula con las coincidencias de búsqueda.

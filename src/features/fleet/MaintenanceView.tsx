@@ -1,3 +1,4 @@
+import { expenseGroupKey, groupExpenses, useExpenseView } from "./expenseViews";
 import { MaintenanceGroupCell } from "./MaintenanceGroupCell";
 import {
   maintenanceGroups,
@@ -26,7 +27,7 @@ import {
   options,
   matches,
   within,
-  invoiceMoney,
+  money,
   type FleetFilters,
   type FilterChange,
 } from "./workspaceModel";
@@ -63,6 +64,8 @@ export function MaintenanceView({
   detailSummary?: ReactNode;
   vehicleActions?: { id: string; label: string; onSelect: () => void }[];
 }) {
+  const view = useExpenseView();
+  const byVehicle = !vehicleId && view.summary;
   const [actionsTarget, setActionsTarget] = useState<HTMLDivElement | null>(
     null,
   );
@@ -121,6 +124,8 @@ export function MaintenanceView({
         ...history.map((r) => ({
           ...exportWorkGroups(groupHistoryWorks(r.works)),
           id: r.id,
+          vehicle_id: r.vehicle_id,
+          group: expenseGroupKey(r),
           date: r.occurred_on,
           plate: r.plate,
           type: "Historial",
@@ -146,6 +151,8 @@ export function MaintenanceView({
         ...invoices.map((r) => ({
           ...exportWorkGroups(groupInvoiceWorks(r)),
           id: r.id,
+          vehicle_id: r.vehicle_id,
+          group: expenseGroupKey(r),
           date: r.performed_on ?? r.invoice_date,
           plate: r.plate,
           type: "Factura",
@@ -179,6 +186,10 @@ export function MaintenanceView({
       ),
     [history, invoices, filters.type, filters.category, filters.search],
   );
+  const detailRows = rows.filter(
+    (row) => vehicleId || !view.group || row.group === view.group.id,
+  );
+  const totals = byVehicle ? rows : detailRows;
   return (
     <>
       <FleetFilterBar
@@ -232,17 +243,25 @@ export function MaintenanceView({
       {showSummary && (
         <SummaryCards
           items={[
-            ["Gasto mantenimiento", invoiceMoney(invoices)],
-            ["Registros históricos", history.length],
-            ["Facturas", invoices.length],
+            [
+              "Gasto mantenimiento",
+              money(totals.filter((r) => r.status === "Completa")),
+            ],
+            [
+              "Registros históricos",
+              totals.filter((r) => r.type === "Historial").length,
+            ],
+            ["Facturas", totals.filter((r) => r.type === "Factura").length],
             [
               "Cargas incompletas",
-              invoices.filter((r) => r.status === "pending").length,
+              totals.filter((r) => r.status === "Incompleta").length,
             ],
           ]}
         />
       )}
+      {!vehicleId && view.switcher}
       <ManagementTable
+        key={byVehicle ? "summary" : "detail"}
         detailStyle={!!vehicleId}
         columnWidths={
           vehicleId
@@ -263,9 +282,38 @@ export function MaintenanceView({
         centeredColumns={maintenanceGroups.map((group) => "group" + group)}
         showRowCount={false}
         actionsTarget={actionsTarget}
-        label="Mantenimiento"
-        fields={fields}
-        rows={rows}
+        label={byVehicle ? "Mantenimiento por vehículo" : "Mantenimiento"}
+        fields={
+          byVehicle
+            ? [
+                ["plate", "Chapa"],
+                ["history", "Registros históricos", "number"],
+                ["invoices", "Facturas", "number"],
+                ["pending", "Cargas incompletas", "number"],
+                ["latest", "Último servicio", "date"],
+                ["expense", "Monto"],
+              ]
+            : fields
+        }
+        rows={
+          byVehicle
+            ? groupExpenses(rows, data.vehicles).map((g) => ({
+                id: g.id,
+                plate: g.plate,
+                history: g.rows.filter((r) => r.type === "Historial").length,
+                invoices: g.rows.filter((r) => r.type === "Factura").length,
+                pending: g.rows.filter((r) => r.status === "Incompleta").length,
+                latest: g.rows
+                  .filter(
+                    (r) => r.type === "Historial" || r.status === "Completa",
+                  )
+                  .map((r) => r.date)
+                  .sort()
+                  .at(-1),
+                expense: money(g.rows.filter((r) => r.status === "Completa")),
+              }))
+            : detailRows
+        }
         omittedColumns={
           vehicleId
             ? [
@@ -276,7 +324,7 @@ export function MaintenanceView({
                 "status",
                 "classification",
               ]
-            : ["currency", "description", "classification"]
+            : ["currency", "description", "classification", "type", "status"]
         }
         render={{
           ...Object.fromEntries(
@@ -295,7 +343,9 @@ export function MaintenanceView({
             moneyCell(r.amount as number | null, r.currency as string | null),
         }}
         actions={vehicleActions}
-        onSelect={onSelect}
+        onSelect={
+          byVehicle ? (row) => view.open(row.id, String(row.plate)) : onSelect
+        }
       />
     </>
   );
