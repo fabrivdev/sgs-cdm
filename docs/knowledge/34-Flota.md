@@ -292,3 +292,5 @@ En Cargar factura, Chapa sugiere coincidencias por prefijo normalizado a partir 
 Las vistas de Combustible y Mantenimiento muestran y filtran por la chapa vigente de Vehículos cuando el registro tiene vínculo por vehicle_id. La chapa de origen se conserva y sigue disponible para la búsqueda. Los registros sin vínculo muestran su chapa informada. La vinculación del servidor compara chapas normalizadas y conserva los alias de cambios reales de chapa.
 
 Formato único de chapa: mayúsculas sin espacios ni guiones. Las vistas y sugerencias presentan ese formato. La migración 20261112150000_fleet_canonical_plate_format.sql normaliza el texto del maestro con la clave ya registrada y mantiene el formato en altas y ediciones. Los documentos originales, alias y vínculos se conservan.
+
+La corrección de formato del maestro se ejecuta en una transacción que pausa únicamente vehicle_audit durante la actualización inicial. El editor SQL no tiene usuario de aplicación para ese registro de auditoría. El disparador se reactiva antes de confirmar la migración y conserva la auditoría de las ediciones normales.
