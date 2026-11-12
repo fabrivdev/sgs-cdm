@@ -1,12 +1,16 @@
 import type { FuelEntry } from "./managementModel";
 
 /** Diagnosis only: retain source values and never interpolate a replacement. */
-export function fuelOdometerIssues(rows: readonly FuelEntry[]) {
+export function fuelOdometerIssues(
+  rows: readonly FuelEntry[],
+  groupKey: (row: FuelEntry) => string | null = (row) => row.vehicle_id,
+) {
   const issues = new Map<FuelEntry, string>();
   const groups = new Map<string, FuelEntry[]>();
   for (const row of rows) {
+    const key = groupKey(row);
     if (
-      !row.vehicle_id ||
+      !key ||
       row.liters <= 0 ||
       row.net_amount < 0 ||
       /aceite|lubricante/i.test(row.product) ||
@@ -18,9 +22,9 @@ export function fuelOdometerIssues(rows: readonly FuelEntry[]) {
       issues.set(row, "Kilometraje inválido");
       continue;
     }
-    const group = groups.get(row.vehicle_id) ?? [];
+    const group = groups.get(key) ?? [];
     group.push(row);
-    groups.set(row.vehicle_id, group);
+    groups.set(key, group);
   }
   for (const group of groups.values()) {
     group.sort((a, b) => a.occurred_at.localeCompare(b.occurred_at));

@@ -4,7 +4,7 @@ import { useState } from "react";
 import { SalesViewSwitcher } from "@/components/ventas/SalesViewSwitcher";
 import { normalizePlate } from "./model";
 import type { ManagementData } from "./VehiclesList";
-import { currentVehicleMileage } from "./maintenanceAlert";
+import { currentVehicleMileage, latestFuelMileage } from "./maintenanceAlert";
 import { responsibleDisplay } from "./workspaceModel";
 import { type GridField, type GridRow } from "./ManagementTable";
 
@@ -25,6 +25,17 @@ export function groupExpenses<T extends Parameters<typeof expenseGroupKey>[0]>(
   const vehicles = new Map(
     data.vehicles.map((vehicle) => [vehicle.id, vehicle]),
   );
+  const unlinkedFuelByPlate = new Map<string, ManagementData["fuel"]>();
+  if (!byBranch) {
+    for (const load of data.fuel) {
+      if (load.vehicle_id) continue;
+      const plate = normalizePlate(load.plate);
+      if (!plate) continue;
+      const loads = unlinkedFuelByPlate.get(plate) ?? [];
+      loads.push(load);
+      unlinkedFuelByPlate.set(plate, loads);
+    }
+  }
   const groups = new Map<
     string,
     {
@@ -52,10 +63,13 @@ export function groupExpenses<T extends Parameters<typeof expenseGroupKey>[0]>(
           !byBranch && vehicle
             ? responsibleDisplay(vehicle.id, data.responsibilityEvents)
             : null,
-        km:
-          !byBranch && vehicle
+        km: byBranch
+          ? null
+          : vehicle
             ? currentVehicleMileage(vehicle, data.readings, data.fuel).km
-            : null,
+            : (latestFuelMileage(
+                unlinkedFuelByPlate.get(normalizePlate(row.plate)) ?? [],
+              )?.km ?? null),
         rows: [row],
       });
   }

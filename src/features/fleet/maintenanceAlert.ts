@@ -11,18 +11,11 @@ import { todayInParaguay } from "./period";
 
 const validKm = (km: number | null | undefined): km is number =>
   km != null && Number.isFinite(Number(km)) && Number(km) >= 0;
-export function currentVehicleMileage(
-  vehicle: ManagedVehicle,
-  readings: FleetOdometerReading[],
-  fuel: FuelEntry[],
+export function latestFuelMileage(
+  rows: FuelEntry[],
   today = todayInParaguay(),
 ) {
-  const manual = vehicleLatestReading(
-    vehicle.id,
-    readings.filter((r) => r.reading_date <= today),
-  );
-  const rows = fuel.filter((r) => r.vehicle_id === vehicle.id);
-  const issues = fuelOdometerIssues(rows);
+  const issues = fuelOdometerIssues(rows, () => "same-vehicle-or-plate");
   const eligible = rows.filter(
     (r) =>
       r.occurred_at.slice(0, 10) <= today &&
@@ -36,18 +29,37 @@ export function currentVehicleMileage(
   const latest = eligible.sort((a, b) =>
     b.occurred_at.localeCompare(a.occurred_at),
   )[0];
+  if (!latest) return null;
+  const sameTime = rows.filter((row) => row.occurred_at === latest.occurred_at);
+  const km = sameTime.every((row) => row.odometer_km === latest.odometer_km)
+    ? Number(latest.odometer_km)
+    : null;
+  return { occurred_at: latest.occurred_at, km };
+}
+
+export function currentVehicleMileage(
+  vehicle: ManagedVehicle,
+  readings: FleetOdometerReading[],
+  fuel: FuelEntry[],
+  today = todayInParaguay(),
+) {
+  const manual = vehicleLatestReading(
+    vehicle.id,
+    readings.filter((r) => r.reading_date <= today),
+  );
+  const rows = fuel.filter((r) => r.vehicle_id === vehicle.id);
+  const latest = latestFuelMileage(rows, today);
   if (
     latest &&
     (!manual || latest.occurred_at.slice(0, 10) > manual.reading_date)
   ) {
-    const sameTime = rows.filter((r) => r.occurred_at === latest.occurred_at);
-    if (sameTime.every((r) => r.odometer_km === latest.odometer_km))
-      return {
-        km: Number(latest.odometer_km),
-        date: latest.occurred_at.slice(0, 10),
-        source: "Combustible",
-      };
-    return { km: null, date: null, source: null };
+    return latest.km == null
+      ? { km: null, date: null, source: null }
+      : {
+          km: latest.km,
+          date: latest.occurred_at.slice(0, 10),
+          source: "Combustible",
+        };
   }
   return vehicleMileageDisplay(vehicle, manual);
 }
