@@ -286,3 +286,5 @@ Pertenencia distingue Propio (movimiento vinculado a un vehículo del padrón) y
 ## Mantenimiento general en una sola tabla
 
 Mantenimiento general abre directamente el detalle, sin tarjetas ni agrupaciones por mes, vehículo o sucursal. Conserva filtros, exportación y apertura de cada registro para consultar trabajos, observaciones o datos de factura. Origen y estado siguen disponibles en los filtros y el detalle. Esta decisión reemplaza la disposición agrupada anterior de Mantenimiento general.
+
+En Cargar factura, Chapa sugiere coincidencias por prefijo normalizado a partir de dos caracteres mediante fleet_search_invoice_plates. La consulta devuelve solo chapas vigentes del padrón para quienes pueden cargar facturas y se conserva la carga manual de chapas de terceros. Clasificación usa una lista desplegable y admite varias selecciones. Aplicar la migración 20261112143000_fleet_invoice_plate_lookup.sql para habilitar sugerencias.

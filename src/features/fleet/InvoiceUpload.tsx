@@ -1,4 +1,5 @@
 import { formatInvoiceNumber, guideInvoiceNumber } from "./invoiceNumber";
+import { InvoicePlateField } from "./InvoicePlateField";
 import { SupplierFields } from "./SupplierFields";
 import {
   ResponsiveDrawerBody,
@@ -11,11 +12,6 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
-import {
-  Popover,
-  PopoverContent,
-  PopoverTrigger,
-} from "@/components/ui/popover";
 import { toast } from "sonner";
 import { maintenanceCategories, invoiceValidation } from "./managementModel";
 import { submitInvoice, fleetRpc } from "./managementApi";
@@ -221,9 +217,14 @@ export default function InvoiceUpload({
                 }}
               />
             </div>
+            <InvoicePlateField
+              value={values.plate}
+              disabled={pending}
+              invalid={errorField === "plate"}
+              onChange={(value) => change("plate", value)}
+            />
             {(
               [
-                ["plate", "Chapa"],
                 ["invoice_number", "N.º de factura"],
                 ["invoice_date", "Fecha de factura"],
               ] as const
@@ -238,9 +239,7 @@ export default function InvoiceUpload({
                   }
                   type={key === "invoice_date" ? "date" : "text"}
                   required
-                  maxLength={
-                    key === "plate" ? 20 : key === "invoice_number" ? 15 : 200
-                  }
+                  maxLength={key === "invoice_number" ? 15 : undefined}
                   placeholder={
                     key === "invoice_number" ? "001-001-0000001" : undefined
                   }
@@ -271,52 +270,63 @@ export default function InvoiceUpload({
               </div>
             ))}
             <div className="space-y-1">
-              <Label>Clasificación</Label>
-              <Popover>
-                <PopoverTrigger asChild>
-                  <Button
-                    disabled={pending}
-                    type="button"
-                    variant="outline"
-                    className="w-full justify-start"
-                    id="invoice-classification"
-                    aria-describedby={
-                      errorField === "classification"
-                        ? "invoice-error"
-                        : undefined
-                    }
-                    aria-label="Clasificación"
+              <Label htmlFor="invoice-classification">Clasificación</Label>
+              <select
+                id="invoice-classification"
+                className="flex h-10 w-full rounded-md border border-input bg-background px-3 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                aria-invalid={errorField === "classification" || undefined}
+                aria-describedby={
+                  errorField === "classification" ? "invoice-error" : undefined
+                }
+                value=""
+                onChange={(e) => {
+                  const category = e.target.value;
+                  if (category && !values.categories.includes(category))
+                    change("categories", [...values.categories, category]);
+                }}
+              >
+                <option value="" disabled>
+                  {values.categories.length
+                    ? "Agregar otra clasificación"
+                    : "Seleccionar"}
+                </option>
+                {maintenanceCategories.map((category) => (
+                  <option
+                    key={category}
+                    value={category}
+                    disabled={values.categories.includes(category)}
                   >
-                    <span
-                      className="truncate"
-                      title={values.categories.join(", ")}
+                    {category}
+                  </option>
+                ))}
+              </select>
+              {values.categories.length > 0 && (
+                <ul className="flex flex-wrap gap-1.5 pt-1">
+                  {values.categories.map((category) => (
+                    <li
+                      key={category}
+                      className="inline-flex items-center gap-1 rounded-md bg-muted px-2 text-sm"
                     >
-                      {values.categories.length
-                        ? values.categories.join(", ")
-                        : "Seleccionar"}
-                    </span>
-                  </Button>
-                </PopoverTrigger>
-                <PopoverContent className="space-y-2">
-                  {maintenanceCategories.map((c) => (
-                    <label key={c} className="flex items-center gap-2 text-sm">
-                      <input
-                        type="checkbox"
-                        checked={values.categories.includes(c)}
-                        onChange={(e) =>
+                      {category}
+                      <button
+                        type="button"
+                        aria-label={`Quitar ${category}`}
+                        className="px-1 py-0.5"
+                        onClick={() =>
                           change(
                             "categories",
-                            e.target.checked
-                              ? [...values.categories, c]
-                              : values.categories.filter((v) => v !== c),
+                            values.categories.filter(
+                              (value) => value !== category,
+                            ),
                           )
                         }
-                      />
-                      {c}
-                    </label>
+                      >
+                        ×
+                      </button>
+                    </li>
                   ))}
-                </PopoverContent>
-              </Popover>
+                </ul>
+              )}
             </div>
             <div className="space-y-1 sm:col-span-2">
               <Label htmlFor="invoice-description">

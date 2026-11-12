@@ -38,7 +38,11 @@ vi.mock("@/features/fleet/managementApi", () => ({
   submitInvoice: mocks.submit,
   fleetRpc: vi
     .fn()
-    .mockResolvedValue([{ ruc: "80000001-1", razon_social: "Taller" }]),
+    .mockImplementation(async (name: string) =>
+      name === "fleet_search_invoice_plates"
+        ? [{ plate: "TEST123" }]
+        : [{ ruc: "80000001-1", razon_social: "Taller" }],
+    ),
   invoiceUrl: vi.fn(),
 }));
 const data = {
@@ -121,7 +125,7 @@ describe("Fleet role journeys", () => {
     mocks.submit.mockRejectedValue(Error("Factura duplicada"));
     mount();
     for (const [label, value] of [
-      ["Chapa", "TEST123"],
+      ["Chapa", "TES"],
       ["RUC del proveedor", "80000001-1"],
       ["N.º de factura", "001-001-0000001"],
       ["Fecha de factura", "2026-10-01"],
@@ -135,10 +139,16 @@ describe("Fleet role journeys", () => {
     expect(screen.getByLabelText("N.º de factura")).toHaveValue(
       "001-001-0000001",
     );
+    const plate = screen.getByRole("combobox", { name: "Chapa" });
+    await screen.findByRole("option", { name: "TEST123" });
+    fireEvent.keyDown(plate, { key: "ArrowDown" });
+    fireEvent.keyDown(plate, { key: "Enter" });
+    expect(plate).toHaveValue("TEST123");
     fireEvent.focus(screen.getByLabelText("RUC del proveedor"));
     fireEvent.click(await screen.findByRole("option", { name: /Taller/ }));
-    fireEvent.click(screen.getByRole("button", { name: "Clasificación" }));
-    fireEvent.click(screen.getByLabelText("Filtros"));
+    fireEvent.change(screen.getByRole("combobox", { name: "Clasificación" }), {
+      target: { value: "Filtros" },
+    });
     fireEvent.change(screen.getByLabelText("Archivo de factura"), {
       target: {
         files: [new File(["pdf"], "factura.pdf", { type: "application/pdf" })],
