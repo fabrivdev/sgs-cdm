@@ -702,6 +702,48 @@ it.each([false, true])(
       await expect(
         call("fleet_import_fuel_entries", [[{ currency: null }]]),
       ).rejects.toThrow("moneda");
+      await db.exec("RESET ROLE");
+      await db.exec(
+        readFileSync(
+          "supabase/migrations/20261112160000_fleet_import_only_new_fuel.sql",
+          "utf8",
+        ),
+      );
+      await db.exec("SET ROLE authenticated");
+      const fuel = {
+        source_key: "imported",
+        plate: "TEST123",
+        occurred_at: "2026-10-01T10:00:00",
+        liters: 10,
+        net_amount: 100,
+        currency: "PYG",
+        odometer_km: 12345,
+        product: "Diesel",
+        station: "Prueba",
+        raw_data: { liquidacion: "original" },
+      };
+      expect((await call("fleet_import_fuel_entries", [[fuel]])).rows).toEqual([
+        { value: 1 },
+      ]);
+      const revised = {
+        ...fuel,
+        odometer_km: 1,
+        raw_data: { liquidacion: "nueva" },
+      };
+      const newFuel = { ...fuel, source_key: "new" };
+      expect(
+        (await call("fleet_import_fuel_entries", [[revised, newFuel]])).rows,
+      ).toEqual([{ value: 1 }]);
+      expect(
+        (await call("fleet_import_fuel_entries", [[revised, newFuel]])).rows,
+      ).toEqual([{ value: 0 }]);
+      expect(
+        (
+          await db.query(
+            "SELECT odometer_km::int AS km, raw_data FROM fleet_fuel_entries WHERE source_key='imported'",
+          )
+        ).rows,
+      ).toEqual([{ km: 12345, raw_data: { liquidacion: "original" } }]);
     } finally {
       await db.close();
     }

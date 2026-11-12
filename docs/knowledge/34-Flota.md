@@ -294,3 +294,5 @@ Las vistas de Combustible y Mantenimiento muestran y filtran por la chapa vigent
 Formato único de chapa: mayúsculas sin espacios ni guiones. Las vistas y sugerencias presentan ese formato. La migración 20261112150000_fleet_canonical_plate_format.sql normaliza el texto del maestro con la clave ya registrada y mantiene el formato en altas y ediciones. Los documentos originales, alias y vínculos se conservan.
 
 La corrección de formato del maestro se ejecuta en una transacción que pausa únicamente vehicle_audit durante la actualización inicial. El editor SQL no tiene usuario de aplicación para ese registro de auditoría. El disparador se reactiva antes de confirmar la migración y conserva la auditoría de las ediciones normales.
+
+La importación de combustible es incremental por clave de comprobante. La migración 20261112160000_fleet_import_only_new_fuel.sql omite las claves existentes aunque cambien sus datos y conserva las correcciones previas. La aplicación informa cuántos comprobantes agregó y cuántos ya estaban registrados.

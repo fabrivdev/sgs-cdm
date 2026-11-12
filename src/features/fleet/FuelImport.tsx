@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { toast } from "sonner";
 import {
   ResponsiveDrawer,
   ResponsiveDrawerHeader,
@@ -111,12 +112,18 @@ export function FuelImport({
             setBusy(true);
             setError("");
             try {
-              await fleetRpc("fleet_import_fuel_entries", {
-                p_rows: rows.map((r) => ({
-                  ...r,
-                  currency: r.currency || currency,
-                })),
-              });
+              const inserted = await fleetRpc<number>(
+                "fleet_import_fuel_entries",
+                {
+                  p_rows: rows.map((r) => ({
+                    ...r,
+                    currency: r.currency || currency,
+                  })),
+                },
+              );
+              toast.success(
+                `Nuevos: ${inserted}. Ya registrados: ${rows.length - inserted}.`,
+              );
               await onSaved();
               onClose();
             } catch (e) {
