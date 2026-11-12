@@ -219,7 +219,30 @@ describe("Fleet role journeys", () => {
       ],
     });
     mount("/servicios/flota/mantenimientos?maintenance%3Aview=Facturas");
-    fireEvent.click(await screen.findByRole("button", { name: "TEST123" }));
+    const periods = await screen.findByRole("table", { name: "Por período" });
+    expect(within(periods).getByText("10/2026")).toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: "Sucursales" }));
+    expect(
+      within(
+        screen.getByRole("table", { name: "Mantenimiento por sucursal" }),
+      ).getByText("Sin sucursal"),
+    ).toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: "Por vehículo" }));
+    const vehicles = screen.getByRole("table", {
+      name: "Mantenimiento por vehículo",
+    });
+    expect(
+      within(vehicles).getByRole("columnheader", { name: "Responsable" }),
+    ).toBeInTheDocument();
+    fireEvent.click(
+      within(vehicles).getByRole("button", { name: "Kilometraje actual" }),
+    );
+    expect(
+      within(vehicles).getByRole("columnheader", {
+        name: /Kilometraje actual/,
+      }),
+    ).toHaveAttribute("aria-sort", "ascending");
+    fireEvent.click(within(vehicles).getByRole("button", { name: "TEST123" }));
     await screen.findByText("PEND001");
     expect(
       screen.getByRole("button", { name: "Detalle · TEST123" }),
@@ -227,7 +250,11 @@ describe("Fleet role journeys", () => {
     expect(
       screen.queryByRole("columnheader", { name: /Origen|Estado/ }),
     ).not.toBeInTheDocument();
-    expect(screen.getByText("Cargas incompletas")).toBeInTheDocument();
+    expect(
+      within(screen.getByRole("region", { name: "Resumen" })).getByText(
+        "Cargas incompletas",
+      ),
+    ).toBeInTheDocument();
     expect(screen.queryByText(/Importe documentado/)).not.toBeInTheDocument();
   });
 });

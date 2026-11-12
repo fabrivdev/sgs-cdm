@@ -272,3 +272,7 @@ Validación local: 20 pruebas de interfaz/nombres/regresión, TypeScript, ESLint
 Combustible y Mantenimiento generales usan el selector de vistas de Ventas. Resumen agrupa los registros filtrados por vehículo vinculado (incluidas chapas anteriores) o por chapa normalizada cuando no existe vínculo. Abrir una fila muestra su detalle en la misma sección; el selector permite volver al resumen o consultar todos los registros. Se conserva el panel de cada gasto y los filtros de recuperación de facturas. Origen y Estado quedan fuera de la tabla de mantenimiento, pero siguen disponibles para filtrar y exportar.
 
 Mantenimiento general abre sin fechas para mostrar el historial; Combustible conserva el período inicial. Los montos solo suman importes documentados por moneda; el consumo usa la serie del vehículo en el período y no se recalcula con las coincidencias de búsqueda.
+
+### Tabla mensual y explorador de gastos
+
+Combustible y Mantenimiento generales muestran una tabla superior por mes y, debajo, Por vehículo, Sucursales o Detalle. Los filtros se aplican a ambas tablas; los históricos sin fecha tienen su propia fila. La sucursal y el responsable corresponden al vehículo actual; los gastos sin vínculo quedan en Sin sucursal. El kilometraje del resumen reutiliza la lectura actual de Flota. Los encabezados ordenan sus columnas; los montos con una sola moneda se ordenan como números. No se suman monedas distintas ni se inventan montos históricos.

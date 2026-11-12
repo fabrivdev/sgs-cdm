@@ -1,7 +1,14 @@
 import { useState } from "react";
 import { SalesViewSwitcher } from "@/components/ventas/SalesViewSwitcher";
 import { normalizePlate } from "./model";
-import type { ManagedVehicle } from "./managementModel";
+import type { ManagementData } from "./VehiclesList";
+import { currentVehicleMileage } from "./maintenanceAlert";
+import { responsibleDisplay } from "./workspaceModel";
+import {
+  ManagementTable,
+  type GridField,
+  type GridRow,
+} from "./ManagementTable";
 
 export function expenseGroupKey(row: {
   vehicle_id: string | null;
@@ -14,20 +21,43 @@ export function expenseGroupKey(row: {
 
 export function groupExpenses<T extends Parameters<typeof expenseGroupKey>[0]>(
   rows: T[],
-  vehicles: ManagedVehicle[],
+  data: ManagementData,
+  byBranch: boolean,
 ) {
-  const plates = new Map(
-    vehicles.map((vehicle) => [vehicle.id, vehicle.plate]),
+  const vehicles = new Map(
+    data.vehicles.map((vehicle) => [vehicle.id, vehicle]),
   );
-  const groups = new Map<string, { id: string; plate: string; rows: T[] }>();
+  const groups = new Map<
+    string,
+    {
+      id: string;
+      plate: string;
+      rows: T[];
+      vehicleId: string | null;
+      responsible: string | null;
+      km: number | null;
+    }
+  >();
   for (const row of rows) {
-    const id = expenseGroupKey(row);
+    const vehicle = vehicles.get(row.vehicle_id ?? "");
+    const id = byBranch
+      ? vehicle?.branch || "Sin sucursal"
+      : expenseGroupKey(row);
     const group = groups.get(id);
     if (group) group.rows.push(row);
     else
       groups.set(id, {
         id,
-        plate: plates.get(row.vehicle_id ?? "") ?? row.plate,
+        plate: byBranch ? id : (vehicle?.plate ?? row.plate),
+        vehicleId: byBranch ? null : (vehicle?.id ?? null),
+        responsible:
+          !byBranch && vehicle
+            ? responsibleDisplay(vehicle.id, data.responsibilityEvents)
+            : null,
+        km:
+          !byBranch && vehicle
+            ? currentVehicleMileage(vehicle, data.readings, data.fuel).km
+            : null,
         rows: [row],
       });
   }
@@ -35,12 +65,13 @@ export function groupExpenses<T extends Parameters<typeof expenseGroupKey>[0]>(
 }
 
 export function useExpenseView() {
-  const [view, setView] = useState<"summary" | "detail">("summary");
+  const [view, setView] = useState<"summary" | "branch" | "detail">("summary");
   const [group, setGroup] = useState<{ id: string; plate: string } | null>(
     null,
   );
   return {
-    summary: view === "summary",
+    mode: view,
+    summary: view !== "detail",
     group,
     open: (id: string, plate: string) => {
       setGroup({ id, plate });
@@ -51,7 +82,8 @@ export function useExpenseView() {
         <SalesViewSwitcher
           value={view}
           options={[
-            ["summary", "Resumen"],
+            ["summary", "Por vehículo"],
+            ["branch", "Sucursales"],
             ["detail", group ? "Detalle · " + group.plate : "Detalle"],
           ]}
           onChange={(next) => {
@@ -62,4 +94,71 @@ export function useExpenseView() {
       </div>
     ),
   };
+}
+
+export function expenseIdentityFields(branch: boolean): GridField[] {
+  return branch
+    ? [["plate", "Sucursal"]]
+    : [
+        ["plate", "Chapa"],
+        ["responsible", "Responsable"],
+        ["km", "Kilometraje actual", "number"],
+      ];
+}
+
+export function expenseMoneyValue(
+  rows: { amount: number | null; currency: string | null }[],
+) {
+  const known = rows.filter((row) => row.amount != null && row.currency);
+  return known.length && new Set(known.map((row) => row.currency)).size === 1
+    ? known.reduce((sum, row) => sum + Number(row.amount), 0)
+    : null;
+}
+
+export function ExpensePeriods<T>({
+  rows,
+  date,
+  metrics,
+  fields,
+}: {
+  rows: T[];
+  date: (row: T) => string | null;
+  metrics: (rows: T[]) => Omit<GridRow, "id">;
+  fields: GridField[];
+}) {
+  const months = new Map<string, T[]>();
+  for (const row of rows) {
+    const month = date(row)?.slice(0, 7) || "";
+    const group = months.get(month);
+    if (group) group.push(row);
+    else months.set(month, [row]);
+  }
+  return (
+    <section className="min-w-0 space-y-2">
+      <h2 className="text-[13px] font-semibold">Por período</h2>
+      <ManagementTable
+        label="Por período"
+        fields={[
+          ["date", "Mes", "date"],
+          ...fields,
+          ["expense", "Monto", "number"],
+        ]}
+        rows={[...months].map(([month, group]) => ({
+          ...metrics(group),
+          id: month || "undated",
+          date: month ? month + "-01" : null,
+        }))}
+        render={{
+          date: (row) =>
+            row.date
+              ? String(row.date).slice(0, 7).split("-").reverse().join("/")
+              : "Sin fecha",
+          expense: (row) => row.expenseLabel,
+        }}
+        showRowCount={false}
+        actionsTarget={null}
+        maxHeight="11rem"
+      />
+    </section>
+  );
 }

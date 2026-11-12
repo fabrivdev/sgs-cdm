@@ -30,8 +30,10 @@ const DataRow = memo(function DataRow({
   fields,
   onSelect,
   render,
+  centeredColumns,
 }: {
   row: GridRow;
+  centeredColumns: string[];
   fields: GridField[];
   onSelect?: (r: GridRow) => void;
   render?: Record<string, (r: GridRow) => ReactNode>;
@@ -44,7 +46,7 @@ const DataRow = memo(function DataRow({
       {fields.map(([key, , kind], i) => (
         <td
           key={key}
-          className={`px-3 py-2 text-xs ${kind === "number" ? "text-right tabular-nums" : "text-left"}`}
+          className={`px-3 py-2 text-xs ${centeredColumns.includes(key) ? "text-center" : kind === "number" ? "text-right tabular-nums" : "text-left"}`}
         >
           <div
             className="max-w-[320px] truncate"
@@ -83,6 +85,7 @@ export function ManagementTable({
   detailStyle = false,
   columnWidths,
   centeredColumns = [],
+  maxHeight,
 }: {
   rows: GridRow[];
   fields: GridField[];
@@ -96,6 +99,7 @@ export function ManagementTable({
   detailStyle?: boolean;
   columnWidths?: Record<string, string>;
   centeredColumns?: string[];
+  maxHeight?: string;
 }) {
   const { can } = useAuth();
   const omittedKey = omittedColumns.join("|");
@@ -132,7 +136,13 @@ export function ManagementTable({
                 book,
                 XLSX.utils.aoa_to_sheet([
                   fields.map((f) => f[1]),
-                  ...ordered.map((r) => fields.map(([k]) => r[k] ?? null)),
+                  ...ordered.map((r) =>
+                    fields.map(([k]) =>
+                      k === "expense"
+                        ? (r.expenseLabel ?? r[k] ?? null)
+                        : (r[k] ?? null),
+                    ),
+                  ),
                 ]),
                 "Datos",
               );
@@ -157,67 +167,70 @@ export function ManagementTable({
         options.length > 0 &&
         createPortal(<SectionActionsMenu options={options} />, actionsTarget)}
       <TableScroll rows={ordered.length} className="overflow-x-auto">
-        <table
-          aria-label={label}
-          className={`w-full whitespace-nowrap ${detailStyle ? "table-fixed" : ""}`}
-        >
-          {columnWidths && (
-            <colgroup>
-              {visible.map(([key]) => (
-                <col key={key} style={{ width: columnWidths[key] }} />
-              ))}
-            </colgroup>
-          )}
-          <thead
-            className={`${scrollHead} text-[11px] font-medium bg-muted text-muted-foreground`}
+        <div style={maxHeight ? { maxHeight, overflow: "auto" } : undefined}>
+          <table
+            aria-label={label}
+            className={`w-full whitespace-nowrap ${detailStyle ? "table-fixed" : ""}`}
           >
-            <tr>
-              {visible.map(([key, title, kind]) => (
-                <th
-                  key={key}
-                  aria-sort={
-                    sort.key === key
-                      ? sort.direction === "asc"
-                        ? "ascending"
-                        : "descending"
-                      : "none"
-                  }
-                  className={`px-3 py-2 font-medium ${centeredColumns.includes(key) ? "text-center" : kind === "number" || (detailStyle && key === "expense") ? "text-right" : "text-left"}`}
-                >
-                  <button onClick={() => toggleSort(key)}>
-                    {title}
-                    {sort.key === key
-                      ? sort.direction === "asc"
-                        ? " ↑"
-                        : " ↓"
-                      : ""}
-                  </button>
-                </th>
-              ))}
-            </tr>
-          </thead>
-          <tbody>
-            {ordered.map((row) => (
-              <DataRow
-                key={row.id}
-                row={row}
-                fields={visible}
-                onSelect={onSelect}
-                render={render}
-              />
-            ))}
-            {!rows.length && (
-              <tr>
-                <td
-                  colSpan={visible.length}
-                  className="p-6 text-center text-sm text-muted-foreground"
-                >
-                  Sin registros
-                </td>
-              </tr>
+            {columnWidths && (
+              <colgroup>
+                {visible.map(([key]) => (
+                  <col key={key} style={{ width: columnWidths[key] }} />
+                ))}
+              </colgroup>
             )}
-          </tbody>
-        </table>
+            <thead
+              className={`${scrollHead} text-[11px] font-medium bg-muted text-muted-foreground`}
+            >
+              <tr>
+                {visible.map(([key, title, kind]) => (
+                  <th
+                    key={key}
+                    aria-sort={
+                      sort.key === key
+                        ? sort.direction === "asc"
+                          ? "ascending"
+                          : "descending"
+                        : "none"
+                    }
+                    className={`px-3 py-2 font-medium ${centeredColumns.includes(key) ? "text-center" : kind === "number" || (detailStyle && key === "expense") ? "text-right" : "text-left"}`}
+                  >
+                    <button onClick={() => toggleSort(key)}>
+                      {title}
+                      {sort.key === key
+                        ? sort.direction === "asc"
+                          ? " ↑"
+                          : " ↓"
+                        : ""}
+                    </button>
+                  </th>
+                ))}
+              </tr>
+            </thead>
+            <tbody>
+              {ordered.map((row) => (
+                <DataRow
+                  key={row.id}
+                  row={row}
+                  fields={visible}
+                  onSelect={onSelect}
+                  render={render}
+                  centeredColumns={centeredColumns}
+                />
+              ))}
+              {!rows.length && (
+                <tr>
+                  <td
+                    colSpan={visible.length}
+                    className="p-6 text-center text-sm text-muted-foreground"
+                  >
+                    Sin registros
+                  </td>
+                </tr>
+              )}
+            </tbody>
+          </table>
+        </div>
       </TableScroll>
     </section>
   );

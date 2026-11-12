@@ -1,4 +1,11 @@
-import { expenseGroupKey, groupExpenses, useExpenseView } from "./expenseViews";
+import {
+  ExpensePeriods,
+  expenseIdentityFields,
+  expenseMoneyValue,
+  expenseGroupKey,
+  groupExpenses,
+  useExpenseView,
+} from "./expenseViews";
 import { ArrowUp, ArrowDown, TriangleAlert } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { fuelMonthRows, usesMonthlyFuel } from "./vehicleFuelSummary";
@@ -35,6 +42,16 @@ const fields: GridField[] = [
   ["currency", "Moneda"],
   ["station", "Estación"],
 ];
+function fuelMetrics(rows: ManagementData["fuel"]) {
+  return {
+    loads: rows.length,
+    liters: rows.reduce((sum, row) => sum + row.liters, 0),
+    expenseLabel: fuelMoney(rows),
+    expense: expenseMoneyValue(
+      rows.map((row) => ({ amount: row.net_amount, currency: row.currency })),
+    ),
+  };
+}
 export function FuelView({
   data,
   vehicleId,
@@ -57,6 +74,7 @@ export function FuelView({
   vehicleActions?: { id: string; label: string; onSelect: () => void }[];
 }) {
   const view = useExpenseView();
+  const byBranch = !vehicleId && view.mode === "branch";
   const byVehicle = !vehicleId && view.summary;
   const [actionsTarget, setActionsTarget] = useState<HTMLDivElement | null>(
     null,
@@ -177,15 +195,30 @@ export function FuelView({
           ]}
         />
       )}
-      {!vehicleId && view.switcher}
+      {!vehicleId && (
+        <>
+          <ExpensePeriods
+            rows={visible}
+            date={(row) => row.occurred_at}
+            fields={[
+              ["loads", "Cargas", "number"],
+              ["liters", "Litros", "number"],
+            ]}
+            metrics={fuelMetrics}
+          />
+          {view.switcher}
+        </>
+      )}
       <ManagementTable
-        key={byVehicle ? "summary" : "detail"}
+        key={vehicleId ? "vehicle" : view.mode}
         detailStyle={!!vehicleId}
         showRowCount={false}
         actionsTarget={actionsTarget}
         label={
           byVehicle
-            ? "Combustible por vehículo"
+            ? byBranch
+              ? "Combustible por sucursal"
+              : "Combustible por vehículo"
             : monthly
               ? "Combustible por mes"
               : "Combustible"
@@ -193,11 +226,13 @@ export function FuelView({
         fields={
           byVehicle
             ? [
-                ["plate", "Chapa"],
+                ...expenseIdentityFields(byBranch),
                 ["loads", "Cargas", "number"],
                 ["liters", "Litros", "number"],
-                ["expense", "Monto"],
-                ["consumption", "L/100 km", "number"],
+                ["expense", "Monto", "number"],
+                ...(!byBranch
+                  ? [["consumption", "L/100 km", "number"] as GridField]
+                  : []),
               ]
             : monthly
               ? [
@@ -213,21 +248,25 @@ export function FuelView({
         }
         rows={
           byVehicle
-            ? groupExpenses(visible, data.vehicles).map((g) => ({
+            ? groupExpenses(visible, data, byBranch).map((g) => ({
                 id: g.id,
                 plate: g.plate,
-                loads: g.rows.length,
-                liters: g.rows.reduce((sum, row) => sum + row.liters, 0),
-                expense: fuelMoney(g.rows),
-                consumption: fleetConsumption(
-                  data.fuel,
-                  data.vehicles.filter(
-                    (v) =>
-                      expenseGroupKey({ vehicle_id: v.id, plate: v.plate }) ===
-                      g.id,
-                  ),
-                  filters,
-                ),
+                responsible: g.responsible,
+                km: g.km,
+                ...fuelMetrics(g.rows),
+                consumption: byBranch
+                  ? null
+                  : fleetConsumption(
+                      data.fuel,
+                      data.vehicles.filter(
+                        (v) =>
+                          expenseGroupKey({
+                            vehicle_id: v.id,
+                            plate: v.plate,
+                          }) === g.id,
+                      ),
+                      filters,
+                    ),
               }))
             : monthly
               ? monthRows.filter(
@@ -253,7 +292,9 @@ export function FuelView({
         omittedColumns={vehicleId ? ["plate", "currency"] : ["currency"]}
         render={{
           expense: (r) => (
-            <span className="block text-right tabular-nums">{r.expense}</span>
+            <span className="block text-right tabular-nums">
+              {r.expenseLabel ?? r.expense}
+            </span>
           ),
           ...(monthly
             ? {
@@ -317,11 +358,13 @@ export function FuelView({
             moneyCell(r.amount as number | null, r.currency as string | null),
         }}
         onSelect={
-          byVehicle
-            ? (row) => view.open(row.id, String(row.plate))
-            : monthly
-              ? openMonth
-              : onSelect
+          byBranch
+            ? undefined
+            : byVehicle
+              ? (row) => view.open(row.id, String(row.plate))
+              : monthly
+                ? openMonth
+                : onSelect
         }
         actions={[
           ...vehicleActions,
