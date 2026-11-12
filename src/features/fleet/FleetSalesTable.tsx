@@ -8,6 +8,17 @@ import { SalesExplorerPanel } from "@/components/ventas/SalesExplorerPanel";
 import type { ComponentProps, ReactNode } from "react";
 import { ManagementTable, type GridRow } from "./ManagementTable";
 
+const vehicleSummaryWeights: Partial<Record<string, number>> = {
+  plate: 0.85,
+  model: 2.5,
+  responsible: 1.5,
+  km: 1.25,
+  loads: 0.65,
+  liters: 0.75,
+  expense: 1.3,
+  consumption: 0.85,
+};
+
 export function FleetSalesTable({
   rows,
   fields,
@@ -24,6 +35,7 @@ export function FleetSalesTable({
   hideTitle?: boolean;
   chronological?: boolean;
 }) {
+  const vehicleSummary = fields.some(([key]) => key === "model");
   const mapped: SalesDisplayColumn<GridRow>[] = fields.map(
     ([key, title, kind]) => {
       const value = (row: GridRow) =>
@@ -37,17 +49,19 @@ export function FleetSalesTable({
           : kind === "number"
             ? "right"
             : "left",
-        weight: [
-          "supplier",
-          "responsible",
-          "station",
-          "vehicles",
-          "distance",
-        ].includes(key)
-          ? 1.7
-          : key.startsWith("group")
-            ? 0.75
-            : 1,
+        weight:
+          (vehicleSummary ? vehicleSummaryWeights[key] : undefined) ??
+          ([
+            "supplier",
+            "responsible",
+            "station",
+            "vehicles",
+            "distance",
+          ].includes(key)
+            ? 1.7
+            : key.startsWith("group")
+              ? 0.75
+              : 1),
         value,
         exportValue:
           key === "expense" ? (row) => row.expenseLabel ?? value(row) : value,
