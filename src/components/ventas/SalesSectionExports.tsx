@@ -28,9 +28,9 @@ export function useSalesSectionExport(option: SectionAction, allowed: boolean) {
   }, [register, allowed, id, label, disabled]);
 }
 
-export function SalesSectionExportMenu() {
+export function SalesSectionExportMenu({ extraActions = [] }: { extraActions?: SectionAction[] }) {
   const registry = useContext(SalesExports);
-  return <SectionActionsMenu options={registry?.options ?? []} />;
+  return <SectionActionsMenu options={[...extraActions, ...(registry?.options ?? [])]} />;
 }
 
 export function SectionTableExportMenu({ options }: { options: TableExportOption[] }) {

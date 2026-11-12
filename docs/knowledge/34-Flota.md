@@ -276,3 +276,5 @@ Mantenimiento general abre sin fechas para mostrar el historial; Combustible con
 ### Tabla mensual y explorador de gastos
 
 Combustible y Mantenimiento generales muestran una tabla superior por mes y, debajo, Por vehículo, Sucursales o Detalle. Los filtros se aplican a ambas tablas; los históricos sin fecha tienen su propia fila. La sucursal y el responsable corresponden al vehículo actual; los gastos sin vínculo quedan en Sin sucursal. El kilometraje del resumen reutiliza la lectura actual de Flota. Los encabezados ordenan sus columnas; los montos con una sola moneda se ordenan como números. No se suman monedas distintas ni se inventan montos históricos.
+
+Las vistas generales de gastos usan SalesDataTable para períodos, vehículos, sucursales y detalle, con el ordenamiento y el menú de exportación compartidos con Ventas. SalesExplorerPanel comparte la cabecera de Movimientos con el explorador de Máquinas en Ventas. La ficha conserva su tabla anterior.

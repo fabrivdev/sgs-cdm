@@ -6,6 +6,7 @@ import { useMemo, useState } from "react";
 import { useIsMobile } from "@/hooks/use-mobile";
 import { useMobileDisclosure } from "@/hooks/useMobileDisclosure";
 import { MobileSalesTable } from "./MobileSalesTable";
+import { SalesExplorerPanel } from "./SalesExplorerPanel";
 import { SalesViewSwitcher } from "./SalesViewSwitcher";
 import { useSalesMobile, useSalesExplorerView } from "./salesMobileContext";
 import { ChevronDown, ChevronUp } from "lucide-react";
@@ -353,8 +354,7 @@ export function MaquinasExplorer({ data, loading, error, desde, hasta, selectedP
   const lines = useMemo(() => (data?.lineas ?? []).filter(line => line.fecha >= desde && line.fecha <= hasta).map(line => ({ ...line, cliente_facturado: canonicalClientName(line.cliente_facturado) })), [data, desde, hasta]);
   const summary = useMemo(() => summarize(lines), [lines]);
   const tabs: Array<[ExplorerView, string]> = [["resumen", "Resumen"], ["vendedores", "Vendedores"], ["clientes", "Clientes"], ["maquinas", "Máquinas"], ["detalle", "Detalle"]];
-  return <Panel className="sales-explorer p-3">
-    <div className="sales-explorer-heading flex min-h-8 flex-col gap-3 border-b pb-3 md:flex-row md:items-center md:justify-between"><h2 className="truncate text-[13px] font-semibold">Indicadores comerciales</h2><SalesViewSwitcher<ExplorerView> value={view} onChange={setView} options={tabs} /></div>
+  return <SalesExplorerPanel title="Indicadores comerciales" switcher={<SalesViewSwitcher<ExplorerView> value={view} onChange={setView} options={tabs} />}>
     {loading ? <div className="py-16 text-center text-[12px] text-muted-foreground">Cargando ventas de máquinas…</div>
       : error ? <div role="alert" className="py-16 text-center text-[12px] text-destructive">{error}</div>
       : view === "resumen" ? <SummaryView summary={summary} lines={lines} />
@@ -362,5 +362,5 @@ export function MaquinasExplorer({ data, loading, error, desde, hasta, selectedP
       : view === "clientes" ? <ClientsTable lines={lines} />
       : view === "maquinas" ? <MachinesTable lines={lines} />
       : <DetailTable lines={lines} />}
-  </Panel>;
+  </SalesExplorerPanel>;
 }

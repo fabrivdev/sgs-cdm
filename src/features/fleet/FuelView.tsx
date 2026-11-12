@@ -11,11 +11,8 @@ import { Button } from "@/components/ui/button";
 import { fuelMonthRows, usesMonthlyFuel } from "./vehicleFuelSummary";
 import { moneyCell } from "./workspaceModel";
 import { useMemo, useState, type ReactNode } from "react";
-import {
-  ManagementTable,
-  type GridField,
-  type GridRow,
-} from "./ManagementTable";
+import { type GridField, type GridRow } from "./ManagementTable";
+import { FleetExpenseTable } from "./FleetSalesTable";
 import type { ManagementData } from "./VehiclesList";
 import {
   Choice,
@@ -206,10 +203,11 @@ export function FuelView({
             ]}
             metrics={fuelMetrics}
           />
-          {view.switcher}
         </>
       )}
-      <ManagementTable
+      <FleetExpenseTable
+        general={!vehicleId}
+        switcher={view.switcher}
         key={vehicleId ? "vehicle" : view.mode}
         detailStyle={!!vehicleId}
         showRowCount={false}

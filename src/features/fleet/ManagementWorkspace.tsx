@@ -1,3 +1,4 @@
+import { SalesSectionExportsProvider } from "@/components/ventas/SalesSectionExports";
 import { quickPeriodPresets } from "@/components/filters/quickPeriodPresets";
 import { useState, useMemo } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
@@ -170,22 +171,24 @@ export function ManagementWorkspace() {
           <PageHeader
             title={section === "fuel" ? "Combustible" : "Mantenimiento"}
           />
-          {section === "fuel" ? (
-            <FuelView
-              data={data}
-              filters={filters}
-              onChange={change}
-              onSelect={setDetail}
-              onImport={() => setImporting(true)}
-            />
-          ) : (
-            <MaintenanceView
-              data={data}
-              filters={filters}
-              onChange={change}
-              onSelect={setDetail}
-            />
-          )}
+          <SalesSectionExportsProvider>
+            {section === "fuel" ? (
+              <FuelView
+                data={data}
+                filters={filters}
+                onChange={change}
+                onSelect={setDetail}
+                onImport={() => setImporting(true)}
+              />
+            ) : (
+              <MaintenanceView
+                data={data}
+                filters={filters}
+                onChange={change}
+                onSelect={setDetail}
+              />
+            )}
+          </SalesSectionExportsProvider>
         </>
       )}
       {editor && (

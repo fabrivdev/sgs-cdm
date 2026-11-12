@@ -18,11 +18,8 @@ import { workCategories } from "./maintenancePresentation";
 import { maintenanceCategories } from "./managementModel";
 import { moneyCell } from "./workspaceModel";
 import { useMemo, useState, type ReactNode } from "react";
-import {
-  ManagementTable,
-  type GridField,
-  type GridRow,
-} from "./ManagementTable";
+import { type GridField, type GridRow } from "./ManagementTable";
+import { FleetExpenseTable } from "./FleetSalesTable";
 import type { ManagementData } from "./VehiclesList";
 import {
   Choice,
@@ -297,10 +294,11 @@ export function MaintenanceView({
             fields={maintenanceMetricsFields}
             metrics={maintenanceMetrics}
           />
-          {view.switcher}
         </>
       )}
-      <ManagementTable
+      <FleetExpenseTable
+        general={!vehicleId}
+        switcher={view.switcher}
         key={vehicleId ? "vehicle" : view.mode}
         detailStyle={!!vehicleId}
         columnWidths={

@@ -1,14 +1,12 @@
+import { Panel } from "@/components/layout/AppPrimitives";
+import { FleetSalesTable } from "./FleetSalesTable";
 import { useState } from "react";
 import { SalesViewSwitcher } from "@/components/ventas/SalesViewSwitcher";
 import { normalizePlate } from "./model";
 import type { ManagementData } from "./VehiclesList";
 import { currentVehicleMileage } from "./maintenanceAlert";
 import { responsibleDisplay } from "./workspaceModel";
-import {
-  ManagementTable,
-  type GridField,
-  type GridRow,
-} from "./ManagementTable";
+import { type GridField, type GridRow } from "./ManagementTable";
 
 export function expenseGroupKey(row: {
   vehicle_id: string | null;
@@ -78,20 +76,18 @@ export function useExpenseView() {
       setView("detail");
     },
     switcher: (
-      <div className="self-start">
-        <SalesViewSwitcher
-          value={view}
-          options={[
-            ["summary", "Por vehículo"],
-            ["branch", "Sucursales"],
-            ["detail", group ? "Detalle · " + group.plate : "Detalle"],
-          ]}
-          onChange={(next) => {
-            setGroup(null);
-            setView(next);
-          }}
-        />
-      </div>
+      <SalesViewSwitcher
+        value={view}
+        options={[
+          ["summary", "Por vehículo"],
+          ["branch", "Sucursales"],
+          ["detail", group ? "Detalle · " + group.plate : "Detalle"],
+        ]}
+        onChange={(next) => {
+          setGroup(null);
+          setView(next);
+        }}
+      />
     ),
   };
 }
@@ -134,9 +130,9 @@ export function ExpensePeriods<T>({
     else months.set(month, [row]);
   }
   return (
-    <section className="min-w-0 space-y-2">
+    <Panel className="sales-periods space-y-2 p-3">
       <h2 className="text-[13px] font-semibold">Por período</h2>
-      <ManagementTable
+      <FleetSalesTable
         label="Por período"
         fields={[
           ["date", "Mes", "date"],
@@ -155,10 +151,7 @@ export function ExpensePeriods<T>({
               : "Sin fecha",
           expense: (row) => row.expenseLabel,
         }}
-        showRowCount={false}
-        actionsTarget={null}
-        maxHeight="11rem"
       />
-    </section>
+    </Panel>
   );
 }

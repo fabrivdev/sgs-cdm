@@ -235,7 +235,9 @@ describe("Fleet role journeys", () => {
       within(vehicles).getByRole("columnheader", { name: "Responsable" }),
     ).toBeInTheDocument();
     fireEvent.click(
-      within(vehicles).getByRole("button", { name: "Kilometraje actual" }),
+      within(vehicles).getByRole("button", {
+        name: /Ordenar Kilometraje actual/,
+      }),
     );
     expect(
       within(vehicles).getByRole("columnheader", {
