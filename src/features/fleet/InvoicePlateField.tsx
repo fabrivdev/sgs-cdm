@@ -32,7 +32,10 @@ export function InvoicePlateField({
       })
         .then((rows) => {
           if (current)
-            setResult({ query, plates: rows.map((row) => row.plate) });
+            setResult({
+              query,
+              plates: rows.map((row) => normalizePlate(row.plate)),
+            });
         })
         .catch(() => {
           if (current) setResult(undefined);

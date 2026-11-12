@@ -12,7 +12,9 @@ export function expensePlate(
   row: { vehicle_id: string | null; plate: string },
   vehicles: ReadonlyMap<string, { plate: string }>,
 ) {
-  return (row.vehicle_id && vehicles.get(row.vehicle_id)?.plate) || row.plate;
+  const plate =
+    (row.vehicle_id && vehicles.get(row.vehicle_id)?.plate) || row.plate;
+  return normalizePlate(plate) || plate;
 }
 
 export function matchesExpensePlate(plate: string, selected: string) {
@@ -69,7 +71,7 @@ export function groupExpenses<T extends Parameters<typeof expenseGroupKey>[0]>(
     else
       groups.set(id, {
         id,
-        plate: byBranch ? id : (vehicle?.plate ?? row.plate),
+        plate: byBranch ? id : expensePlate(row, vehicles),
         model: byBranch ? null : (vehicle?.model ?? null),
         vehicleId: byBranch ? null : (vehicle?.id ?? null),
         responsible:

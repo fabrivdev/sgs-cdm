@@ -2,6 +2,7 @@ import { completeInvoiceNumber } from "./invoiceNumber";
 /* eslint-disable @typescript-eslint/no-explicit-any -- Regenerate Supabase types after applying the reviewed local migration. */
 import { supabase } from "@/integrations/supabase/client";
 import { loadFleetSnapshot } from "./api";
+import { normalizePlate } from "./model";
 import type {
   ManagedVehicle,
   MaintenanceEntry,
@@ -58,7 +59,10 @@ export async function loadManagement(
   ]);
   return {
     ...base,
-    vehicles: base.vehicles as ManagedVehicle[],
+    vehicles: (base.vehicles as ManagedVehicle[]).map((vehicle) => ({
+      ...vehicle,
+      plate: normalizePlate(vehicle.plate),
+    })),
     fuel: fuel.map((r) => ({
       ...r,
       liters: Number(r.liters),

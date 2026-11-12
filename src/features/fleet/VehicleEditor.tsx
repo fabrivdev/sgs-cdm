@@ -1,6 +1,7 @@
 import { ResponsiblePicker } from "./ResponsiblePicker";
 import {
   currentFleetResponsibility,
+  normalizePlate,
   type FleetResponsibleCandidate,
   type FleetResponsibilityEvent,
 } from "./model";
@@ -145,7 +146,7 @@ export function VehicleEditor({
       if (assignmentChanged) {
         await fleetRpc("fleet_save_vehicle_responsible", {
           p_id: vehicle!.id,
-          p_data: data,
+          p_data: { ...data, plate: normalizePlate(data.plate) },
           p_responsible_id:
             responsibleId === "__new__" ? null : responsibleId || null,
           p_source:
@@ -163,7 +164,7 @@ export function VehicleEditor({
       } else {
         await fleetRpc("fleet_save_vehicle", {
           p_id: vehicle?.id ?? null,
-          p_data: data,
+          p_data: { ...data, plate: normalizePlate(data.plate) },
         });
       }
       onSaved();
