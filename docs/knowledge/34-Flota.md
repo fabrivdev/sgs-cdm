@@ -302,3 +302,5 @@ Cargar factura lee el PDF o la imagen al adjuntarla mediante el extractor de doc
 La carga de facturas permite ingresar kilometraje y fecha del trabajo como campos opcionales. El lector extrae ambos cuando están explícitos y descarta el RUC de Campos del Mañana o el RUC identificado como comprador antes de consultar el maestro. La migración 20261112170000_fleet_invoice_work_details.sql guarda ambos campos en la carga inicial y los reintentos.
 
 Si la primera lectura no identifica el RUC del emisor o el kilometraje, se consulta una segunda vez enfocando el encabezado fiscal y las observaciones del vehículo. Si esa consulta falla, se conservan los campos de la primera lectura.
+
+El documento de factura actual y el archivo anterior de auditoría abren en el visor compartido con Maquinaria. El visor descarga desde el bucket privado de Flota con la sesión actual, muestra PDF e imágenes dentro de la app y ofrece descarga.

@@ -3,6 +3,7 @@ import {
   guideInvoiceNumber,
   completeInvoiceNumber,
 } from "./invoiceNumber";
+import { openStoredDocument } from "@/components/StoredDocumentViewer";
 import { SupplierFields } from "./SupplierFields";
 import { useEffect, useState, useRef } from "react";
 import { MoreVertical } from "lucide-react";
@@ -26,7 +27,6 @@ import {
   fleetRpc,
   replaceInvoiceFile,
   loadInvoiceAudit,
-  invoiceUrl,
 } from "./managementApi";
 import { maintenanceCategories, type Invoice } from "./managementModel";
 
@@ -234,23 +234,15 @@ export function InvoiceActions({
                       {a.before_data.storage_path && (
                         <Button
                           variant="link"
-                          onClick={async () => {
-                            const win = window.open("about:blank", "_blank");
-                            if (!win) return;
-                            win.opener = null;
-                            try {
-                              win.location.replace(
-                                await invoiceUrl({
-                                  storage_path: String(
-                                    a.before_data.storage_path,
-                                  ),
-                                }),
-                              );
-                            } catch {
-                              win.close();
-                              setError("No se pudo abrir el archivo");
-                            }
-                          }}
+                          onClick={() =>
+                            openStoredDocument(
+                              "fleet-invoices",
+                              String(a.before_data.storage_path),
+                              String(
+                                a.before_data.filename || "Archivo anterior",
+                              ),
+                            )
+                          }
                         >
                           Archivo anterior
                         </Button>

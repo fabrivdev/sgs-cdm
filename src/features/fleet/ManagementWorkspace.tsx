@@ -1,3 +1,4 @@
+import { StoredDocumentViewer } from "@/components/StoredDocumentViewer";
 import { LoadingScreen } from "@/components/LoadingScreen";
 import { SalesSectionExportsProvider } from "@/components/ventas/SalesSectionExports";
 import { quickPeriodPresets } from "@/components/filters/quickPeriodPresets";
@@ -204,6 +205,7 @@ export function ManagementWorkspace() {
         vehicle={vehicleId}
         onVehicle={open}
       />
+      <StoredDocumentViewer bucket="fleet-invoices" />
       {importing && (
         <FuelImport onClose={() => setImporting(false)} onSaved={refresh} />
       )}

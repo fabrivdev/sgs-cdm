@@ -109,14 +109,6 @@ export async function submitInvoice(
     throw error;
   await fleetRpc("fleet_finalize_invoice", { p_id: path.split("/").at(-1) });
 }
-export async function invoiceUrl(invoice: Pick<Invoice, "storage_path">) {
-  const { data, error } = await supabase.storage
-    .from("fleet-invoices")
-    .createSignedUrl(invoice.storage_path, 60);
-  if (error) throw error;
-  return data.signedUrl;
-}
-
 export async function loadInvoiceAudit(id: string) {
   const { data, error } = await client
     .from("fleet_invoice_audit")

@@ -12,7 +12,8 @@ import {
 } from "@/components/ui/responsive-drawer";
 import { toast } from "sonner";
 import { InvoiceActions, InvoiceActionMenu } from "./InvoiceActions";
-import { fleetRpc, invoiceUrl } from "./managementApi";
+import { fleetRpc } from "./managementApi";
+import { openStoredDocument } from "@/components/StoredDocumentViewer";
 import {
   ManagementTable,
   type GridRow,
@@ -233,22 +234,13 @@ export function ExpenseDetails({
                   className={
                     selectedInvoice.status !== "uploaded" ? "hidden" : undefined
                   }
-                  onClick={async () => {
-                    const popup = window.open("about:blank", "_blank");
-                    if (!popup) {
-                      toast.error(
-                        "Permití abrir una pestaña para consultar la factura.",
-                      );
-                      return;
-                    }
-                    popup.opener = null;
-                    try {
-                      popup.location.replace(await invoiceUrl(selectedInvoice));
-                    } catch {
-                      popup.close();
-                      toast.error("No se pudo abrir el archivo.");
-                    }
-                  }}
+                  onClick={() =>
+                    openStoredDocument(
+                      "fleet-invoices",
+                      selectedInvoice.storage_path,
+                      selectedInvoice.filename,
+                    )
+                  }
                 >
                   Abrir factura
                 </Button>
