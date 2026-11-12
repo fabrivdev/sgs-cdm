@@ -298,3 +298,5 @@ La corrección de formato del maestro se ejecuta en una transacción que pausa �
 La importación de combustible es incremental por clave de comprobante. La migración 20261112160000_fleet_import_only_new_fuel.sql omite las claves existentes aunque cambien sus datos y conserva las correcciones previas. La aplicación informa cuántos comprobantes agregó y cuántos ya estaban registrados.
 
 Cargar factura lee el PDF o la imagen al adjuntarla mediante el extractor de documentos existente (Gemini). Completa campos disponibles y conserva los ya ingresados, valida la identidad con el maestro cuando encuentra el RUC y deja la revisión y confirmación al usuario. La ruta de Flota comprueba fleet_can_submit y requiere desplegar la versión actualizada de machine-document-extractor.
+
+La carga de facturas permite ingresar kilometraje y fecha del trabajo como campos opcionales. El lector extrae ambos cuando están explícitos y descarta el RUC de Campos del Mañana o el RUC identificado como comprador antes de consultar el maestro. La migración 20261112170000_fleet_invoice_work_details.sql guarda ambos campos en la carga inicial y los reintentos.

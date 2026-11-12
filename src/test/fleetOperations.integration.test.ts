@@ -623,11 +623,26 @@ it.each([false, true])(
           `select ${name}(${args.map((_, i) => "$" + (i + 1)).join(",")}) as value`,
           args,
         );
-      const path = (await call("fleet_reserve_invoice", [id, input])).rows[0]
-        .value;
+      await db.exec("RESET ROLE");
+      await db.exec(
+        readFileSync(
+          "supabase/migrations/20261112170000_fleet_invoice_work_details.sql",
+          "utf8",
+        ),
+      );
+      await db.exec("SET ROLE authenticated");
+      const work = { odometer_km: "41971", performed_on: "2026-10-01" };
+      const path = (
+        await call("fleet_reserve_invoice", [id, { ...input, ...work }])
+      ).rows[0].value;
       await call("fleet_update_pending_invoice", [
         id,
-        { ...input, description: "Editada", plate: "TEST456" },
+        {
+          ...input,
+          description: "Editada",
+          plate: "TEST456",
+          odometer_km: "41972",
+        },
       ]);
       await expect(
         call("fleet_reserve_invoice", [id2, input]),
@@ -641,11 +656,17 @@ it.each([false, true])(
       expect(
         (
           await db.query(
-            "SELECT description,plate,version FROM fleet_maintenance_invoices WHERE id=$1",
+            "SELECT description,plate,version,odometer_km::int AS km,performed_on::text AS work_date FROM fleet_maintenance_invoices WHERE id=$1",
             [id],
           )
         ).rows[0],
-      ).toMatchObject({ description: "Editada", plate: "TEST456", version: 2 });
+      ).toMatchObject({
+        description: "Editada",
+        plate: "TEST456",
+        version: 2,
+        km: 41972,
+        work_date: "2026-10-01",
+      });
       await expect(
         call("fleet_set_invoice_amount", [id, -1, "PYG", 2, "Error"]),
       ).rejects.toThrow("cero");

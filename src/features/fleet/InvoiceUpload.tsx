@@ -14,7 +14,11 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { toast } from "sonner";
-import { maintenanceCategories, invoiceValidation } from "./managementModel";
+import {
+  maintenanceCategories,
+  invoiceValidation,
+  isFleetBuyerRuc,
+} from "./managementModel";
 import { submitInvoice, fleetRpc } from "./managementApi";
 const empty = {
   plate: "",
@@ -22,6 +26,8 @@ const empty = {
   supplier_tax_id: "",
   invoice_number: "",
   invoice_date: "",
+  odometer_km: "",
+  performed_on: "",
   description: "",
   categories: [] as string[],
 };
@@ -52,7 +58,7 @@ export default function InvoiceUpload({
     }
   });
   const [confirmation, setConfirmation] = useState("");
-  const [values, setValues] = useState(draft?.values ?? { ...empty, plate }),
+  const [values, setValues] = useState({ ...empty, plate, ...draft?.values }),
     [file, setFile] = useState<File | null>(null),
     [pending, setPending] = useState(false),
     [error, setError] = useState("");
@@ -111,13 +117,15 @@ export default function InvoiceUpload({
           "plate",
           "invoice_number",
           "invoice_date",
+          "odometer_km",
+          "performed_on",
           "description",
         ] as const) {
           if (!previous[key] && fields[key]) applied[key] = fields[key];
         }
         if (
-          !previous.supplier_tax_id &&
-          !previous.supplier &&
+          ((!previous.supplier_tax_id && !previous.supplier) ||
+            isFleetBuyerRuc(previous.supplier_tax_id)) &&
           fields.supplier_tax_id
         ) {
           applied.supplier_tax_id = fields.supplier_tax_id;
@@ -189,10 +197,20 @@ export default function InvoiceUpload({
       setError("Ingresá el RUC del proveedor");
       return;
     }
+    if (isFleetBuyerRuc(values.supplier_tax_id)) {
+      setError(
+        "Ingresá el RUC del proveedor. El RUC de Campos del Mañana corresponde al comprador.",
+      );
+      return;
+    }
     if (!values.supplier.trim()) {
       setError(
         "Completá el proveedor: seleccioná una coincidencia o ingresá el nombre si el RUC no está en el maestro",
       );
+      return;
+    }
+    if (values.odometer_km && !/^[0-9]{1,15}$/.test(values.odometer_km)) {
+      setError("Ingresá un kilometraje entero y mayor o igual a cero.");
       return;
     }
     const problem = invoiceValidation(values, file);
@@ -306,6 +324,8 @@ export default function InvoiceUpload({
                     "plate",
                     "invoice_number",
                     "invoice_date",
+                    "odometer_km",
+                    "performed_on",
                     "description",
                   ] as const) {
                     if (previous[key] === previousExtraction[key])
@@ -403,6 +423,28 @@ export default function InvoiceUpload({
                 />
               </div>
             ))}
+            <div className="space-y-1">
+              <Label htmlFor="invoice-odometer_km">
+                Kilometraje del trabajo
+              </Label>
+              <Input
+                id="invoice-odometer_km"
+                inputMode="numeric"
+                pattern="[0-9]{1,15}"
+                maxLength={15}
+                value={values.odometer_km}
+                onChange={(e) => change("odometer_km", e.target.value)}
+              />
+            </div>
+            <div className="space-y-1">
+              <Label htmlFor="invoice-performed_on">Fecha del trabajo</Label>
+              <Input
+                id="invoice-performed_on"
+                type="date"
+                value={values.performed_on}
+                onChange={(e) => change("performed_on", e.target.value)}
+              />
+            </div>
             <div className="space-y-1">
               <Label htmlFor="invoice-classification">Clasificación</Label>
               <select

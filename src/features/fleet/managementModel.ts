@@ -275,3 +275,6 @@ export function vehicleMileageDisplay(
         : null,
   };
 }
+
+export const isFleetBuyerRuc = (ruc: string) =>
+  ruc.replace(/\D/g, "") === "800567382";

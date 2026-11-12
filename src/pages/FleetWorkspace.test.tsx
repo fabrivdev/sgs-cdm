@@ -36,6 +36,8 @@ vi.mock("@/hooks/useAuth", () => ({
 vi.mock("@/features/fleet/invoiceExtraction", () => ({
   extractFleetInvoice: vi.fn(async () => ({
     plate: "AUTO123",
+    odometer_km: "41971",
+    performed_on: "",
     supplier_tax_id: "80000001-1",
     supplier: "Nombre leído",
     invoice_number: "001-002-0000123",
@@ -146,6 +148,10 @@ describe("Fleet role journeys", () => {
       "Revisá los datos completados y los campos que falten.",
     );
     expect(screen.getByLabelText("Chapa")).toHaveValue("MANUAL123");
+    expect(screen.getByLabelText("Kilometraje del trabajo")).toHaveValue(
+      "41971",
+    );
+    expect(screen.getByLabelText("Fecha del trabajo")).toHaveValue("");
     expect(screen.getByLabelText("Proveedor")).toHaveValue("Taller");
     expect(screen.getByLabelText("N.º de factura")).toHaveValue(
       "001-002-0000123",
@@ -191,7 +197,7 @@ describe("Fleet role journeys", () => {
       },
     });
     await screen.findByText(
-      "No se agregaron datos automáticamente. Revisá el formulario.",
+      "Revisá los datos completados y los campos que falten.",
     );
     fireEvent.submit(
       screen.getByRole("button", { name: "Cargar factura" }).closest("form")!,
