@@ -200,7 +200,7 @@ describe("Fleet role journeys", () => {
     );
     expect(mocks.load).not.toHaveBeenCalled();
   });
-  it("shows incomplete invoices to management without adding them to documented totals", async () => {
+  it("shows incomplete invoices directly in the maintenance detail table", async () => {
     mocks.load.mockResolvedValue({
       ...data,
       invoices: [
@@ -219,45 +219,24 @@ describe("Fleet role journeys", () => {
       ],
     });
     mount("/servicios/flota/mantenimientos?maintenance%3Aview=Facturas");
-    const periods = await screen.findByRole("table", { name: "Por período" });
-    expect(within(periods).getByText("oct. 2026")).toBeInTheDocument();
-    fireEvent.click(screen.getByRole("button", { name: "Sucursales" }));
+    const table = await screen.findByRole("table", { name: "Mantenimiento" });
+    expect(within(table).getByText("PEND001")).toBeInTheDocument();
+    expect(within(table).getByText("TEST123")).toBeInTheDocument();
+    expect(screen.getAllByRole("table")).toHaveLength(1);
     expect(
-      within(
-        screen.getByRole("table", { name: "Mantenimiento por sucursal" }),
-      ).getByText("Sin sucursal"),
-    ).toBeInTheDocument();
-    fireEvent.click(screen.getByRole("button", { name: "Vehículo" }));
-    const vehicles = screen.getByRole("table", {
-      name: "Mantenimiento por vehículo",
-    });
-    expect(
-      within(vehicles).getByRole("columnheader", { name: "Responsable" }),
-    ).toBeInTheDocument();
-    fireEvent.click(
-      within(vehicles).getByRole("button", {
-        name: /Ordenar Kilometraje actual/,
-      }),
-    );
-    expect(
-      within(vehicles).getByRole("columnheader", {
-        name: /Kilometraje actual/,
-      }),
-    ).toHaveAttribute("aria-sort", "ascending");
-    fireEvent.click(within(vehicles).getByRole("button", { name: "TEST123" }));
-    await screen.findByText("PEND001");
-    expect(
-      screen.getByRole("button", { name: "Detalle · TEST123" }),
-    ).toHaveAttribute("aria-pressed", "true");
-    expect(
-      screen.queryByRole("columnheader", { name: /Origen|Estado/ }),
+      screen.queryByRole("region", { name: "Resumen" }),
     ).not.toBeInTheDocument();
     expect(
-      within(screen.getByRole("region", { name: "Resumen" })).getByText(
-        "Cargas incompletas",
-      ),
+      screen.queryByRole("button", { name: "Sucursales" }),
+    ).not.toBeInTheDocument();
+    expect(
+      within(table).queryByRole("columnheader", { name: /Origen|Estado/ }),
+    ).not.toBeInTheDocument();
+    fireEvent.click(within(table).getByRole("button", { name: "01/10/2026" }));
+    expect(
+      await screen.findByText("Descripción del trabajo"),
     ).toBeInTheDocument();
-    expect(screen.queryByText(/Importe documentado/)).not.toBeInTheDocument();
+    expect(screen.getByText("Trabajo")).toBeInTheDocument();
   });
 });
 

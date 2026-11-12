@@ -213,7 +213,6 @@ export function VehicleDetail({
           filters={filters}
           onChange={onChange}
           onSelect={onSelect}
-          showSummary={false}
           detailSummary={detailSummary}
           vehicleActions={vehicleActions}
         />

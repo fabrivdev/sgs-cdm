@@ -282,3 +282,7 @@ Las vistas generales de gastos usan SalesDataTable para períodos, vehículos, s
 ## Filtros del combustible general
 
 Pertenencia distingue Propio (movimiento vinculado a un vehículo del padrón) y Terceros (chapa informada sin vínculo). Los movimientos sin chapa ni vínculo quedan en Todos. Más filtros permite combinar sucursal, departamento, marca, modelo, responsable actual, tipo de vehículo y estado operativo del padrón. Los filtros afectan el resumen por período y las vistas de movimientos. El indicador de consumo usa los intervalos válidos de los movimientos seleccionados, calculados a partir de la serie completa; la búsqueda de texto no modifica ese indicador. Sin cambios en la ficha, la lista de vehículos ni en la base de datos.
+
+## Mantenimiento general en una sola tabla
+
+Mantenimiento general abre directamente el detalle, sin tarjetas ni agrupaciones por mes, vehículo o sucursal. Conserva filtros, exportación y apertura de cada registro para consultar trabajos, observaciones o datos de factura. Origen y estado siguen disponibles en los filtros y el detalle. Esta decisión reemplaza la disposición agrupada anterior de Mantenimiento general.
