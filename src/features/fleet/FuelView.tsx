@@ -145,12 +145,18 @@ export function FuelView({
       ),
     [scope, filters.search],
   );
-  const distanceByLoad = useMemo(
-    () =>
-      fuelIntervals(data.fuel, false, undefined, undefined, fuelIdentity)
-        .distanceByLoad,
-    [data.fuel],
-  );
+  const distanceByLoad = useMemo(() => {
+    const distances = new Map<string, number>();
+    fuelIntervals(
+      data.fuel,
+      false,
+      undefined,
+      undefined,
+      fuelIdentity,
+      distances,
+    );
+    return distances;
+  }, [data.fuel]);
   const rows = useMemo(
     () =>
       visible.map((r) => ({

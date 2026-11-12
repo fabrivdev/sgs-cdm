@@ -162,6 +162,7 @@ export function fuelIntervals(
   from = "",
   to = "9999-12-31",
   identity: (row: FuelEntry) => string | null = (row) => row.vehicle_id,
+  distanceByLoad?: Map<string, number>,
 ) {
   const ordered = [...rows].sort(
     (a, b) =>
@@ -174,7 +175,6 @@ export function fuelIntervals(
     const key = identity(r) + "|" + r.occurred_at;
     occurrences.set(key, (occurrences.get(key) ?? 0) + 1);
   }
-  const distanceByLoad = new Map<string, number>();
   let intervals = 0;
   const coveredDates: string[] = [];
   let km = 0,
@@ -222,7 +222,7 @@ export function fuelIntervals(
     intervals++;
     coveredDates.push(a.occurred_at.slice(0, 10), b.occurred_at.slice(0, 10));
     const distance = b.odometer_km - a.odometer_km;
-    distanceByLoad.set(b.id, distance);
+    distanceByLoad?.set(b.id, distance);
     km += distance;
     liters += a.liters;
   }
@@ -230,7 +230,6 @@ export function fuelIntervals(
     km,
     liters,
     intervals,
-    distanceByLoad,
     from: coveredDates.sort()[0] ?? null,
     to: coveredDates.sort().at(-1) ?? null,
     l100: km > 0 ? (liters / km) * 100 : null,
