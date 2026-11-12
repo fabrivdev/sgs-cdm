@@ -31,9 +31,11 @@ export function FleetSalesTable({
   actions = [],
   hideTitle = true,
   chronological = false,
+  selected,
 }: ComponentProps<typeof ManagementTable> & {
   hideTitle?: boolean;
   chronological?: boolean;
+  selected?: (row: GridRow) => boolean;
 }) {
   const vehicleSummary = fields.some(([key]) => key === "model");
   const mapped: SalesDisplayColumn<GridRow>[] = fields.map(
@@ -107,6 +109,7 @@ export function FleetSalesTable({
           sheetName="Flota"
           empty="Sin registros"
           onRowClick={onSelect}
+          selected={selected}
           desktopBreakpoint={640}
           fixedSort={chronological}
         />

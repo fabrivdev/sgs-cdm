@@ -139,13 +139,37 @@ export function FuelView({
       ),
     [data.fuel, vehicleId, filters.from, filters.to, filters.plate],
   );
-  const visible = useMemo(
+  const [selectedMonth, setSelectedMonth] = useState<string | null>(null);
+  const periodRows = useMemo(
     () =>
       scope.filter((r) =>
         matches(filters.search, r.plate, r.station, r.product, r.raw_data),
       ),
     [scope, filters.search],
   );
+  const activeMonth =
+    !vehicleId &&
+    selectedMonth &&
+    periodRows.some((row) => row.occurred_at.startsWith(selectedMonth))
+      ? selectedMonth
+      : null;
+  const visible = useMemo(
+    () =>
+      activeMonth
+        ? periodRows.filter((row) => row.occurred_at.startsWith(activeMonth))
+        : periodRows,
+    [activeMonth, periodRows],
+  );
+  const movementFilters = { ...filters };
+  if (activeMonth) {
+    const [year, month] = activeMonth.split("-").map(Number);
+    const first = activeMonth + "-01";
+    const last = new Date(Date.UTC(year, month, 0)).toISOString().slice(0, 10);
+    if (!movementFilters.from || movementFilters.from < first)
+      movementFilters.from = first;
+    if (!movementFilters.to || movementFilters.to > last)
+      movementFilters.to = last;
+  }
   const distanceByLoad = useMemo(() => {
     const distances = new Map<string, number>();
     fuelIntervals(
@@ -254,7 +278,7 @@ export function FuelView({
                             r.vehicle_id === v.id && r.plate === filters.plate,
                         ),
                     ),
-                  filters,
+                  movementFilters,
                 ),
               ),
             ],
@@ -266,7 +290,9 @@ export function FuelView({
           <ExpensePeriods
             title="Gasto en combustible por periodo"
             chronological
-            rows={visible}
+            rows={periodRows}
+            selectedMonth={activeMonth}
+            onSelectMonth={setSelectedMonth}
             date={(row) => row.occurred_at}
             fields={[
               ["vehicles", "Vehículos que cargaron", "number"],
@@ -331,7 +357,7 @@ export function FuelView({
                   ? null
                   : expenseConsumption(
                       data.fuel.filter((row) => expenseGroupKey(row) === g.id),
-                      filters,
+                      movementFilters,
                     ),
               }))
             : monthly

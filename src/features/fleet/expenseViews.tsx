@@ -146,9 +146,13 @@ export function ExpensePeriods<T>({
   fields,
   title = "Por período",
   chronological = false,
+  selectedMonth,
+  onSelectMonth,
 }: {
   title?: string;
   chronological?: boolean;
+  selectedMonth?: string | null;
+  onSelectMonth?: (month: string | null) => void;
   rows: T[];
   date: (row: T) => string | null;
   metrics: (rows: T[]) => Omit<GridRow, "id">;
@@ -163,10 +167,27 @@ export function ExpensePeriods<T>({
   }
   return (
     <Panel className="sales-periods space-y-2 p-3">
-      <h2 className="text-[13px] font-semibold">{title}</h2>
+      <div className="flex items-center justify-between gap-2">
+        <h2 className="text-[13px] font-semibold">{title}</h2>
+        {selectedMonth && onSelectMonth && (
+          <button
+            type="button"
+            className="rounded-full border bg-accent px-2.5 py-1 text-xs"
+            onClick={() => onSelectMonth(null)}
+          >
+            Ver período completo ×
+          </button>
+        )}
+      </div>
       <FleetSalesTable
         label={title}
         chronological={chronological}
+        selected={onSelectMonth ? (row) => row.id === selectedMonth : undefined}
+        onSelect={
+          onSelectMonth
+            ? (row) => onSelectMonth(row.id === selectedMonth ? null : row.id)
+            : undefined
+        }
         fields={[
           ["date", "Mes", "date"],
           ...fields,
