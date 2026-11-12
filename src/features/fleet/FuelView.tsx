@@ -36,6 +36,16 @@ import {
   type FleetFilters,
   type FilterChange,
 } from "./workspaceModel";
+const vehicleFilterFields = [
+  ["branch", "Sucursal", "branch"],
+  ["department", "Departamento", "department"],
+  ["brand", "Marca", "brand"],
+  ["model", "Modelo", "model"],
+  ["responsible", "Responsable", "responsible"],
+  ["vehicleType", "Tipo de vehículo", "vehicle_type"],
+  ["state", "Estado operativo", "operational_status"],
+] as const;
+
 const fields: GridField[] = [
   ["date", "Fecha", "date"],
   ["plate", "Chapa"],
@@ -135,15 +145,47 @@ export function FuelView({
   const [actionsTarget, setActionsTarget] = useState<HTMLDivElement | null>(
     null,
   );
+  const vehicleMetadata = useMemo(
+    () =>
+      new Map(
+        data.vehicles.map((vehicle) => [
+          vehicle.id,
+          {
+            ...vehicle,
+            responsible: responsibleDisplay(
+              vehicle.id,
+              data.responsibilityEvents,
+            ),
+          },
+        ]),
+      ),
+    [data.vehicles, data.responsibilityEvents],
+  );
   const scope = useMemo(
     () =>
-      data.fuel.filter(
-        (r) =>
-          (!vehicleId || r.vehicle_id === vehicleId) &&
-          (!filters.plate || r.plate === filters.plate) &&
-          within(r.occurred_at, { from: filters.from, to: filters.to }),
-      ),
-    [data.fuel, vehicleId, filters.from, filters.to, filters.plate],
+      data.fuel.filter((row) => {
+        if (!within(row.occurred_at, filters)) return false;
+        if (vehicleId)
+          return (
+            row.vehicle_id === vehicleId &&
+            (!filters.plate || row.plate === filters.plate)
+          );
+        const vehicle = row.vehicle_id
+          ? vehicleMetadata.get(row.vehicle_id)
+          : undefined;
+        const ownership = vehicle ? "Propio" : "Terceros";
+        return (
+          (!filters.plate || row.plate === filters.plate) &&
+          (!filters.ownership ||
+            ((vehicle || normalizePlate(row.plate)) &&
+              filters.ownership === ownership)) &&
+          vehicleFilterFields.every(
+            ([key, , field]) =>
+              !filters[key] || vehicle?.[field] === filters[key],
+          )
+        );
+      }),
+    [data.fuel, vehicleId, filters, vehicleMetadata],
   );
   const [selectedMonth, setSelectedMonth] = useState<string | null>(null);
   const periodRows = useMemo(
@@ -258,8 +300,30 @@ export function FuelView({
         secondaryActions={<div ref={setActionsTarget} />}
         filters={filters}
         onChange={onChange}
+        more={
+          !vehicleId &&
+          vehicleFilterFields.map(([key, label, field]) => (
+            <Choice
+              key={key}
+              label={label}
+              value={filters[key] ?? ""}
+              onChange={(value) => onChange(key, value)}
+              options={options(
+                [...vehicleMetadata.values()].map((vehicle) => vehicle[field]),
+              )}
+            />
+          ))
+        }
       >
         <PeriodFields filters={filters} onChange={onChange} />
+        {!vehicleId && (
+          <Choice
+            label="Pertenencia"
+            value={filters.ownership ?? ""}
+            onChange={(value) => onChange("ownership", value)}
+            options={["Propio", "Terceros"]}
+          />
+        )}
         {!vehicleId && (
           <Choice
             label="Chapa"
@@ -279,23 +343,23 @@ export function FuelView({
             [
               "Consumo estimado (L/100 km)",
               fmt(
-                fleetConsumption(
-                  data.fuel,
-                  data.vehicles
-                    .filter((v) => !vehicleId || v.id === vehicleId)
-                    .filter(
-                      (v) => !view.group || "vehicle:" + v.id === view.group.id,
+                vehicleId
+                  ? fleetConsumption(
+                      data.fuel,
+                      data.vehicles.filter(
+                        (vehicle) => vehicle.id === vehicleId,
+                      ),
+                      movementFilters,
                     )
-                    .filter(
-                      (v) =>
-                        !filters.plate ||
-                        data.fuel.some(
-                          (r) =>
-                            r.vehicle_id === v.id && r.plate === filters.plate,
-                        ),
-                    ),
-                  movementFilters,
-                ),
+                  : monthlyFuelMetrics(
+                      scope.filter(
+                        (row) =>
+                          within(row.occurred_at, movementFilters) &&
+                          (!view.group ||
+                            expenseGroupKey(row) === view.group.id),
+                      ),
+                      periodSegments,
+                    ).consumption,
               ),
             ],
           ]}

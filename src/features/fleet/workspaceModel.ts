@@ -22,6 +22,10 @@ export interface FleetFilters {
   type: string;
   invoiceState: string;
   category?: string;
+  ownership?: string;
+  model?: string;
+  responsible?: string;
+  vehicleType?: string;
 }
 export const initialFilters: FleetFilters = {
   search: "",
@@ -36,6 +40,10 @@ export const initialFilters: FleetFilters = {
   type: "",
   invoiceState: "",
   category: "",
+  ownership: "",
+  model: "",
+  responsible: "",
+  vehicleType: "",
 };
 export type FilterChange = (
   key: keyof FleetFilters | "period" | "reset",
