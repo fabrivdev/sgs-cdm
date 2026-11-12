@@ -300,6 +300,7 @@ export function FuelView({
             ? groupExpenses(visible, data, byBranch).map((g) => ({
                 id: g.id,
                 plate: g.plate,
+                model: g.model,
                 responsible: g.responsible,
                 km: g.km,
                 ...fuelMetrics(g.rows),

@@ -342,6 +342,7 @@ export function MaintenanceView({
             ? groupExpenses(rows, data, byBranch).map((g) => ({
                 id: g.id,
                 plate: g.plate,
+                model: g.model,
                 responsible: g.responsible,
                 km: g.km,
                 ...maintenanceMetrics(g.rows),

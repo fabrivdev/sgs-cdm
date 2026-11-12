@@ -43,6 +43,7 @@ export function groupExpenses<T extends Parameters<typeof expenseGroupKey>[0]>(
       plate: string;
       rows: T[];
       vehicleId: string | null;
+      model: string | null;
       responsible: string | null;
       km: number | null;
     }
@@ -58,6 +59,7 @@ export function groupExpenses<T extends Parameters<typeof expenseGroupKey>[0]>(
       groups.set(id, {
         id,
         plate: byBranch ? id : (vehicle?.plate ?? row.plate),
+        model: byBranch ? null : (vehicle?.model ?? null),
         vehicleId: byBranch ? null : (vehicle?.id ?? null),
         responsible:
           !byBranch && vehicle
@@ -111,6 +113,7 @@ export function expenseIdentityFields(branch: boolean): GridField[] {
     ? [["plate", "Sucursal"]]
     : [
         ["plate", "Chapa"],
+        ["model", "Modelo"],
         ["responsible", "Responsable"],
         ["km", "Kilometraje actual", "number"],
       ];
