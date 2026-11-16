@@ -40,6 +40,10 @@ function isComplete(control?: Control) {
   return Boolean(control?.finalizado || control?.situacion);
 }
 
+function checkDisabled(machine: Machine, stage: Stage) {
+  return machine.marca === "CLAAS" && stage === "recibimiento";
+}
+
 async function rpc<T>(name: string, args?: Record<string, unknown>): Promise<T> {
   // Las funciones se incorporan a los tipos generados al aplicar la migración.
   const client = supabase as unknown as {
@@ -134,6 +138,7 @@ export default function MachineChecks() {
               {stageKeys.map(stage => <TableCell key={stage} className="text-center [&:has([role=checkbox])]:px-3">
                 <div className="flex justify-center">
                 <Checkbox checked={isComplete(machine.controles[stage])}
+                  disabled={checkDisabled(machine, stage)}
                   aria-label={stages[stage] + " de " + machine.chasis}
                   onCheckedChange={() => setChassis(machine.chasis)} />
                 </div>
@@ -153,6 +158,7 @@ export default function MachineChecks() {
           {orders.isError && <div role="alert">No se pudieron cargar las OS. <Button variant="outline" onClick={() => orders.refetch()}>Reintentar</Button></div>}
           {stageKeys.map(stage => <StageControl key={machine.chasis + stage} stage={stage}
             chassis={machine.chasis} saved={machine.controles[stage] ?? empty} canEdit={canEdit}
+            disableCheck={checkDisabled(machine, stage)}
             orders={orders.data} refresh={() => cache.invalidateQueries({ queryKey: key })} />)}
           {!!machine.historico?.length && <Panel className="mb-4 overflow-x-auto p-0">
             <Table>
@@ -182,11 +188,12 @@ function ChassisStatus({ status }: { status: Machine["situacion_chasis"] }) {
   return <Badge variant="outline" className={`whitespace-nowrap text-[10px] ${color}`}>{label}</Badge>;
 }
 
-function StageControl({ stage, chassis, saved, canEdit, orders, refresh }: {
+function StageControl({ stage, chassis, saved, canEdit, disableCheck, orders, refresh }: {
   stage: Stage;
   chassis: string;
   saved: Control;
   canEdit: boolean;
+  disableCheck: boolean;
   orders?: Order[];
   refresh: () => Promise<void>;
 }) {
@@ -220,7 +227,7 @@ function StageControl({ stage, chassis, saved, canEdit, orders, refresh }: {
   return <Panel>
     <div className="mb-3 flex items-center justify-between gap-2">
       <label className="flex items-center gap-2 font-medium">
-        <Checkbox checked={isComplete(draft)} disabled={disabled} onCheckedChange={value => toggle(value === true)} />
+        <Checkbox checked={isComplete(draft)} disabled={disabled || disableCheck} onCheckedChange={value => toggle(value === true)} />
         {stages[stage]}
       </label>
       {canEdit && <Button size="sm" disabled={disabled || !!osError || (osChanged && !!osNumber && !order) || JSON.stringify(draft) === JSON.stringify(saved)}
