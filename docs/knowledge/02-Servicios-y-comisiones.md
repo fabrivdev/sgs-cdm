@@ -2,6 +2,8 @@
 
 ## Controles de máquinas
 
+La lista usa el contenedor y los encabezados compartidos. El chasis abre una ficha con las tres etapas, y el filtro Etapa pendiente muestra equipos habilitados que todavía no registraron su finalización o situación. La búsqueda de OS filtra por número dentro de las órdenes del mismo chasis. La migración `20261116200000_machine_check_conflicts.sql` muestra los chasis por conciliar y las filas históricas repetidas, manteniendo la validación original de edición.
+
 La sección `servicios.controles_maquinas` reúne recibimiento, preentrega y entrega técnica de CLAAS y HORSCH. Consulta por permiso de sección y edición para Jefatura, Administración y Gerencia. Las unidades se habilitan por ATA vigente o confirmación física de Importaciones, con chasis único y sin cancelación. Una etapa admite guardado sin OS. Las OS elegibles se buscan por chasis exacto normalizado y los técnicos provienen de jornadas vigentes. El histórico HORSCH se carga por separado y no sobrescribe controles operativos. El chasis histórico repetido conserva ambas filas originales y no se proyecta automáticamente.
 
 Fuentes: `MachineChecks.tsx` y `20261116190000_service_machine_checks.sql`. El despliegue y la aplicación de SQL están pendientes de verificación en Cloud.
