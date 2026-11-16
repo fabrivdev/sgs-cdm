@@ -4,6 +4,7 @@ import { useAuth } from "@/hooks/useAuth";
 import { supabase } from "@/integrations/supabase/client";
 import { PageHeader, PageShell, Panel } from "@/components/layout/AppPrimitives";
 import { FiltersBar, FilterSelect } from "@/components/filters/FiltersBar";
+import { LoadingScreen } from "@/components/LoadingScreen";
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Input } from "@/components/ui/input";
@@ -69,7 +70,7 @@ export default function MachineChecks() {
         options={[{ value: "todas", label: "Todas" }, ...stageKeys.map(value => ({ value, label: stages[value] }))]} />
     </FiltersBar>
     {machines.isPending ? <Panel className="p-0">
-      <p role="status" className="py-8 text-center text-sm text-muted-foreground">Cargando…</p>
+      <LoadingScreen variant="section" />
     </Panel> : machines.isError ?
       <div role="alert">No se pudieron cargar los controles. <Button variant="outline" onClick={() => machines.refetch()}>Reintentar</Button></div> :
       <Panel className="overflow-hidden p-0">
