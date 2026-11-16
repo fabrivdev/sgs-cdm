@@ -5,6 +5,8 @@ import { supabase } from "@/integrations/supabase/client";
 import { PageHeader, PageShell, Panel } from "@/components/layout/AppPrimitives";
 import { FiltersBar, FilterDate, FilterSelect } from "@/components/filters/FiltersBar";
 import { LoadingScreen } from "@/components/LoadingScreen";
+import { MarcaBadge } from "@/components/StatusBadges";
+import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Input } from "@/components/ui/input";
@@ -17,6 +19,7 @@ const stages = { recibimiento: "Recibimiento", preentrega: "Preentrega", entrega
 type Stage = keyof typeof stages;
 type Control = { finalizado: string | null; informado: string | null; situacion: string | null; os_numero: string | null; actualizado: string | null };
 type Machine = { chasis: string; marca: string | null; modelo: string | null; ata: string | null; habilitada: boolean;
+  situacion_chasis?: keyof typeof chassisStatuses | null;
   conflicto?: boolean; historico?: { fila: number; controles: Partial<Record<Stage, Control>> }[];
   controles: Partial<Record<Stage, Control>> };
 type Order = { numero: string; responsable: string | null; estado: string | null; problema: string | null; tecnicos: string[] };
@@ -24,6 +27,11 @@ const empty: Control = { finalizado: null, informado: null, situacion: null, os_
 const stageKeys = Object.keys(stages) as Stage[];
 const dateLabel = (value: string | null) => value?.split("-").reverse().join("/") ?? "—";
 const initialFilters = { search: "", brand: "", stage: "", status: "", equipment: "", from: "", to: "" };
+const chassisStatuses = {
+  parque: { label: "En parque", color: "border-teal-200 bg-teal-50 text-teal-700" },
+  pedido: { label: "Con pedido", color: "border-blue-200 bg-blue-50 text-blue-700" },
+  stock: { label: "Stock", color: "border-emerald-200 bg-emerald-50 text-emerald-700" },
+};
 const options = (all: string, values: Record<string, string>) => [
   { value: "todas", label: all }, ...Object.entries(values).map(([value, label]) => ({ value, label })),
 ];
@@ -111,22 +119,27 @@ export default function MachineChecks() {
       <TableScroll rows={visible.length} className="overflow-x-auto">
         <Table>
           <TableHeader className={scrollHead}><TableRow className={salesHeader + " bg-muted"}>
-            {["Chasis", "Marca", "Modelo", "Arribo", ...Object.values(stages)].map(label => <TableHead key={label}>{label}</TableHead>)}
+            {["Chasis", "Marca", "Modelo", "Situación", "Arribo"].map(label => <TableHead key={label}>{label}</TableHead>)}
+            {Object.values(stages).map(label => <TableHead key={label} className="text-center">{label}</TableHead>)}
           </TableRow></TableHeader>
           <TableBody>
             {visible.map(machine => <TableRow key={machine.chasis}>
               <TableCell><Button variant="link" size="sm" className="h-auto p-0"
                 onClick={() => setChassis(machine.chasis)}>
                 {machine.chasis}
-              </Button></TableCell><TableCell>{machine.marca ?? "—"}</TableCell>
-              <TableCell>{machine.modelo || "—"}</TableCell><TableCell>{dateLabel(machine.ata)}</TableCell>
-              {stageKeys.map(stage => <TableCell key={stage}>
+              </Button></TableCell><TableCell>{machine.marca ? <MarcaBadge marca={machine.marca} /> : "—"}</TableCell>
+              <TableCell>{machine.modelo || "—"}</TableCell>
+              <TableCell><ChassisStatus status={machine.situacion_chasis} /></TableCell>
+              <TableCell>{dateLabel(machine.ata)}</TableCell>
+              {stageKeys.map(stage => <TableCell key={stage} className="text-center [&:has([role=checkbox])]:px-3">
+                <div className="flex justify-center">
                 <Checkbox checked={isComplete(machine.controles[stage])}
                   aria-label={stages[stage] + " de " + machine.chasis}
                   onCheckedChange={() => setChassis(machine.chasis)} />
+                </div>
               </TableCell>)}
             </TableRow>)}
-            {!visible.length && <TableRow><TableCell colSpan={7} className="text-center text-muted-foreground">Sin registros</TableCell></TableRow>}
+            {!visible.length && <TableRow><TableCell colSpan={8} className="text-center text-muted-foreground">Sin registros</TableCell></TableRow>}
           </TableBody>
         </Table>
       </TableScroll></Panel>}
@@ -161,6 +174,12 @@ export default function MachineChecks() {
       </>}
     </ResponsiveDrawer>
   </PageShell>;
+}
+
+function ChassisStatus({ status }: { status: Machine["situacion_chasis"] }) {
+  if (!status) return "—";
+  const { label, color } = chassisStatuses[status];
+  return <Badge variant="outline" className={`whitespace-nowrap text-[10px] ${color}`}>{label}</Badge>;
 }
 
 function StageControl({ stage, chassis, saved, canEdit, orders, refresh }: {

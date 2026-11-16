@@ -2,6 +2,8 @@
 
 ## Puesta a punto
 
+El listado muestra el badge de marca compartido, casillas centradas y la situación del chasis. La migración `20261116220000_machine_check_chassis_status.sql` prioriza Parque activo, después un pedido vigente y después saldo positivo de stock. Sin evidencia o con conflicto queda sin situación.
+
 La sección conserva su ruta y permiso. Permite buscar por chasis, modelo u OS y combinar marca, etapa y estado de la misma etapa. Más filtros incluye situación del equipo y rango de arribo. `20261116210000_rename_machine_checks.sql` actualiza el nombre en Administración.
 
 La OS se escribe en un solo campo, con ejemplo `01-00000034`. Se valida el número completo contra las órdenes del mismo chasis antes de guardar. Las casillas sin evidencia de finalización quedan vacías y el detalle identifica los equipos históricos de solo consulta.
