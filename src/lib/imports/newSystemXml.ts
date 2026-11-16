@@ -175,8 +175,12 @@ export function mapFacturaVentasSheet(
       unitValueBase: signedUnitBase,
       totalValueBase: signedTotalBase,
       ivaRate,
-      unitValueWithIva: applyIva(signedUnitBase, ivaRate),
-      totalValueWithIva: applyIva(signedTotalBase, ivaRate),
+      unitValueWithIva: hasUsdValue && firstValue(row, ["UNIUSDIVA"]) !== null
+        ? (isCreditNote ? -Math.abs(number(row, ["UNIUSDIVA"])) : number(row, ["UNIUSDIVA"]))
+        : applyIva(signedUnitBase, ivaRate),
+      totalValueWithIva: hasUsdValue && firstValue(row, ["TOTUSDIVA"]) !== null
+        ? (isCreditNote ? -Math.abs(number(row, ["TOTUSDIVA"])) : number(row, ["TOTUSDIVA"]))
+        : applyIva(signedTotalBase, ivaRate),
       currency,
       exchangeRate: number(row, ["TIPCAM"]) || null,
       paymentCondition: text(row, ["CNDPAG"]),

@@ -843,6 +843,25 @@ describe("importacion XML de facturacion", () => {
     });
   });
 
+  it("utiliza el total con IVA informado por TOTVS en operaciones con tratamiento mixto", () => {
+    const result = mapFacturaVentasSheet("facturas.xml", {
+      name: "Facturas",
+      headers: [],
+      rows: [{
+        DOCUMENTO: "0010010005249",
+        MONORI: "Dolares",
+        ESPECIE: "NF",
+        CANTIDAD: 1,
+        TOTALUSD: 145454.55,
+        VUNITUSD: 145454.55,
+        TIPOES: "511 - 30% IVA 70% EXE C/S",
+        UNIUSDIVA: 160000,
+        TOTUSDIVA: 160000,
+      }],
+    });
+    expect(result.rows[0]).toMatchObject({ totalValueBase: 145454.55, totalValueWithIva: 160000, unitValueWithIva: 160000 });
+  });
+
   it("resta notas de credito y no usa la factura original como numero propio", () => {
     const result = mapFacturaVentasSheet("facturas.xml", {
       name: "Facturas",
