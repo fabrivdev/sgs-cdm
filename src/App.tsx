@@ -16,6 +16,7 @@ const Auth = lazy(() => import("./pages/Auth"));
 const Planificador = lazy(() => import("./pages/Planificador"));
 const Calendario = lazy(() => import("./pages/Calendario"));
 const OrdenesServicio = lazy(() => import("./pages/OrdenesServicio"));
+const MachineChecks = lazy(() => import("./pages/MachineChecks"));
 const Flota = lazy(() => import("./pages/FleetWorkspace"));
 const FlotaPreview = import.meta.env.DEV ? lazy(() => import("./pages/FlotaPreview")) : null;
 const Ventas = lazy(() => import("./pages/Ventas"));
@@ -67,6 +68,7 @@ const App = () => (
                 <Route path="/" element={<ProtectedRoute requireModulo="servicios" requireSection="servicios.planificador"><Planificador /></ProtectedRoute>} />
                 <Route path="/trabajos" element={<ProtectedRoute requireModulo="servicios" requireSection="servicios.trabajos"><Trabajos /></ProtectedRoute>} />
                 <Route path="/calendario" element={<ProtectedRoute requireModulo="servicios" requireSection="servicios.calendario"><Calendario /></ProtectedRoute>} />
+                <Route path="/servicios/controles-maquinas" element={<ProtectedRoute requireModulo="servicios" requireSection="servicios.controles_maquinas"><MachineChecks /></ProtectedRoute>} />
                 <Route path="/servicios/ventas" element={<ProtectedRoute requireModulo="servicios" requireSection="servicios.ventas"><Ventas area="servicios" /></ProtectedRoute>} />
                 <Route
                   path="/servicios/ordenes"

@@ -1,5 +1,11 @@
 # Servicios y comisiones
 
+## Controles de máquinas
+
+La sección `servicios.controles_maquinas` reúne recibimiento, preentrega y entrega técnica de CLAAS y HORSCH. Consulta por permiso de sección y edición para Jefatura, Administración y Gerencia. Las unidades se habilitan por ATA vigente o confirmación física de Importaciones, con chasis único y sin cancelación. Una etapa admite guardado sin OS. Las OS elegibles se buscan por chasis exacto normalizado y los técnicos provienen de jornadas vigentes. El histórico HORSCH se carga por separado y no sobrescribe controles operativos. El chasis histórico repetido conserva ambas filas originales y no se proyecta automáticamente.
+
+Fuentes: `MachineChecks.tsx` y `20261116190000_service_machine_checks.sql`. El despliegue y la aplicación de SQL están pendientes de verificación en Cloud.
+
 La semántica de servicios_cantidad para eficiencia sigue pendiente de verificar. Consultar [[26-Ordenes-servicio-y-productividad]] antes de llamarlo horas trabajadas acreditadas; horas OS, horas-persona y horas cobradas no se intercambian.
 
 La sección activa de Órdenes de servicio reúne Órdenes, Productividad y Cumplimiento; ver [[26-Ordenes-servicio-y-productividad]] para sus fuentes, cálculos, incidencias y límites. Esta vista operativa no reemplaza la población financiera de Ventas ni los estados de validación/liquidación de Comisiones.
