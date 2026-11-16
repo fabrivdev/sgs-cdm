@@ -80,7 +80,7 @@ const navGroups: NavGroup[] = [
       { to: "/trabajos", label: "Trabajos", icon: Wrench, section: "servicios.trabajos" },
       { to: "/calendario", label: "Calendario", icon: CalendarDays, section: "servicios.calendario" },
       { to: "/servicios/ordenes", label: "Órdenes de servicio", icon: ListChecks, section: "servicios.ordenes", managementOnly: true },
-      { to: "/servicios/controles-maquinas", label: "Controles de máquinas", icon: ClipboardList, section: "servicios.controles_maquinas" },
+      { to: "/servicios/controles-maquinas", label: "Puesta a punto", icon: ClipboardList, section: "servicios.controles_maquinas" },
 
       { to: "/comisiones", label: "Comisiones", icon: HandCoins, section: "servicios.comisiones", adminOnly: true },
     ],

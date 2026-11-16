@@ -3,7 +3,7 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useAuth } from "@/hooks/useAuth";
 import { supabase } from "@/integrations/supabase/client";
 import { PageHeader, PageShell, Panel } from "@/components/layout/AppPrimitives";
-import { FiltersBar, FilterSelect } from "@/components/filters/FiltersBar";
+import { FiltersBar, FilterDate, FilterSelect } from "@/components/filters/FiltersBar";
 import { LoadingScreen } from "@/components/LoadingScreen";
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
@@ -23,6 +23,10 @@ type Order = { numero: string; responsable: string | null; estado: string | null
 const empty: Control = { finalizado: null, informado: null, situacion: null, os_numero: null, actualizado: null };
 const stageKeys = Object.keys(stages) as Stage[];
 const dateLabel = (value: string | null) => value?.split("-").reverse().join("/") ?? "—";
+const initialFilters = { search: "", brand: "", stage: "", status: "", equipment: "", from: "", to: "" };
+const options = (all: string, values: Record<string, string>) => [
+  { value: "todas", label: all }, ...Object.entries(values).map(([value, label]) => ({ value, label })),
+];
 
 function isComplete(control?: Control) {
   return Boolean(control?.finalizado || control?.situacion);
@@ -43,9 +47,10 @@ export default function MachineChecks() {
   const cache = useQueryClient();
   const key = ["machine-checks", user?.id];
   const machines = useQuery({ queryKey: key, queryFn: () => rpc<Machine[]>("servicios_controles_listar") });
-  const [search, setSearch] = useState("");
-  const [brand, setBrand] = useState("todas");
-  const [pendingStage, setPendingStage] = useState("todas");
+  const [filters, setFilters] = useState(initialFilters);
+  const change = (field: keyof typeof filters) => (value: string) =>
+    setFilters(previous => ({ ...previous, [field]: field !== "search" && value === "todas" ? "" : value }));
+  const invalidRange = !!filters.from && !!filters.to && filters.from > filters.to;
   const [chassis, setChassis] = useState<string | null>(null);
   const machine = machines.data?.find(row => row.chasis === chassis);
   const canEdit = !!machine?.habilitada && roles.some(role => ["admin", "superadmin", "jefatura", "gerencia"].includes(role));
@@ -54,22 +59,51 @@ export default function MachineChecks() {
     queryFn: () => rpc<Order[]>("servicios_controles_os", { p_chasis: chassis }),
     enabled: !!machine?.habilitada,
   });
-  const visible = (machines.data ?? []).filter(machine =>
-    (brand === "todas" || machine.marca === brand)
-    && (pendingStage === "todas" || (machine.habilitada
-      && !machine.controles[pendingStage as Stage]?.finalizado
-      && !machine.controles[pendingStage as Stage]?.situacion))
-    && [machine.chasis, machine.modelo].some(value => value?.toLowerCase().includes(search.trim().toLowerCase())));
+  const visible = (machines.data ?? []).filter(machine => {
+    if (filters.brand && machine.marca !== filters.brand) return false;
+    const equipment = machine.conflicto ? "conciliar" : machine.habilitada ? "habilitados" : "historico";
+    if (filters.equipment && equipment !== filters.equipment) return false;
+    if (filters.from && (!machine.ata || machine.ata < filters.from)) return false;
+    if (filters.to && (!machine.ata || machine.ata > filters.to)) return false;
+    const selectedStages = filters.stage ? [filters.stage as Stage] : stageKeys;
+    if (filters.status && !selectedStages.some(stage => {
+      const control = machine.controles[stage];
+      switch (filters.status) {
+        case "pendiente": return machine.habilitada && !isComplete(control) && !machine.historico?.length;
+        case "sin-os": return isComplete(control) && !control?.os_numero;
+        case "sin-informar": return !!control?.finalizado && !control.informado;
+        case "a-cobrar": return control?.situacion === "A cobrar";
+        case "cobrado": return control?.situacion === "Cobrado";
+        default: return isComplete(control);
+      }
+    })) return false;
+    const search = filters.search.trim().toLowerCase();
+    return !search || [machine.chasis, machine.modelo, ...selectedStages.map(stage => machine.controles[stage]?.os_numero)]
+      .some(value => value?.toLowerCase().includes(search));
+  });
 
   return <PageShell>
-    <PageHeader title="Controles de máquinas" />
-    <FiltersBar search={{ value: search, onChange: setSearch, placeholder: "Chasis o modelo" }}>
-      <FilterSelect label="Marca" value={brand} onChange={setBrand} placeholder="Todas"
-        options={["todas", "CLAAS", "HORSCH"].map(value => ({ value, label: value === "todas" ? "Todas" : value }))} />
-      <FilterSelect label="Etapa pendiente" value={pendingStage} onChange={setPendingStage} placeholder="Todas"
-        options={[{ value: "todas", label: "Todas" }, ...stageKeys.map(value => ({ value, label: stages[value] }))]} />
+    <PageHeader title="Puesta a punto" />
+    <FiltersBar search={{ value: filters.search, onChange: change("search"), placeholder: "Chasis, modelo o N.º de OS" }}
+      activeCount={Object.values(filters).filter(value => value.trim()).length}
+      onClear={() => setFilters(initialFilters)}
+      expanded={<>
+        <FilterSelect label="Equipos" value={filters.equipment || "todas"} onChange={change("equipment")} placeholder="Todos"
+          options={options("Todos", { habilitados: "Habilitados", historico: "Histórico", conciliar: "Chasis por conciliar" })} />
+        <FilterDate label="Arribo desde" value={filters.from} onChange={change("from")} max={filters.to || undefined} />
+        <FilterDate label="Arribo hasta" value={filters.to} onChange={change("to")} min={filters.from || undefined} />
+      </>}>
+      <FilterSelect label="Marca" value={filters.brand || "todas"} onChange={change("brand")} placeholder="Todas"
+        options={options("Todas", { CLAAS: "CLAAS", HORSCH: "HORSCH" })} />
+      <FilterSelect label="Etapa" value={filters.stage || "todas"} onChange={value =>
+        setFilters(previous => ({ ...previous, stage: value === "todas" ? "" : value, status: value === "todas" ? previous.status : previous.status || "pendiente" }))}
+        placeholder="Todas" options={options("Todas", stages)} />
+      <FilterSelect label="Estado de la etapa" value={filters.status || "todas"} onChange={change("status")} placeholder="Todos"
+        options={options("Todos", { pendiente: "Pendiente", realizada: "Realizada", "sin-os": "Realizada sin OS",
+          "sin-informar": "Sin informar a fábrica", "a-cobrar": "A cobrar", cobrado: "Cobrado" })} />
     </FiltersBar>
-    {machines.isPending ? <Panel className="p-0">
+    {invalidRange ? <p role="alert" className="text-sm text-destructive">El arribo desde debe ser anterior o igual al arribo hasta.</p>
+      : machines.isPending ? <Panel className="p-0">
       <LoadingScreen variant="section" />
     </Panel> : machines.isError ?
       <div role="alert">No se pudieron cargar los controles. <Button variant="outline" onClick={() => machines.refetch()}>Reintentar</Button></div> :
