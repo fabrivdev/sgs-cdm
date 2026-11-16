@@ -85,8 +85,7 @@ export default function MachineChecks() {
               </Button></TableCell><TableCell>{machine.marca ?? "—"}</TableCell>
               <TableCell>{machine.modelo || "—"}</TableCell><TableCell>{dateLabel(machine.ata)}</TableCell>
               {stageKeys.map(stage => <TableCell key={stage}>
-                <Checkbox checked={isComplete(machine.controles[stage]) ? true
-                  : !machine.habilitada || machine.historico?.length ? "indeterminate" : false}
+                <Checkbox checked={isComplete(machine.controles[stage])}
                   aria-label={stages[stage] + " de " + machine.chasis}
                   onCheckedChange={() => setChassis(machine.chasis)} />
               </TableCell>)}
@@ -101,6 +100,7 @@ export default function MachineChecks() {
         <ResponsiveDrawerHeader><h2 className="font-semibold">{[machine.chasis, machine.modelo || machine.marca].filter(Boolean).join(" · ")}</h2></ResponsiveDrawerHeader>
         <ResponsiveDrawerBody className="space-y-3">
           {machine.conflicto && <div role="status" className="text-sm text-muted-foreground">Chasis por conciliar en Importaciones</div>}
+          {!machine.habilitada && !machine.conflicto && <div role="status" className="text-sm text-muted-foreground">Histórico · Solo consulta</div>}
           {orders.isError && <div role="alert">No se pudieron cargar las OS. <Button variant="outline" onClick={() => orders.refetch()}>Reintentar</Button></div>}
           {stageKeys.map(stage => <StageControl key={machine.chasis + stage} stage={stage}
             chassis={machine.chasis} saved={machine.controles[stage] ?? empty} canEdit={canEdit}
@@ -136,12 +136,19 @@ function StageControl({ stage, chassis, saved, canEdit, orders, refresh }: {
   refresh: () => Promise<void>;
 }) {
   const [edited, setEdited] = useState<Control | null>(null);
-  const [search, setSearch] = useState("");
   const draft = edited ?? saved;
+  const osNumber = draft.os_numero?.trim() || null;
+  const order = orders?.find(item => item.numero === osNumber);
+  const osChanged = osNumber !== saved.os_numero;
+  const osError = osChanged && osNumber
+    ? !/^\d{2}-\d+$/.test(osNumber)
+      ? "Usá el formato 01-00000034."
+      : orders && !order ? "La OS no figura para este chasis." : null
+    : null;
   const save = useMutation({
     mutationFn: () => rpc("servicios_controles_guardar", {
       p_chasis: chassis, p_etapa: stage, p_finalizado: draft.finalizado, p_informado: draft.informado,
-      p_situacion: draft.situacion, p_os: draft.os_numero, p_version: draft.actualizado,
+      p_situacion: draft.situacion, p_os: osNumber, p_version: draft.actualizado,
     }),
     onSuccess: async () => {
       await refresh();
@@ -154,8 +161,6 @@ function StageControl({ stage, chassis, saved, canEdit, orders, refresh }: {
   const toggle = (checked: boolean) => setEdited(checked
     ? { ...draft, situacion: draft.situacion ?? "Finalizado" }
     : { ...draft, finalizado: null, situacion: null });
-  const order = orders?.find(item => item.numero === draft.os_numero);
-  const matches = orders?.filter(item => item.numero.includes(search.trim())) ?? [];
   const disabled = !canEdit || save.isPending;
   return <Panel>
     <div className="mb-3 flex items-center justify-between gap-2">
@@ -163,7 +168,7 @@ function StageControl({ stage, chassis, saved, canEdit, orders, refresh }: {
         <Checkbox checked={isComplete(draft)} disabled={disabled} onCheckedChange={value => toggle(value === true)} />
         {stages[stage]}
       </label>
-      {canEdit && <Button size="sm" disabled={disabled || JSON.stringify(draft) === JSON.stringify(saved)}
+      {canEdit && <Button size="sm" disabled={disabled || !!osError || (osChanged && !!osNumber && !order) || JSON.stringify(draft) === JSON.stringify(saved)}
         onClick={() => save.mutate()}>{save.isPending ? "Guardando…" : "Guardar"}</Button>}
     </div>
     {canEdit ? <div className="grid gap-2 sm:grid-cols-3 text-sm">
@@ -173,14 +178,11 @@ function StageControl({ stage, chassis, saved, canEdit, orders, refresh }: {
         value={draft.situacion ?? ""} disabled={disabled} onChange={event => update("situacion", event.target.value)}>
         <option value="">—</option>{["Finalizado", "A cobrar", "Cobrado"].map(value => <option key={value}>{value}</option>)}
       </select></label>
-      <label className="grid gap-1">Buscar OS<Input value={search} disabled={disabled || !orders} onChange={event => setSearch(event.target.value)} /></label>
-      <label className="grid gap-1 sm:col-span-2">N.º de OS<select className="h-10 rounded-md border bg-background px-2"
-        value={draft.os_numero ?? ""} disabled={disabled || !orders} onChange={event => update("os_numero", event.target.value)}>
-        <option value="">—</option>
-        {draft.os_numero && !matches.some(item => item.numero === draft.os_numero) && <option>{draft.os_numero}</option>}
-        {matches.map(item => <option key={item.numero}>{item.numero}</option>)}
-      </select></label>
-      {search.trim() && !matches.length && <div role="status" className="text-muted-foreground sm:col-span-3">Sin coincidencias para este chasis</div>}
+      <label className="grid gap-1">N.º de OS
+        <Input placeholder="01-00000034" autoComplete="off" value={draft.os_numero ?? ""}
+          aria-invalid={!!osError} disabled={disabled} onChange={event => update("os_numero", event.target.value)} />
+      </label>
+      {osError && <div role="status" className="self-end pb-2 text-destructive sm:col-span-2">{osError}</div>}
     </div> : <CheckDetails fields={{
       Finalización: dateLabel(draft.finalizado), "Informado a fábrica": dateLabel(draft.informado),
       Situación: draft.situacion, "N.º de OS": draft.os_numero,
