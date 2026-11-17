@@ -1069,6 +1069,14 @@ export default function MaquinariaOperaciones() {
     { key: "valor", label: "Valor", kind: "number", align: "right", value: r => (r as OrderRow).valor_venta == null ? null : Number((r as OrderRow).valor_venta) },
   ];
   const list = useSectionTable({ rows, columns, initialSort: { key: "fecha", direction: "desc" },
+    exportColumns: importsView ? [
+      ...columns,
+      { key: "factura_proveedor", label: "N.º de factura proveedor", kind: "text", value: r => (r as ImportRow).invoice_supplier },
+      { key: "fecha_factura_proveedor", label: "Fecha factura proveedor", kind: "date", value: r => (r as ImportRow).factura_proveedor_fecha?.slice(0, 10) },
+      { key: "moneda_factura_proveedor", label: "Moneda factura proveedor", kind: "text", value: r => (r as ImportRow).factura_proveedor_moneda },
+      { key: "monto_facturado_proveedor", label: "Monto facturado proveedor", kind: "number", excelFormat: "#,##0.00",
+        value: r => (r as ImportRow).valor_factura_proveedor == null ? null : Number((r as ImportRow).valor_factura_proveedor) },
+    ] : undefined,
     title: importsView ? "Importaciones" : "Operaciones", fileName: importsView ? "importaciones.xlsx" : "operaciones.xlsx",
     disabled: operationsQuery.isLoading || operationsQuery.isError || (!importsView && confirmedBillingQuery.isError) });
   return <main className={pageShell}>

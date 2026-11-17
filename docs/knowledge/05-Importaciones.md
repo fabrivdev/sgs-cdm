@@ -1,5 +1,7 @@
 # Importaciones
 
+El Excel del listado agrega número, fecha, moneda y monto unitario de factura del proveedor desde los campos de la unidad. Conserva el número como texto y el monto como número, incluidos ceros. Los datos ausentes quedan vacíos. Fuente: `MaquinariaOperaciones.tsx`, opción `exportColumns` del exportador compartido.
+
 ## Facturas del proveedor por subconjunto: cambio del 14/10/2026
 
 Acuerdo confirmado: una factura puede cubrir una unidad, todo el lote o un subconjunto (por ejemplo, 5 de 8). El archivo se vincula a las unidades elegidas, una unidad no admite dos archivos vigentes y la OC permanece compartida. La migración `20261014120000_link_supplier_invoice_documents_to_import_units.sql` agrega el vínculo documento↔unidades y conserva todos los archivos existentes. Solo asigna automáticamente los documentos de líneas con una unidad; los documentos históricos de lotes múltiples quedan visibles, pendientes de asignación explícita. Nunca inferir cobertura de un lote por el número de archivos o por datos de factura de la unidad.
