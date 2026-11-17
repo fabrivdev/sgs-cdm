@@ -4,6 +4,8 @@ import { useAuth } from "@/hooks/useAuth";
 import { supabase } from "@/integrations/supabase/client";
 import { PageHeader, PageShell, Panel } from "@/components/layout/AppPrimitives";
 import { FiltersBar, FilterDate, FilterSelect } from "@/components/filters/FiltersBar";
+import { SectionActionsMenu } from "@/components/exports/SectionActionsMenu";
+import type { SalesColumn } from "@/components/ventas/salesTableInteraction";
 import { LoadingScreen } from "@/components/LoadingScreen";
 import { MarcaBadge } from "@/components/StatusBadges";
 import { Badge } from "@/components/ui/badge";
@@ -44,6 +46,18 @@ function checkDisabled(machine: Machine, stage: Stage) {
   return machine.marca === "CLAAS" && stage === "recibimiento";
 }
 
+const exportColumns: SalesColumn<Machine>[] = [
+  { key: "chasis", label: "Chasis", kind: "text", value: row => row.chasis },
+  { key: "marca", label: "Marca", kind: "text", value: row => row.marca },
+  { key: "modelo", label: "Modelo", kind: "text", value: row => row.modelo },
+  { key: "situacion", label: "Situación", kind: "text", value: row => row.situacion_chasis ? chassisStatuses[row.situacion_chasis].label : null },
+  { key: "arribo", label: "Arribo", kind: "date", value: row => row.ata },
+  ...stageKeys.map((stage): SalesColumn<Machine> => ({
+    key: stage, label: stages[stage], kind: "text",
+    value: row => checkDisabled(row, stage) ? null : isComplete(row.controles[stage]) ? "Sí" : "No",
+  })),
+];
+
 async function rpc<T>(name: string, args?: Record<string, unknown>): Promise<T> {
   // Las funciones se incorporan a los tipos generados al aplicar la migración.
   const client = supabase as unknown as {
@@ -55,7 +69,7 @@ async function rpc<T>(name: string, args?: Record<string, unknown>): Promise<T> 
 }
 
 export default function MachineChecks() {
-  const { user, roles } = useAuth();
+  const { user, roles, can } = useAuth();
   const cache = useQueryClient();
   const key = ["machine-checks", user?.id];
   const machines = useQuery({ queryKey: key, queryFn: () => rpc<Machine[]>("servicios_controles_listar") });
@@ -97,6 +111,14 @@ export default function MachineChecks() {
   return <PageShell>
     <PageHeader title="Puesta a punto" />
     <FiltersBar search={{ value: filters.search, onChange: change("search"), placeholder: "Chasis, modelo o N.º de OS" }}
+      secondaryActions={can("datos:exportar") && <SectionActionsMenu options={[{
+        id: "puesta-a-punto", label: "Exportar a Excel",
+        disabled: invalidRange || machines.isPending || machines.isError || !visible.length,
+        onSelect: async () => {
+          const { exportSalesTable } = await import("@/components/ventas/salesTableExport");
+          exportSalesTable({ rows: visible, columns: exportColumns, fileName: "puesta-a-punto.xlsx", sheetName: "Puesta a punto" });
+        },
+      }]} />}
       activeCount={Object.values(filters).filter(value => value.trim()).length}
       onClear={() => setFilters(initialFilters)}
       expanded={<>
