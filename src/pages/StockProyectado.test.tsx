@@ -48,7 +48,7 @@ describe("Stock proyectado advanced filters", () => {
     const kpis = [...document.querySelectorAll(".kpi-item")].slice(1);
     expect(kpis[0]).toHaveTextContent("Stock1");
     expect(kpis[1]).toHaveTextContent("Órdenes de compra0");
-    expect(kpis[2]).toHaveTextContent("Ventas pendientes3");
+    expect(kpis[2]).toHaveTextContent("Unidades pendientes3");
     expect(kpis[3]).toHaveTextContent("Stock proyectado-2");
 
     const actions = screen.getByRole("button", { name: "Acciones de la sección" });

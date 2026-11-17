@@ -128,7 +128,7 @@ export default function StockProyectado() {
     { key: "stock", label: "Stock", kind: "number", align: "center", value: (row) => row.stock },
     { key: "pedidos_compra", label: "OC", kind: "number", align: "center", value: (row) => row.pedidos_compra },
     { key: "disponibilidad", label: "Disponible", kind: "number", align: "center", value: (row) => row.disponibilidad },
-    { key: "ventas_pendientes", label: "Ventas pend.", kind: "number", align: "center", value: (row) => row.ventas_pendientes },
+    { key: "ventas_pendientes", label: "Unidades pend.", kind: "number", align: "center", value: (row) => row.ventas_pendientes },
     { key: "stock_proyectado", label: "Proyectado", kind: "number", align: "center", value: (row) => row.stock_proyectado },
   ];
   const table = useSectionTable({
@@ -183,7 +183,7 @@ export default function StockProyectado() {
         <KpiItem label="Vendidas YTD" value={ytdTotal == null ? "-" : units(ytdTotal)} tone="info" icon={<PackageCheck className="h-4 w-4" />} />
         <KpiItem label="Stock" value={loading || loadError ? "—" : units(totals.stock)} tone="positive" icon={<Boxes className="h-4 w-4" />} />
         <KpiItem label="Órdenes de compra" value={loading || loadError ? "—" : units(totals.pedidosCompra)} tone="info" icon={<ShoppingCart className="h-4 w-4" />} />
-        <KpiItem label="Ventas pendientes" value={loading || loadError ? "—" : units(totals.ventasPendientes)} tone="warning" icon={<ClipboardList className="h-4 w-4" />} />
+        <KpiItem label="Unidades pendientes" value={loading || loadError ? "—" : units(totals.ventasPendientes)} tone="warning" icon={<ClipboardList className="h-4 w-4" />} />
         <KpiItem label="Stock proyectado" value={loading || loadError ? "—" : units(totals.stockProyectado)} tone={totals.stockProyectado < 0 ? "danger" : "positive"} icon={<PackageCheck className="h-4 w-4" />} />
       </KpiStrip>
 
