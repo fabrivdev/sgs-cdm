@@ -4,7 +4,7 @@ import { format } from "date-fns";
 import { useAuth } from "@/hooks/useAuth";
 import { supabase } from "@/integrations/supabase/client";
 import { PageShell, PageHeader, KpiStrip, KpiItem } from "@/components/layout/AppPrimitives";
-import { FiltersBar, FilterDate, FilterSelect } from "@/components/filters/FiltersBar";
+import { FiltersBar, FilterCustom, FilterDate, FilterSelect } from "@/components/filters/FiltersBar";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { SalesDataTable, type SalesDisplayColumn } from "@/components/ventas/SalesDataTable";
 import { SalesSectionExportsProvider, SalesSectionExportMenu } from "@/components/ventas/SalesSectionExports";
@@ -14,8 +14,8 @@ import { SUCURSALES } from "@/lib/constants";
 
 type Row = { clave: string; nombre: string | null; descripcion: string | null; actual: number | null; anterior: number | null; antiguo: number | null };
 type Report = { anio: number; anios_con_datos: number[]; filas: Row[] };
-const money = (value: number | null) => value == null ? "—" : new Intl.NumberFormat("es-PY", { style: "currency", currency: "USD", maximumFractionDigits: 2 }).format(value);
-const percent = (value: number | null) => value == null ? "—" : new Intl.NumberFormat("es-PY", { style: "percent", maximumFractionDigits: 1, signDisplay: "exceptZero" }).format(value);
+const money = (value: number | null) => value == null ? "—" : "$ " + new Intl.NumberFormat("es-PY", { maximumFractionDigits: 0 }).format(value);
+const percent = (value: number | null) => value == null ? "—" : new Intl.NumberFormat("es-PY", { style: "percent", maximumFractionDigits: 0, signDisplay: "exceptZero" }).format(value);
 const variation = (row: Row) => row.actual == null || row.anterior == null || row.anterior <= 0 ? null : (row.actual-row.anterior)/row.anterior;
 const difference = (row: Row) => row.actual == null || row.anterior == null ? null : row.actual-row.anterior;
 function trend(row: Row) {
@@ -64,10 +64,10 @@ function HistoricalWorkspace() {
     ...(view === "repuestos" ? [{ key: "descripcion", label: "Descripción", kind: "text" as const, value: (row: Row) => row.descripcion, weight: 2.3 }] : []),
     ...(["actual", "anterior", "antiguo"] as const).map((key,index) => ({
       key, label: "Ventas " + (year-index), kind: "number" as const, align: "right" as const,
-      value: (row: Row) => row[key], render: (row: Row) => money(row[key]), excelFormat: '"$" #,##0.00', weight: 1.3,
+      value: (row: Row) => row[key], render: (row: Row) => money(row[key]), excelFormat: '"$" #,##0', weight: 1.3,
     })),
-    { key: "diferencia", label: "Variación USD", kind: "number", align: "right", value: difference, render: row => money(difference(row)), excelFormat: '"$" #,##0.00', weight: 1.2 },
-    { key: "variacion", label: "Variación %", kind: "number", align: "right", value: variation, render: row => percent(variation(row)), excelFormat: "0.0%" },
+    { key: "diferencia", label: "Variación $", kind: "number", align: "right", value: difference, render: row => money(difference(row)), excelFormat: '"$" #,##0', weight: 1.2 },
+    { key: "variacion", label: "Variación %", kind: "number", align: "right", value: variation, render: row => percent(variation(row)), excelFormat: "0%" },
     { key: "tendencia", label: "Tendencia", kind: "text", value: trend, render: row => <span className={difference(row) == null ? "" : difference(row)! > 0 ? "text-emerald-600" : difference(row)! < 0 ? "text-destructive" : "text-muted-foreground"}>{trend(row) ?? "—"}</span> },
   ];
   const totals = (field: "actual" | "anterior" | "antiguo") => query.data?.anios_con_datos.includes(year-["actual","anterior","antiguo"].indexOf(field))
@@ -75,13 +75,17 @@ function HistoricalWorkspace() {
   const totalRow: Row = { clave: "total", nombre: null, descripcion: null, actual: totals("actual"), anterior: totals("anterior"), antiguo: totals("antiguo") };
   const ready = valid && query.isSuccess;
   return <PageShell>
-    <PageHeader title="Histórico" tabs={<Tabs value={view} onValueChange={setView}><TabsList>
-      <TabsTrigger value="clientes">Clientes</TabsTrigger><TabsTrigger value="repuestos">Repuestos</TabsTrigger>
-    </TabsList></Tabs>} />
+    <PageHeader title="Histórico" />
     <FiltersBar search={{ value: search, onChange: setSearch, placeholder: view === "clientes" ? "Cliente" : "Código o descripción" }}
       activeCount={[search, branch === "TODAS" ? "" : branch, direction === "todas" ? "" : direction].filter(Boolean).length}
       onClear={() => { setSearch(""); setBranch("TODAS"); setDirection("todas"); setCutoff(today); }}
       secondaryActions={<SalesSectionExportMenu />}>
+      <FilterCustom>
+        <Tabs value={view} onValueChange={setView}><TabsList aria-label="Vista del histórico">
+          <TabsTrigger value="clientes">Clientes</TabsTrigger>
+          <TabsTrigger value="repuestos">Repuestos</TabsTrigger>
+        </TabsList></Tabs>
+      </FilterCustom>
       <FilterDate label="Comparar hasta" value={cutoff} onChange={setCutoff} max={today} min="2002-01-01" />
       <FilterSelect label="Sucursal" value={branch} onChange={setBranch} placeholder="Todas"
         options={[{ value: "TODAS", label: "Todas" }, ...SUCURSALES.map(value => ({ value, label: value }))]} />
@@ -93,12 +97,12 @@ function HistoricalWorkspace() {
       : query.isError ? <div role="alert" className="text-sm">No se pudo cargar el histórico. <Button variant="outline" onClick={() => query.refetch()}>Reintentar</Button></div>
       : ready && <>
         <KpiStrip>
-          <KpiItem label={"Ventas " + year} value={money(totalRow.actual)} />
-          <KpiItem label={"Ventas " + (year-1)} value={money(totalRow.anterior)} />
-          <KpiItem label={"Ventas " + (year-2)} value={money(totalRow.antiguo)} />
+          <KpiItem label="Año actual" value={money(totalRow.actual)} />
+          <KpiItem label="Año anterior" value={money(totalRow.anterior)} />
+          <KpiItem label="Año antepasado" value={money(totalRow.antiguo)} />
           <KpiItem label="Variación" value={percent(variation(totalRow))} />
         </KpiStrip>
-        <SalesDataTable key={view + cutoff + branch} title={view === "clientes" ? "Clientes" : "Repuestos"}
+        <SalesDataTable key={view + cutoff + branch} title={view === "clientes" ? "Evolución de compras por cliente" : "Evolución de ventas por repuesto"}
           rows={rows} columns={columns} initialSort={{ key: "actual", direction: "desc" }}
           rowKey={row => row.clave} fileName={"historico-" + view + ".xlsx"} sheetName="Histórico"
           empty="Sin movimientos para estos filtros." desktopBreakpoint={640} />
