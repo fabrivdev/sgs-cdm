@@ -2,6 +2,8 @@
 
 ## Histórico por cliente y repuesto
 
+Histórico muestra 20 filas antes del scroll, pestañas al extremo derecho de la barra antes del menú de exportación y variación con un decimal. Participación reemplaza Tendencia y divide la venta del año actual de cada fila entre la suma del listado filtrado cuando es positiva; no se calcula sin importe o denominador positivo.
+
 `/repuestos/historico` usa el permiso independiente `repuestos.historico`, gestionado en Administración. La migración `20261118120000_parts_historical_comparison.sql` reutiliza `ventas_repuestos_movimientos_v1`, con notas de crédito y ventas en USD de las fuentes vigentes. Compara desde enero hasta la misma fecha de corte en tres años. La variación porcentual es (actual-anterior)/anterior cuando anterior es positivo. Nueva actividad significa anterior cero y actual positivo, no demuestra que el cliente nunca haya comprado. Tendencia representa el cambio entre ambos períodos. Un año sin movimientos en la fuente de la sucursal queda desconocido. La ausencia de una entidad en un año con movimientos da cero, sin afirmar cobertura completa.
 
 La pantalla reutiliza PageShell, PageHeader, Tabs, FiltersBar, KpiStrip, SalesDataTable y el menú de exportación. Búsqueda y tendencia filtran tabla, totales y Excel. Clientes se agrupan por nombre canónico normalizado y repuestos por código de la fuente; no se inventan vínculos por RUC o equivalencias ambiguas. SQL preparado para aplicación manual, validación de datos reales pendiente.

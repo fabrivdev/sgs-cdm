@@ -14,7 +14,7 @@ export type SalesDisplayColumn<T> = SalesColumn<T> & {
 export function SalesDataTable<T>({ title, rows, columns, initialSort, rowKey, fileName, sheetName = "Ventas Servicios",
   empty = "Sin facturación en el período.", footer, onRowClick, onDetailClick, selected, countLabel = "filas",
   mobileIdentity, mobileEmbedded = false, mobileCountKey, mobileCountLabel, mobilePrimaryLabel, mobileMetricLabel, desktopBreakpoint = 1024,
-  hideDesktopTitle = false, exportColumns, fixedSort = false,
+  hideDesktopTitle = false, exportColumns, fixedSort = false, visibleRows,
 }: {
   title: string; rows: readonly T[]; columns: readonly SalesDisplayColumn<T>[];
   initialSort: SalesSort; rowKey: (row: T) => string; fileName: string; sheetName?: string;
@@ -22,6 +22,7 @@ export function SalesDataTable<T>({ title, rows, columns, initialSort, rowKey, f
   mobileEmbedded?: boolean; onDetailClick?: (row: T) => void; desktopBreakpoint?: number;
   hideDesktopTitle?: boolean;
   fixedSort?: boolean;
+  visibleRows?: 20;
   mobileCountKey?: string; mobileCountLabel?: string; mobilePrimaryLabel?: string; mobileMetricLabel?: string;
   mobileIdentity?: (row: T) => string;
   exportColumns?: readonly SalesColumn<T>[];
@@ -49,8 +50,8 @@ export function SalesDataTable<T>({ title, rows, columns, initialSort, rowKey, f
       <h3 className="truncate text-[12px] font-semibold">{title}</h3>
     </div>}
     <div role="table" aria-label={title} aria-colcount={columns.length}>
-      <TableScroll rows={ordered.length} className="min-w-0 max-w-full">
-        <div role="row" style={grid} className={`grid gap-x-2 bg-muted/60 px-3 py-2 text-[11px] font-medium text-muted-foreground ${scrollHead} ${salesHeader}`}>
+      <TableScroll rows={ordered.length} className="min-w-0 max-w-full" maxHeight={visibleRows ? visibleRows * 36 + 36 : undefined}>
+        <div role="row" style={grid} className={`grid gap-x-2 bg-muted/60 px-3 py-2 text-[11px] font-medium text-muted-foreground ${visibleRows ? "h-9 items-center" : ""} ${scrollHead} ${salesHeader}`}>
           {columns.map(column => <div role="columnheader" key={column.key} className="min-w-0 truncate"
             aria-sort={sort.key === column.key ? sort.direction === "asc" ? "ascending" : "descending" : "none"}>
             {fixedSort ? <span className={cn("block", column.align === "right" && "text-right", column.align === "center" && "text-center")}>{column.label}</span> : <SalesSortButton label={column.label} kind={column.kind} align={column.align} active={sort.key === column.key} direction={sort.direction} onClick={() => toggleSort(column.key)} />}
