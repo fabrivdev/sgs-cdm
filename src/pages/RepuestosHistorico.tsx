@@ -8,7 +8,7 @@ import { FiltersBar, FilterDate, FilterSelect } from "@/components/filters/Filte
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { SalesDataTable, type SalesDisplayColumn } from "@/components/ventas/SalesDataTable";
 import { SalesSectionExportsProvider, SalesSectionExportMenu } from "@/components/ventas/SalesSectionExports";
-import { LoadingScreen } from "@/components/LoadingScreen";
+import { PartsReportState } from "@/components/ventas/PartsReportState";
 import { Button } from "@/components/ui/button";
 import { SUCURSALES } from "@/lib/constants";
 
@@ -89,7 +89,7 @@ function HistoricalWorkspace() {
         options={["todas","En alza","En baja","Estable","Nueva actividad"].map(value => ({ value, label: value === "todas" ? "Todas" : value }))} />
     </FiltersBar>
     {!valid ? <p role="alert" className="text-sm text-destructive">Seleccioná una fecha de corte válida.</p>
-      : query.isPending ? <LoadingScreen variant="section" />
+      : query.isPending ? <PartsReportState loading />
       : query.isError ? <div role="alert" className="text-sm">No se pudo cargar el histórico. <Button variant="outline" onClick={() => query.refetch()}>Reintentar</Button></div>
       : ready && <>
         <KpiStrip>

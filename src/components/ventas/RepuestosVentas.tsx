@@ -1,4 +1,5 @@
 import { SALES_LABELS } from "./salesLabels";
+import { PartsReportState as State } from "./PartsReportState";
 import { periodMoneyColumn, comparisonColumn, comparisonExports } from "./salesPeriodColumns";
 import type { SalesDisplayColumn } from "./SalesDataTable";
 /* eslint-disable @typescript-eslint/no-explicit-any -- RPCs nuevas, tipadas al regenerar Supabase. */
@@ -91,12 +92,6 @@ function useOverview(filters: Filters, mode: PeriodMode) {
   return useQuery({ queryKey: [name, args, mode],
     queryFn: ({ signal }) => rpc<PartsOverview>(name, { ...args, p_agrupacion: mode }, signal),
     enabled: validRange(filters), retry: false, staleTime: 60_000, refetchOnWindowFocus: false });
-}
-function State({ loading, error, retry }: { loading?: boolean; error?: Error | null; retry?: () => void }) {
-  return <div role={error ? "alert" : "status"} className={cn("py-10 text-center text-[12px]", error ? "text-destructive" : "text-muted-foreground")}>
-    {error ? error.message : loading ? "Cargando ventas…" : "No hay ventas de Repuestos en el período."}
-    {error && retry && <button type="button" onClick={retry} className="ml-3 rounded border px-2 py-1 text-foreground">Reintentar</button>}
-  </div>;
 }
 function metricColumns<T extends Partial<PartsMetrics>>(client = false): SalesColumn<T>[] {
   return [
