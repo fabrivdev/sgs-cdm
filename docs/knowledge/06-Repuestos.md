@@ -1,5 +1,11 @@
 # Repuestos
 
+## Histórico por cliente y repuesto
+
+`/repuestos/historico` usa el permiso independiente `repuestos.historico`, gestionado en Administración. La migración `20261118120000_parts_historical_comparison.sql` reutiliza `ventas_repuestos_movimientos_v1`, con notas de crédito y ventas en USD de las fuentes vigentes. Compara desde enero hasta la misma fecha de corte en tres años. La variación porcentual es (actual-anterior)/anterior cuando anterior es positivo. Nueva actividad significa anterior cero y actual positivo, no demuestra que el cliente nunca haya comprado. Tendencia representa el cambio entre ambos períodos. Un año sin movimientos en la fuente de la sucursal queda desconocido. La ausencia de una entidad en un año con movimientos da cero, sin afirmar cobertura completa.
+
+La pantalla reutiliza PageShell, PageHeader, Tabs, FiltersBar, KpiStrip, SalesDataTable y el menú de exportación. Búsqueda y tendencia filtran tabla, totales y Excel. Clientes se agrupan por nombre canónico normalizado y repuestos por código de la fuente; no se inventan vínculos por RUC o equivalencias ambiguas. SQL preparado para aplicación manual, validación de datos reales pendiente.
+
 ## Semáforo histórico de stock (código del 14/10/2026)
 
 `RepuestosAnalisis.tsx` presenta el semáforo como sección independiente `Repuestos > Análisis` en `/repuestos/analisis`; ya no es pestaña de Catálogo y Stock. Exige el permiso independiente `repuestos.analisis` (corregido el 15/10; ver apartado de permisos). `StockSemaphoreSection` usa PageHeader, KpiStrip, FiltersBar, menú de exportación y detalle en ResponsiveDrawer como las demás secciones. El RPC se invoca directamente desde el cliente de Supabase: extraer `supabase.rpc` como función suelta producía `Cannot read properties of undefined (reading 'rest')` en la app. La migración `20261014190000_parts_historical_semaphore.sql` crea `v_repuestos_semaforo_historico` y su RPC paginada. SQL aplicado en el proyecto FASANTA de SGS-CDM el 14/10; la pantalla pública corregida requiere comprobación posterior al despliegue. El prototipo aislado en `codex/stock-semaphore-v1` quedó reemplazado para esta función; no trasladar sus cuatro estados de reposición.

@@ -105,6 +105,7 @@ const navGroups: NavGroup[] = [
     icon: Package,
     items: [
       { to: "/repuestos/ventas", label: "Ventas", icon: BadgeDollarSign, section: "repuestos.ventas", end: true },
+      { to: "/repuestos/historico", label: "Histórico", icon: ChartNoAxesCombined, section: "repuestos.historico" },
       { to: "/repuestos", label: "Catálogo y Stock", icon: Package, section: "repuestos.stock", end: true },
       { to: "/repuestos/analisis", label: "Análisis", icon: ChartNoAxesCombined, section: "repuestos.analisis", end: true },
       { to: "/repuestos/compras", label: "Compras", icon: ShoppingCart, section: "repuestos.compras", end: true },

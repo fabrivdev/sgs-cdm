@@ -17,6 +17,7 @@ export const SECTION_ROUTES = [
   { id: "parque.operaciones", module: "parque", route: "/parque-operaciones" },
   { id: "parque.importaciones", module: "parque", route: "/parque-importaciones" },
   { id: "repuestos.ventas", module: "repuestos", route: "/repuestos/ventas" },
+  { id: "repuestos.historico", module: "repuestos", route: "/repuestos/historico" },
   { id: "repuestos.stock", module: "repuestos", route: "/repuestos" },
   { id: "repuestos.analisis", module: "repuestos", route: "/repuestos/analisis" },
   { id: "repuestos.compras", module: "repuestos", route: "/repuestos/compras" },
@@ -31,7 +32,7 @@ export type SectionKey = (typeof SECTION_ROUTES)[number]["id"] | "servicios.dash
 
 export function sectionsFromLegacyModules(modules: readonly string[], roles: readonly Role[] = []) {
   const sections = SECTION_ROUTES
-    .filter((section) => section.id !== "servicios.controles_maquinas" && modules.includes(section.module))
+    .filter((section) => !["servicios.controles_maquinas", "repuestos.historico"].includes(section.id) && modules.includes(section.module))
     .map((section) => section.id);
   if (roles.includes("admin") || roles.includes("superadmin")) {
     sections.push("admin.usuarios", "admin.importaciones", "admin.parametros");

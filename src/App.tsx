@@ -27,6 +27,7 @@ const MaquinariaOperaciones = lazy(() => import("./pages/MaquinariaOperaciones")
 const Trabajos = lazy(() => import("./pages/Trabajos"));
 const Repuestos = lazy(() => import("./pages/Repuestos"));
 const RepuestosAnalisis = lazy(() => import("./pages/RepuestosAnalisis"));
+const RepuestosHistorico = lazy(() => import("./pages/RepuestosHistorico"));
 const RepuestosCompras = lazy(() => import("./pages/RepuestosCompras"));
 const RepuestosSugerencias = lazy(() => import("./pages/RepuestosSugerencias"));
 const Admin = lazy(() => import("./pages/Admin"));
@@ -68,6 +69,7 @@ const App = () => (
                 <Route path="/" element={<ProtectedRoute requireModulo="servicios" requireSection="servicios.planificador"><Planificador /></ProtectedRoute>} />
                 <Route path="/trabajos" element={<ProtectedRoute requireModulo="servicios" requireSection="servicios.trabajos"><Trabajos /></ProtectedRoute>} />
                 <Route path="/calendario" element={<ProtectedRoute requireModulo="servicios" requireSection="servicios.calendario"><Calendario /></ProtectedRoute>} />
+                <Route path="/repuestos/historico" element={<ProtectedRoute requireModulo="repuestos" requireSection="repuestos.historico"><RepuestosHistorico /></ProtectedRoute>} />
                 <Route path="/servicios/controles-maquinas" element={<ProtectedRoute requireModulo="servicios" requireSection="servicios.controles_maquinas"><MachineChecks /></ProtectedRoute>} />
                 <Route path="/servicios/ventas" element={<ProtectedRoute requireModulo="servicios" requireSection="servicios.ventas"><Ventas area="servicios" /></ProtectedRoute>} />
                 <Route
