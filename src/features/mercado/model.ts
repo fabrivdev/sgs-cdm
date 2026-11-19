@@ -95,8 +95,7 @@ export const months = [
 ];
 export const number = (n: number) =>
   n.toLocaleString("de-DE", { maximumFractionDigits: 0 });
-export const money = (n: number | null) =>
-  n === null ? "—" : "USD " + number(n);
+export const money = (n: number | null) => (n === null ? "—" : "$" + number(n));
 export const percent = (n: number | null) =>
   n === null
     ? "—"

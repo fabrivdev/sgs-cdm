@@ -210,7 +210,9 @@
   background: hsl(var(--primary));
 }
 .market-scroll {
-  overflow-x: auto;
+  --market-row: 34px;
+  max-height: calc(var(--market-row) * 21);
+  overflow: auto;
 }
 .market-tractors table {
   width: 100%;
@@ -220,7 +222,9 @@
 .market-tractors th,
 .market-tractors td {
   text-align: right;
-  padding: 11px 9px;
+  height: var(--market-row);
+  padding: 0 9px;
+  line-height: 1.2;
   border-bottom: 1px solid hsl(var(--border));
   white-space: nowrap;
 }
@@ -228,9 +232,51 @@
   text-align: left;
 }
 .market-tractors thead th {
+  position: sticky;
+  top: 0;
+  z-index: 1;
+  background: hsl(var(--card));
   font-weight: 550;
   color: hsl(var(--muted-foreground));
   font-size: 0.75rem;
+}
+.market-metrics {
+  gap: 10px;
+  border: 0;
+}
+.market-metric,
+.market-metric + .market-metric {
+  border: 1px solid hsl(var(--border));
+  border-radius: 8px;
+  background: hsl(var(--card));
+}
+.market-metric > a {
+  display: block;
+}
+.market-panel h2 {
+  margin: 0;
+}
+.market-rank {
+  grid-template-columns: minmax(120px, 1fr) minmax(40px, 1.1fr) 55px;
+}
+.market-band {
+  grid-template-columns: minmax(145px, 1fr) minmax(35px, 1fr) 44px;
+}
+.market-rank .market-paired {
+  display: grid;
+  height: 10px;
+  gap: 2px;
+  background: none;
+}
+.market-paired b:first-child {
+  background: hsl(var(--muted-foreground) / 0.45);
+}
+.market-tractors .market-claas {
+  background: #84b81824;
+  font-weight: 650;
+}
+.market-rank.market-claas b {
+  background: #78a912;
 }
 .market-tractors tbody th {
   font-weight: 550;

@@ -1,5 +1,9 @@
 # Mercado de tractores
 
+En el tablero, el filtro Marca cambia el ranking a modelos. La tabla se desplaza con el encabezado fijo y hasta 20 filas visibles. Los importes con $ conservan la moneda de origen del FOB (dólares estadounidenses).
+
+El catálogo técnico de potencia en src/features/mercado/power.ts enlaza fichas de fabricante y completa las bandas faltantes al consultar la base. En ausencia de ficha, reutiliza una banda observada si es única para la misma marca y modelo. La potencia informada prevalece y los casos ambiguos quedan pendientes.
+
 La sección `mercado.tractores` abre el tablero y sus vistas de marcas, modelos, potencia, precios, importadores, e historia. Los enlaces conservan el período, el estado y los filtros elegidos. Una fila de precios abre sus marcas y permite desglosar por modelo e importador.
 
 El corte inicial es el último mes con movimientos. Las comparaciones usan los mismos meses del año anterior y los mismos filtros. La cuota usa el total del conjunto filtrado. El precio FOB se calcula como valor dividido por unidades. El gráfico de marcas incluye CLAAS como categoría si tiene movimientos en los períodos comparados.
