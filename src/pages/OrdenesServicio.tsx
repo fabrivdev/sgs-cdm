@@ -186,7 +186,7 @@ export function OrdersWorkspace() {
         </> : <>
           <FilterMultiSelect label="Estado OS" values={filters.fEstadosOS} onChange={v => change("fEstadosOS", v as OperationsFilters["fEstadosOS"])} options={[{ value: "abierta", label: "Abiertas / sin cierre" }, { value: "cerrada", label: "Cerradas" }, { value: "otra", label: "Anuladas / canceladas" }]} />
           <FilterMultiSelect label="Técnico" values={filters.fResponsablesOS} onChange={v => change("fResponsablesOS", v)} options={(tab === "productividad" ? workTechnicianOptions : model.responsablesOSOptions).map(value => ({ value, label: value }))} />
-          <FilterMultiSelect label="Tipo de tiempo" values={filters.fTiposTiempo} onChange={v => change("fTiposTiempo", v)} options={["Cliente", "Garantia", "Interno", "Mixto", "Sin tipo"].map(value => ({ value, label: value === "Garantia" ? "Garantía" : value }))} />
+          <FilterMultiSelect label="Tipo de tiempo" values={filters.fTiposTiempo} onChange={v => change("fTiposTiempo", v)} options={["Cliente", "Garantia", "Interno", "Agrega al costo", "Mixto", "Sin tipo"].map(value => ({ value, label: value === "Garantia" ? "Garantía" : value }))} />
           <FilterMultiSelect label="Rubro OS" values={filters.fOSRubros} onChange={v => change("fOSRubros", v as OperationsFilters["fOSRubros"])} options={["Servicio", "Repuestos", "Kilometraje"].map(value => ({ value, label: value }))} />
         </>}
       </>}>

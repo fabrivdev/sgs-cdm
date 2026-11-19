@@ -223,6 +223,7 @@ export function realChassisOS(row: OrdenServicioImportada) {
 export function canonicalTipoTiempo(value: string | null | undefined) {
   const normalized = normalizeOSLookup(value);
   if (!normalized) return "Sin tipo";
+  if (/^(AGR|AGS)(?:\s|$|-)/.test(normalized) || normalized === "AGREGA AL COSTO") return "Agrega al costo";
   if (normalized.includes("GARANT")) return "Garantia";
   if (normalized.includes("CLIENTE") || normalized.includes("FACTURAR")) return "Cliente";
   if (

@@ -1,5 +1,9 @@
 # Servicios y comisiones
 
+AGR (Agregar repuestos) y AGS (Agregar servicios) se reconocen como Agrega al costo en importación, OS y Ventas. En Comisiones se transforman a Garantia antes de construir las claves estables de jornada y agrupar bloques, para conservar la identidad y el tratamiento previo. No se modifica la valorización de máquinas.
+
+`20261119120000_add_machine_cost_time_type.sql` amplía los tipos financieros, actualiza el normalizador y corrige OS de tipo único acreditadas por TIPTEM original y sus líneas de facturación vinculadas. Las OS mixtas requieren reimportar el XML de OS y facturas para recuperar la clasificación por línea. El SQL no cambia jornadas ni liquidaciones.
+
 ## Puesta a punto
 
 El listado muestra el badge de marca compartido, casillas centradas y la situación del chasis. La migración `20261116220000_machine_check_chassis_status.sql` prioriza Parque activo, después un pedido vigente y después saldo positivo de stock. Sin evidencia o con conflicto queda sin situación.

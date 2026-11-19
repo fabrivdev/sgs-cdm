@@ -1,6 +1,6 @@
 export type CanonicalCurrency = "USD" | "GS" | "PYG" | "UNKNOWN";
 export type CanonicalIvaRate = 0 | 0.05 | 0.1;
-export type CanonicalTimeType = "Cliente" | "Garantia" | "Interno" | "Desconocido";
+export type CanonicalTimeType = "Cliente" | "Garantia" | "Interno" | "Agrega al costo" | "Desconocido";
 export type CanonicalBillingType = "Repuestos" | "Servicio" | "Kilometraje" | "Maquinarias" | "Otros";
 
 export interface CanonicalImportEnvelope<T> {

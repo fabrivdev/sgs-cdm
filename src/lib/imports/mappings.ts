@@ -19,6 +19,7 @@ export function normalizeStableKey(value: unknown) {
 export function inferCanonicalTimeType(value: unknown): CanonicalTimeType {
   const sample = normalizeUpper(value);
   if (!sample) return "Desconocido";
+  if (/^(AGR|AGS)(?:\s|$|-)/.test(sample) || sample === "AGREGA AL COSTO") return "Agrega al costo";
   if (WARRANTY_PATTERNS.some((token) => sample.includes(token))) return "Garantia";
   if (INTERNAL_PATTERNS.some((token) => sample.includes(token))) return "Interno";
   if (CLIENT_PATTERNS.some((token) => sample.includes(token))) return "Cliente";

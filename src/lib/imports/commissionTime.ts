@@ -12,6 +12,10 @@ export { calculateCommissionDuration, normalizeCommissionTime };
 
 export type CommissionValidationStatus = "VALIDA" | "REVISAR" | "INVALIDA";
 
+function commissionTimeType(value: CanonicalServiceOrderRow["timeType"]): CommissionTimeEntry["tipo_tiempo"] {
+  return value === "Agrega al costo" ? "Garantia" : value;
+}
+
 export interface CommissionTimeEntry {
   fuente_clave: string;
   importacion_id: string | null;
@@ -158,7 +162,7 @@ function timeBlockKey(row: CanonicalServiceOrderRow) {
     normalizeCommissionTime(row.raw.canonical_start_time),
     row.raw.canonical_end_date,
     normalizeCommissionTime(row.raw.canonical_end_time),
-    row.timeType,
+    commissionTimeType(row.timeType),
   ].map((value) => String(value ?? "").trim().toUpperCase()).join("|");
 }
 
@@ -173,7 +177,7 @@ function sourceKey(row: CanonicalServiceOrderRow, technician: string, role: stri
     raw.canonical_start_time,
     raw.canonical_end_date,
     raw.canonical_end_time,
-    row.timeType,
+    commissionTimeType(row.timeType),
     normalizeTechnicianName(technician),
     role,
   ].map((value) => String(value ?? "").trim().toUpperCase()).join("|");
@@ -280,8 +284,8 @@ export function buildCommissionTimeEntries(
           tecnico_nombre: matched?.nombre ?? parsed.name,
           tecnico_profile_id: matched?.id ?? null,
           rol_tecnico: role,
-          tipo_tiempo: row.timeType,
-          tipo_tiempo_importado: row.timeType,
+          tipo_tiempo: commissionTimeType(row.timeType),
+          tipo_tiempo_importado: commissionTimeType(row.timeType),
           tipo_tiempo_ajustado: false,
           tipo_tiempo_ajustado_por: null,
           tipo_tiempo_ajustado_en: null,

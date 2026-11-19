@@ -52,7 +52,7 @@ export interface NewSystemImportBundle {
     billingMatchedToOs: number;
     billingDirectSales: number;
     serviceOrders: number;
-    serviceOrderTimeTypes: Record<"Cliente" | "Garantia" | "Interno" | "Desconocido", number>;
+    serviceOrderTimeTypes: Record<"Cliente" | "Garantia" | "Interno" | "Agrega al costo" | "Desconocido", number>;
     products: number;
     replacement: {
       facturacion: ReturnType<typeof resolveReplacementWindow>;
@@ -113,7 +113,7 @@ export function prepareNewSystemImportBundle(input: NewSystemImportBundleInput):
       counts[row.timeType] += 1;
       return counts;
     },
-    { Cliente: 0, Garantia: 0, Interno: 0, Desconocido: 0 },
+    { Cliente: 0, Garantia: 0, Interno: 0, "Agrega al costo": 0, Desconocido: 0 },
   );
 
   return {
