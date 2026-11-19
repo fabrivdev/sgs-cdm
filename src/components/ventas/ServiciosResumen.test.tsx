@@ -26,7 +26,7 @@ const fixture: IndicadoresResponse = {
 const mockData = (data: unknown) => useIndicadores.mockReturnValue({ data, loading: false, error: null });
 
 describe('service summary breakdown contract', () => {
-  it('keeps an evidenced brand and time type visible even without a historical OS link', () => {
+  it('preserves a historical brand without treating an inferred Cliente as an accredited time type', () => {
     mockData({ ...fixture, por_tipo: [
       { ...amounts, tipo_tiempo: 'Cliente', ordenes: 0, clientes: 1, facturas: 1, horas: null, sin_vinculo_historico: true },
     ], por_marca_tipo: [
@@ -34,8 +34,8 @@ describe('service summary breakdown contract', () => {
     ] });
     render(<ServiciosResumen {...props} />);
     expect(screen.getByText('HORSCH')).toBeInTheDocument();
-    expect(screen.getAllByText('Cliente')).toHaveLength(2);
-    expect(screen.queryByText('Histórico sin OS vinculada')).not.toBeInTheDocument();
+    expect(screen.queryByText('Cliente')).not.toBeInTheDocument();
+    expect(screen.getByText('Histórico sin OS vinculada')).toBeInTheDocument();
   });
   it('matches the alignment of headings and data in both breakdowns', () => {
     mockData(fixture);
