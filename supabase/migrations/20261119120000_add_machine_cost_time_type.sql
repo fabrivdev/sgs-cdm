@@ -2,9 +2,19 @@ BEGIN;
 ALTER TABLE public.facturacion_lineas_importadas DROP CONSTRAINT IF EXISTS facturacion_lineas_tipo_tiempo_check;
 ALTER TABLE public.facturacion_lineas_importadas ADD CONSTRAINT facturacion_lineas_tipo_tiempo_check
   CHECK(tipo_tiempo IS NULL OR tipo_tiempo IN ('Cliente','Garantia','Interno','Agrega al costo'));
-ALTER TABLE public.facturacion DROP CONSTRAINT IF EXISTS facturacion_tipo_tiempo_check;
-ALTER TABLE public.facturacion ADD CONSTRAINT facturacion_tipo_tiempo_check
-  CHECK(tipo_tiempo IS NULL OR tipo_tiempo IN ('Cliente','Garantia','Interno','Agrega al costo'));
+-- La tabla histórica facturacion no tiene esta columna en todos los proyectos.
+DO $legacy$
+BEGIN
+  IF EXISTS (
+    SELECT 1 FROM information_schema.columns
+    WHERE table_schema='public' AND table_name='facturacion' AND column_name='tipo_tiempo'
+  ) THEN
+    EXECUTE 'ALTER TABLE public.facturacion DROP CONSTRAINT IF EXISTS facturacion_tipo_tiempo_check';
+    EXECUTE $constraint$ALTER TABLE public.facturacion ADD CONSTRAINT facturacion_tipo_tiempo_check
+      CHECK(tipo_tiempo IS NULL OR tipo_tiempo IN ('Cliente','Garantia','Interno','Agrega al costo'))$constraint$;
+  END IF;
+END;
+$legacy$;
 
 CREATE OR REPLACE FUNCTION public.ventas_tipo_tiempo_normalizado(p_valor text)
 RETURNS text LANGUAGE sql IMMUTABLE PARALLEL SAFE AS $$

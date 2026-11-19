@@ -2,6 +2,8 @@
 
 AGR (Agregar repuestos) y AGS (Agregar servicios) se reconocen como Agrega al costo en importación, OS y Ventas. En Comisiones se transforman a Garantia antes de construir las claves estables de jornada y agrupar bloques, para conservar la identidad y el tratamiento previo. No se modifica la valorización de máquinas.
 
+La columna tipo_tiempo de facturacion histórica es opcional. El SQL comprueba su existencia antes de ampliar su restricción. Validado en PostgreSQL aislado con y sin esa columna, incluida una segunda ejecución.
+
 `20261119120000_add_machine_cost_time_type.sql` amplía los tipos financieros, actualiza el normalizador y corrige OS de tipo único acreditadas por TIPTEM original y sus líneas de facturación vinculadas. Las OS mixtas requieren reimportar el XML de OS y facturas para recuperar la clasificación por línea. El SQL no cambia jornadas ni liquidaciones.
 
 ## Puesta a punto
