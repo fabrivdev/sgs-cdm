@@ -1,6 +1,13 @@
 {
   "modules": [
     {
+      "id": "mercado",
+      "title": "Mercado",
+      "description": "Importaciones de maquinaria agrícola de Paraguay por familia.",
+      "notes": ["49-Mercado-tractores"],
+      "related": ["datos", "administracion"]
+    },
+    {
       "id": "servicios",
       "title": "Servicios técnicos",
       "description": "Planificación, trabajos, jornadas, comisiones y OS con Productividad/Cumplimiento. Eficiencia = cobradas/trabajadas; la equivalencia de servicios_cantidad con trabajo real sigue pendiente de acreditar.",
@@ -1798,6 +1805,13 @@
   ],
   "flows": [
     {
+      "id": "analizar-mercado-tractores",
+      "title": "Explorar el mercado de tractores",
+      "module": "mercado",
+      "description": "Importar el informe validado, comparar períodos y abrir los movimientos de una categoría.",
+      "sources": ["src/features/mercado/Tractores.tsx", "src/features/mercado/TractorDashboard.tsx", "src/features/mercado/model.ts"]
+    },
+    {
       "id": "panorama-periodo-automatico",
       "title": "Periodo automatico de Panorama",
       "module": "asistente",
@@ -2545,6 +2559,14 @@
     }
   ],
   "screens": [
+    {
+      "id": "mercado.tractores",
+      "title": "Mercado de tractores",
+      "module": "mercado",
+      "description": "Tablero y subsecciones navegables por marcas, modelos, HP, precios, importadores e historia.",
+      "sources": ["src/features/mercado/Tractores.tsx"],
+      "flows": ["analizar-mercado-tractores"]
+    },
     {
       "id": "asistente.panorama",
       "title": "Panorama de Campi",

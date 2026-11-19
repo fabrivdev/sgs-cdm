@@ -71,6 +71,12 @@ const AI_ASSISTANT_ENABLED = false;
 
 const navGroups: NavGroup[] = [
   {
+    modulo: "mercado",
+    label: "Mercado",
+    icon: ChartNoAxesCombined,
+    items: [{ to: "/mercado/tractores", label: "Tractores", icon: Tractor, section: "mercado.tractores" }],
+  },
+  {
     modulo: "servicios",
     label: "Servicios",
     icon: BriefcaseBusiness,

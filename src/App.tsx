@@ -13,6 +13,7 @@ import { LoadingScreen } from "@/components/LoadingScreen";
 import { OfflineExperience } from "@/components/offline/OfflineExperience";
 import { useOnlineStatus } from "@/hooks/useOnlineStatus";
 const Auth = lazy(() => import("./pages/Auth"));
+const MercadoTractores = lazy(() => import("./features/mercado/Tractores"));
 const Planificador = lazy(() => import("./pages/Planificador"));
 const Calendario = lazy(() => import("./pages/Calendario"));
 const OrdenesServicio = lazy(() => import("./pages/OrdenesServicio"));
@@ -67,6 +68,7 @@ const App = () => (
                 }
               >
                 <Route path="/" element={<ProtectedRoute requireModulo="servicios" requireSection="servicios.planificador"><Planificador /></ProtectedRoute>} />
+                <Route path="/mercado/tractores/:vista?" element={<ProtectedRoute requireModulo="mercado" requireSection="mercado.tractores"><MercadoTractores /></ProtectedRoute>} />
                 <Route path="/trabajos" element={<ProtectedRoute requireModulo="servicios" requireSection="servicios.trabajos"><Trabajos /></ProtectedRoute>} />
                 <Route path="/calendario" element={<ProtectedRoute requireModulo="servicios" requireSection="servicios.calendario"><Calendario /></ProtectedRoute>} />
                 <Route path="/repuestos/historico" element={<ProtectedRoute requireModulo="repuestos" requireSection="repuestos.historico"><RepuestosHistorico /></ProtectedRoute>} />

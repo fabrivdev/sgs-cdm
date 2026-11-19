@@ -14,6 +14,12 @@ export type Database = {
   }
   public: {
     Tables: {
+      mercado_tractores: {
+        Row: { id: number; datos: Json }
+        Insert: { id: number; datos: Json }
+        Update: { datos?: Json }
+        Relationships: []
+      }
       ai_conversations: {
         Row: {
           created_at: string

@@ -1,0 +1,539 @@
+import { useMemo } from "react";
+import { Link, useLocation, useSearchParams } from "react-router-dom";
+import { ArrowUpRight, ChevronRight, Tractor } from "lucide-react";
+import {
+  compare,
+  dimensions,
+  dimensionKeys,
+  label,
+  leadingBrands,
+  money,
+  months,
+  number,
+  percent,
+  ratio,
+  totals,
+  type Dimension,
+  type Movement,
+} from "./model";
+import "./tractores.css";
+
+const root = "/mercado/tractores";
+const titles = {
+  ...dimensions,
+  historia: "Historia",
+  movimientos: "Movimientos",
+  resumen: "Tablero",
+};
+type View = keyof typeof titles;
+const next: Record<Dimension, Dimension[]> = {
+  precios: ["marcas", "modelos", "importadores"],
+  potencia: ["marcas", "modelos", "importadores"],
+  marcas: ["modelos", "importadores"],
+  modelos: ["importadores"],
+  importadores: ["marcas", "modelos"],
+};
+const orderedBands: Partial<Record<Dimension, string[]>> = {
+  potencia: [
+    "Hasta 80 HP",
+    "81–120 HP",
+    "121–170 HP",
+    "171–230 HP",
+    "Más de 230 HP",
+    "Sin potencia informada",
+  ],
+  precios: [
+    "Menos de USD 25.000",
+    "USD 25.000 a <50.000",
+    "USD 50.000 a <100.000",
+    "USD 100.000 a <150.000",
+    "USD 150.000 o más",
+    "Sin FOB positivo",
+  ],
+};
+export function TractorDashboard({ rows }: { rows: Movement[] }) {
+  const [params, setParams] = useSearchParams();
+  const location = useLocation();
+  const slug = location.pathname.split("/").filter(Boolean).at(-1) || "";
+  const view: View = Object.prototype.hasOwnProperty.call(titles, slug)
+    ? (slug as View)
+    : "resumen";
+  const years = useMemo(
+    () => [...new Set(rows.map((r) => r[1]))].sort((a, b) => b - a),
+    [rows],
+  );
+  const year = years.includes(Number(params.get("año")))
+    ? Number(params.get("año"))
+    : years[0];
+  const maxMonth = rows.reduce(
+    (m, r) => (r[1] === year ? Math.max(m, r[2]) : m),
+    1,
+  );
+  const end = Math.min(
+    maxMonth,
+    Math.max(1, Number(params.get("hasta")) || maxMonth),
+  );
+  const state = params.get("estado") || "";
+  const active = dimensionKeys.filter((d) => params.has(d));
+  const monthOnly = view === "movimientos" ? Number(params.get("mes")) : 0;
+  const scoped = rows.filter(
+    (r) =>
+      r[2] <= end &&
+      (!monthOnly || r[2] === monthOnly) &&
+      (!state || r[8] === state) &&
+      active.every((d) => label(r, d) === params.get(d)),
+  );
+  const current = scoped.filter((r) => r[1] === year),
+    previous = scoped.filter((r) => r[1] === year - 1);
+  const a = totals(previous),
+    b = totals(current);
+  function href(target: View, changes: Record<string, string | null> = {}) {
+    const p = new URLSearchParams(params);
+    if (target !== "movimientos") p.delete("mes");
+    for (const [k, v] of Object.entries(changes)) {
+      if (v === null) p.delete(k);
+      else p.set(k, v);
+    }
+    p.delete("pagina");
+    p.delete("buscar");
+    p.delete("orden");
+    const query = p.toString();
+    return (
+      root +
+      (target === "resumen" ? "" : "/" + target) +
+      (query ? "?" + query : "")
+    );
+  }
+  function set(k: string, v: string) {
+    const p = new URLSearchParams(params);
+    if (v) p.set(k, v);
+    else p.delete(k);
+    if (k !== "pagina") p.delete("pagina");
+    setParams(p);
+  }
+  function drill(d: Dimension, value: string) {
+    const target = next[d].find((k) => !active.includes(k)) ?? "movimientos";
+    return href(target, { [d]: value });
+  }
+  const nav = (target: View) => (
+    <Link
+      className={view === target ? "chosen" : ""}
+      key={target}
+      to={href(target)}
+    >
+      {titles[target]}
+    </Link>
+  );
+  const brands = leadingBrands(compare(current, previous, (r) => r[3]));
+  const monthly = compare(current, previous, (r) => String(r[2])).sort(
+    (a, b) => Number(a.name) - Number(b.name),
+  );
+  const metric = (name: string, value: string, detail: string, to: View) => (
+    <Link className="market-metric" to={href(to)}>
+      <span>
+        {name}
+        <ArrowUpRight size={16} />
+      </span>
+      <strong>{value}</strong>
+      <small>{detail}</small>
+    </Link>
+  );
+  const annualChange = (now: number, old: number) =>
+    old ? percent(now / old - 1) + " interanual" : "Sin base anterior";
+  const brandView = dimensionKeys.includes(view as Dimension)
+    ? (view as Dimension)
+    : null;
+  const search = params.get("buscar") ?? "";
+  const page = Number(params.get("pagina")) || 1;
+  const ordering = params.get("orden") || "unidades";
+  let groups = brandView
+    ? compare(current, previous, (r) => label(r, brandView))
+    : [];
+  if (brandView && orderedBands[brandView] && !params.has("orden")) {
+    const order = orderedBands[brandView]!;
+    groups = groups.sort(
+      (x, y) => order.indexOf(x.name) - order.indexOf(y.name),
+    );
+  }
+  if (ordering === "fob") groups.sort((x, y) => y.fob - x.fob);
+  if (ordering === "precio")
+    groups.sort((x, y) => (y.fob / y.units || 0) - (x.fob / x.units || 0));
+  if (ordering === "nombre")
+    groups.sort((x, y) => x.name.localeCompare(y.name, "es"));
+  groups = groups.filter((g) =>
+    g.name.toLowerCase().includes(search.toLowerCase()),
+  );
+  const records =
+    view === "movimientos"
+      ? current.filter((r) =>
+          [r[0], r[3], r[4], r[7]]
+            .join(" ")
+            .toLowerCase()
+            .includes(search.toLowerCase()),
+        )
+      : [];
+  const size = 25,
+    count = view === "movimientos" ? records.length : groups.length;
+  const pages = Math.max(1, Math.ceil(count / size)),
+    safePage = Math.max(1, Math.min(page, pages)),
+    offset = (safePage - 1) * size;
+  const history = years
+    .filter((y) => rows.some((r) => r[1] === y && r[2] >= end))
+    .map((y) => ({ year: y, ...totals(scoped.filter((r) => r[1] === y)) }));
+  const filters = (
+    <div className="market-tools">
+      <input
+        aria-label="Buscar en el detalle"
+        placeholder="Buscar en el detalle…"
+        value={search}
+        onChange={(e) => set("buscar", e.target.value)}
+      />
+      {brandView && (
+        <label>
+          Ordenar{" "}
+          <select
+            value={params.get("orden") || ""}
+            onChange={(e) => set("orden", e.target.value)}
+          >
+            <option value="">Predeterminado</option>
+            <option value="unidades">Unidades</option>
+            <option value="fob">Valor FOB</option>
+            <option value="precio">Precio medio</option>
+            <option value="nombre">Nombre</option>
+          </select>
+        </label>
+      )}
+    </div>
+  );
+  return (
+    <main className="market-tractors">
+      <header>
+        <div className="market-eyebrow">
+          <Tractor size={17} /> Mercado / Paraguay
+        </div>
+        <h1>Tractores</h1>
+        <p>Importaciones de maquinaria agrícola</p>
+      </header>
+      <div className="market-tools">
+        <label>
+          Año{" "}
+          <select value={year} onChange={(e) => set("año", e.target.value)}>
+            {years.map((y) => (
+              <option key={y}>{y}</option>
+            ))}
+          </select>
+        </label>
+        <label>
+          Acumulado hasta{" "}
+          <select value={end} onChange={(e) => set("hasta", e.target.value)}>
+            {months.slice(0, maxMonth).map((m, i) => (
+              <option key={m} value={i + 1}>
+                {m}
+              </option>
+            ))}
+          </select>
+        </label>
+        <label>
+          Estado{" "}
+          <select value={state} onChange={(e) => set("estado", e.target.value)}>
+            <option value="">Todos</option>
+            {[...new Set(rows.map((r) => r[8]))].sort().map((s) => (
+              <option key={s}>{s}</option>
+            ))}
+          </select>
+        </label>
+      </div>
+      <nav aria-label="Secciones de tractores">
+        {(
+          ["resumen", ...dimensionKeys, "historia", "movimientos"] as View[]
+        ).map(nav)}
+      </nav>
+      {active.length > 0 && (
+        <div className="market-filters">
+          {active.map((d) => (
+            <Link
+              key={d}
+              title={"Quitar filtro " + dimensions[d]}
+              to={href(view, { [d]: null })}
+            >
+              {dimensions[d]} · {params.get(d)} ×
+            </Link>
+          ))}
+        </div>
+      )}
+      {!!monthOnly && (
+        <div className="market-filters">
+          <Link to={href(view, { mes: null })}>{months[monthOnly - 1]} ×</Link>
+        </div>
+      )}
+      <section className="market-metrics">
+        {metric(
+          "Unidades importadas",
+          number(b.units),
+          annualChange(b.units, a.units),
+          "movimientos",
+        )}
+        {metric(
+          "Valor FOB",
+          money(b.fob),
+          annualChange(b.fob, a.fob),
+          "marcas",
+        )}
+        {metric(
+          "FOB medio por tractor",
+          money(ratio(b.fob, b.units)),
+          annualChange(
+            b.units ? b.fob / b.units : 0,
+            a.units ? a.fob / a.units : 0,
+          ),
+          "precios",
+        )}
+      </section>
+      {view === "resumen" && (
+        <>
+          <div className="market-panels">
+            <section className="market-panel">
+              <h2>
+                <Link to={href("marcas")}>
+                  Participación por marca <ChevronRight />
+                </Link>
+              </h2>
+              <p>Cuota de unidades · {year}</p>
+              {brands.map((g) => (
+                <Link
+                  className="market-rank"
+                  key={g.name}
+                  to={drill("marcas", g.name)}
+                >
+                  <span>{g.name}</span>
+                  <i>
+                    <b
+                      style={{
+                        width: percent(ratio(g.units, brands[0].units))
+                          .replace(",", ".")
+                          .replace(" ", ""),
+                      }}
+                    />
+                  </i>
+                  <strong>{percent(ratio(g.units, b.units))}</strong>
+                </Link>
+              ))}
+              {!brands.length && <p>Sin movimientos en este período.</p>}
+            </section>
+            <section className="market-panel">
+              <h2>
+                <Link to={href("historia")}>
+                  Evolución mensual <ChevronRight />
+                </Link>
+              </h2>
+              <p>
+                Unidades · {year - 1} y {year}
+              </p>
+              <div className="market-months">
+                {monthly.map((m) => {
+                  const max = Math.max(
+                    1,
+                    ...monthly.flatMap((n) => [n.units, n.prior]),
+                  );
+                  return (
+                    <Link
+                      key={m.name}
+                      to={href("movimientos", { mes: m.name })}
+                      aria-label={
+                        months[+m.name - 1] +
+                        ": " +
+                        m.prior +
+                        " y " +
+                        m.units +
+                        " unidades"
+                      }
+                      title={m.prior + " → " + m.units + " unidades"}
+                    >
+                      <strong>{m.units}</strong>
+                      <i>
+                        <b style={{ height: (100 * m.prior) / max + "%" }} />
+                        <b style={{ height: (100 * m.units) / max + "%" }} />
+                      </i>
+                      <small>{months[+m.name - 1]}</small>
+                    </Link>
+                  );
+                })}
+              </div>
+              <div className="market-legend">
+                {year - 1} <span /> {year}
+              </div>
+            </section>
+          </div>
+          <div className="market-sections">
+            {dimensionKeys.map((d) => (
+              <Link key={d} to={href(d)}>
+                <span>{dimensions[d]}</span>
+                <ArrowUpRight size={16} />
+              </Link>
+            ))}
+            <Link to={href("historia")}>
+              Historia <ArrowUpRight size={16} />
+            </Link>
+          </div>
+        </>
+      )}
+      {brandView && (
+        <section className="market-panel">
+          <h2>{titles[view]}</h2>
+          {filters}
+          <div className="market-scroll">
+            <table>
+              <thead>
+                <tr>
+                  {[
+                    titles[view],
+                    "Uds. " + (year - 1),
+                    "Uds. " + year,
+                    "Cuota uds.",
+                    "Δ cuota (pp)",
+                    "Valor FOB",
+                    "Cuota FOB",
+                    "USD/tractor " + (year - 1),
+                    "USD/tractor " + year,
+                  ].map((t) => (
+                    <th key={t}>{t}</th>
+                  ))}
+                </tr>
+              </thead>
+              <tbody>
+                {groups.slice(offset, offset + size).map((g) => (
+                  <tr key={g.name}>
+                    <th>
+                      <Link to={drill(brandView, g.name)}>{g.name} ›</Link>
+                    </th>
+                    <td>{number(g.prior)}</td>
+                    <td>{number(g.units)}</td>
+                    <td>{percent(ratio(g.units, b.units))}</td>
+                    <td>
+                      {a.units && b.units
+                        ? (
+                            (g.units / b.units - g.prior / a.units) *
+                            100
+                          ).toLocaleString("de-DE", {
+                            maximumFractionDigits: 1,
+                          })
+                        : "—"}
+                    </td>
+                    <td>{money(g.fob)}</td>
+                    <td>{percent(ratio(g.fob, b.fob))}</td>
+                    <td>{money(ratio(g.priorFob, g.prior))}</td>
+                    <td>{money(ratio(g.fob, g.units))}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </section>
+      )}
+      {view === "historia" && (
+        <section className="market-panel">
+          <h2>Historia · Ene–{months[end - 1]}</h2>
+          <div className="market-scroll">
+            <table>
+              <thead>
+                <tr>
+                  {[
+                    "Año",
+                    "Unidades",
+                    "Variación interanual",
+                    "Valor FOB",
+                    "FOB medio por tractor",
+                  ].map((t) => (
+                    <th key={t}>{t}</th>
+                  ))}
+                </tr>
+              </thead>
+              <tbody>
+                {history.map((r, i) => (
+                  <tr key={r.year}>
+                    <th>
+                      <Link
+                        to={href("marcas", {
+                          año: String(r.year),
+                          hasta: String(end),
+                        })}
+                      >
+                        {r.year} ›
+                      </Link>
+                    </th>
+                    <td>{number(r.units)}</td>
+                    <td>
+                      {history[i + 1]?.units
+                        ? percent(r.units / history[i + 1].units - 1)
+                        : "—"}
+                    </td>
+                    <td>{money(r.fob)}</td>
+                    <td>{money(ratio(r.fob, r.units))}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </section>
+      )}
+      {view === "movimientos" && (
+        <section className="market-panel">
+          <h2>Movimientos</h2>
+          {filters}
+          <div className="market-scroll">
+            <table>
+              <thead>
+                <tr>
+                  {[
+                    "Referencia",
+                    "Mes",
+                    "Marca · modelo",
+                    "Importador",
+                    "Potencia",
+                    "Unidades",
+                    "Valor FOB",
+                  ].map((t) => (
+                    <th key={t}>{t}</th>
+                  ))}
+                </tr>
+              </thead>
+              <tbody>
+                {records.slice(offset, offset + size).map((r) => (
+                  <tr key={r[0]}>
+                    <th>{r[0]}</th>
+                    <td>{months[r[2] - 1]}</td>
+                    <td>{label(r, "modelos")}</td>
+                    <td>{r[7]}</td>
+                    <td>{r[5]}</td>
+                    <td>{number(r[9])}</td>
+                    <td>{money(r[10])}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </section>
+      )}
+      {(brandView || view === "movimientos") && (
+        <footer>
+          {count ? number(count) + " resultados" : "Sin resultados"}
+          <div>
+            <button
+              disabled={safePage === 1}
+              onClick={() => set("pagina", String(safePage - 1))}
+            >
+              Anterior
+            </button>{" "}
+            {safePage} / {pages}{" "}
+            <button
+              disabled={safePage === pages}
+              onClick={() => set("pagina", String(safePage + 1))}
+            >
+              Siguiente
+            </button>
+          </div>
+        </footer>
+      )}
+    </main>
+  );
+}
