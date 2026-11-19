@@ -1,6 +1,6 @@
 import { useMemo } from "react";
 import { Link, useLocation, useSearchParams } from "react-router-dom";
-import { ArrowUpRight, ChevronRight, Tractor } from "lucide-react";
+import { ChevronRight } from "lucide-react";
 import {
   compare,
   dimensions,
@@ -16,13 +16,13 @@ import {
   type Dimension,
   type Movement,
 } from "./model";
+import { FiltersBar, FilterSelect } from "@/components/filters/FiltersBar";
 import "./tractores.css";
 
 const root = "/mercado/tractores";
 const titles = {
   ...dimensions,
   historia: "Historia",
-  movimientos: "Movimientos",
   resumen: "Tablero",
 };
 type View = keyof typeof titles;
@@ -75,7 +75,7 @@ export function TractorDashboard({ rows }: { rows: Movement[] }) {
   );
   const state = params.get("estado") || "";
   const active = dimensionKeys.filter((d) => params.has(d));
-  const monthOnly = view === "movimientos" ? Number(params.get("mes")) : 0;
+  const monthOnly = Number(params.get("mes"));
   const scoped = rows.filter(
     (r) =>
       r[2] <= end &&
@@ -89,7 +89,6 @@ export function TractorDashboard({ rows }: { rows: Movement[] }) {
     b = totals(current);
   function href(target: View, changes: Record<string, string | null> = {}) {
     const p = new URLSearchParams(params);
-    if (target !== "movimientos") p.delete("mes");
     for (const [k, v] of Object.entries(changes)) {
       if (v === null) p.delete(k);
       else p.set(k, v);
@@ -112,8 +111,8 @@ export function TractorDashboard({ rows }: { rows: Movement[] }) {
     setParams(p);
   }
   function drill(d: Dimension, value: string) {
-    const target = next[d].find((k) => !active.includes(k)) ?? "movimientos";
-    return href(target, { [d]: value });
+    const target = next[d].find((k) => !active.includes(k));
+    return target ? href(target, { [d]: value }) : null;
   }
   const nav = (target: View) => (
     <Link
@@ -130,10 +129,7 @@ export function TractorDashboard({ rows }: { rows: Movement[] }) {
   );
   const metric = (name: string, value: string, detail: string, to: View) => (
     <Link className="market-metric" to={href(to)}>
-      <span>
-        {name}
-        <ArrowUpRight size={16} />
-      </span>
+      <span>{name}</span>
       <strong>{value}</strong>
       <small>{detail}</small>
     </Link>
@@ -163,90 +159,92 @@ export function TractorDashboard({ rows }: { rows: Movement[] }) {
   groups = groups.filter((g) =>
     g.name.toLowerCase().includes(search.toLowerCase()),
   );
-  const records =
-    view === "movimientos"
-      ? current.filter((r) =>
-          [r[0], r[3], r[4], r[7]]
-            .join(" ")
-            .toLowerCase()
-            .includes(search.toLowerCase()),
-        )
-      : [];
   const size = 25,
-    count = view === "movimientos" ? records.length : groups.length;
+    count = groups.length;
   const pages = Math.max(1, Math.ceil(count / size)),
     safePage = Math.max(1, Math.min(page, pages)),
     offset = (safePage - 1) * size;
   const history = years
     .filter((y) => rows.some((r) => r[1] === y && r[2] >= end))
     .map((y) => ({ year: y, ...totals(scoped.filter((r) => r[1] === y)) }));
-  const filters = (
-    <div className="market-tools">
-      <input
-        aria-label="Buscar en el detalle"
-        placeholder="Buscar en el detalle…"
-        value={search}
-        onChange={(e) => set("buscar", e.target.value)}
-      />
-      {brandView && (
-        <label>
-          Ordenar{" "}
-          <select
-            value={params.get("orden") || ""}
-            onChange={(e) => set("orden", e.target.value)}
-          >
-            <option value="">Predeterminado</option>
-            <option value="unidades">Unidades</option>
-            <option value="fob">Valor FOB</option>
-            <option value="precio">Precio medio</option>
-            <option value="nombre">Nombre</option>
-          </select>
-        </label>
-      )}
-    </div>
-  );
+  const options = (values: string[]) =>
+    values.map((value) => ({ value, label: value }));
   return (
     <main className="market-tractors">
-      <header>
-        <div className="market-eyebrow">
-          <Tractor size={17} /> Mercado / Paraguay
-        </div>
+      <header className="market-heading">
         <h1>Tractores</h1>
-        <p>Importaciones de maquinaria agrícola</p>
+        <span>Paraguay · Importaciones</span>
       </header>
-      <div className="market-tools">
-        <label>
-          Año{" "}
-          <select value={year} onChange={(e) => set("año", e.target.value)}>
-            {years.map((y) => (
-              <option key={y}>{y}</option>
-            ))}
-          </select>
-        </label>
-        <label>
-          Acumulado hasta{" "}
-          <select value={end} onChange={(e) => set("hasta", e.target.value)}>
-            {months.slice(0, maxMonth).map((m, i) => (
-              <option key={m} value={i + 1}>
-                {m}
-              </option>
-            ))}
-          </select>
-        </label>
-        <label>
-          Estado{" "}
-          <select value={state} onChange={(e) => set("estado", e.target.value)}>
-            <option value="">Todos</option>
-            {[...new Set(rows.map((r) => r[8]))].sort().map((s) => (
-              <option key={s}>{s}</option>
-            ))}
-          </select>
-        </label>
-      </div>
+      <FiltersBar
+        activeCount={
+          active.length +
+          Number(Boolean(state)) +
+          Number(Boolean(monthOnly)) +
+          Number(params.has("año")) +
+          Number(params.has("hasta"))
+        }
+        onClear={() => setParams({})}
+        mobileContext={
+          <span>
+            {year} ·{" "}
+            {monthOnly ? months[monthOnly - 1] : "Ene–" + months[end - 1]}
+          </span>
+        }
+        search={
+          brandView
+            ? {
+                value: search,
+                onChange: (value) => set("buscar", value),
+                placeholder: "Buscar en el detalle…",
+              }
+            : undefined
+        }
+      >
+        <FilterSelect
+          label="Año"
+          placeholder="Año"
+          width="w-[105px]"
+          value={String(year)}
+          onChange={(value) => set("año", value)}
+          options={options(years.map(String))}
+        />
+        <FilterSelect
+          label="Acumulado hasta"
+          placeholder="Mes de corte"
+          value={String(end)}
+          onChange={(value) => set("hasta", value)}
+          options={months
+            .slice(0, maxMonth)
+            .map((label, i) => ({ label, value: String(i + 1) }))}
+        />
+        <FilterSelect
+          label="Estado"
+          placeholder="Estado"
+          value={state || "todos"}
+          onChange={(value) => set("estado", value === "todos" ? "" : value)}
+          options={[
+            { value: "todos", label: "Todos" },
+            ...options([...new Set(rows.map((r) => r[8]))].sort()),
+          ]}
+        />
+        {brandView && (
+          <FilterSelect
+            label="Orden"
+            placeholder="Orden"
+            value={params.get("orden") || "normal"}
+            onChange={(value) => set("orden", value === "normal" ? "" : value)}
+            options={[
+              { value: "normal", label: "Predeterminado" },
+              { value: "unidades", label: "Unidades" },
+              { value: "fob", label: "Valor FOB" },
+              { value: "precio", label: "Precio medio" },
+              { value: "nombre", label: "Nombre" },
+            ]}
+          />
+        )}
+      </FiltersBar>
       <nav aria-label="Secciones de tractores">
-        {(
-          ["resumen", ...dimensionKeys, "historia", "movimientos"] as View[]
-        ).map(nav)}
+        {(["resumen", ...dimensionKeys, "historia"] as View[]).map(nav)}
       </nav>
       {active.length > 0 && (
         <div className="market-filters">
@@ -271,7 +269,7 @@ export function TractorDashboard({ rows }: { rows: Movement[] }) {
           "Unidades importadas",
           number(b.units),
           annualChange(b.units, a.units),
-          "movimientos",
+          "historia",
         )}
         {metric(
           "Valor FOB",
@@ -303,7 +301,7 @@ export function TractorDashboard({ rows }: { rows: Movement[] }) {
                 <Link
                   className="market-rank"
                   key={g.name}
-                  to={drill("marcas", g.name)}
+                  to={drill("marcas", g.name) ?? href("marcas")}
                 >
                   <span>{g.name}</span>
                   <i>
@@ -338,7 +336,7 @@ export function TractorDashboard({ rows }: { rows: Movement[] }) {
                   return (
                     <Link
                       key={m.name}
-                      to={href("movimientos", { mes: m.name })}
+                      to={href("marcas", { mes: m.name })}
                       aria-label={
                         months[+m.name - 1] +
                         ": " +
@@ -363,24 +361,47 @@ export function TractorDashboard({ rows }: { rows: Movement[] }) {
                 {year - 1} <span /> {year}
               </div>
             </section>
-          </div>
-          <div className="market-sections">
-            {dimensionKeys.map((d) => (
-              <Link key={d} to={href(d)}>
-                <span>{dimensions[d]}</span>
-                <ArrowUpRight size={16} />
-              </Link>
-            ))}
-            <Link to={href("historia")}>
-              Historia <ArrowUpRight size={16} />
-            </Link>
+            {(["potencia", "precios"] as const).map((d) => {
+              const chart = compare(current, previous, (r) => label(r, d));
+              const order = orderedBands[d]!;
+              chart.sort(
+                (x, y) => order.indexOf(x.name) - order.indexOf(y.name),
+              );
+              const max = Math.max(1, ...chart.map((g) => g.units));
+              return (
+                <section className="market-panel" key={d}>
+                  <h2>
+                    <Link to={href(d)}>
+                      {d === "potencia"
+                        ? "Tractores por potencia"
+                        : "Distribución por precio FOB"}
+                      <ChevronRight />
+                    </Link>
+                  </h2>
+                  <p>Unidades · {year}</p>
+                  {chart.map((g) => (
+                    <Link
+                      key={g.name}
+                      className="market-rank market-band"
+                      to={drill(d, g.name) ?? href(d)}
+                    >
+                      <span>{g.name}</span>
+                      <i>
+                        <b style={{ width: (g.units / max) * 100 + "%" }} />
+                      </i>
+                      <strong>{number(g.units)}</strong>
+                    </Link>
+                  ))}
+                  {!chart.length && <p>Sin datos en este período.</p>}
+                </section>
+              );
+            })}
           </div>
         </>
       )}
       {brandView && (
         <section className="market-panel">
           <h2>{titles[view]}</h2>
-          {filters}
           <div className="market-scroll">
             <table>
               <thead>
@@ -401,30 +422,33 @@ export function TractorDashboard({ rows }: { rows: Movement[] }) {
                 </tr>
               </thead>
               <tbody>
-                {groups.slice(offset, offset + size).map((g) => (
-                  <tr key={g.name}>
-                    <th>
-                      <Link to={drill(brandView, g.name)}>{g.name} ›</Link>
-                    </th>
-                    <td>{number(g.prior)}</td>
-                    <td>{number(g.units)}</td>
-                    <td>{percent(ratio(g.units, b.units))}</td>
-                    <td>
-                      {a.units && b.units
-                        ? (
-                            (g.units / b.units - g.prior / a.units) *
-                            100
-                          ).toLocaleString("de-DE", {
-                            maximumFractionDigits: 1,
-                          })
-                        : "—"}
-                    </td>
-                    <td>{money(g.fob)}</td>
-                    <td>{percent(ratio(g.fob, b.fob))}</td>
-                    <td>{money(ratio(g.priorFob, g.prior))}</td>
-                    <td>{money(ratio(g.fob, g.units))}</td>
-                  </tr>
-                ))}
+                {groups.slice(offset, offset + size).map((g) => {
+                  const detail = drill(brandView, g.name);
+                  return (
+                    <tr key={g.name}>
+                      <th>
+                        {detail ? <Link to={detail}>{g.name} ›</Link> : g.name}
+                      </th>
+                      <td>{number(g.prior)}</td>
+                      <td>{number(g.units)}</td>
+                      <td>{percent(ratio(g.units, b.units))}</td>
+                      <td>
+                        {a.units && b.units
+                          ? (
+                              (g.units / b.units - g.prior / a.units) *
+                              100
+                            ).toLocaleString("de-DE", {
+                              maximumFractionDigits: 1,
+                            })
+                          : "—"}
+                      </td>
+                      <td>{money(g.fob)}</td>
+                      <td>{percent(ratio(g.fob, b.fob))}</td>
+                      <td>{money(ratio(g.priorFob, g.prior))}</td>
+                      <td>{money(ratio(g.fob, g.units))}</td>
+                    </tr>
+                  );
+                })}
               </tbody>
             </table>
           </div>
@@ -476,45 +500,7 @@ export function TractorDashboard({ rows }: { rows: Movement[] }) {
           </div>
         </section>
       )}
-      {view === "movimientos" && (
-        <section className="market-panel">
-          <h2>Movimientos</h2>
-          {filters}
-          <div className="market-scroll">
-            <table>
-              <thead>
-                <tr>
-                  {[
-                    "Referencia",
-                    "Mes",
-                    "Marca · modelo",
-                    "Importador",
-                    "Potencia",
-                    "Unidades",
-                    "Valor FOB",
-                  ].map((t) => (
-                    <th key={t}>{t}</th>
-                  ))}
-                </tr>
-              </thead>
-              <tbody>
-                {records.slice(offset, offset + size).map((r) => (
-                  <tr key={r[0]}>
-                    <th>{r[0]}</th>
-                    <td>{months[r[2] - 1]}</td>
-                    <td>{label(r, "modelos")}</td>
-                    <td>{r[7]}</td>
-                    <td>{r[5]}</td>
-                    <td>{number(r[9])}</td>
-                    <td>{money(r[10])}</td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        </section>
-      )}
-      {(brandView || view === "movimientos") && (
+      {brandView && (
         <footer>
           {count ? number(count) + " resultados" : "Sin resultados"}
           <div>

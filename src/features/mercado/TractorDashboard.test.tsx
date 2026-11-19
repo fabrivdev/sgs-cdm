@@ -1,6 +1,6 @@
 import { fireEvent, render, screen, within } from "@testing-library/react";
 import { MemoryRouter } from "react-router-dom";
-import { describe, expect, it } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { TractorDashboard } from "./TractorDashboard";
 import { leadingBrands, compare, type Movement } from "./model";
 
@@ -46,25 +46,28 @@ const sample: Movement[] = [
   ],
 ];
 describe("Mercado de tractores", () => {
-  it("conserva el tramo de precio al abrir marca, modelo, importador y movimiento", () => {
+  beforeEach(() => {
+    vi.stubGlobal("ResizeObserver", class {
+      observe() {}
+      disconnect() {}
+    });
+  });
+  afterEach(() => vi.unstubAllGlobals());
+  it("conserva el tramo de precio al abrir marca, modelo e importador", () => {
     render(
       <MemoryRouter initialEntries={["/mercado/tractores/precios"]}>
         <TractorDashboard rows={sample} />
       </MemoryRouter>,
     );
-    for (const title of [
-      "USD 150.000 o más ›",
-      "CLAAS ›",
-      "CLAAS · AXION ›",
-      "Importador A ›",
-    ]) {
+    for (const title of ["USD 150.000 o más ›", "CLAAS ›", "CLAAS · AXION ›"]) {
       fireEvent.click(
         within(screen.getByRole("table")).getByRole("link", { name: title }),
       );
     }
     const table = screen.getByRole("table");
-    expect(within(table).getByText("A")).toBeTruthy();
-    expect(within(table).queryByText("B")).toBeNull();
+    expect(within(table).getByText("Importador A")).toBeTruthy();
+    expect(within(table).queryByText("Importador B")).toBeNull();
+    expect(screen.queryByRole("link", { name: "Movimientos" })).toBeNull();
   });
   it("incluye CLAAS una vez fuera del top seis", () => {
     const input: Movement[] = Array.from({ length: 7 }, (_, i) => [

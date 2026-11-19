@@ -1,3 +1,4 @@
+import { TractorImport } from "@/features/mercado/TractorImport";
 /* eslint-disable @typescript-eslint/no-explicit-any -- Administración consulta tablas nuevas antes de regenerar database.types. */
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
@@ -979,6 +980,7 @@ export default function Admin() {
 
         <TabsContent value="importar" className="space-y-4">
           <ImportarTotvsTab onChanged={load} />
+          {hasSectionAccess("admin.importaciones") && <TractorImport />}
 
           <Collapsible>
             <CollapsibleTrigger className="flex w-full items-center gap-1.5 rounded-md py-1 text-[12px] font-medium text-muted-foreground hover:text-foreground [&[data-state=open]>svg]:rotate-180">
