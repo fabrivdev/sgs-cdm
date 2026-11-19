@@ -13,7 +13,7 @@ import {
   ResponsiveDrawerBody,
 } from "@/components/ui/responsive-drawer";
 import { ReadingsView } from "./ReadingsView";
-import { maintenanceHistoryMoney } from "./maintenanceAmounts";
+import { maintenanceExpenseMoney } from "./maintenanceAmounts";
 import { initialFilters } from "./workspaceModel";
 import { fuelMonthRows } from "./vehicleFuelSummary";
 import { currentVehicleMileage, maintenanceAlert } from "./maintenanceAlert";
@@ -32,7 +32,6 @@ import {
   responsibleDisplay,
   within,
   fuelMoney,
-  money,
   fleetConsumption,
   type FleetFilters,
   type FilterChange,
@@ -85,13 +84,8 @@ export function VehicleDetail({
         },
       ];
   const fuel = data.fuel.filter(
-      (r) => r.vehicle_id === vehicle.id && within(r.occurred_at, filters),
-    ),
-    invoices = data.invoices.filter(
-      (r) =>
-        r.vehicle_id === vehicle.id &&
-        within(r.performed_on ?? r.invoice_date, filters),
-    );
+    (r) => r.vehicle_id === vehicle.id && within(r.occurred_at, filters),
+  );
   const consumption = estimatedConsumption(
     data.fuel.filter((r) => r.vehicle_id === vehicle.id),
     filters.from,
@@ -137,16 +131,7 @@ export function VehicleDetail({
               ["Próximo servicio", alert.label],
               [
                 "Gasto total",
-                money([
-                  ...invoices.filter((r) => r.status === "uploaded"),
-                  ...data.history
-                    .filter(
-                      (r) =>
-                        r.vehicle_id === vehicle.id &&
-                        within(r.occurred_on, filters),
-                    )
-                    .map(maintenanceHistoryMoney),
-                ]),
+                maintenanceExpenseMoney(data.history, data.invoices, new Set([vehicle.id]), filters),
               ],
             ]
           : [

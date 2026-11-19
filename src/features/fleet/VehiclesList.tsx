@@ -1,4 +1,5 @@
 import { currentVehicleMileage, maintenanceAlert } from "./maintenanceAlert";
+import { maintenanceExpenseMoney } from "./maintenanceAmounts";
 import { useMemo, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { PageHeader } from "@/components/layout/AppPrimitives";
@@ -20,7 +21,6 @@ import {
   within,
   fmt,
   fuelMoney,
-  invoiceMoney,
   type FleetFilters,
   type FilterChange,
 } from "./workspaceModel";
@@ -160,13 +160,7 @@ export function VehiclesList({
           ],
           [
             "Gasto mantenimiento",
-            invoiceMoney(
-              data.invoices.filter(
-                (r) =>
-                  ids.has(r.vehicle_id ?? "") &&
-                  within(r.performed_on ?? r.invoice_date, filters),
-              ),
-            ),
+            maintenanceExpenseMoney(data.history, data.invoices, ids, filters),
           ],
         ]}
       />

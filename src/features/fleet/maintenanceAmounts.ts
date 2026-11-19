@@ -1,4 +1,27 @@
-import type { MaintenanceEntry } from "./managementModel";
+import type { Invoice, MaintenanceEntry } from "./managementModel";
+import { money, within, type FleetFilters } from "./workspaceModel";
+
+export function maintenanceExpenseMoney(
+  history: MaintenanceEntry[],
+  invoices: Invoice[],
+  vehicleIds: ReadonlySet<string>,
+  filters: Pick<FleetFilters, "from" | "to">,
+) {
+  return money([
+    ...invoices.filter(
+      (r) =>
+        r.status === "uploaded" &&
+        vehicleIds.has(r.vehicle_id ?? "") &&
+        within(r.performed_on ?? r.invoice_date, filters),
+    ),
+    ...history
+      .filter(
+        (r) =>
+          vehicleIds.has(r.vehicle_id ?? "") && within(r.occurred_on, filters),
+      )
+      .map(maintenanceHistoryMoney),
+  ]);
+}
 
 /** Only consume amounts explicitly prepared by the reviewed TOTVS import. */
 export function maintenanceHistoryMoney(

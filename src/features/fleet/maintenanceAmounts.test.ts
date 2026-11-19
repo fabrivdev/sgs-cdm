@@ -1,7 +1,88 @@
 import { describe, expect, it } from "vitest";
-import { maintenanceHistoryMoney } from "./maintenanceAmounts";
+import {
+  maintenanceHistoryMoney,
+  maintenanceExpenseMoney,
+} from "./maintenanceAmounts";
+import type { MaintenanceEntry, Invoice } from "./managementModel";
 
 describe("reviewed maintenance import amounts", () => {
+  it("includes imported amounts and uploaded invoices within the selected vehicles and period", () => {
+    const financial = {
+      version: 1,
+      currency: "PYG",
+      base: 100000,
+      tax: 10000,
+      total: 110000,
+    };
+    const history = [
+      {
+        vehicle_id: "v1",
+        occurred_on: "2026-07-01",
+        raw_data: { totvs_financial: financial },
+      },
+      {
+        vehicle_id: "v2",
+        occurred_on: "2026-07-01",
+        raw_data: { totvs_financial: financial },
+      },
+      {
+        vehicle_id: "v1",
+        occurred_on: "2025-07-01",
+        raw_data: { totvs_financial: financial },
+      },
+      { vehicle_id: "v1", occurred_on: "2026-07-01", raw_data: {} },
+    ] as MaintenanceEntry[];
+    const invoices = [
+      {
+        vehicle_id: "v1",
+        invoice_date: "2026-07-01",
+        status: "uploaded",
+        amount: 20000,
+        currency: "PYG",
+      },
+      {
+        vehicle_id: "v1",
+        invoice_date: "2025-07-01",
+        performed_on: "2026-07-01",
+        status: "uploaded",
+        amount: 10000,
+        currency: "PYG",
+      },
+      {
+        vehicle_id: "v1",
+        invoice_date: "2026-07-01",
+        status: "void",
+        amount: 999999,
+        currency: "PYG",
+      },
+      {
+        vehicle_id: "v1",
+        invoice_date: "2026-07-01",
+        status: "pending",
+        amount: 999999,
+        currency: "PYG",
+      },
+      {
+        vehicle_id: "v2",
+        invoice_date: "2026-07-01",
+        status: "uploaded",
+        amount: 999999,
+        currency: "PYG",
+      },
+    ] as Invoice[];
+    expect(
+      maintenanceExpenseMoney(history, invoices, new Set(["v1"]), {
+        from: "2026-01-01",
+        to: "2026-12-31",
+      }),
+    ).toBe("Gs 140.000");
+    expect(
+      maintenanceExpenseMoney(history, invoices, new Set(["v1"]), {
+        from: "2026-08-01",
+        to: "2026-12-31",
+      }),
+    ).toBe("—");
+  });
   const read = (value: unknown) =>
     maintenanceHistoryMoney({ raw_data: { totvs_financial: value } });
   it("uses the total including tax", () => {
