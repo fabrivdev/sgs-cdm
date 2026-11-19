@@ -1,5 +1,7 @@
 # Ventas y conciliación
 
+Las clasificaciones documentales confirmadas se guardan por fecha, factura, sucursal y código en `ventas_servicios_clasificaciones_confirmadas`. El reporte enriquecido las prioriza al resolver marca y tipo, conservando identidad del documento al reimportar. Se registran motivo, fecha y usuario de confirmación cuando exista sesión. Solo se administran mediante SQL autorizado. No asignan OS ni horas ni modifican importes o comisiones. Migración `20261119150000_confirmed_service_document_classifications.sql`.
+
 El importador de OS normaliza marcas distintas de CLAAS y HORSCH como OTROS, conservando la marca explícita de TOTVS en raw_data.MARCA. `20261119140000_recover_original_totvs_os_brand.sql` agrega esa evidencia como respaldo cuando la marca normalizada es genérica. El resumen sigue agrupando esas marcas como OTROS.
 
 La migración `20261119130000_recover_service_machine_brand_from_os.sql` recupera la marca explícita de la OS cuando la identidad por chasis no tiene marca. Conserva la prioridad de Parque/Stock y no usa la marca del repuesto. Un conflicto de identidad queda sin resolver automáticamente. En el resumen, las marcas distintas de CLAAS/HORSCH continúan agrupadas bajo OTROS según el componente existente. Los documentos sin OS siguen pendientes de diagnóstico.
