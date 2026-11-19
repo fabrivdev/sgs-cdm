@@ -1,4 +1,5 @@
 import { expensePlate, matchesExpensePlate } from "./expenseViews";
+import { maintenanceHistoryMoney } from "./maintenanceAmounts";
 import { MaintenanceGroupCell } from "./MaintenanceGroupCell";
 import {
   maintenanceGroups,
@@ -137,8 +138,7 @@ export function MaintenanceView({
             )
             .join(" · "),
           supplier: r.supplier,
-          amount: null,
-          currency: null,
+          ...maintenanceHistoryMoney(r),
           invoice: formatInvoiceNumber(r.invoice_number),
           status: null,
         })),

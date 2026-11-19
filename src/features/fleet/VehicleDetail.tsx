@@ -13,6 +13,7 @@ import {
   ResponsiveDrawerBody,
 } from "@/components/ui/responsive-drawer";
 import { ReadingsView } from "./ReadingsView";
+import { maintenanceHistoryMoney } from "./maintenanceAmounts";
 import { initialFilters } from "./workspaceModel";
 import { fuelMonthRows } from "./vehicleFuelSummary";
 import { currentVehicleMileage, maintenanceAlert } from "./maintenanceAlert";
@@ -31,7 +32,7 @@ import {
   responsibleDisplay,
   within,
   fuelMoney,
-  invoiceMoney,
+  money,
   fleetConsumption,
   type FleetFilters,
   type FilterChange,
@@ -74,13 +75,15 @@ export function VehicleDetail({
           ? { ...f, from: value, to: to ?? "" }
           : { ...f, [key]: value },
     );
-  const vehicleActions = readOnly ? [] : [
-    {
-      id: "vehicle-administration",
-      label: "Kilometraje y responsable",
-      onSelect: () => setAdministration(true),
-    },
-  ];
+  const vehicleActions = readOnly
+    ? []
+    : [
+        {
+          id: "vehicle-administration",
+          label: "Kilometraje y responsable",
+          onSelect: () => setAdministration(true),
+        },
+      ];
   const fuel = data.fuel.filter(
       (r) => r.vehicle_id === vehicle.id && within(r.occurred_at, filters),
     ),
@@ -132,7 +135,19 @@ export function VehicleDetail({
                 lastWork?.split("-").reverse().join("/") ?? "—",
               ],
               ["Próximo servicio", alert.label],
-              ["Gasto total", invoiceMoney(invoices)],
+              [
+                "Gasto total",
+                money([
+                  ...invoices.filter((r) => r.status === "uploaded"),
+                  ...data.history
+                    .filter(
+                      (r) =>
+                        r.vehicle_id === vehicle.id &&
+                        within(r.occurred_on, filters),
+                    )
+                    .map(maintenanceHistoryMoney),
+                ]),
+              ],
             ]
           : [
               [
@@ -177,9 +192,11 @@ export function VehicleDetail({
                 ))}
               </TabsList>
             </Tabs>
-            {!readOnly && <Button variant="outline" size="sm" onClick={onEdit}>
-              Editar
-            </Button>}
+            {!readOnly && (
+              <Button variant="outline" size="sm" onClick={onEdit}>
+                Editar
+              </Button>
+            )}
           </div>
         </div>
         <p className="flex flex-wrap items-center gap-x-2 text-xs text-muted-foreground">

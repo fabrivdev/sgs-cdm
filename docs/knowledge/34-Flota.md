@@ -308,3 +308,13 @@ La carga de facturas permite ingresar kilometraje y fecha del trabajo como campo
 Si la primera lectura no identifica el RUC del emisor o el kilometraje, se consulta una segunda vez enfocando el encabezado fiscal y las observaciones del vehículo. Si esa consulta falla, se conservan los campos de la primera lectura.
 
 El documento de factura actual y el archivo anterior de auditoría abren en el visor compartido con Maquinaria. El visor descarga desde el bucket privado de Flota con la sesión actual, muestra PDF e imágenes dentro de la app y ofrece descarga.
+
+## Importes del mantenimiento TOTVS — 19/11/2026
+
+La importación revisada de mantenimiento conserva los datos de origen y los importes por línea en raw_data. Por indicación del usuario, TOTALGS se trata como base: TIPOES 004 y 303 agregan 10%; 006 y 007 son exentos. El IVA se redondea por línea a guaraníes enteros. Se agrupan líneas de la misma factura y chapa sumando únicamente sus asignaciones, sin repetir el total del documento entre vehículos. El kilometraje cero se conserva en el original y se presenta como desconocido.
+
+El SQL privado cruza RUC/número normalizado con facturas no anuladas y omite las existentes. Solo carga vínculos revisados que siguen coincidiendo con los alias actuales. Las chapas sin vínculo confirmado quedan pendientes; no se crean vehículos ni se adivinan chapas. Los registros previos no se actualizan. La clave estable por RUC/factura/chapa y la transacción con bloqueo evitan duplicar esta carga al repetirla. Archivos fuente, auditoría y SQL con datos privados permanecen fuera de Git.
+
+maintenanceAmounts.ts reconoce exclusivamente el bloque totvs_financial versión 1 en PYG y valida base + IVA = total con enteros no negativos. Mantenimiento muestra ese total en tabla, Excel y detalle; Gasto total de la ficha lo incorpora al período junto con las facturas completas. El historial antiguo sin importe explícito conserva la raya. No se modifica la lista de vehículos.
+
+Validación local: siete pruebas de lectura de importes, dos de agrupación, TypeScript y ejecución del SQL en PGlite con datos de revisión. La segunda ejecución no agrega filas y el total reconcilia con las líneas elegibles. Esto no acredita carga ni validación en Cloud: el usuario ejecuta el SQL manualmente.

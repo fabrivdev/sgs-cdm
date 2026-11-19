@@ -130,7 +130,6 @@ export function ExpenseDetails({
                           "performed",
                           "description",
                           "status",
-                          "amount",
                           "km",
                         ].includes(k))
                     ),
