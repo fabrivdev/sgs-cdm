@@ -1,5 +1,7 @@
 # Ventas y conciliación
 
+El importador de OS normaliza marcas distintas de CLAAS y HORSCH como OTROS, conservando la marca explícita de TOTVS en raw_data.MARCA. `20261119140000_recover_original_totvs_os_brand.sql` agrega esa evidencia como respaldo cuando la marca normalizada es genérica. El resumen sigue agrupando esas marcas como OTROS.
+
 La migración `20261119130000_recover_service_machine_brand_from_os.sql` recupera la marca explícita de la OS cuando la identidad por chasis no tiene marca. Conserva la prioridad de Parque/Stock y no usa la marca del repuesto. Un conflicto de identidad queda sin resolver automáticamente. En el resumen, las marcas distintas de CLAAS/HORSCH continúan agrupadas bajo OTROS según el componente existente. Los documentos sin OS siguen pendientes de diagnóstico.
 
 Servicios conserva las marcas identificadas aunque el histórico no tenga OS vinculada. El tipo histórico sin OS continúa como Histórico sin OS vinculada, porque Cliente puede venir de una inferencia de la fuente y no acredita el tipo original. Las horas y la cantidad de OS históricas siguen desconocidas. La presentación y el Excel mantienen esa distinción; falta auditar los documentos para resolver cada tipo.
