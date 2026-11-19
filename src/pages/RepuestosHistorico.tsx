@@ -26,20 +26,22 @@ export default function RepuestosHistorico() {
 function HistoricalWorkspace() {
   const { user } = useAuth();
   const today = format(new Date(), "yyyy-MM-dd");
+  const endOfYear = today.slice(0, 4) + "-12-31";
   const [cutoff, setCutoff] = useState(today);
   const [view, setView] = useState("clientes");
   const [branch, setBranch] = useState("TODAS");
+  const [brand, setBrand] = useState("TODAS");
   const [search, setSearch] = useState("");
-  const valid = /^\d{4}-\d{2}-\d{2}$/.test(cutoff) && cutoff >= "2002-01-01" && cutoff <= today;
+  const valid = /^\d{4}-\d{2}-\d{2}$/.test(cutoff) && cutoff >= "2002-01-01" && cutoff <= endOfYear;
   const query = useQuery({
-    queryKey: ["parts-historical", user?.id, cutoff, view, branch],
+    queryKey: ["parts-historical", user?.id, cutoff, view, branch, brand],
     queryFn: async ({ signal }) => {
       // RPC pendiente de incorporación a los tipos generados de la base.
       const { data, error } = await (supabase as unknown as {
         rpc: (name: string, args: Record<string, unknown>) => {
           abortSignal: (signal: AbortSignal) => PromiseLike<{ data: Report; error: { message: string } | null }>;
         };
-      }).rpc("repuestos_historico_v1", { p_corte: cutoff, p_vista: view, p_sucursal: branch === "TODAS" ? null : branch }).abortSignal(signal);
+      }).rpc("repuestos_historico_v2", { p_corte: cutoff, p_vista: view, p_sucursal: branch === "TODAS" ? null : branch, p_marca: brand === "TODAS" ? null : brand }).abortSignal(signal);
       if (error) throw new Error(error.message);
       if (!data || !Array.isArray(data.filas)) throw new Error("No se pudo leer el histórico.");
       return data;
@@ -72,8 +74,8 @@ function HistoricalWorkspace() {
   return <PageShell>
     <PageHeader title="Histórico" />
     <FiltersBar search={{ value: search, onChange: setSearch, placeholder: view === "clientes" ? "Cliente" : "Código o descripción" }}
-      activeCount={[search, branch === "TODAS" ? "" : branch].filter(Boolean).length}
-      onClear={() => { setSearch(""); setBranch("TODAS"); setCutoff(today); }}
+      activeCount={[search, branch === "TODAS" ? "" : branch, brand === "TODAS" ? "" : brand].filter(Boolean).length}
+      onClear={() => { setSearch(""); setBranch("TODAS"); setBrand("TODAS"); setCutoff(today); }}
       secondaryActions={<div className="flex items-end gap-2">
         <Tabs value={view} onValueChange={setView}><TabsList aria-label="Vista del histórico">
           <TabsTrigger value="clientes">Clientes</TabsTrigger>
@@ -81,9 +83,11 @@ function HistoricalWorkspace() {
         </TabsList></Tabs>
         <SalesSectionExportMenu />
       </div>}>
-      <FilterDate label="Comparar hasta" value={cutoff} onChange={setCutoff} max={today} min="2002-01-01" />
+      <FilterDate label="Comparar hasta" value={cutoff} onChange={setCutoff} max={endOfYear} min="2002-01-01" />
       <FilterSelect label="Sucursal" value={branch} onChange={setBranch} placeholder="Todas"
         options={[{ value: "TODAS", label: "Todas" }, ...SUCURSALES.map(value => ({ value, label: value }))]} />
+      <FilterSelect label="Marca" value={brand} onChange={setBrand} placeholder="Todas"
+        options={[{ value: "TODAS", label: "Todas" }, { value: "CLAAS", label: "CLAAS" }, { value: "HORSCH", label: "HORSCH" }, { value: "OTROS", label: "Otros" }]} />
     </FiltersBar>
     {!valid ? <p role="alert" className="text-sm text-destructive">Seleccioná una fecha de corte válida.</p>
       : query.isPending ? <PartsReportState loading />
@@ -95,7 +99,7 @@ function HistoricalWorkspace() {
           <KpiItem label="Año antepasado" value={money(totalRow.antiguo)} />
           <KpiItem label="Variación" value={percent(variation(totalRow))} />
         </KpiStrip>
-        <SalesDataTable key={view + cutoff + branch} title={view === "clientes" ? "Evolución de compras por cliente" : "Evolución de ventas por repuesto"}
+        <SalesDataTable key={view + cutoff + branch + brand} title={view === "clientes" ? "Evolución de compras por cliente" : "Evolución de ventas por repuesto"}
           rows={rows} columns={columns} initialSort={{ key: "actual", direction: "desc" }}
           rowKey={row => row.clave} fileName={"historico-" + view + ".xlsx"} sheetName="Histórico"
           empty="Sin movimientos para estos filtros." desktopBreakpoint={640} visibleRows={20} />
