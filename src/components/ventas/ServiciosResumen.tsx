@@ -11,6 +11,7 @@ const decimal = new Intl.NumberFormat("es-PY", { maximumFractionDigits: 1 });
 const integer = new Intl.NumberFormat("es-PY", { maximumFractionDigits: 0 });
 const typeLabel = (value: string) => value === "Garantia" ? "Garantía" : value;
 const historicLabel = "Histórico sin OS vinculada";
+const hasTimeType = (value: string) => ["Cliente", "Garantia", "Interno", "Agrega al costo"].includes(value);
 const unknown = (value: string) => /(?:sin|no) (?:identificar|identificado|informar|informado|clasificar|clasificado)/i.test(value);
 type Amounts = { mo: number; km: number; repuestos: number; terceros: number; neto: number; horas: number | null; sin_vinculo_historico?: boolean };
 function amountColumns<T extends Amounts>(total: number): SalesDisplayColumn<T>[] {
@@ -29,14 +30,14 @@ export function ServiciosResumen(props: IndicadoresFiltros) {
   if (!data) return <div className="py-12 text-center text-[12px] text-muted-foreground">No hay datos para el período.</div>;
   const { totales } = data;
   const tipoColumns: SalesDisplayColumn<IndicadorTipo>[] = [
-    { key: "tipo", label: "Tipo de tiempo", kind: "text", weight: 1.6, value: row => row.sin_vinculo_historico ? historicLabel : typeLabel(row.tipo_tiempo) },
+    { key: "tipo", label: "Tipo de tiempo", kind: "text", weight: 1.6, value: row => row.sin_vinculo_historico && !hasTimeType(row.tipo_tiempo) ? historicLabel : typeLabel(row.tipo_tiempo) },
     serviceNumberColumn("ordenes", "OS asociadas", row => row.sin_vinculo_historico ? null : row.ordenes),
     ...amountColumns<IndicadorTipo>(totales.neto),
   ];
   const brandColumns: SalesDisplayColumn<IndicadorMarcaTipo>[] = [
-    { key: "marca", label: "Marca", kind: "text", weight: 1.6, value: row => row.sin_vinculo_historico ? historicLabel : row.marca,
-      render: row => row.sin_vinculo_historico ? historicLabel : unknown(row.marca) ? row.marca : <MarcaBadge marca={row.marca} className="max-w-full truncate text-[10px]" /> },
-    { key: "tipo", label: "Tipo", kind: "text", value: row => row.sin_vinculo_historico ? null : typeLabel(row.tipo_tiempo) },
+    { key: "marca", label: "Marca", kind: "text", weight: 1.6, value: row => row.sin_vinculo_historico && unknown(row.marca) ? historicLabel : row.marca,
+      render: row => row.sin_vinculo_historico && unknown(row.marca) ? historicLabel : unknown(row.marca) ? row.marca : <MarcaBadge marca={row.marca} className="max-w-full truncate text-[10px]" /> },
+    { key: "tipo", label: "Tipo", kind: "text", value: row => row.sin_vinculo_historico && !hasTimeType(row.tipo_tiempo) ? null : typeLabel(row.tipo_tiempo) },
     ...amountColumns<IndicadorMarcaTipo>(totales.neto),
   ];
   const cards: Array<[string, string]> = [

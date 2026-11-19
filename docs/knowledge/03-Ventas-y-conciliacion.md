@@ -1,5 +1,7 @@
 # Ventas y conciliación
 
+Servicios conserva en ambos resúmenes el tipo y la marca acreditados aunque el histórico no tenga OS vinculada. La etiqueta histórico sin OS solo sustituye un campo no identificado. La falta de vínculo continúa dejando horas y cantidad de OS históricas como desconocidas. La corrección es de presentación y Excel; no asigna OS ni reparte importes.
+
 Estado al 14/10/2026: 8295892 unifica los dos nombres de Agustín y retira filtro local/aviso rojo; cac486c unifica “Facturación por período” y elimina el desplegable/título interno duplicado de Servicios. Integrado en main, publicación no verificada. Orden y exportación de Máquinas/Repuestos ya fueron ampliados: los pasos históricos de abajo no son pendientes. En teléfono prevalece [[25-Revision-movil-transversal]].
 
 ## Búsqueda y filtros de Servicios — cambio local del 15/10/2026
