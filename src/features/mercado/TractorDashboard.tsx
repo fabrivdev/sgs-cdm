@@ -4,8 +4,6 @@ import {
   compare,
   dimensions,
   dimensionKeys,
-  harvestClasses,
-  harvestPriceBands,
   label,
   leadingBrands,
   marketChartTitles,
@@ -16,7 +14,6 @@ import {
   pricedAverage,
   ratio,
   totals,
-  unknownHarvestClass,
   type Dimension,
   type Movement,
 } from "./model";
@@ -25,7 +22,8 @@ import { Card } from "@/components/ui/card";
 import { PageHeader, PageShell } from "@/components/layout/AppPrimitives";
 import { completePower, powerSpec } from "./power";
 import { completeHarvestClasses } from "./harvesterClasses";
-import { TractorAnalysis } from "./TractorAnalysis";
+import { TractorAnalysis, YearLegend } from "./TractorAnalysis";
+import { marketFamilies, plantingFilters, type MarketFamily } from "./marketFamily";
 import "./tractores.css";
 
 const tractorTitles = {
@@ -41,65 +39,33 @@ const next: Record<Dimension, Dimension[]> = {
   modelos: ["importadores"],
   importadores: ["marcas", "modelos"],
 };
-const orderedBands: Partial<Record<Dimension, string[]>> = {
-  potencia: [
-    "Hasta 80 HP",
-    "81–120 HP",
-    "121–170 HP",
-    "171–230 HP",
-    "Más de 230 HP",
-    "Sin potencia informada",
-  ],
-  precios: [
-    "Menos de USD 25.000",
-    "USD 25.000 a <50.000",
-    "USD 50.000 a <100.000",
-    "USD 100.000 a <150.000",
-    "USD 150.000 o más",
-  ],
-};
 function priceEligible(row: Movement) {
   return row[10] > 0 && label(row, "precios") !== "Sin FOB positivo";
 }
 
-function YearLegend({ year }: { year: number }) {
-  return (
-    <div className="market-legend">
-      <span>
-        <i className="market-year-prior" />
-        {year - 1}
-      </span>
-      <span>
-        <i className="market-year-current" />
-        {year}
-      </span>
-    </div>
-  );
-}
-
-const harvesterTitles = { ...tractorTitles, potencia: "Clases" };
-const harvesterBands = {
-  potencia: [...harvestClasses, unknownHarvestClass],
-  precios: harvestPriceBands,
-};
-
 export function TractorDashboard({
   rows: data,
-  harvester = false,
+  family = "tractores",
 }: {
   rows: Movement[];
-  harvester?: boolean;
+  family?: MarketFamily;
 }) {
-  const rows = useMemo(
-    () => (harvester ? completeHarvestClasses(data) : completePower(data)),
-    [data, harvester],
-  );
-  const machine = harvester ? "cosechadora" : "tractor";
-  const root = harvester ? "/mercado/cosechadoras" : "/mercado/tractores";
-  const titles = harvester ? harvesterTitles : tractorTitles;
-  const bands = harvester ? harvesterBands : orderedBands;
-  const routeKey = (key: string) =>
-    harvester && key === "potencia" ? "clases" : key;
+  const rows = useMemo(() => {
+    if (family === "tractores") return completePower(data);
+    if (family === "cosechadoras") return completeHarvestClasses(data);
+    return data;
+  }, [data, family]);
+  const planting = family === "sembradoras";
+  const positivePriceOnly = family !== "tractores";
+  const equipment = marketFamilies[family];
+  const { machine, benchmark } = equipment;
+  const root = "/mercado/" + family;
+  const titles = { ...tractorTitles, potencia: equipment.segmentTab };
+  const bands: Partial<Record<Dimension, readonly string[]>> = {
+    potencia: [...equipment.segments, equipment.unknownSegment],
+    precios: equipment.prices,
+  };
+  const routeKey = (key: string) => key === "potencia" ? equipment.segmentRoute : key;
   const [params, setParams] = useSearchParams();
   const location = useLocation();
   const slug = location.pathname.split("/").filter(Boolean).at(-1) || "";
@@ -126,17 +92,25 @@ export function TractorDashboard({
   const rankingDimension = brand ? "modelos" : "marcas";
   const active = dimensionKeys.filter((d) => params.has(routeKey(d)));
   const monthOnly = Number(params.get("mes"));
+  const extraFilters = planting ? plantingFilters : [];
   const accumulatedScope = rows.filter(
     (r) =>
       r[2] <= end &&
       (!state || r[8] === state) &&
-      active.every((d) => label(r, d) === params.get(routeKey(d))),
+      active.every((d) => label(r, d) === params.get(routeKey(d))) &&
+      extraFilters.every(({ key, field }) => !params.has(key) || r[field] === params.get(key)),
   );
   const scoped = monthOnly
     ? accumulatedScope.filter((r) => r[2] === monthOnly)
     : accumulatedScope;
   const current = scoped.filter((r) => r[1] === year),
     previous = scoped.filter((r) => r[1] === year - 1);
+  const observedMonths = (period: number) =>
+    new Set(rows.filter((row) => row[1] === period).map((row) => row[2]));
+  const priorMonths = observedMonths(year - 1);
+  const selectedMonths = monthOnly ? [monthOnly] : Array.from({ length: end }, (_, i) => i + 1);
+  const includesPeriod = (months: Set<number>) => selectedMonths.every((month) => months.has(month));
+  const priorComplete = !planting || (includesPeriod(priorMonths) && includesPeriod(observedMonths(year)));
   const a = totals(previous),
     b = totals(current);
   function href(target: View, changes: Record<string, string | null> = {}) {
@@ -176,9 +150,8 @@ export function TractorDashboard({
     </Link>
   );
   const ranking = compare(current, previous, (r) => label(r, rankingDimension));
-  const leaders = brand ? ranking.slice(0, 7) : leadingBrands(ranking);
-  const isClaas = (name: string) =>
-    name === "CLAAS" || name.startsWith("CLAAS · ");
+  const leaders = brand ? ranking.slice(0, 7) : leadingBrands(ranking, benchmark);
+  const isBenchmark = (name: string) => name === benchmark || name.startsWith(benchmark + " · ");
   const monthly = compare(current, previous, (r) => String(r[2])).sort(
     (a, b) => Number(a.name) - Number(b.name),
   );
@@ -210,7 +183,7 @@ export function TractorDashboard({
           <strong>{value}</strong>
           <small className="market-metric-change" data-trend={trend}>
             {delta === null
-              ? "Sin base anterior"
+              ? planting && !priorComplete ? "Período incompleto" : "Sin base anterior"
               : (delta > 0 ? "+" : "") + percent(delta) + " interanual"}
           </small>
         </Link>
@@ -218,7 +191,7 @@ export function TractorDashboard({
     );
   };
   const annualChange = (now: number | null, old: number | null) =>
-    now !== null && old ? now / old - 1 : null;
+    priorComplete && now !== null && old ? now / old - 1 : null;
   const brandView = dimensionKeys.includes(view as Dimension)
     ? (view as Dimension)
     : null;
@@ -238,7 +211,7 @@ export function TractorDashboard({
     );
   }
   const pricedGroups =
-    harvester && brandView
+    positivePriceOnly && brandView
       ? new Map(
           compare(
             current.filter(priceEligible),
@@ -266,7 +239,8 @@ export function TractorDashboard({
       return {
         year: y,
         ...totals(period),
-        average: harvester ? pricedAverage(period) : undefined,
+        average: positivePriceOnly ? pricedAverage(period) : undefined,
+        complete: !planting || includesPeriod(observedMonths(y)),
       };
     });
   const options = (values: string[]) =>
@@ -274,20 +248,16 @@ export function TractorDashboard({
   return (
     <PageShell className="market-tractors">
       <PageHeader
-        title={harvester ? "Cosechadoras" : "Tractores"}
+        title={equipment.title}
         titleAccessory={
           <span className="text-xs text-muted-foreground">
-            {harvester
-              ? "Paraguay · Cosechadoras de granos"
-              : "Paraguay · Importaciones"}
+            {family === "cosechadoras" ? "Paraguay · Cosechadoras de granos" : "Paraguay · Importaciones"}
           </span>
         }
         tabs={
           <nav
             className="market-tabs"
-            aria-label={
-              harvester ? "Secciones de cosechadoras" : "Secciones de tractores"
-            }
+            aria-label={"Secciones de " + family}
           >
             {(["resumen", ...dimensionKeys, "historia"] as View[]).map(nav)}
           </nav>
@@ -295,7 +265,7 @@ export function TractorDashboard({
       />
       <FiltersBar
         activeCount={
-          active.length +
+          active.length + extraFilters.filter(({ key }) => params.has(key)).length +
           Number(Boolean(state)) +
           Number(Boolean(monthOnly)) +
           Number(params.has("año")) +
@@ -361,6 +331,19 @@ export function TractorDashboard({
             ...options([...new Set(rows.map((r) => r[8]))].sort()),
           ]}
         />
+        {extraFilters.map(({key, label, field}) => (
+          <FilterSelect
+            key={key}
+            label={label}
+            placeholder={label}
+            value={params.get(key) || "todas"}
+            onChange={(value) => set(key, value === "todas" ? "" : value)}
+            options={[
+              { value: "todas", label: "Todos" },
+              ...options([...new Set(rows.flatMap((row) => row[field] ? [row[field]] : []).filter((value): value is string => typeof value === "string"))].sort()),
+            ]}
+          />
+        ))}
         {brandView && (
           <FilterSelect
             label="Orden"
@@ -410,10 +393,10 @@ export function TractorDashboard({
         )}
         {metric(
           "FOB medio por " + machine,
-          money(harvester ? pricedAverage(current) : ratio(b.fob, b.units)),
+          money(positivePriceOnly ? pricedAverage(current) : ratio(b.fob, b.units)),
           annualChange(
-            harvester ? pricedAverage(current) : ratio(b.fob, b.units),
-            harvester ? pricedAverage(previous) : ratio(a.fob, a.units),
+            positivePriceOnly ? pricedAverage(current) : ratio(b.fob, b.units),
+            positivePriceOnly ? pricedAverage(previous) : ratio(a.fob, a.units),
           ),
           "precios",
         )}
@@ -430,7 +413,7 @@ export function TractorDashboard({
               {leaders.map((g) => (
                 <div
                   className={
-                    "market-rank" + (isClaas(g.name) ? " market-claas" : "")
+                    "market-rank" + (isBenchmark(g.name) ? " market-claas" : "")
                   }
                   key={g.name}
                 >
@@ -473,7 +456,7 @@ export function TractorDashboard({
                         " · " +
                         (year - 1) +
                         ": " +
-                        number(m.prior) +
+                        (planting && !priorMonths.has(Number(m.name)) ? "Sin registros" : number(m.prior)) +
                         " · " +
                         year +
                         ": " +
@@ -574,7 +557,8 @@ export function TractorDashboard({
             year={year}
             end={end}
             month={monthOnly}
-            harvester={harvester}
+            family={family}
+            priorComplete={priorComplete}
           />
         </>
       )}
@@ -592,7 +576,7 @@ export function TractorDashboard({
                 <tr>
                   {[
                     titles[view],
-                    ...(brandView === "modelos" && !harvester
+                    ...(brandView === "modelos" && !positivePriceOnly
                       ? ["HP de ficha"]
                       : []),
                     "Uds. " + (year - 1),
@@ -614,13 +598,13 @@ export function TractorDashboard({
                   const priced = pricedGroups ? pricedGroups.get(g.name) : g;
                   const [modelBrand, model] = g.name.split(" · ");
                   const spec =
-                    brandView === "modelos" && !harvester && model
+                    brandView === "modelos" && !positivePriceOnly && model
                       ? powerSpec(modelBrand, model)
                       : undefined;
                   return (
                     <tr
                       key={g.name}
-                      className={isClaas(g.name) ? "market-claas" : undefined}
+                      className={isBenchmark(g.name) ? "market-claas" : undefined}
                     >
                       <th>
                         {detail ? (
@@ -631,7 +615,7 @@ export function TractorDashboard({
                           g.name.replace("USD ", "$")
                         )}
                       </th>
-                      {brandView === "modelos" && !harvester && (
+                      {brandView === "modelos" && !positivePriceOnly && (
                         <td>
                           {spec ? (
                             <a
@@ -651,7 +635,7 @@ export function TractorDashboard({
                       <td>{number(g.units)}</td>
                       <td>{percent(ratio(g.units, b.units))}</td>
                       <td>
-                        {a.units && b.units
+                        {priorComplete && a.units && b.units
                           ? (
                               (g.units / b.units - g.prior / a.units) *
                               100
@@ -709,20 +693,20 @@ export function TractorDashboard({
                           hasta: String(end),
                         })}
                       >
-                        {r.year} ›
+                        {r.year}{!r.complete && " · incompleto"} ›
                       </Link>
                     </th>
                     <td>{number(r.units)}</td>
                     <td>
-                      {history[i + 1]?.units &&
-                      (!harvester || history[i + 1].year === r.year - 1)
+                      {r.complete && history[i + 1]?.complete && history[i + 1]?.units &&
+                      (!positivePriceOnly || history[i + 1].year === r.year - 1)
                         ? percent(r.units / history[i + 1].units - 1)
                         : "—"}
                     </td>
                     <td>{money(r.fob)}</td>
                     <td>
                       {money(
-                        harvester ? (r.average ?? null) : ratio(r.fob, r.units),
+                        positivePriceOnly ? (r.average ?? null) : ratio(r.fob, r.units),
                       )}
                     </td>
                   </tr>

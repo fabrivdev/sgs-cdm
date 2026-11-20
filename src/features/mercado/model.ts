@@ -1,66 +1,27 @@
 import { z } from "zod";
 
-// One observation per source line, keeping only fields needed for the report.
-export const movements = z
-  .array(
-    z.tuple([
-      z.string().min(1),
-      z.number().int().min(2000).max(2100),
-      z.number().int().min(1).max(12),
-      z.string(),
-      z.string(),
-      z.string(),
-      z.string(),
-      z.string(),
-      z.string(),
-      z.number().int().positive(),
-      z.number().finite().nonnegative(),
-    ]),
-  )
-  .nonempty();
-export type Movement = [
-  string,
-  number,
-  number,
-  string,
-  string,
-  string,
-  string,
-  string,
-  string,
-  number,
-  number,
+const movementFields = [
+  z.string().min(1),
+  z.number().int().min(2000).max(2100),
+  z.number().int().min(1).max(12),
+  z.string(), z.string(), z.string(), z.string(), z.string(), z.string(),
+  z.number().int().positive(), z.number().finite().nonnegative(),
+] as const;
+const standardMovement = z.tuple([...movementFields]);
+const plantingMovement = z.tuple([
+  ...movementFields,
+  z.number().int().positive().nullable(),
+  z.string(),
+  z.string(),
+]);
+export const movements = z.array(z.union([standardMovement, plantingMovement])).nonempty();
+type StandardMovement = [
+  string, number, number, string, string, string, string, string, string, number, number,
 ];
-export const parseMovements = (value: unknown): Movement[] =>
-  movements
-    .parse(value)
-    .map(
-      ([
-        id,
-        year,
-        month,
-        brand,
-        model,
-        power,
-        price,
-        importer,
-        state,
-        units,
-        fob,
-      ]) => [
-        id,
-        year,
-        month,
-        brand,
-        model,
-        power,
-        price,
-        importer,
-        state,
-        units,
-        fob,
-      ],
-    );
+export type PlantingMovement = [...StandardMovement, number | null, string, string];
+export type Movement = StandardMovement | PlantingMovement;
+export const parseMovements = (value: unknown): Movement[] => movements.parse(value) as unknown as Movement[];
+
 export const dimensions = {
   marcas: "Marcas",
   modelos: "Modelos",
@@ -81,6 +42,7 @@ export const marketChartTitles = {
   cumulativeUnits: "Unidades acumuladas",
   importerConcentration: "Concentración por importador",
   conditionMix: "Nuevas y usadas",
+  plantingRows: "Líneas de siembra por segmento",
   seasonality: "Estacionalidad",
 } as const;
 
@@ -184,10 +146,10 @@ export function compare(
     (a, b) => b.units - a.units || a.name.localeCompare(b.name, "es"),
   );
 }
-export function leadingBrands(groups: ReturnType<typeof compare>) {
+export function leadingBrands(groups: ReturnType<typeof compare>, benchmark = "CLAAS") {
   const top = groups.slice(0, 6),
-    claas = groups.find((x) => x.name === "CLAAS");
-  return claas && !top.includes(claas) ? [...top, claas] : top;
+    reference = groups.find((x) => x.name === benchmark);
+  return reference && !top.includes(reference) ? [...top, reference] : top;
 }
 export async function readReport(
   file: Pick<File, "arrayBuffer">,

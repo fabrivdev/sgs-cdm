@@ -24,6 +24,7 @@ export const SECTION_ROUTES = [
   { id: "repuestos.sugerencias", module: "repuestos", route: "/repuestos/sugerencias" },
   { id: "mercado.tractores", module: "mercado", route: "/mercado/tractores" },
   { id: "mercado.cosechadoras", module: "mercado", route: "/mercado/cosechadoras" },
+  { id: "mercado.sembradoras", module: "mercado", route: "/mercado/sembradoras" },
   { id: "admin.usuarios", module: "admin", route: "/admin" },
   { id: "admin.importaciones", module: "admin", route: "/admin" },
   { id: "admin.parametros", module: "admin", route: "/admin" },
@@ -34,7 +35,7 @@ export type SectionKey = (typeof SECTION_ROUTES)[number]["id"] | "servicios.dash
 
 export function sectionsFromLegacyModules(modules: readonly string[], roles: readonly Role[] = []) {
   const sections = SECTION_ROUTES
-    .filter((section) => !["servicios.controles_maquinas", "repuestos.historico", "mercado.tractores", "mercado.cosechadoras"].includes(section.id) && modules.includes(section.module))
+    .filter((section) => !["servicios.controles_maquinas", "repuestos.historico"].includes(section.id) && section.module !== "mercado" && modules.includes(section.module))
     .map((section) => section.id);
   if (roles.includes("admin") || roles.includes("superadmin")) {
     sections.push("admin.usuarios", "admin.importaciones", "admin.parametros");

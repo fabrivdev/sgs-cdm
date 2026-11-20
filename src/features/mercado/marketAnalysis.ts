@@ -15,7 +15,7 @@ const identified = (row: Movement) =>
 export function positioning(
   current: Movement[],
   state: string,
-  bands = hpBands,
+  bands: readonly string[] = hpBands,
 ) {
   const priced = current.filter((row) => row[10] > 0 && row[8] === state);
   const comparable = priced.filter(
@@ -45,11 +45,14 @@ function monthlyUnits(
   scoped: Movement[],
   year: number,
   months: number[],
+  observedMonthsOnly = false,
 ) {
   const coverage = new Map<number, [number, number]>();
   const quantities = new Map<number, number[]>();
+  const observed = new Set<number>();
   for (const row of rows) {
     if (row[1] > year) continue;
+    observed.add(row[1] * 12 + row[2]);
     const [first, last] = coverage.get(row[1]) ?? [12, 1];
     coverage.set(row[1], [Math.min(first, row[2]), Math.max(last, row[2])]);
   }
@@ -63,7 +66,7 @@ function monthlyUnits(
     .map(([period, [first, last]]) => ({
       year: period,
       values: months.map((month) =>
-        month >= first && month <= last
+        month >= first && month <= last && (!observedMonthsOnly || observed.has(period * 12 + month))
           ? (quantities.get(period)?.[month - 1] ?? 0)
           : null,
       ),
@@ -75,8 +78,9 @@ export function seasonality(
   scoped: Movement[],
   year: number,
   months: number[],
+  observedMonthsOnly = false,
 ) {
-  const grid = monthlyUnits(rows, scoped, year, months);
+  const grid = monthlyUnits(rows, scoped, year, months, observedMonthsOnly);
   const baseline = months.map((_, i) => {
     const samples = grid
       .filter((row) => row.year < year)
@@ -106,10 +110,11 @@ export function cumulativeUnits(
   scoped: Movement[],
   year: number,
   end: number,
+  observedMonthsOnly = false,
 ) {
   const months = Array.from({ length: end }, (_, index) => index + 1);
   const byYear = new Map(
-    monthlyUnits(rows, scoped, year, months).map((period) => {
+    monthlyUnits(rows, scoped, year, months, observedMonthsOnly).map((period) => {
       let total: number | null = 0;
       const cumulative = period.values.map((value) => {
         total = total === null || value === null ? null : total + value;

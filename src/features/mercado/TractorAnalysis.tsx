@@ -15,7 +15,6 @@ import { useState } from "react";
 import { Card } from "@/components/ui/card";
 import {
   compare,
-  harvestClasses,
   label,
   marketChartTitles,
   money,
@@ -25,15 +24,14 @@ import {
   pricedAverage,
   ratio,
   totals,
-  unknownHarvestClass,
   type Movement,
 } from "./model";
 import {
-  hpBands,
   positioning,
   cumulativeUnits,
   seasonality,
 } from "./marketAnalysis";
+import { marketFamilies, type MarketFamily } from "./marketFamily";
 
 type Period = {
   current: Movement[];
@@ -44,19 +42,17 @@ function SegmentOpportunity({
   current,
   previous,
   year,
-  harvester,
-}: Period & { harvester: boolean }) {
-  const bands = harvester ? harvestClasses : hpBands;
-  const order = [
-    ...bands,
-    harvester ? unknownHarvestClass : "Sin potencia informada",
-  ];
+  family,
+  priorComplete,
+}: Period & { family: MarketFamily; priorComplete: boolean }) {
+  const { segments: bands, unknownSegment, benchmark, segmentName, segmentHeader } = marketFamilies[family];
+  const order = [...bands, unknownSegment];
   const groups = compare(current, previous, (row) => row[5]).sort((a, b) => {
     return order.indexOf(a.name) - order.indexOf(b.name);
   });
   const brand = new Map(
     compare(
-      current.filter((row) => row[3] === "CLAAS"),
+      current.filter((row) => row[3] === benchmark),
       [],
       (row) => row[5],
     ).map((group) => [group.name, group.units]),
@@ -76,18 +72,16 @@ function SegmentOpportunity({
         className="market-scroll"
         tabIndex={0}
         role="region"
-        aria-label={
-          harvester ? "Comparación por clase" : "Comparación por potencia"
-        }
+        aria-label={"Comparación por " + segmentName}
       >
         <table className="market-opportunity-table">
           <thead>
             <tr>
-              <th scope="col">{harvester ? "Clase" : "Banda HP"}</th>
+              <th scope="col">{segmentHeader}</th>
               <th scope="col">Unidades</th>
               <th scope="col">Var. interanual</th>
               <th scope="col">FOB medio</th>
-              <th scope="col">Cuota CLAAS</th>
+              <th scope="col">Cuota {benchmark}</th>
             </tr>
           </thead>
           <tbody>
@@ -95,7 +89,7 @@ function SegmentOpportunity({
               const price = priced.get(group.name);
               const classified = bands.includes(group.name);
               const change =
-                group.prior && classified
+                priorComplete && group.prior && classified
                   ? group.units / group.prior - 1
                   : null;
               return (
@@ -165,20 +159,21 @@ function SegmentOpportunity({
 
 function ModelPosition({
   current,
-  harvester,
-}: Pick<Period, "current"> & { harvester: boolean }) {
+  family,
+}: Pick<Period, "current"> & { family: MarketFamily }) {
   const states = [...new Set(current.map((row) => row[8]))];
   const [preferred, setPreferred] = useState("NUEVO");
   const state = states.includes(preferred)
     ? preferred
     : (states[0] ?? preferred);
-  const segments = harvester ? harvestClasses : hpBands;
+  const { segments, benchmark, segmentName } = marketFamilies[family];
+  const benchmarkPrefix = benchmark + " · ";
   const { points } = positioning(current, state, segments);
   const bands = segments
     .map((band) => {
       const inBand = points.filter((point) => point.band === band);
       const peers = inBand.filter(
-        (point) => !point.model.startsWith("CLAAS · "),
+        (point) => !point.model.startsWith(benchmarkPrefix),
       );
       const prices = peers.map((point) => point.price).sort((a, b) => a - b);
       const middle = Math.floor(prices.length / 2);
@@ -191,12 +186,12 @@ function ModelPosition({
         low: prices[0],
         high: prices.at(-1),
         median,
-        claasModels: inBand.filter((point) =>
-          point.model.startsWith("CLAAS · "),
+        benchmarkModels: inBand.filter((point) =>
+          point.model.startsWith(benchmarkPrefix),
         ),
       };
     })
-    .filter((band) => band.peers.length || band.claasModels.length);
+    .filter((band) => band.peers.length || band.benchmarkModels.length);
   const maxPrice = Math.max(1, ...points.map((point) => point.price));
   const magnitude = 10 ** Math.floor(Math.log10(maxPrice));
   const limit = Math.ceil(maxPrice / magnitude) * magnitude;
@@ -211,7 +206,7 @@ function ModelPosition({
             <i className="peer-key" /> Otras marcas
           </span>
           <span>
-            <i className="claas-key" /> CLAAS
+            <i className="claas-key" /> {benchmark}
           </span>
         </div>
         {states.length > 1 && (
@@ -231,7 +226,7 @@ function ModelPosition({
       {bands.length ? (
         <>
           <div className="market-price-ranges">
-            {bands.map(({ band, peers, low, high, median, claasModels }) => (
+            {bands.map(({ band, peers, low, high, median, benchmarkModels }) => (
               <div className="market-range" key={band}>
                 <div className="market-range-label">
                   <strong>{band}</strong>
@@ -263,13 +258,13 @@ function ModelPosition({
                       />
                     </>
                   )}
-                  {claasModels.map((point) => (
+                  {benchmarkModels.map((point) => (
                     <span
                       className="market-range-point"
                       key={point.model}
                       style={{ left: scale(point.price) }}
-                      title={`CLAAS · ${money(point.price)}`}
-                      aria-label={`CLAAS · ${money(point.price)}`}
+                      title={`${benchmark} · ${money(point.price)}`}
+                      aria-label={`${benchmark} · ${money(point.price)}`}
                     />
                   ))}
                 </div>
@@ -289,9 +284,7 @@ function ModelPosition({
         </>
       ) : (
         <p>
-          {harvester
-            ? "Sin modelos con clase y FOB informado para este filtro."
-            : "Sin modelos con potencia y FOB informado para este filtro."}
+          Sin modelos con {segmentName} y FOB informado para este filtro.
         </p>
       )}
     </Card>
@@ -311,15 +304,17 @@ function ImportRhythm({
   year,
   end,
   month,
+  family,
 }: {
   rows: Movement[];
   accumulatedScope: Movement[];
   year: number;
   end: number;
   month: number;
+  family: MarketFamily;
 }) {
   const cutoff = month ? Math.min(end, month) : end;
-  const data = cumulativeUnits(rows, accumulatedScope, year, cutoff);
+  const data = cumulativeUnits(rows, accumulatedScope, year, cutoff, family === "sembradoras");
   const lines = [
     { key: "current", label: String(year), width: 3 },
     { key: "previous", label: String(year - 1), width: 2 },
@@ -536,6 +531,66 @@ function ImporterConcentration({ current }: Pick<Period, "current">) {
   );
 }
 
+export function YearLegend({ year }: { year: number }) {
+  return (
+    <div className="market-legend">
+      <span>
+        <i className="market-year-prior" />
+        {year - 1}
+      </span>
+      <span>
+        <i className="market-year-current" />
+        {year}
+      </span>
+    </div>
+  );
+}
+
+function PlantingRows({ current, previous, year }: Period) {
+  const countRows = (values: Movement[]) => {
+    const counts = new Map<string, number>();
+    for (const row of values) {
+      if (row[11] == null) continue;
+      counts.set(row[5], (counts.get(row[5]) ?? 0) + row[9] * row[11]);
+    }
+    return counts;
+  };
+  const recent = countRows(current);
+  const prior = countRows(previous);
+  const groups = marketFamilies.sembradoras.segments
+    .filter((segment) => recent.has(segment) || prior.has(segment));
+  const peak = Math.max(1, ...groups.flatMap((segment) => [recent.get(segment) ?? 0, prior.get(segment) ?? 0]));
+  return (
+    <Card className="market-panel market-condition-panel">
+      <h2>{marketChartTitles.plantingRows}</h2>
+      {groups.length ? (
+        <>
+          <div className="market-planting-rows">
+            {groups.map((segment) => {
+              const now = recent.get(segment);
+              const before = prior.get(segment);
+              return (
+                <div key={segment} className="market-rank market-band"
+                  title={`${year - 1}: ${before == null ? "—" : number(before)} · ${year}: ${now == null ? "—" : number(now)}`}>
+                  <span>{segment}</span>
+                  <i className="market-paired" aria-hidden="true">
+                    <b style={{ width: ((before ?? 0) / peak) * 100 + "%" }} />
+                    <b style={{ width: ((now ?? 0) / peak) * 100 + "%" }} />
+                  </i>
+                  <strong>{now == null ? "—" : number(now)}</strong>
+                </div>
+              );
+            })}
+          </div>
+          <YearLegend year={year} />
+        </>
+      ) : (
+        <p>Sin cantidad de líneas o surcos informada en este período.</p>
+      )}
+    </Card>
+  );
+}
+
 function ConditionMix({ current, previous, year }: Period) {
   const states = [
     { key: "NUEVO", name: "Nuevas", color: "hsl(var(--primary))" },
@@ -617,17 +672,19 @@ function Seasonality({
   year,
   end,
   month,
+  family,
 }: {
   rows: Movement[];
   scoped: Movement[];
   year: number;
   end: number;
   month: number;
+  family: MarketFamily;
 }) {
   const selected = month
     ? [month]
     : Array.from({ length: end }, (_, index) => index + 1);
-  const { grid: periods, baseline } = seasonality(rows, scoped, year, selected);
+  const { grid: periods, baseline } = seasonality(rows, scoped, year, selected, family === "sembradoras");
   const peak = Math.max(
     1,
     ...periods.flatMap((period) => period.values.map((value) => value ?? 0)),
@@ -727,7 +784,8 @@ export function TractorAnalysis(
     accumulatedScope: Movement[];
     end: number;
     month: number;
-    harvester: boolean;
+    family: MarketFamily;
+    priorComplete: boolean;
   },
 ) {
   return (
@@ -736,7 +794,8 @@ export function TractorAnalysis(
       <ModelPosition {...props} />
       <ImportRhythm {...props} />
       <ImporterConcentration {...props} />
-      {props.harvester && <ConditionMix {...props} />}
+      {props.family === "cosechadoras" && <ConditionMix {...props} />}
+      {props.family === "sembradoras" && <PlantingRows {...props} />}
       <Seasonality {...props} />
     </div>
   );

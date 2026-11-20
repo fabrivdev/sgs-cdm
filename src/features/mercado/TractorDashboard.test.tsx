@@ -186,7 +186,7 @@ describe("Mercado de cosechadoras", () => {
     tractors.unmount();
     render(
       <MemoryRouter initialEntries={["/mercado/cosechadoras"]}>
-        <TractorDashboard rows={harvesters} harvester />
+        <TractorDashboard rows={harvesters} family="cosechadoras" />
       </MemoryRouter>,
     );
     expect(titles().filter((title) => title !== "Nuevas y usadas")).toEqual(
@@ -204,7 +204,7 @@ describe("Mercado de cosechadoras", () => {
   it("abre las clases y conserva la clase al desglosar por marca", () => {
     render(
       <MemoryRouter initialEntries={["/mercado/cosechadoras/clases"]}>
-        <TractorDashboard rows={harvesters} harvester />
+        <TractorDashboard rows={harvesters} family="cosechadoras" />
       </MemoryRouter>,
     );
     expect(screen.getByRole("heading", { name: "Cosechadoras" })).toBeVisible();
@@ -217,4 +217,24 @@ describe("Mercado de cosechadoras", () => {
       screen.getByRole("link", { name: "Clases · Clase 8 ×" }),
     ).toBeVisible();
   });
+});
+
+it("conserva el tipo de grano al abrir un segmento de Sembradoras", () => {
+  const planters: Movement[] = [
+    ["A", 2026, 9, "HORSCH", "MAESTRO", "17–18 líneas", "$100.000 a <$200.000", "A", "NUEVO", 2, 250000, 18, "Grano grueso", "Autotransportable"],
+    ["B", 2026, 9, "OTRA", "MODELO", "21–24 surcos", "$25.000 a <$50.000", "B", "NUEVO", 1, 30000, 24, "Grano fino", "Lateral"],
+  ];
+  render(
+    <MemoryRouter initialEntries={["/mercado/sembradoras?grano=Grano+grueso"]}>
+      <TractorDashboard rows={planters} family="sembradoras" />
+    </MemoryRouter>,
+  );
+  const lines = screen.getByRole("heading", { name: "Líneas de siembra por segmento" }).closest<HTMLElement>(".market-panel")!;
+  expect(within(lines).getByText("36")).toBeVisible();
+  expect(within(lines).queryByText("24")).toBeNull();
+  expect(screen.getByRole("columnheader", { name: "Cuota HORSCH" })).toBeVisible();
+  fireEvent.click(screen.getByRole("link", { name: "Segmentos" }));
+  fireEvent.click(screen.getByRole("link", { name: "17–18 líneas ›" }));
+  expect(screen.getByRole("link", { name: "HORSCH ›" })).toBeVisible();
+  expect(screen.queryByText("OTRA")).toBeNull();
 });

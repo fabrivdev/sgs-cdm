@@ -82,3 +82,18 @@ describe("Análisis de mercado de tractores", () => {
     expect(result.baseline).toEqual([4, 0, 0]);
   });
 });
+
+it("trata un hueco del histórico de sembradoras como un mes sin cobertura", () => {
+  const rows = [
+    movement(2025, 1, "A", 4, 800),
+    movement(2025, 3, "A", 6, 800),
+    movement(2026, 1, "A", 3, 600),
+    movement(2026, 2, "B", 4, 800),
+    movement(2026, 3, "A", 5, 800),
+  ];
+  const filtered = rows.filter((row) => row[4] === "A");
+  const { grid } = seasonality(rows, filtered, 2026, [1, 2, 3], true);
+  expect(grid.map((row) => row.values)).toEqual([[3, 0, 5], [4, null, 6]]);
+  expect(cumulativeUnits(rows, filtered, 2026, 3, true).map((month) => month.previous))
+    .toEqual([4, null, null]);
+});

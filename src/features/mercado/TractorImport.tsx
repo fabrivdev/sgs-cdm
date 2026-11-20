@@ -5,16 +5,17 @@ import { Button } from "@/components/ui/button";
 import { months, number, parseMovements, totals } from "./model";
 import { readHarvesterUpload } from "./harvesterImport";
 import { readTractorUpload } from "./tractorPentaImport";
+import { readPlanterUpload } from "./planterImport";
+import { marketFamilies, type MarketFamily } from "./marketFamily";
 import type { MarketUpload } from "./penta";
 
 function formatMonth(index: number) {
   return months[index % 12] + " " + Math.floor(index / 12);
 }
 
-export function TractorImport({ harvester = false }: { harvester?: boolean }) {
+export function TractorImport({ family = "tractores" }: { family?: MarketFamily }) {
   const cache = useQueryClient();
-  const equipment = harvester ? "cosechadoras" : "tractores";
-  const table = harvester ? "mercado_cosechadoras" : "mercado_tractores";
+  const { table, title } = marketFamilies[family];
   const [pending, setPending] = useState<MarketUpload>();
   const [busy, setBusy] = useState(false);
   const [message, setMessage] = useState("");
@@ -31,9 +32,11 @@ export function TractorImport({ harvester = false }: { harvester?: boolean }) {
       if (error) throw new Error("No se pudo consultar la base guardada.");
       const existing = data ? parseMovements(data.datos) : [];
       setPending(
-        await (harvester
-          ? readHarvesterUpload(files, existing)
-          : readTractorUpload(files[0], existing)),
+        await (family === "tractores"
+          ? readTractorUpload(files[0], existing)
+          : family === "cosechadoras"
+            ? readHarvesterUpload(files, existing)
+            : readPlanterUpload(files, existing)),
       );
     } catch (err) {
       setMessage(
@@ -52,7 +55,7 @@ export function TractorImport({ harvester = false }: { harvester?: boolean }) {
     try {
       const { error } = pending.period
         ? await supabase.rpc("actualizar_mercado_por_periodo", {
-            p_familia: equipment,
+            p_familia: family,
             p_desde: pending.period.start,
             p_hasta: pending.period.end,
             p_datos: pending.rows,
@@ -68,11 +71,11 @@ export function TractorImport({ harvester = false }: { harvester?: boolean }) {
         throw error;
       }
       setPending(undefined);
-      await cache.invalidateQueries({ queryKey: ["mercado-" + equipment] });
+      await cache.invalidateQueries({ queryKey: ["mercado-" + family] });
       setMessage(
         pending.period
-          ? "Período de " + equipment + " actualizado."
-          : "Base de " + equipment + " guardada.",
+          ? "Período de " + family + " actualizado."
+          : "Base de " + family + " guardada.",
       );
     } catch (err) {
       setMessage(
@@ -93,7 +96,7 @@ export function TractorImport({ harvester = false }: { harvester?: boolean }) {
   return (
     <details className="rounded-lg border p-4">
       <summary className="cursor-pointer font-medium">
-        Mercado · {harvester ? "Cosechadoras" : "Tractores"}
+        Mercado · {title}
       </summary>
       <div className="mt-4 space-y-3">
         <label className="block text-sm">
@@ -103,7 +106,7 @@ export function TractorImport({ harvester = false }: { harvester?: boolean }) {
             className="block mt-2"
             type="file"
             accept=".xlsx"
-            multiple={harvester}
+            multiple={family !== "tractores"}
             disabled={busy}
             onChange={(e) => {
               const files = Array.from(e.target.files ?? []);

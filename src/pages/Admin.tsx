@@ -982,7 +982,8 @@ export default function Admin() {
           <ImportarTotvsTab onChanged={load} />
           {hasSectionAccess("admin.importaciones") && <>
             <TractorImport />
-            <TractorImport harvester />
+            <TractorImport family="cosechadoras" />
+            <TractorImport family="sembradoras" />
           </>}
 
           <Collapsible>
