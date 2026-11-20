@@ -274,11 +274,6 @@ export function TractorDashboard({
     <PageShell className={fieldEquipment ? "market-tractors market-horsch" : "market-tractors"}>
       <PageHeader
         title={equipment.title}
-        titleAccessory={
-          <span className="text-xs text-muted-foreground">
-            {family === "cosechadoras" ? "Paraguay · Cosechadoras de granos" : spraying ? "Paraguay · Autopropulsados" : "Paraguay · Importaciones"}
-          </span>
-        }
         tabs={
           <nav
             className="market-tabs"
