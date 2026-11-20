@@ -50,9 +50,27 @@ const orderedBands: Partial<Record<Dimension, string[]>> = {
     "USD 50.000 a <100.000",
     "USD 100.000 a <150.000",
     "USD 150.000 o más",
-    "Sin FOB positivo",
   ],
 };
+function priceEligible(row: Movement) {
+  return row[10] > 0 && label(row, "precios") !== "Sin FOB positivo";
+}
+
+function YearLegend({ year }: { year: number }) {
+  return (
+    <div className="market-legend">
+      <span>
+        <i className="market-year-prior" />
+        {year - 1}
+      </span>
+      <span>
+        <i className="market-year-current" />
+        {year}
+      </span>
+    </div>
+  );
+}
+
 export function TractorDashboard({ rows: data }: { rows: Movement[] }) {
   const rows = useMemo(() => completePower(data), [data]);
   const [params, setParams] = useSearchParams();
@@ -134,6 +152,18 @@ export function TractorDashboard({ rows: data }: { rows: Movement[] }) {
   const monthly = compare(current, previous, (r) => String(r[2])).sort(
     (a, b) => Number(a.name) - Number(b.name),
   );
+  const monthlyMax = Math.max(1, ...monthly.flatMap((m) => [m.units, m.prior]));
+  const targetStep = monthlyMax / 5;
+  const tickMagnitude = 10 ** Math.floor(Math.log10(targetStep));
+  const tickStep = Math.max(
+    1,
+    Math.ceil(
+      ([1, 2, 2.5, 5, 10].find((step) => step * tickMagnitude >= targetStep) ??
+        10) * tickMagnitude,
+    ),
+  );
+  const tickCount = Math.ceil(monthlyMax / tickStep);
+  const plotMax = tickStep * tickCount;
   const metric = (name: string, value: string, detail: string, to: View) => (
     <Card className="market-metric">
       <Link to={href(to)}>
@@ -151,7 +181,11 @@ export function TractorDashboard({ rows: data }: { rows: Movement[] }) {
   const search = params.get("buscar") ?? "";
   const ordering = params.get("orden") || "unidades";
   let groups = brandView
-    ? compare(current, previous, (r) => label(r, brandView))
+    ? compare(
+        brandView === "precios" ? current.filter(priceEligible) : current,
+        brandView === "precios" ? previous.filter(priceEligible) : previous,
+        (r) => label(r, brandView),
+      )
     : [];
   if (brandView && orderedBands[brandView] && !params.has("orden")) {
     const order = orderedBands[brandView]!;
@@ -351,42 +385,71 @@ export function TractorDashboard({ rows: data }: { rows: Movement[] }) {
               <p>
                 Unidades · {year - 1} y {year}
               </p>
-              <div className="market-months">
-                {monthly.map((m) => {
-                  const max = Math.max(
-                    1,
-                    ...monthly.flatMap((n) => [n.units, n.prior]),
-                  );
-                  return (
-                    <Link
-                      key={m.name}
-                      to={href("marcas", { mes: m.name })}
-                      aria-label={
-                        months[+m.name - 1] +
+              <div className="market-month-window">
+                <div className="market-month-plot">
+                  <div className="market-grid" aria-hidden="true">
+                    {Array.from(
+                      { length: tickCount + 1 },
+                      (_, i) => (tickCount - i) * tickStep,
+                    ).map((tick) => (
+                      <div key={tick}>
+                        <span>{number(tick)}</span>
+                      </div>
+                    ))}
+                  </div>
+                  <div className="market-months">
+                    {monthly.map((m) => {
+                      const month = months[Number(m.name) - 1];
+                      const description =
+                        month +
+                        " · " +
+                        (year - 1) +
                         ": " +
-                        m.prior +
-                        " y " +
-                        m.units +
-                        " unidades"
-                      }
-                      title={m.prior + " → " + m.units + " unidades"}
-                    >
-                      <strong>{number(m.units)}</strong>
-                      <i>
-                        <b style={{ height: (100 * m.prior) / max + "%" }} />
-                        <b style={{ height: (100 * m.units) / max + "%" }} />
-                      </i>
-                      <small>{months[+m.name - 1]}</small>
-                    </Link>
-                  );
-                })}
+                        number(m.prior) +
+                        " · " +
+                        year +
+                        ": " +
+                        number(m.units);
+                      return (
+                        <Link
+                          key={m.name}
+                          to={href("marcas", { mes: m.name })}
+                          aria-label={description}
+                          title={description}
+                        >
+                          <div className="market-month-bars">
+                            <div
+                              aria-hidden="true"
+                              className="market-month-bar market-year-prior"
+                              style={{
+                                height: (m.prior / plotMax) * 100 + "%",
+                              }}
+                            />
+                            <div
+                              aria-hidden="true"
+                              className="market-month-bar market-year-current"
+                              style={{
+                                height: (m.units / plotMax) * 100 + "%",
+                              }}
+                            >
+                              <strong>{number(m.units)}</strong>
+                            </div>
+                          </div>
+                          <small>{month}</small>
+                        </Link>
+                      );
+                    })}
+                  </div>
+                </div>
               </div>
-              <div className="market-legend">
-                {year - 1} <span /> {year}
-              </div>
+              <YearLegend year={year} />
             </Card>
             {(["potencia", "precios"] as const).map((d) => {
-              const chart = compare(current, previous, (r) => label(r, d));
+              const chart = compare(
+                d === "precios" ? current.filter(priceEligible) : current,
+                d === "precios" ? previous.filter(priceEligible) : previous,
+                (r) => label(r, d),
+              );
               const order = orderedBands[d]!;
               chart.sort(
                 (x, y) => order.indexOf(x.name) - order.indexOf(y.name),
@@ -412,6 +475,16 @@ export function TractorDashboard({ rows: data }: { rows: Movement[] }) {
                     <Link
                       key={g.name}
                       className="market-rank market-band"
+                      title={
+                        year -
+                        1 +
+                        ": " +
+                        number(g.prior) +
+                        " · " +
+                        year +
+                        ": " +
+                        number(g.units)
+                      }
                       to={drill(d, g.name) ?? href(d)}
                     >
                       <span>{g.name.replace("USD ", "$")}</span>
@@ -422,7 +495,11 @@ export function TractorDashboard({ rows: data }: { rows: Movement[] }) {
                       <strong>{number(g.units)}</strong>
                     </Link>
                   ))}
-                  {!chart.length && <p>Sin datos en este período.</p>}
+                  {chart.length ? (
+                    <YearLegend year={year} />
+                  ) : (
+                    <p>Sin datos en este período.</p>
+                  )}
                 </Card>
               );
             })}

@@ -86,6 +86,33 @@ describe("Mercado de tractores", () => {
       "market-claas",
     );
   });
+  it("oculta unidades sin FOB de la distribución y conserva el total de mercado", () => {
+    const noFob: Movement = [...sample[0]];
+    noFob[0] = "Sin FOB";
+    noFob[6] = "Sin FOB positivo";
+    noFob[10] = 0;
+    render(
+      <MemoryRouter initialEntries={["/mercado/tractores"]}>
+        <TractorDashboard rows={[...sample, noFob]} />
+      </MemoryRouter>,
+    );
+    expect(screen.queryByText("Sin FOB positivo")).toBeNull();
+    expect(
+      within(
+        screen.getByRole("link", { name: /Unidades importadas/ }),
+      ).getByText("5"),
+    ).toBeTruthy();
+    const october = screen.getByRole("link", {
+      name: "Oct · 2025: 3 · 2026: 4",
+    });
+    expect(
+      october.querySelector(".market-year-current strong"),
+    ).toHaveTextContent("4");
+    fireEvent.click(screen.getByRole("link", { name: "Precios" }));
+    expect(
+      within(screen.getByRole("table")).queryByText("Sin FOB positivo"),
+    ).toBeNull();
+  });
   it("incluye CLAAS una vez fuera del top seis", () => {
     const input: Movement[] = Array.from({ length: 7 }, (_, i) => [
       String(i),
