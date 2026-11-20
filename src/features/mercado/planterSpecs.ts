@@ -1,4 +1,5 @@
-import { coarseGrain, fineGrain } from "./marketFamily";
+import { coarseGrain, fineGrain, plantingSegment, unknownGrain, unknownPlantingSegment } from "./marketFamily";
+import type { Movement, PlantingMovement } from "./model";
 
 type PlanterSpec = {
   model: string;
@@ -8,6 +9,37 @@ type PlanterSpec = {
   transport?: string;
 };
 
+const maestroGVRows: Readonly<Record<string, number>> = {
+  "22.81": 22, "24.76": 24, "30.60": 30, "32.55": 32,
+  "36.50": 36, "39.45": 39, "40.45": 40,
+};
+
+function maestroGVSpec(brand: string, description: string): PlanterSpec | undefined {
+  if (brand !== "HORSCH") return undefined;
+  const match = description.match(/\bMAESTRO\s+(\d{2})[.,](\d{2})\s+GV\s*F\b/);
+  // The confirmed Paraguayan 40.45 shipment was declared as GV ENG V.
+  const config = match ? match[1] + "." + match[2]
+    : /\bMAESTRO\s+40[.,]45\s+GV\b/.test(description) ? "40.45" : "";
+  const lines = maestroGVRows[config];
+  return lines ? { model: "MAESTRO " + config + " GV F", lines, grain: coarseGrain } : undefined;
+}
+
+export function completePlantingSegments(rows: Movement[]): Movement[] {
+  return rows.map((row) => {
+    if (row.length !== 14) return row;
+    const spec = maestroGVSpec(row[3], row[4]);
+    if (!spec?.lines) return row;
+    const grain = row[12] === unknownGrain ? coarseGrain : row[12];
+    const lines = row[11] ?? spec.lines;
+    const updated: PlantingMovement = [...row];
+    updated[4] = spec.model;
+    updated[11] = lines;
+    updated[12] = grain;
+    if (updated[5] === unknownPlantingSegment) updated[5] = plantingSegment(grain, lines);
+    return updated;
+  });
+}
+
 export function plantingLines(description: string) {
   const hits = [...description.matchAll(/\b(\d{1,3})\s*(?:LINEAS?|LINHAS?|SURCOS?|SULCOS?|HILERAS?|FILAS?|CUERPOS(?: DE SIEMBRA)?)\b/g)];
   const reported = [...new Set(hits.map((hit) => Number(hit[1])).filter((n) => n > 0 && n <= 200))];
@@ -15,6 +47,7 @@ export function plantingLines(description: string) {
 }
 
 export function planterSpec(brand: string, description: string): PlanterSpec | undefined {
+  if (brand === "HORSCH") return maestroGVSpec(brand, description);
   const text = description.replace(/\bBIF FARM\b/g, "BIG FARM");
   if (brand === "FRAVI" || brand === "PLANTI CENTER") {
     const senior = text.match(/\bSFR\s*(19|23|27|31|35|39)\s*(?:SENIOR?|000)\b/);

@@ -262,3 +262,20 @@ it("resume las bandas de sembradoras en el tablero y conserva el detalle en Segm
   fireEvent.click(screen.getByRole("link", { name: "Segmentos" }));
   expect(screen.getByRole("link", { name: "13–14 líneas ›" })).toBeVisible();
 });
+
+it("ubica una Maestro GV guardada en su banda y muestra su FOB original", () => {
+  const rows: Movement[] = [
+    ["GV", 2026, 8, "HORSCH", "MAESTRO 40.45 GV", "Sin segmento informado", "$200.000 o más", "A", "NUEVO", 1, 447_301.39, null, "Sin tipo informado", "Sin transporte informado"],
+    ["DK", 2026, 4, "HORSCH", "DAKAR 8 CF", "Más de 37 surcos", "$100.000 a <$200.000", "A", "NUEVO", 1, 155_104.13, 60, "Grano fino", "Autotransportable"],
+  ];
+  render(
+    <MemoryRouter initialEntries={["/mercado/sembradoras"]}>
+      <TractorDashboard family="sembradoras" rows={rows} />
+    </MemoryRouter>,
+  );
+  const maestro = screen.getByTitle("HORSCH · MAESTRO 40.45 GV F · FOB $447.301");
+  expect(maestro.closest(".market-range")).toHaveTextContent("Más de 27 líneas");
+  const dakar = screen.getByTitle("HORSCH · DAKAR 8 CF · FOB $155.104");
+  expect(dakar.closest(".market-range")).toHaveTextContent("Más de 37 surcos");
+  expect(screen.getByText("$500.000")).toBeVisible();
+});

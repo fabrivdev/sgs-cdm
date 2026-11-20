@@ -85,6 +85,15 @@ describe("Carga de sembradoras", () => {
     ]);
   });
 
+  it("clasifica la Maestro 40.45 GV con su FOB declarado", async () => {
+    const result = await readPlanterUpload([extract([{
+      ...penta,
+      "Descripción Subitem": "SEMBRADORA ABONADORA MODELO MAESTRO 40.45 GV ENG V",
+      "U$S FOB": 447_301.39,
+    }])]);
+    expect(result.rows[0]).toMatchObject({ 4: "MAESTRO 40.45 GV F", 5: "Más de 27 líneas", 10: 447_301.39, 11: 40 });
+  });
+
   it("procesa solo el mes de un Penta mensual y usa la configuración guardada", async () => {
     const original = await readPlanterUpload([history]);
     const update = await readPlanterUpload([extract([{

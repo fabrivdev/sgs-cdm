@@ -22,6 +22,7 @@ import { Card } from "@/components/ui/card";
 import { PageHeader, PageShell } from "@/components/layout/AppPrimitives";
 import { completePower, powerSpec } from "./power";
 import { completeHarvestClasses } from "./harvesterClasses";
+import { completePlantingSegments } from "./planterSpecs";
 import { TractorAnalysis, YearLegend } from "./TractorAnalysis";
 import {
   marketFamilies,
@@ -60,7 +61,7 @@ export function TractorDashboard({
   const rows = useMemo(() => {
     if (family === "tractores") return completePower(data);
     if (family === "cosechadoras") return completeHarvestClasses(data);
-    return data;
+    return completePlantingSegments(data);
   }, [data, family]);
   const planting = family === "sembradoras";
   const positivePriceOnly = family !== "tractores";

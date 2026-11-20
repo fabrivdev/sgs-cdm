@@ -168,6 +168,8 @@ function ModelPosition({
     : (states[0] ?? preferred);
   const { segments, benchmark, segmentName } = marketFamilies[family];
   const benchmarkPrefix = benchmark + " · ";
+  const pointLabel = (point: { model: string; price: number }) =>
+    family === "sembradoras" ? `${point.model} · FOB ${money(point.price)}` : `${benchmark} · ${money(point.price)}`;
   const { points } = positioning(current, state, segments);
   const bands = segments
     .map((band) => {
@@ -263,8 +265,8 @@ function ModelPosition({
                       className="market-range-point"
                       key={point.model}
                       style={{ left: scale(point.price) }}
-                      title={`${benchmark} · ${money(point.price)}`}
-                      aria-label={`${benchmark} · ${money(point.price)}`}
+                      title={pointLabel(point)}
+                      aria-label={pointLabel(point)}
                     />
                   ))}
                 </div>
