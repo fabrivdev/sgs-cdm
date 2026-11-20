@@ -13,10 +13,12 @@ describe("Market Share analytics", () => {
     const current = [period(2026, 1, [["A", "D1", 30], ["B", "D2", 21], ["D", "D3", 8], ["E", "D4", 9], ["F", "D5", 3]])];
     const brands = standings(current, previous, "marca", ["G"]);
     const drivers = marketContributions(brands, "B");
-    expect(drivers).toEqual([
+    expect(drivers.map(({ name, delta }) => ({ name, delta }))).toEqual([
       { name: "A", delta: 24 }, { name: "C", delta: -10 }, { name: "E", delta: 9 },
       { name: "D", delta: 8 }, { name: "F", delta: 3 }, { name: "B", delta: 1 },
     ]);
+    expect(drivers.find(({ name }) => name === "A")).toEqual({ name: "A", units: 30, priorUnits: 6, delta: 24 });
+    expect(drivers.find(({ name }) => name === "C")).toEqual({ name: "C", units: 0, priorUnits: 10, delta: -10 });
     expect(drivers.reduce((sum, row) => sum + row.delta, 0)).toBe(71 - 36);
     expect(brands.find(({ name }) => name === "B")?.points).toBeLessThan(0);
     expect(brands.find(({ name }) => name === "G")?.share).toBe(0);

@@ -91,7 +91,7 @@ export function MarketShareDashboard({ periods }: { periods: SalesPeriod[] }) {
             detail={cdmShare !== null && <>{number(cdm?.units ?? 0)} uds. {cdm?.points != null && <>· <Delta value={cdm.points} format={pointsLabel} /></>}</>} />
         </KpiStrip>
         <div className="ms-grid">
-          <GrowthDrivers brands={brands} benchmark={benchmark} delta={delta} />
+          <GrowthDrivers brands={brands} benchmark={benchmark} year={year} total={total} priorTotal={priorTotal} delta={delta} />
           <SharePosition brands={brands} benchmark={benchmark} />
           <SalesPace data={marketHistory(dataset, chartYears, cutoff)} years={chartYears} currentYear={year} />
           <DistributorPareto concentration={concentration} />
