@@ -20,6 +20,7 @@ import { FiltersBar, FilterSelect } from "@/components/filters/FiltersBar";
 import { Card } from "@/components/ui/card";
 import { PageHeader, PageShell } from "@/components/layout/AppPrimitives";
 import { completePower, powerSpec } from "./power";
+import { TractorAnalysis } from "./TractorAnalysis";
 import "./tractores.css";
 
 const root = "/mercado/tractores";
@@ -523,6 +524,16 @@ export function TractorDashboard({ rows: data }: { rows: Movement[] }) {
               );
             })}
           </div>
+          <TractorAnalysis
+            current={current}
+            previous={previous}
+            rows={rows}
+            scoped={scoped}
+            year={year}
+            end={end}
+            month={monthOnly}
+            href={href}
+          />
         </>
       )}
       {brandView && (

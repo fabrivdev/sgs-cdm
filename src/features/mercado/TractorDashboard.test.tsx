@@ -82,7 +82,7 @@ describe("Mercado de tractores", () => {
     expect(
       screen.getByRole("link", { name: "Modelos principales" }),
     ).toBeTruthy();
-    expect(screen.getByRole("link", { name: /AXION/ })).toHaveClass(
+    expect(screen.getByRole("link", { name: /^AXION/ })).toHaveClass(
       "market-claas",
     );
   });

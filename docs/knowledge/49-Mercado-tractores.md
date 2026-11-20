@@ -8,6 +8,10 @@ El gráfico y el detalle por precio muestran unidades con FOB positivo. Los movi
 
 En las tarjetas del tablero, la variación interanual positiva se muestra en verde y la negativa en rojo. El cero y la ausencia de comparación se muestran en color neutro.
 
+El tablero agrega oportunidades por banda HP, posicionamiento CLAAS por banda y estado, puente de FOB, concentración por importador y estacionalidad. Los análisis respetan los filtros activos. La cuota CLAAS usa el total filtrado de la banda y el FOB de los nuevos análisis utiliza unidades con FOB positivo.
+
+El puente parte del promedio anterior, retira los registros sin par, aplica la mezcla actual a precios anteriores, aplica los valores actuales y reincorpora los registros actuales sin par. Los pares coinciden en marca, modelo y estado. El Pareto excluye importadores sin identificar de su denominador e informa la cobertura. El mapa de calor estima el intervalo cubierto a partir del primer y último mes de cada año presentes en la base e informa la mediana de años anteriores por mes.
+
 El catálogo técnico de potencia en src/features/mercado/power.ts enlaza fichas de fabricante y completa las bandas faltantes al consultar la base. En ausencia de ficha, reutiliza una banda observada si es única para la misma marca y modelo. La potencia informada prevalece y los casos ambiguos quedan pendientes.
 
 La sección `mercado.tractores` abre el tablero y sus vistas de marcas, modelos, potencia, precios, importadores, e historia. Los enlaces conservan el período, el estado y los filtros elegidos. Una fila de precios abre sus marcas y permite desglosar por modelo e importador.

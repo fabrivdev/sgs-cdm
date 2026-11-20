@@ -239,6 +239,86 @@
   height: 11px;
   border-radius: 2px;
 }
+.market-analysis-chart {
+  height: 226px;
+  min-width: 0;
+}
+.market-analysis-control {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 0.8rem;
+  margin-bottom: 4px;
+}
+.market-analysis-control select {
+  border: 1px solid hsl(var(--border));
+  border-radius: 6px;
+  background: hsl(var(--background));
+  padding: 3px 6px;
+}
+.market-chart-tooltip {
+  background: hsl(var(--card));
+  border: 1px solid hsl(var(--border));
+  border-radius: 6px;
+  padding: 8px;
+  font-size: 0.78rem;
+}
+.market-panel .market-analysis-note {
+  margin: 8px 0;
+}
+.market-analysis-details {
+  font-size: 0.8rem;
+}
+.market-analysis-details summary {
+  cursor: pointer;
+  font-weight: 600;
+}
+.market-analysis-details ol {
+  list-style: decimal inside;
+  margin-top: 6px;
+}
+.market-price-count {
+  display: block;
+  font-size: 0.7rem;
+}
+.market-panel td[data-tone="up"] {
+  color: #15803d;
+}
+.market-panel td[data-tone="down"] {
+  color: #b91c1c;
+}
+.dark .market-panel td[data-tone="up"] {
+  color: #86efac;
+}
+.dark .market-panel td[data-tone="down"] {
+  color: #fca5a5;
+}
+.market-bridge-labels {
+  display: grid;
+  margin-left: 68px;
+  margin-right: 10px;
+  gap: 3px;
+  font-size: 0.68rem;
+  text-align: center;
+}
+.market-bridge-labels strong {
+  display: block;
+}
+.market-seasonality {
+  grid-column: 1 / -1;
+}
+.market-seasonality table td,
+.market-seasonality table th:not(:first-child) {
+  text-align: center;
+}
+.market-seasonality tfoot {
+  font-weight: 600;
+}
+@media (max-width: 410px) {
+  .market-bridge-labels {
+    font-size: 0.62rem;
+  }
+}
 .market-scroll {
   --market-row: 34px;
   max-height: calc(var(--market-row) * 21);
