@@ -322,8 +322,8 @@ it.each(["tractores", "cosechadoras", "sembradoras"] as const)(
     const panel = screen.getByRole("heading", { name: "Participación por marca" }).closest<HTMLElement>(".market-panel")!;
     const row = within(panel).getByText("MARCA A").closest<HTMLElement>(".market-rank")!;
     const marker = within(row).getByRole("img", { name: /2025 · 50,0/ });
-    expect(marker).toHaveStyle({ left: "50%" });
+    expect(marker).toHaveStyle("--market-prior-share: 50%");
     expect(marker.closest(".market-rank")).toHaveTextContent(/MARCA A.*30,0/);
-    expect(within(panel).getByRole("img", { name: /2025 · 0,0/ })).toHaveStyle({ left: "0%" });
+    expect(within(panel).getByRole("img", { name: /2025 · 0,0/ })).toHaveStyle("--market-prior-share: 0%");
   },
 );

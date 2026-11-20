@@ -1,4 +1,4 @@
-import { useMemo } from "react";
+import { useMemo, type CSSProperties } from "react";
 import { Link, useLocation, useSearchParams } from "react-router-dom";
 import {
   compare,
@@ -454,7 +454,7 @@ export function TractorDashboard({
                       {priorShare !== null && (
                         <span
                           className="market-share-prior"
-                          style={{ left: (priorShare * 100) + "%" }}
+                          style={{ "--market-prior-share": (priorShare * 100) + "%" } as CSSProperties}
                           role="img"
                           aria-label={priorLabel}
                           title={priorLabel}

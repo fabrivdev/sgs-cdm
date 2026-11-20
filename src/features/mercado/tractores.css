@@ -153,14 +153,14 @@
 .market-share-legend b {
   width: 2px;
   height: 13px;
-  border-radius: 1px;
-  background: hsl(var(--foreground) / 0.8);
+  background: hsl(var(--foreground));
 }
 .market-share-prior {
   position: absolute;
-  top: 50%;
-  transform: translate(-50%, -50%);
-  box-shadow: 0 0 0 1px hsl(var(--card));
+  top: -1px;
+  left: var(--market-prior-share);
+  left: round(nearest, var(--market-prior-share), 1px);
+  margin-left: -1px;
 }
 .market-legend.market-share-legend {
   margin-top: 8px;
