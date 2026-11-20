@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { dealerConcentration, marketContributions, marketHistory, standings, unknownDealer } from "./marketShareAnalytics";
+import { dealerConcentration, distributorHistory, marketContributions, marketHistory, standings, unknownDealer } from "./marketShareAnalytics";
 import type { Sale, SalesPeriod } from "./marketShareModel";
 
 function period(anio: number, mes: number, rows: [string, string | null, number][]): SalesPeriod {
@@ -30,7 +30,8 @@ describe("Market Share analytics", () => {
     const dealers = standings(current, previous, "distribuidor");
     expect(dealers.map(({ name, rank, priorUnits }) => [name, rank, priorUnits]))
       .toEqual([["D1", 1, 30], ["D2", 1, null], [unknownDealer, null, 40]]);
-    expect(dealers.every((row) => row.delta === null && row.priorRank === null)).toBe(true);
+    expect(dealers[0]).toMatchObject({ delta: 5, partialComparison: true, priorRank: null });
+    expect(dealers.slice(1).every((row) => row.delta === null && row.priorRank === null)).toBe(true);
     const details = standings(current, previous, "distribuidor", [], { by: "marca", name: "A" });
     expect(details.map(({ share, priorShare }) => [share, priorShare])).toEqual([[.35, null], [.35, null], [0, 40 / 70]]);
     expect(standings(current, previous, "marca", [], { by: "distribuidor", name: "D1" }))
@@ -38,6 +39,23 @@ describe("Market Share analytics", () => {
     const concentration = dealerConcentration(dealers, 100);
     expect(concentration.rows[1]).toMatchObject({ name: "D2", cumulative: 70 });
     expect(concentration.rows.at(-1)).toMatchObject({ name: "Sin identificar", cumulative: 100 });
+  });
+
+  it("keeps all source years in history without assigning aggregate sales or treating missing detail as zero", () => {
+    const data = [
+      period(2026, 1, [["A", "D1", 15], ["B", "D2", 5]]),
+      period(2025, 1, [["A", "D1", 10], ["A", null, 4]]),
+      { ...period(2024, 1, []), total: 19, detalle: null },
+      period(2023, 2, [["A", "D1", 16]]),
+    ];
+    const history = distributorHistory(data, [2026, 2025, 2024, 2023], 1);
+    expect(history.periods.map(({ year, units }) => [year, units])).toEqual([[2023, null], [2024, 19], [2025, 14], [2026, 20]]);
+    expect(history.rows).toEqual([
+      { name: "D1", values: [null, null, 10, 15], total: 25 },
+      { name: "D2", values: [null, null, null, 5], total: 5 },
+      { name: unknownDealer, values: [null, null, 4, 0], total: 4 },
+    ]);
+    expect(history.aggregateOnly).toEqual([null, 19, null, null]);
   });
 
   it("treats a reported zero as data and does not draw an accumulated point beyond a missing month", () => {

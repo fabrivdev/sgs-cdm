@@ -115,7 +115,6 @@
 .ms-search { position: relative; width: min(210px, 48%); }
 .ms-search svg { position: absolute; width: 14px; left: 9px; top: 50%; translate: 0 -50%; color: hsl(var(--muted-foreground)); }
 .ms-search input { padding-left: 30px; height: 34px; font-size: .8rem; }
-.ms-table-meta { color: hsl(var(--muted-foreground)); font-size: .75rem; }
 .ms-table-scroll { max-height: calc(21 * 34px + 1px); overflow: auto; border: 1px solid hsl(var(--border)); border-radius: 7px; }
 .ms-table {
   border-collapse: separate;
@@ -182,6 +181,26 @@
 .ms-calendar thead tr > :first-child { z-index: 3; background: var(--ms-header-bg); }
 .ms-calendar .ms-reference-row > :first-child { background: color-mix(in srgb, var(--ms-row-bg), var(--ms-reference) 9%); }
 .ms-calendar .ms-cutoff { border-right: 2px solid hsl(var(--primary) / .48); }
+.ms-dealer-history { min-width: 520px; }
+.ms-dealer-history tr > :first-child {
+  position: sticky;
+  left: 0;
+  z-index: 1;
+  width: 220px;
+  min-width: 150px;
+  text-align: left;
+  background: var(--ms-row-bg);
+  border-right: 1px solid hsl(var(--border));
+}
+.ms-dealer-history thead tr > :first-child,
+.ms-dealer-history tfoot tr > :first-child { z-index: 3; background: var(--ms-header-bg); }
+.ms-dealer-history tbody td[style] { background-image: linear-gradient(to right, hsl(var(--muted-foreground) / .10) var(--ms-year-fill), transparent var(--ms-year-fill)); }
+.ms-dealer-history .ms-reference-row th {
+  background: color-mix(in srgb, var(--ms-row-bg), var(--ms-reference) 9%);
+  color: var(--ms-reference);
+  font-weight: 700;
+}
+.ms-dealer-history .ms-history-total { font-weight: 700; }
 
 @media (max-width: 800px) {
   .ms-grid { grid-template-columns: minmax(0, 1fr); }
@@ -194,4 +213,5 @@
   .ms-standing .ms-share-track { display: none; }
   .ms-drivers { min-height: 0; }
   .ms-driver { grid-template-columns: minmax(75px, 1fr) minmax(28px, 1fr) 36px 47px 36px; gap: 5px; }
+  .ms-dealer-history tr > :first-child { width: 155px; }
 }

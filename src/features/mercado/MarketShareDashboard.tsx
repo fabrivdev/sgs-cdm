@@ -5,7 +5,7 @@ import { months, number, percent } from "./model";
 import { salesFamilies, salesTotal, type SalesFamily, type SalesPeriod } from "./marketShareModel";
 import { dealerConcentration, marketHistory, pointsLabel, standings } from "./marketShareAnalytics";
 import { DistributorPareto, GrowthDrivers, SalesPace, SharePosition } from "./MarketShareCharts";
-import { SalesCalendar, StandingTable } from "./MarketShareTables";
+import { DistributorHistory, SalesCalendar, StandingTable } from "./MarketShareTables";
 import "./tractores.css";
 import "./marketShare.css";
 
@@ -84,8 +84,8 @@ export function MarketShareDashboard({ periods }: { periods: SalesPeriod[] }) {
           <DistributorPareto concentration={concentration} />
         </div>
       </> : view === "historia" ? <>
+        <DistributorHistory dataset={dataset} years={years} year={year} cutoff={cutoff} benchmark={referenceDealer} />
         <SalesCalendar dataset={dataset} years={years} year={year} cutoff={cutoff} />
-        <SalesPace data={marketHistory(dataset, chartYears, cutoff)} years={chartYears} currentYear={year} />
       </> : (
         <StandingTable key={view + ":" + family} rows={view === "marcas" ? brands : dealers} by={view === "marcas" ? "marca" : "distribuidor"}
           current={current} previous={previous} year={year} benchmark={view === "marcas" ? benchmark : referenceDealer} />

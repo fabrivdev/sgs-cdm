@@ -4,7 +4,7 @@ import { Card } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { months, number, percent, ratio } from "./model";
 import { salesTotal, type SalesPeriod } from "./marketShareModel";
-import { pointsLabel, standings, unattributedUnits, type Dimension, type MarketStanding } from "./marketShareAnalytics";
+import { distributorHistory, pointsLabel, standings, unknownDealer, type Dimension, type MarketStanding } from "./marketShareAnalytics";
 import { Delta } from "./MarketShareCharts";
 
 const showUnits = (value: number | null) => value === null ? "—" : number(value);
@@ -54,31 +54,23 @@ export function StandingTable({ rows, by, current, previous, year, benchmark }: 
   const marketUnits = salesTotal(current);
   const priorUnits = previous.length ? salesTotal(previous) : null;
   const marketDelta = priorUnits === null ? null : marketUnits - priorUnits;
-  const missingPrior = by === "distribuidor" ? unattributedUnits(previous) : null;
-  const missingCurrent = by === "distribuidor" ? unattributedUnits(current) : null;
 
   function metricCells(row: MarketStanding) {
+    const comparison = row.partialComparison ? "Variación sobre ventas con distribuidor identificado" : undefined;
     return <>
       <td>{showUnits(row.priorUnits)}</td>
       <td className="ms-current">{showUnits(row.units)}</td>
-      <td><Delta value={row.delta} /></td>
-      <td><Delta value={changeRate(row)} format={signedRate} /></td>
+      <td title={comparison}><Delta value={row.delta} /></td>
+      <td title={comparison}><Delta value={changeRate(row)} format={signedRate} /></td>
       <td>{percent(row.priorShare)}</td>
       <td className="ms-current"><ShareCell row={row} scale={scale} year={year} /></td>
-      <td><Delta value={row.points} format={pointsLabel} /></td>
+      <td title={comparison}><Delta value={row.points} format={pointsLabel} /></td>
     </>;
   }
 
   return <Card className="ms-panel">
     <div className="ms-table-head">
-      <div>
-        <h2>{title}</h2>
-        {(!!missingPrior || !!missingCurrent) && <div className="ms-table-meta">
-          {!!missingPrior && <span>{year - 1} · {number(missingPrior)} uds. sin distribuidor</span>}
-          {!!missingPrior && !!missingCurrent && " / "}
-          {!!missingCurrent && <span>{year} · {number(missingCurrent)} uds. sin distribuidor</span>}
-        </div>}
-      </div>
+      <h2>{title}</h2>
       {!!rows.length && <label className="ms-search"><Search aria-hidden="true" />
         <Input type="search" placeholder={"Buscar " + entity.toLowerCase()} aria-label={"Buscar " + entity.toLowerCase()} value={query}
           onChange={(event) => setQuery(event.target.value)} />
@@ -132,9 +124,63 @@ export function StandingTable({ rows, by, current, previous, year, benchmark }: 
   </Card>;
 }
 
-export function SalesCalendar({ dataset, years, year, cutoff }: {
+type HistoryProps = {
   dataset: SalesPeriod[]; years: number[]; year: number; cutoff: number;
-}) {
+};
+
+export function DistributorHistory({ dataset, years, year, cutoff, benchmark }: HistoryProps & { benchmark: string }) {
+  const { periods, rows, aggregateOnly } = distributorHistory(dataset, years, cutoff);
+  const dealerRows = rows.filter((row) => row.name !== unknownDealer);
+  const unknown = rows.find((row) => row.name === unknownDealer);
+  const maxByYear = periods.map((_, index) => Math.max(1, ...dealerRows.map((row) => row.values[index] ?? 0)));
+  const aggregateTotal = aggregateOnly.reduce<number>((sum, units) => sum + (units ?? 0), 0);
+  const total = periods.some((period) => period.units !== null)
+    ? periods.reduce((sum, period) => sum + (period.units ?? 0), 0)
+    : null;
+  const title = "Ranking histórico de distribuidores";
+  return <Card className="ms-panel">
+    <h2>{title}</h2>
+    <div className="ms-table-scroll" tabIndex={0} role="region" aria-label={title}>
+      <table className="ms-table ms-dealer-history">
+        <thead><tr>
+          <th scope="col">Distribuidor</th>
+          {periods.map((period) => <th key={period.year} scope="col" className={period.year === year ? "ms-current" : undefined}
+            title={period.units === null ? "Corte incompleto" : period.counts ? undefined : "Total de mercado sin desglose"}>{period.year}</th>)}
+          <th scope="col" aria-sort="descending">Total</th>
+        </tr></thead>
+        <tbody>
+          {dealerRows.map((row) => <tr key={row.name} className={row.name === benchmark ? "ms-reference-row" : undefined}>
+            <th scope="row">{row.name}</th>
+            {row.values.map((units, index) => <td key={periods[index].year}
+              className={periods[index].year === year ? "ms-current" : undefined}
+              title={units === null ? (periods[index].counts ? "Distribuidor no identificado en este corte" : "Sin desglose para este corte") : undefined}
+              style={units ? { "--ms-year-fill": (100 * units / maxByYear[index]) + "%" } as React.CSSProperties : undefined}>
+              {showUnits(units)}
+            </td>)}
+            <td className="ms-history-total">{number(row.total)}</td>
+          </tr>)}
+          {unknown && <tr>
+            <th scope="row">{unknownDealer}</th>
+            {unknown.values.map((units, index) => <td key={periods[index].year}>{showUnits(units)}</td>)}
+            <td className="ms-history-total">{number(unknown.total)}</td>
+          </tr>}
+          {aggregateOnly.some((units) => units !== null) && <tr>
+            <th scope="row">Sin desglose disponible</th>
+            {aggregateOnly.map((units, index) => <td key={periods[index].year}>{showUnits(units)}</td>)}
+            <td className="ms-history-total">{number(aggregateTotal)}</td>
+          </tr>}
+        </tbody>
+        <tfoot><tr>
+          <th scope="row">Total al corte ({months[cutoff - 1]})</th>
+          {periods.map((period) => <td key={period.year}>{showUnits(period.units)}</td>)}
+          <td>{showUnits(total)}</td>
+        </tr></tfoot>
+      </table>
+    </div>
+  </Card>;
+}
+
+export function SalesCalendar({ dataset, years, year, cutoff }: HistoryProps) {
   const rows = years.map((entry) => {
     const periods = dataset.filter((period) => period.anio === entry);
     return { year: entry, months: new Map(periods.map((period) => [period.mes, period.total])) };
@@ -145,7 +191,7 @@ export function SalesCalendar({ dataset, years, year, cutoff }: {
     return values.some((value) => value === undefined) ? null : values.reduce<number>((sum, value) => sum + (value ?? 0), 0);
   }
   return <Card className="ms-panel">
-    <div className="ms-table-head"><h2>Calendario de ventas</h2><span className="ms-table-meta">Unidades</span></div>
+    <h2>Calendario de ventas</h2>
     <div className="ms-table-scroll" tabIndex={0} role="region" aria-label="Calendario de ventas">
       <table className="ms-table ms-calendar">
         <thead><tr><th scope="col">Año</th>

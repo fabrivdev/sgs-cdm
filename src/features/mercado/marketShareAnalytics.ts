@@ -19,6 +19,7 @@ export type MarketStanding = {
   points: number | null;
   rank: number | null;
   priorRank: number | null;
+  partialComparison: boolean;
 };
 
 function positions(counts: Map<string, number>) {
@@ -69,13 +70,35 @@ export function standings(current: SalesPeriod[], previous: SalesPeriod[], by: D
     const priorUnits = before ? before.get(name) ?? (priorUnknown && name !== unknownDealer ? null : 0) : null;
     const share = ratio(units, total);
     const priorShare = priorUnits === null ? null : ratio(priorUnits, priorTotal);
+    const canCompare = priorUnits !== null && name !== unknownDealer && (!currentUnknown || now.has(name));
     return {
       name, units, priorUnits, share, priorShare,
-      delta: !comparable || priorUnits === null ? null : units - priorUnits,
-      points: !comparable || share === null || priorShare === null ? null : (share - priorShare) * 100,
+      delta: canCompare ? units - priorUnits : null,
+      points: !canCompare || share === null || priorShare === null ? null : (share - priorShare) * 100,
       rank: rank.get(name) ?? null, priorRank: priorRank.get(name) ?? null,
+      partialComparison: canCompare && !comparable,
     };
   }).sort((a, b) => b.units - a.units || (b.priorUnits ?? 0) - (a.priorUnits ?? 0) || a.name.localeCompare(b.name, "es"));
+}
+
+export function distributorHistory(dataset: SalesPeriod[], years: number[], cutoff: number) {
+  const periods = [...years].sort((a, b) => a - b).map((year) => {
+    const entries = dataset.filter((period) => period.anio === year && period.mes <= cutoff);
+    const complete = entries.length === cutoff;
+    return {
+      year,
+      units: complete ? salesTotal(entries) : null,
+      counts: complete ? group(entries, "distribuidor") : null,
+    };
+  });
+  const names = new Set(periods.flatMap(({ counts }) => [...(counts?.keys() ?? [])]));
+  const rows = [...names].map((name) => {
+    const values = periods.map(({ counts }) => counts?.get(name)
+      ?? (counts && (!counts.has(unknownDealer) || name === unknownDealer) ? 0 : null));
+    return { name, values, total: values.reduce<number>((sum, units) => sum + (units ?? 0), 0) };
+  }).sort((a, b) => b.total - a.total || a.name.localeCompare(b.name, "es"));
+  const aggregateOnly = periods.map(({ units, counts }) => counts ? null : units);
+  return { periods, rows, aggregateOnly };
 }
 
 export function marketContributions(brands: MarketStanding[], benchmark: string) {
