@@ -2600,7 +2600,7 @@
       "id": "mercado.pulverizadores",
       "title": "Mercado de pulverizadores",
       "module": "mercado",
-      "description": "Tablero y desgloses por marca, modelo, tanque, precio e importador. Incluye participación interanual, ancho de barra y posicionamiento HORSCH.",
+      "description": "Tablero y desgloses por marca, modelo, tanque, precio e importador. Incluye participación interanual, filtros de ancho de barra y potencia, y posicionamiento HORSCH.",
       "sources": ["src/features/mercado/TractorDashboard.tsx", "src/features/mercado/sprayerImport.ts", "supabase/migrations/20261120150000_mercado_pulverizadores.sql"],
       "flows": ["analizar-mercado-pulverizadores"]
     },

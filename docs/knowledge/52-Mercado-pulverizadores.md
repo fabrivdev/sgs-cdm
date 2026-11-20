@@ -1,6 +1,6 @@
 # Mercado de pulverizadores
 
-Ruta `/mercado/pulverizadores`. El tablero sigue el mercado paraguayo de autopropulsados para mantener el alcance de OCIT Pulverizadores. Incluye unidades, FOB, participación con referencia interanual, marcas, modelos, tanques, precios, importadores e historia. Compara estado y ancho de barra por año, con filtros de barra y potencia.
+Ruta `/mercado/pulverizadores`. El tablero sigue el mercado paraguayo de autopropulsados para mantener el alcance de OCIT Pulverizadores. Incluye unidades, FOB, participación con referencia interanual, marcas, modelos, tanques, precios, importadores e historia. Compara estado por año y ofrece filtros de ancho de barra y potencia.
 
 El gráfico y la pestaña Tanques agrupan la capacidad nominal en litros. Se prioriza el tanque declarado de la máquina sobre las fichas por modelo y se distingue del caudal de la bomba. Las barras solo se clasifican cuando el ancho declarado o las opciones verificadas caen en una banda común. Se conserva un valor desconocido cuando no hay evidencia suficiente. La potencia expresada en kW o CV se convierte a HP.
 

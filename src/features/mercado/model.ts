@@ -43,7 +43,6 @@ export const marketChartTitles = {
   cumulativeUnits: "Unidades acumuladas",
   importerConcentration: "Concentración por importador",
   conditionMix: "Nuevas y usadas",
-  boomMix: "Ancho de barra",
   grainMix: "Tipo de grano",
   seasonality: "Estacionalidad",
 } as const;

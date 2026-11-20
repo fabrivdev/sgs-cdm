@@ -34,8 +34,6 @@ import {
 import {
   marketFamilies,
   plantingSummaryBand,
-  boomBands,
-  unknownSprayerBoom,
   coarseGrain,
   fineGrain,
   mixedGrain,
@@ -555,10 +553,8 @@ export function YearLegend({ year }: { year: number }) {
   );
 }
 
-function MarketMix({ current, previous, year, mode }: Period & { mode: "grain" | "condition" | "boom" }) {
-  const categories = mode === "boom" ? [...boomBands, unknownSprayerBoom].map((name, i) => ({
-    key: name, name, color: ["hsl(var(--primary))", "#71869c", "#a97837", "hsl(var(--muted-foreground) / 0.45)"][i],
-  })) : mode === "grain" ? [
+function MarketMix({ current, previous, year, mode }: Period & { mode: "grain" | "condition" }) {
+  const categories = mode === "grain" ? [
     { key: coarseGrain, name: coarseGrain, color: "hsl(var(--primary))" },
     { key: fineGrain, name: fineGrain, color: "#71869c" },
     { key: mixedGrain, name: mixedGrain, color: "#a97837" },
@@ -576,14 +572,13 @@ function MarketMix({ current, previous, year, mode }: Period & { mode: "grain" |
     { year: year - 1, rows: previous },
     { year, rows: current },
   ];
-  const category = (row: Movement) => mode === "boom" ? (row[12] || unknownSprayerBoom)
-    : mode === "grain" ? (row[12] || unknownGrain) : row[8];
+  const category = (row: Movement) => mode === "grain" ? (row[12] || unknownGrain) : row[8];
   const shown = categories.filter(({ key }) =>
     periods.some(({ rows }) => rows.some((row) => category(row) === key)),
   );
   return (
     <Card className="market-panel market-condition-panel">
-      <h2>{mode === "boom" ? marketChartTitles.boomMix : mode === "grain" ? marketChartTitles.grainMix : marketChartTitles.conditionMix}</h2>
+      <h2>{mode === "grain" ? marketChartTitles.grainMix : marketChartTitles.conditionMix}</h2>
       {shown.length ? (
         <div className="market-condition-mix">
           {periods.map(({ year: period, rows }) => {
@@ -769,7 +764,6 @@ export function TractorAnalysis(
       <ImporterConcentration {...props} />
       {props.family === "sembradoras" && <MarketMix {...props} mode="grain" />}
       {(props.family === "cosechadoras" || props.family === "pulverizadores") && <MarketMix {...props} mode="condition" />}
-      {props.family === "pulverizadores" && <MarketMix {...props} mode="boom" />}
       <Seasonality {...props} />
     </div>
   );

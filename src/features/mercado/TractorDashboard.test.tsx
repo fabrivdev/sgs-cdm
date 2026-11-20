@@ -338,7 +338,8 @@ it("abre la banda de tanque de Pulverizadores con el FOB y la referencia HORSCH"
       <TractorDashboard family="pulverizadores" rows={rows} />
     </MemoryRouter>,
   );
-  expect(screen.getByRole("heading", { name: "Ancho de barra" })).toBeVisible();
+  expect(screen.queryByRole("heading", { name: "Ancho de barra" })).toBeNull();
+  expect(screen.getByText("Ancho de barra", { exact: true })).toBeVisible();
   expect(screen.getByTitle("HORSCH · LEEB 5.280 VL · FOB $330.000")).toBeVisible();
   fireEvent.click(screen.getByRole("link", { name: "Tanques" }));
   fireEvent.click(screen.getByRole("link", { name: "Más de 4.500 l ›" }));

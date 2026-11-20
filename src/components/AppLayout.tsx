@@ -11,6 +11,9 @@ import {
   LogOut,
   Wrench,
   Tractor,
+  Wheat,
+  Sprout,
+  SprayCan,
   Menu,
   Package,
   Boxes,
@@ -76,9 +79,9 @@ const navGroups: NavGroup[] = [
     icon: ChartNoAxesCombined,
     items: [
       { to: "/mercado/tractores", label: "Tractores", icon: Tractor, section: "mercado.tractores" },
-      { to: "/mercado/cosechadoras", label: "Cosechadoras", icon: Tractor, section: "mercado.cosechadoras" },
-      { to: "/mercado/sembradoras", label: "Sembradoras", icon: Tractor, section: "mercado.sembradoras" },
-      { to: "/mercado/pulverizadores", label: "Pulverizadores", icon: Tractor, section: "mercado.pulverizadores" },
+      { to: "/mercado/cosechadoras", label: "Cosechadoras", icon: Wheat, section: "mercado.cosechadoras" },
+      { to: "/mercado/sembradoras", label: "Sembradoras", icon: Sprout, section: "mercado.sembradoras" },
+      { to: "/mercado/pulverizadores", label: "Pulverizadores", icon: SprayCan, section: "mercado.pulverizadores" },
     ],
   },
   {

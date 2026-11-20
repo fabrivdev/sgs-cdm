@@ -71,7 +71,7 @@ export const unknownSprayerTank = "Sin tanque informado";
 export const unknownSprayerBoom = "Sin barra informada";
 export const unknownSprayerPower = "Sin HP informado";
 const tankBands = ["Hasta 2.000 l", "2.001–2.500 l", "2.501–3.500 l", "3.501–4.500 l", "Más de 4.500 l"];
-export const boomBands = ["Hasta 27 m", "Más de 27 a 36 m", "Más de 36 m"];
+const boomBands = ["Hasta 27 m", "Más de 27 a 36 m", "Más de 36 m"];
 const powerBands = ["Hasta 150 HP", "151–220 HP", "221–280 HP", "Más de 280 HP"];
 const sprayerPrices = ["Menos de $100.000", "$100.000 a <$150.000", "$150.000 a <$200.000", "$200.000 a <$300.000", "$300.000 o más"];
 export function sprayerTankBand(litres: number | null) {
