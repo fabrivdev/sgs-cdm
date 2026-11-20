@@ -143,6 +143,28 @@
   background: hsl(var(--primary));
   border-radius: 3px;
 }
+.market-rank .market-share-track {
+  position: relative;
+  height: 12px;
+  background: hsl(var(--muted));
+  border-radius: 3px;
+}
+.market-share-prior,
+.market-share-legend b {
+  width: 2px;
+  height: 13px;
+  border-radius: 1px;
+  background: hsl(var(--foreground) / 0.8);
+}
+.market-share-prior {
+  position: absolute;
+  top: 50%;
+  transform: translate(-50%, -50%);
+  box-shadow: 0 0 0 1px hsl(var(--card));
+}
+.market-legend.market-share-legend {
+  margin-top: 8px;
+}
 .market-rank strong {
   text-align: right;
 }

@@ -1,6 +1,8 @@
 import { describe, expect, it } from "vitest";
 import * as XLSX from "xlsx";
 import { readPlanterUpload } from "./planterImport";
+import { plantingSummaryBand } from "./marketFamily";
+import { completePlantingSegments } from "./planterSpecs";
 
 function file(name: string, sheets: Record<string, XLSX.WorkSheet>) {
   const workbook = XLSX.utils.book_new();
@@ -92,6 +94,26 @@ describe("Carga de sembradoras", () => {
       "U$S FOB": 447_301.39,
     }])]);
     expect(result.rows[0]).toMatchObject({ 4: "MAESTRO 40.45 GV F", 5: "Más de 27 líneas", 10: 447_301.39, 11: 40 });
+  });
+
+  it("ubica la Dakar 8 CF en la banda común sin copiar los 60 surcos de OCIT", async () => {
+    const baseline = await readPlanterUpload([history]);
+    baseline.rows.push(["ocit:DK", 2025, 9, "HORSCH", "DAKAR 8 CF", "Más de 37 surcos", "$100.000 a <$200.000", "A", "NUEVO", 1, 111_518.28, 60, "Grano fino", "Autotransportable"]);
+    const result = await readPlanterUpload([extract([
+      { ...penta, "Descripción Subitem": "SEMBRADORA MODELO DAKAR 8 CF", "U$S FOB": 155_104.13 },
+      { ...penta, Subitem: 2, "Descripción Subitem": "SEMBRADORA MODELO DAKAR 8 CF 34 LINEAS" },
+      { ...penta, Subitem: 3, "Marca Subitem": "MASSEY FERGUSON", "Descripción Subitem": "SEMBRADORA ABONADORA MF511XM" },
+      { ...penta, Subitem: 4, "Marca Subitem": "AGRI", "Descripción Subitem": "SEMBRADORA DE MAIZ DOS HILERAS" },
+    ])], baseline.rows);
+    expect(result.rows.map((row) => [row[11], plantingSummaryBand(row)])).toEqual([
+      [null, "30 líneas o más"],
+      [34, "30 líneas o más"],
+      [null, "Hasta 14 líneas"],
+      [2, "Hasta 14 líneas"],
+    ]);
+    const [oldDakar] = completePlantingSegments(baseline.rows.slice(-1));
+    expect(oldDakar[11]).toBeNull();
+    expect(plantingSummaryBand(oldDakar)).toBe("30 líneas o más");
   });
 
   it("procesa solo el mes de un Penta mensual y usa la configuración guardada", async () => {

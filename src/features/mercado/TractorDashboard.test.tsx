@@ -304,3 +304,26 @@ it("oculta el filtro de estado en un período de sembradoras sin equipos usados"
   expect(within(panel).getByText("Grano grueso")).toBeVisible();
   expect(within(panel).getByText("Grano fino")).toBeVisible();
 });
+
+it.each(["tractores", "cosechadoras", "sembradoras"] as const)(
+  "marca la cuota del año anterior sobre la misma escala en %s",
+  (family) => {
+    const rows: Movement[] = [
+      ["A26", 2026, 1, "MARCA A", "M1", "Sin segmento informado", "", "EMPRESA", "NUEVO", 3, 0],
+      ["B26", 2026, 1, "MARCA B", "M2", "Sin segmento informado", "", "EMPRESA", "NUEVO", 7, 0],
+      ["A25", 2025, 1, "MARCA A", "M1", "Sin segmento informado", "", "EMPRESA", "NUEVO", 2, 0],
+      ["C25", 2025, 1, "MARCA C", "M3", "Sin segmento informado", "", "EMPRESA", "NUEVO", 2, 0],
+    ];
+    render(
+      <MemoryRouter initialEntries={["/mercado/" + family]}>
+        <TractorDashboard family={family} rows={rows} />
+      </MemoryRouter>,
+    );
+    const panel = screen.getByRole("heading", { name: "Participación por marca" }).closest<HTMLElement>(".market-panel")!;
+    const row = within(panel).getByText("MARCA A").closest<HTMLElement>(".market-rank")!;
+    const marker = within(row).getByRole("img", { name: /2025 · 50,0/ });
+    expect(marker).toHaveStyle({ left: "50%" });
+    expect(marker.closest(".market-rank")).toHaveTextContent(/MARCA A.*30,0/);
+    expect(within(panel).getByRole("img", { name: /2025 · 0,0/ })).toHaveStyle({ left: "0%" });
+  },
+);

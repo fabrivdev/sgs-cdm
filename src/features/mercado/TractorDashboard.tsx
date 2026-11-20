@@ -435,28 +435,41 @@ export function TractorDashboard({
                   ? marketChartTitles.modelShare
                   : marketChartTitles.brandShare}
               </h2>
-              {leaders.map((g) => (
-                <div
-                  className={
-                    "market-rank" + (isBenchmark(g.name) ? " market-benchmark" : "")
-                  }
-                  key={g.name}
-                >
-                  <span>
-                    {brand
-                      ? g.name.split(" · ").slice(1).join(" · ")
-                      : g.name.replace("USD ", "$")}
-                  </span>
-                  <i>
-                    <b
-                      style={{
-                        width: (b.units ? (g.units / b.units) * 100 : 0) + "%",
-                      }}
-                    />
-                  </i>
-                  <strong>{percent(ratio(g.units, b.units))}</strong>
+              {leaders.map((g) => {
+                const share = ratio(g.units, b.units);
+                const priorShare = priorComplete ? ratio(g.prior, a.units) : null;
+                const priorLabel = year - 1 + " · " + percent(priorShare);
+                return (
+                  <div
+                    className={"market-rank" + (isBenchmark(g.name) ? " market-benchmark" : "")}
+                    key={g.name}
+                  >
+                    <span>
+                      {brand
+                        ? g.name.split(" · ").slice(1).join(" · ")
+                        : g.name.replace("USD ", "$")}
+                    </span>
+                    <div className="market-share-track">
+                      <b style={{ width: ((share ?? 0) * 100) + "%" }} />
+                      {priorShare !== null && (
+                        <span
+                          className="market-share-prior"
+                          style={{ left: (priorShare * 100) + "%" }}
+                          role="img"
+                          aria-label={priorLabel}
+                          title={priorLabel}
+                        />
+                      )}
+                    </div>
+                    <strong>{percent(share)}</strong>
+                  </div>
+                );
+              })}
+              {leaders.length > 0 && priorComplete && a.units > 0 && (
+                <div className="market-legend market-share-legend">
+                  <span><b aria-hidden="true" /> {year - 1}</span>
                 </div>
-              ))}
+              )}
               {!leaders.length && <p>Sin movimientos en este período.</p>}
             </Card>
             <Card className="market-panel">

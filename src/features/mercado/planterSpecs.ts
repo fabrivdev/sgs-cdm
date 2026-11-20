@@ -1,5 +1,6 @@
 import { coarseGrain, fineGrain, plantingSegment, unknownGrain, unknownPlantingSegment } from "./marketFamily";
 import type { Movement, PlantingMovement } from "./model";
+import { catalogLineOptions } from "./planterCatalog";
 
 type PlanterSpec = {
   model: string;
@@ -24,30 +25,56 @@ function maestroGVSpec(brand: string, description: string): PlanterSpec | undefi
   return lines ? { model: "MAESTRO " + config + " GV F", lines, grain: coarseGrain } : undefined;
 }
 
+function dakarCFSpec(description: string): PlanterSpec | undefined {
+  const dakar = description.match(/\bDAKAR\s+(8|10)\s+CF\b/);
+  if (!dakar) return undefined;
+  const model = "DAKAR " + dakar[1] + " CF";
+  return { model, grain: fineGrain, possibleLines: catalogLineOptions("HORSCH", model) };
+}
+
 export function completePlantingSegments(rows: Movement[]): Movement[] {
   return rows.map((row) => {
     if (row.length !== 14) return row;
-    const spec = maestroGVSpec(row[3], row[4]);
-    if (!spec?.lines) return row;
-    const grain = row[12] === unknownGrain ? coarseGrain : row[12];
-    const lines = row[11] ?? spec.lines;
+    const spec = row[3] === "HORSCH"
+      ? maestroGVSpec(row[3], row[4]) ?? dakarCFSpec(row[4])
+      : undefined;
+    if (!spec) return row;
     const updated: PlantingMovement = [...row];
     updated[4] = spec.model;
-    updated[11] = lines;
-    updated[12] = grain;
-    if (updated[5] === unknownPlantingSegment) updated[5] = plantingSegment(grain, lines);
+    updated[12] = row[12] === unknownGrain ? (spec.grain ?? unknownGrain) : row[12];
+    updated[11] = row[11] ?? spec.lines ?? null;
+    // A stored count outside the catalogue cannot describe this Dakar configuration.
+    if (updated[11] != null && spec.possibleLines && !spec.possibleLines.includes(updated[11])) {
+      updated[11] = null;
+      updated[5] = unknownPlantingSegment;
+    }
+    if (updated[5] === unknownPlantingSegment) updated[5] = plantingSegment(updated[12], updated[11]);
     return updated;
   });
 }
 
+const spelledLines: Record<string, number> = {
+  UN: 1, UMA: 1, UNA: 1, DOS: 2, DOIS: 2, DUAS: 2, TRES: 3,
+  CUATRO: 4, QUATRO: 4, CINCO: 5, SEIS: 6, SIETE: 7, SETE: 7,
+  OCHO: 8, OITO: 8, NUEVE: 9, NOVE: 9, DIEZ: 10, DEZ: 10,
+};
+const lineCountPattern = new RegExp(
+  "\\b(\\d{1,3}|" + Object.keys(spelledLines).join("|") +
+    ")\\s*(?:L\\s*INEAS?|L\\s+NEAS?|LINHAS?|SURCOS?|SULCOS?|HILERAS?|FILAS?|CUERPOS(?: DE SIEMBRA)?)\\b",
+  "g",
+);
+
 export function plantingLines(description: string) {
-  const hits = [...description.matchAll(/\b(\d{1,3})\s*(?:LINEAS?|LINHAS?|SURCOS?|SULCOS?|HILERAS?|FILAS?|CUERPOS(?: DE SIEMBRA)?)\b/g)];
-  const reported = [...new Set(hits.map((hit) => Number(hit[1])).filter((n) => n > 0 && n <= 200))];
-  return reported.length === 1 ? reported[0] : null;
+  const reported = new Set(
+    [...description.matchAll(lineCountPattern)]
+      .map((hit) => spelledLines[hit[1]] ?? Number(hit[1]))
+      .filter((n) => n > 0 && n <= 200),
+  );
+  return reported.size === 1 ? [...reported][0] : null;
 }
 
 export function planterSpec(brand: string, description: string): PlanterSpec | undefined {
-  if (brand === "HORSCH") return maestroGVSpec(brand, description);
+  if (brand === "HORSCH") return maestroGVSpec(brand, description) ?? dakarCFSpec(description);
   const text = description.replace(/\bBIF FARM\b/g, "BIG FARM");
   if (brand === "FRAVI" || brand === "PLANTI CENTER") {
     const senior = text.match(/\bSFR\s*(19|23|27|31|35|39)\s*(?:SENIOR?|000)\b/);
@@ -59,9 +86,10 @@ export function planterSpec(brand: string, description: string): PlanterSpec | u
     const farm = text.match(/\bBIG FARM\s+(13|15|17|19|21)(\s+AT)?\b/);
     if (farm) return { model: "BIG FARM " + farm[1] + (farm[2] ? " AT" : ""), grain: coarseGrain };
     const premier = text.match(/\bPREMIER\s+(\d{1,2})\s*\/\s*(\d{1,2})\b/);
-    if (premier) return { model: "PREMIER " + premier[1] + "/" + premier[2], possibleLines: [Number(premier[1]), Number(premier[2])], grain: coarseGrain };
+    if (premier) return { model: "PREMIER " + premier[1] + "/" + premier[2], possibleLines: catalogLineOptions(brand, premier[0]), grain: coarseGrain };
   }
   if (brand === "TATU") {
+    if (/\bMANIV\s+PHT\b/.test(text)) return { model: "MANIV PHT", lines: 2 };
     const sda = text.match(/\bSDA[-\s]?T\s+(17|19|23|25|29|33|37)\s*\/\s*(\d{2})\s*E\s*175\b/);
     if (sda) return { model: "SDA-T " + sda[2], lines: Number(sda[2]), grain: fineGrain };
     const hit = text.match(/\b(PST\s*(?:4|PLUS|DUO|TRIO)?(?:\s+FLEX)?(?:\s+SUPREMA)?)\s+(\d{1,2})(?:\s*\/\s*(\d{1,2}))?(?:\s*(E\s*\d{3}))?\b/);
@@ -84,24 +112,31 @@ export function planterSpec(brand: string, description: string): PlanterSpec | u
     const momentum = text.match(/\bMOMENTUM\s+(18|20|22|24|30|40)\s*([FMV]\b)?\b/);
     if (momentum) return { model: "MOMENTUM " + momentum[1] + (momentum[2] ? " " + momentum[2] : ""), lines: Number(momentum[1]), grain: coarseGrain };
     if (brand === "VALTRA" && /\bHI\s*TECH\b/.test(text)) {
-      const variant = text.match(/\bBP\s*(805|905|1005|1106|1206|1307|1508|1709)\b/)?.[1];
+      const code = text.match(/\bCHAS(?:S)?I(?:S)?\s*[:.]?\s*9AGP(0?805|0?905|1005|1106|1206|1307|1508|1709)[A-Z0-9]+\b/)?.[1];
+      const serial = text.match(/\bSERIE\s*[:.]?\s*H(08|09|10|11|12|13|15|17)\d+\b/)?.[1];
+      const declared = text.match(/\bBP\s*(805|905|1005|1106|1206|1307|1508|1709)\b/)?.[1];
+      // In this format the chassis carries the BP model code, corroborated by the serial prefix.
+      const variant = declared ?? (code && serial === code.slice(0, -2) ? code.replace(/^0/, "") : undefined);
       return { model: variant ? "HITECH BP " + variant : "HITECH", lines: variant ? Number(variant.slice(0, -2)) : undefined, grain: coarseGrain };
     }
     if (brand === "MASSEY FERGUSON") {
       const mf = text.match(/\bMF\s*-?\s*(50[89]|51[0-357])\s*(X[HMP]?\b)?\b/);
       if (mf) {
-        const maximum = Number(mf[1]) - 500;
-        return { model: "MF" + mf[1] + (mf[2] ?? ""), grain: coarseGrain, possibleLines: [maximum - (maximum === 15 || maximum === 17 ? 2 : 1), maximum] };
+        const model = "MF" + mf[1] + (mf[2] ?? "");
+        return { model, grain: coarseGrain, possibleLines: catalogLineOptions(brand, model) };
       }
     }
   }
   if (brand === "BALDAN") {
     const compact = text.match(/\b(?:PLB|PBL)(?=\b|\d)/);
     if (compact) return { model: "PLB", grain: coarseGrain, possibleLines: [2, 3, 4, 5, 6, 7, 8] };
+    const winter = text.match(/\bSKADI\s*5000(?:\s*SB)?\b/);
+    if (winter) return { model: "SKADI 5000", grain: fineGrain, lines: 25 };
     const series = text.match(/\b(PPS(?:OLO)?|SPE|SPTG)\s*(\d{4})(?:SB(\d{1,2})P\d+|\b)/);
     if (series) {
       const configuration = text.match(/\bS(?:P)?EED BOX\s+\d{1,2}\s*\/\s*(\d{1,2})\b/);
-      return { model: series[1].replace("PPSOLO", "PPS") + " " + series[2], lines: configuration ? Number(configuration[1]) : undefined, grain: coarseGrain };
+      const model = series[1].replace("PPSOLO", "PPS") + " " + series[2];
+      return { model, lines: configuration ? Number(configuration[1]) : undefined, grain: coarseGrain, possibleLines: catalogLineOptions(brand, model) };
     }
   }
   if (brand === "JOHN DEERE") {

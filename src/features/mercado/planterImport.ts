@@ -1,5 +1,5 @@
 import { parseMovements, type Movement, type PlantingMovement } from "./model";
-import { planterSpec, plantingLines } from "./planterSpecs";
+import { completePlantingSegments, planterSpec, plantingLines } from "./planterSpecs";
 import {
   coarseGrain, fineGrain, mixedGrain, unknownGrain, unknownTransport, unknownPlantingSegment,
   plantingImportSegments, plantingPriceBand, plantingSegment,
@@ -105,7 +105,7 @@ const outsideScope = /\b(?:MOTOCULTOR|CULTIVADORA|ZANJADORA|PERNA GRILL?O|MATRAC
 const ends = /^84323(?:010|110|190|910|990)/;
 function finish(rows: Movement[]) {
   if (!rows.length) throw new Error("No se identificaron sembradoras agrícolas en los archivos.");
-  return parseMovements(rows);
+  return parseMovements(completePlantingSegments(rows));
 }
 
 export async function readPlanterUpload(files: SourceFile[], existing: Movement[] = []): Promise<MarketUpload> {

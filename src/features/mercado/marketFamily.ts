@@ -1,5 +1,6 @@
 import { harvestClasses, harvestPriceBands, unknownHarvestClass, type Movement } from "./model";
 import { hpBands } from "./marketAnalysis";
+import { catalogLineOptions } from "./planterCatalog";
 
 export type MarketFamily = "tractores" | "cosechadoras" | "sembradoras";
 
@@ -39,7 +40,8 @@ const storedPlantingBands = new Map(
 );
 export function plantingSummaryBand(row: Movement) {
   if (row[11] != null) return bandAt(row[11]) ?? unknownPlantingSegment;
-  const bounds = storedPlantingBands.get(row[5]);
+  const options = catalogLineOptions(row[3], row[4]);
+  const bounds = options ? [Math.min(...options), Math.max(...options)] : storedPlantingBands.get(row[5]);
   if (bounds && bandAt(bounds[0]) === bandAt(bounds[1])) {
     return bandAt(bounds[0]) ?? unknownPlantingSegment;
   }
