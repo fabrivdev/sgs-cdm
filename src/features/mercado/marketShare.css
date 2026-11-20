@@ -64,6 +64,9 @@
 }
 
 .ms-drivers { min-height: 208px; padding-top: 2px; }
+.ms-driver-legend { display: flex; flex-wrap: wrap; gap: 4px 12px; margin-bottom: 6px; color: hsl(var(--muted-foreground)); font-size: .7rem; }
+.ms-driver-legend span { display: flex; align-items: center; gap: 4px; }
+.ms-driver-legend i { display: block; width: 10px; height: 7px; border-radius: 2px; }
 .ms-driver-scroll { max-height: 225px; overflow-y: auto; scrollbar-width: thin; }
 .ms-driver-footer { position: sticky; bottom: 0; background: hsl(var(--card)); }
 .ms-driver {
@@ -82,10 +85,11 @@
   position: relative;
 }
 
-.ms-driver-track::before { content: ""; position: absolute; inset-block: 0; left: var(--ms-zero); border-left: 1px solid hsl(var(--border)); }
+.ms-driver-track::before { content: ""; position: absolute; inset-block: 0; left: 0; border-left: 1px solid hsl(var(--border)); }
 .ms-driver-track i { position: absolute; top: 6px; height: 13px; border-radius: 2px; }
-.ms-driver-track .up { background: hsl(var(--primary)); }
-.ms-driver-track .down { background: var(--ms-negative); }
+.ms-driver-track .base, .ms-driver-legend .base { background: hsl(var(--muted-foreground) / .35); }
+.ms-driver-track .up, .ms-driver-legend .up { background: hsl(var(--primary)); }
+.ms-driver-track .down, .ms-driver-legend .down { background: var(--ms-negative); }
 .ms-driver-axis { color: hsl(var(--muted-foreground)); font-size: .68rem; }
 .ms-driver-axis div { display: flex; justify-content: space-between; border-top: 1px solid hsl(var(--border)); padding-top: 3px; }
 .ms-chart-total { display: flex; justify-content: space-between; margin-top: 8px; border-top: 1px solid hsl(var(--border)); padding-top: 9px; font-size: .78rem; }

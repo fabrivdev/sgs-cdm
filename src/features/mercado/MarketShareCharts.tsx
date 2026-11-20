@@ -25,24 +25,21 @@ function ChartPanel({ title, children, className = "" }: { title: string; childr
   return <Card className={"ms-panel " + className}><h2>{title}</h2>{children}</Card>;
 }
 
-export function GrowthDrivers({ brands, benchmark, delta }: { brands: MarketStanding[]; benchmark: string; delta: number | null }) {
+export function GrowthDrivers({ brands, benchmark, delta, year }: { brands: MarketStanding[]; benchmark: string; delta: number | null; year: number }) {
   const rows = marketContributions(brands, benchmark);
-  const max = Math.max(1, ...rows.map((row) => Math.abs(row.delta)));
-  const minScale = rows.some((row) => row.delta < 0) ? -max : 0;
-  const maxScale = rows.some((row) => row.delta > 0) ? max : 0;
-  const range = maxScale - minScale || 1;
-  const zero = -minScale / range * 100;
-  const axis = minScale < 0 && maxScale > 0 ? [minScale, 0, maxScale] : [minScale, maxScale];
+  const max = Math.max(1, ...rows.map(({ units, priorUnits }) => Math.max(units, priorUnits)));
+  const width = (value: number) => (value / max * 100) + "%";
   const referenceIndex = rows.findIndex(({ name }) => name === benchmark);
   const pinned = referenceIndex >= 7 ? rows[referenceIndex] : undefined;
   const visibleRows = pinned ? rows.filter((row) => row !== pinned) : rows;
-  function contribution({ name, delta }: typeof rows[number]) {
+  function contribution({ name, delta, priorUnits, units }: typeof rows[number]) {
+    const label = `${year - 1} · ${number(priorUnits)} uds. → ${year} · ${number(units)} uds.`;
     return <div className="ms-driver" role="listitem" key={name}>
       <span title={name} className={name === benchmark ? "ms-reference" : undefined}>{name}</span>
-      <div className="ms-driver-track" style={{ "--ms-zero": zero + "%" } as React.CSSProperties} aria-hidden="true">
-        <i className={delta < 0 ? "down" : "up"}
-          style={{ left: delta < 0 ? undefined : zero + "%", right: delta < 0 ? (100 - zero) + "%" : undefined,
-            width: Math.abs(delta) / range * 100 + "%" }} />
+      <div className="ms-driver-track" role="img" title={label} aria-label={label}>
+        <i className="base" style={{ left: 0, width: width(priorUnits) }} />
+        {delta !== 0 && <i className={delta < 0 ? "down" : "up"}
+          style={{ left: width(Math.min(priorUnits, units)), width: width(Math.abs(delta)) }} />}
       </div>
       <strong><Delta value={delta} /></strong>
     </div>;
@@ -50,12 +47,17 @@ export function GrowthDrivers({ brands, benchmark, delta }: { brands: MarketStan
   return <ChartPanel title="Aporte de cada marca al crecimiento">
     {rows.length ? <>
       <div className="ms-drivers">
+        <div className="ms-driver-legend">
+          <span><i className="base" aria-hidden="true" /> Base {year - 1}</span>
+          <span><i className="up" aria-hidden="true" /> Aumento {year}</span>
+          <span><i className="down" aria-hidden="true" /> Caída {year}</span>
+        </div>
         <div className="ms-driver-scroll" role="list" tabIndex={rows.length > 8 ? 0 : undefined} aria-label="Variación interanual en unidades">
           {visibleRows.map(contribution)}
           <div className="ms-driver-footer">
             {pinned && contribution(pinned)}
             <div className="ms-driver ms-driver-axis" aria-hidden="true">
-              <span /><div>{axis.map((value) => <span key={value}>{signedUnits(value)}</span>)}</div><span>uds.</span>
+              <span /><div><span>0</span><span>{number(max)}</span></div><span>uds.</span>
             </div>
           </div>
         </div>
