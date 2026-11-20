@@ -12,51 +12,6 @@ const identified = (row: Movement) =>
   Boolean(row[3].trim() && row[4].trim()) &&
   row[4].toLowerCase() !== "sin identificar";
 
-export function priceBridge(current: Movement[], previous: Movement[]) {
-  const withPrice = (rows: Movement[]) => rows.filter((row) => row[10] > 0);
-  const recent = withPrice(current),
-    prior = withPrice(previous);
-  const currentTotal = totals(recent),
-    priorTotal = totals(prior);
-  if (!currentTotal.units || !priorTotal.units) return null;
-  const before = priorTotal.fob / priorTotal.units;
-  const after = currentTotal.fob / currentTotal.units;
-  const matched = compare(
-    recent.filter(identified),
-    prior.filter(identified),
-    (row) => JSON.stringify([row[3], row[4], row[8]]),
-  ).filter((group) => group.units > 0 && group.prior > 0);
-  const recentUnits = matched.reduce((sum, group) => sum + group.units, 0);
-  const priorUnits = matched.reduce((sum, group) => sum + group.prior, 0);
-  const coverage = {
-    priorUnits,
-    recentUnits,
-    priorTotal: priorTotal.units,
-    recentTotal: currentTotal.units,
-  };
-  if (!matched.length) return { before, after, coverage, steps: [] };
-  const priorComparable =
-    matched.reduce((sum, group) => sum + group.priorFob, 0) / priorUnits;
-  const mix =
-    matched.reduce(
-      (sum, group) => sum + (group.units * group.priorFob) / group.prior,
-      0,
-    ) / recentUnits;
-  const recentComparable =
-    matched.reduce((sum, group) => sum + group.fob, 0) / recentUnits;
-  return {
-    before,
-    after,
-    coverage,
-    steps: [
-      { name: "Sin par anterior", from: before, to: priorComparable },
-      { name: "Mezcla de modelos", from: priorComparable, to: mix },
-      { name: "FOB en comparables", from: mix, to: recentComparable },
-      { name: "Sin par actual", from: recentComparable, to: after },
-    ],
-  };
-}
-
 export function positioning(current: Movement[], state: string) {
   const priced = current.filter((row) => row[10] > 0 && row[8] === state);
   const comparable = priced.filter(
@@ -81,7 +36,7 @@ export function positioning(current: Movement[], state: string) {
   };
 }
 
-export function seasonality(
+function monthlyUnits(
   rows: Movement[],
   scoped: Movement[],
   year: number,
@@ -99,7 +54,7 @@ export function seasonality(
     values[row[2] - 1] += row[9];
     quantities.set(row[1], values);
   }
-  const grid = [...coverage.entries()]
+  return [...coverage.entries()]
     .sort(([left], [right]) => right - left)
     .map(([period, [first, last]]) => ({
       year: period,
@@ -109,6 +64,15 @@ export function seasonality(
           : null,
       ),
     }));
+}
+
+export function seasonality(
+  rows: Movement[],
+  scoped: Movement[],
+  year: number,
+  months: number[],
+) {
+  const grid = monthlyUnits(rows, scoped, year, months);
   const baseline = months.map((_, i) => {
     const samples = grid
       .filter((row) => row.year < year)
@@ -123,4 +87,51 @@ export function seasonality(
     );
   });
   return { grid, baseline };
+}
+
+function quantile(sorted: number[], probability: number) {
+  const rank = (sorted.length - 1) * probability;
+  const lower = Math.floor(rank);
+  return (
+    sorted[lower] + (sorted[Math.ceil(rank)] - sorted[lower]) * (rank - lower)
+  );
+}
+
+export function cumulativeUnits(
+  rows: Movement[],
+  scoped: Movement[],
+  year: number,
+  end: number,
+) {
+  const months = Array.from({ length: end }, (_, index) => index + 1);
+  const byYear = new Map(
+    monthlyUnits(rows, scoped, year, months).map((period) => {
+      let total: number | null = 0;
+      const cumulative = period.values.map((value) => {
+        total = total === null || value === null ? null : total + value;
+        return total;
+      });
+      return [period.year, cumulative] as const;
+    }),
+  );
+  const history = [...byYear].filter(([period]) => period < year);
+  return months.map((month, index) => {
+    const samples = history
+      .map(([, values]) => values[index])
+      .filter((value): value is number => value !== null)
+      .sort((a, b) => a - b);
+    return {
+      month,
+      current: byYear.get(year)?.[index] ?? null,
+      previous: byYear.get(year - 1)?.[index] ?? null,
+      median: samples.length ? quantile(samples, 0.5) : null,
+      range:
+        samples.length > 1
+          ? ([quantile(samples, 0.25), quantile(samples, 0.75)] as [
+              number,
+              number,
+            ])
+          : null,
+    };
+  });
 }

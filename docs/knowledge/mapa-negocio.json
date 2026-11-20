@@ -2563,7 +2563,7 @@
       "id": "mercado.tractores",
       "title": "Mercado de tractores",
       "module": "mercado",
-      "description": "Tablero y subsecciones navegables por marcas, modelos, HP, precios, importadores e historia. Incluye posicionamiento CLAAS, oportunidades por HP, puente FOB, concentración y estacionalidad.",
+      "description": "Tablero y subsecciones navegables por marcas, modelos, HP, precios, importadores e historia. Incluye posicionamiento CLAAS, oportunidades por HP, ritmo acumulado de unidades, concentración y estacionalidad.",
       "sources": ["src/features/mercado/Tractores.tsx", "src/features/mercado/TractorAnalysis.tsx", "src/features/mercado/marketAnalysis.ts"],
       "flows": ["analizar-mercado-tractores"]
     },

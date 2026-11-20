@@ -100,13 +100,15 @@ export function TractorDashboard({ rows: data }: { rows: Movement[] }) {
   const rankingDimension = brand ? "modelos" : "marcas";
   const active = dimensionKeys.filter((d) => params.has(d));
   const monthOnly = Number(params.get("mes"));
-  const scoped = rows.filter(
+  const accumulatedScope = rows.filter(
     (r) =>
       r[2] <= end &&
-      (!monthOnly || r[2] === monthOnly) &&
       (!state || r[8] === state) &&
       active.every((d) => label(r, d) === params.get(d)),
   );
+  const scoped = monthOnly
+    ? accumulatedScope.filter((r) => r[2] === monthOnly)
+    : accumulatedScope;
   const current = scoped.filter((r) => r[1] === year),
     previous = scoped.filter((r) => r[1] === year - 1);
   const a = totals(previous),
@@ -516,6 +518,7 @@ export function TractorDashboard({ rows: data }: { rows: Movement[] }) {
             previous={previous}
             rows={rows}
             scoped={scoped}
+            accumulatedScope={accumulatedScope}
             year={year}
             end={end}
             month={monthOnly}

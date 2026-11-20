@@ -1,4 +1,16 @@
-import { Cell, Pie, PieChart, ResponsiveContainer } from "recharts";
+import {
+  Area,
+  CartesianGrid,
+  Cell,
+  ComposedChart,
+  Line,
+  Pie,
+  PieChart,
+  ResponsiveContainer,
+  Tooltip,
+  XAxis,
+  YAxis,
+} from "recharts";
 import { useState } from "react";
 import { Card } from "@/components/ui/card";
 import {
@@ -14,7 +26,7 @@ import {
 import {
   hpBands,
   positioning,
-  priceBridge,
+  cumulativeUnits,
   seasonality,
 } from "./marketAnalysis";
 
@@ -279,132 +291,146 @@ function ModelPosition({ current, year }: Omit<Period, "previous">) {
   );
 }
 
-const signedMoney = (value: number) =>
-  (Math.round(Math.abs(value)) === 0 ? "" : value < 0 ? "−" : "+") +
-  money(Math.abs(value));
+const rhythmColors = {
+  current: "hsl(var(--primary))",
+  previous: "hsl(var(--muted-foreground) / .7)",
+  median: "hsl(var(--foreground) / .82)",
+  range: "hsl(var(--muted-foreground) / .18)",
+};
 
-function FobBridge({ current, previous, year }: Period) {
-  const bridge = priceBridge(current, previous);
-  const effects = bridge?.steps.length
-    ? [
-        {
-          name: "Modelos sin comparación",
-          delta:
-            bridge.steps[0].to -
-            bridge.steps[0].from +
-            (bridge.steps[3].to - bridge.steps[3].from),
-        },
-        {
-          name: "Mezcla de modelos comparables",
-          delta: bridge.steps[1].to - bridge.steps[1].from,
-        },
-        {
-          name: "FOB de los mismos modelos",
-          delta: bridge.steps[2].to - bridge.steps[2].from,
-        },
-      ]
-    : [];
-  const change = bridge ? bridge.after - bridge.before : 0;
-  const stages = bridge
-    ? [
-        { name: String(year - 1), from: 0, to: bridge.before, total: true },
-        ...effects.map((effect, index) => {
-          const from =
-            bridge.before +
-            effects.slice(0, index).reduce((sum, item) => sum + item.delta, 0);
-          return {
-            name: effect.name,
-            from,
-            to: from + effect.delta,
-            total: false,
-          };
-        }),
-        { name: String(year), from: 0, to: bridge.after, total: true },
-      ]
-    : [];
-  const scale = Math.max(
-    1,
-    ...stages.flatMap((stage) => [stage.from, stage.to]),
+function ImportRhythm({
+  rows,
+  accumulatedScope,
+  year,
+  end,
+  month,
+}: {
+  rows: Movement[];
+  accumulatedScope: Movement[];
+  year: number;
+  end: number;
+  month: number;
+}) {
+  const cutoff = month ? Math.min(end, month) : end;
+  const data = cumulativeUnits(rows, accumulatedScope, year, cutoff);
+  const lines = [
+    { key: "current", label: String(year), width: 3 },
+    { key: "previous", label: String(year - 1), width: 2 },
+    { key: "median", label: "Mediana histórica", width: 2 },
+  ] as const;
+  const visibleLines = lines.filter(({ key }) =>
+    data.some((point) => point[key] !== null),
   );
+  const hasRange = data.some((point) => point.range !== null);
+  const tickColor = "hsl(var(--muted-foreground))";
   return (
     <Card className="market-panel">
       <Heading
-        title="Qué cambió el FOB por tractor"
-
-        detail="FOB por tractor · Comparación interanual"
+        title="Ritmo acumulado de importaciones"
+        detail={
+          cutoff === 1
+            ? "Unidades · Ene"
+            : `Unidades · Ene–${months[cutoff - 1]}`
+        }
       />
-      {bridge ? (
+      {visibleLines.length ? (
         <>
-          <div className="market-bridge-summary">
-            <div>
-              <span>{year - 1}</span>
-              <strong>{money(bridge.before)}</strong>
-            </div>
-            <div>
-              <span>{year}</span>
-              <strong>{money(bridge.after)}</strong>
-            </div>
-            <div
-              className="market-bridge-change"
-              data-direction={change < 0 ? "down" : "up"}
-            >
-              <span>Variación por tractor</span>
-              <strong>{percent(change / bridge.before)}</strong>
-              <small>{signedMoney(change)}</small>
-            </div>
-          </div>
-          {effects.length ? (
-            <>
-              <div
-                className="market-waterfall"
-                aria-label="Contribuciones al cambio del FOB medio"
+          <div className="market-rhythm-chart">
+            <ResponsiveContainer width="100%" height="100%">
+              <ComposedChart
+                data={data}
+                margin={{ top: 8, right: 18, left: 0, bottom: 0 }}
+                accessibilityLayer
               >
-                {stages.map((stage, index) => {
-                  const delta = stage.to - stage.from;
-                  const height = (Math.abs(delta) / scale) * 100;
-                  const bottom = (Math.min(stage.from, stage.to) / scale) * 100;
-                  return (
-                    <div className="market-waterfall-stage" key={stage.name}>
-                      <div className="market-waterfall-plot">
-                        {index === 0 && (
-                          <span className="market-waterfall-zero">$0</span>
-                        )}
-                        {index < stages.length - 1 && (
-                          <i
-                            className="market-waterfall-connector"
-                            aria-hidden="true"
-                            style={{ bottom: (stage.to / scale) * 100 + "%" }}
-                          />
-                        )}
-                        <div
-                          className="market-waterfall-bar"
-                          data-kind={
-                            stage.total ? "total" : delta < 0 ? "down" : "up"
-                          }
-                          style={{ bottom: bottom + "%", height: height + "%" }}
-                        >
-                          <strong className="market-waterfall-value">
-                            {stage.total ? money(stage.to) : signedMoney(delta)}
-                          </strong>
-                        </div>
+                <CartesianGrid vertical={false} stroke="hsl(var(--border))" />
+                <XAxis
+                  dataKey="month"
+                  tickFormatter={(value: number) => months[value - 1]}
+                  tick={{ fill: tickColor, fontSize: 11 }}
+                  tickLine={false}
+                  minTickGap={8}
+                  padding={{ left: 9, right: 6 }}
+                />
+                <YAxis
+                  domain={[0, "auto"]}
+                  allowDecimals={false}
+                  tickFormatter={number}
+                  tick={{ fill: tickColor, fontSize: 11 }}
+                  width={44}
+                  tickLine={false}
+                  axisLine={false}
+                />
+                <Tooltip
+                  content={({ active, label, payload }) => {
+                    const point = data.find(
+                      ({ month }) => month === Number(label),
+                    );
+                    if (!active || !payload?.length || !point) return null;
+                    return (
+                      <div className="market-rhythm-tooltip">
+                        <strong>{months[point.month - 1]}</strong>
+                        <dl>
+                          {visibleLines.map(({ key, label: name }) => (
+                            <div key={key}>
+                              <dt>{name}</dt>
+                              <dd>
+                                {point[key] === null ? "—" : number(point[key])}
+                              </dd>
+                            </div>
+                          ))}
+                          {point.range && (
+                            <div>
+                              <dt>P25–P75 histórico</dt>
+                              <dd>{point.range.map(number).join("–")}</dd>
+                            </div>
+                          )}
+                        </dl>
                       </div>
-                      <span className="market-waterfall-label">
-                        {stage.name}
-                      </span>
-                    </div>
-                  );
-                })}
-              </div>
-            </>
-          ) : (
-            <p>
-              No hay modelos identificados en ambos períodos para separar los
-              efectos.
-            </p>
-          )}
+                    );
+                  }}
+                />
+                {hasRange && (
+                  <Area
+                    dataKey="range"
+                    stroke="none"
+                    fill={rhythmColors.range}
+                    fillOpacity={1}
+                    isAnimationActive={false}
+                  />
+                )}
+                {[...visibleLines].reverse().map(({ key, width }) => (
+                  <Line
+                    key={key}
+                    dataKey={key}
+                    stroke={rhythmColors[key]}
+                    strokeWidth={width}
+                    strokeDasharray={key === "median" ? "3 4" : undefined}
+                    dot={
+                      data.filter((point) => point[key] !== null).length === 1
+                    }
+                    isAnimationActive={false}
+                  />
+                ))}
+              </ComposedChart>
+            </ResponsiveContainer>
+          </div>
+          <ul className="market-rhythm-legend" aria-label="Series del gráfico">
+            {visibleLines.map(({ key, label }) => (
+              <li key={key}>
+                <i data-series={key} aria-hidden="true" />
+                {label}
+              </li>
+            ))}
+            {hasRange && (
+              <li>
+                <i data-series="range" aria-hidden="true" />
+                P25–P75 histórico
+              </li>
+            )}
+          </ul>
         </>
       ) : (
-        <p>Se necesitan unidades con FOB en ambos períodos.</p>
+        <p>Sin cobertura desde enero para el período seleccionado.</p>
       )}
     </Card>
   );
@@ -541,6 +567,20 @@ function Seasonality({
         title="Estacionalidad de importación"
         detail="Unidades por mes y mediana de años anteriores"
       />
+      <ul className="market-season-legend" aria-label="Escala de unidades">
+        <li>
+          <i data-volume="low" aria-hidden="true" />
+          Menor
+        </li>
+        <li>
+          <i data-volume="mid" aria-hidden="true" />
+          Intermedio
+        </li>
+        <li>
+          <i data-volume="high" aria-hidden="true" />
+          Mayor
+        </li>
+      </ul>
       <div
         className="market-scroll"
         tabIndex={0}
@@ -567,12 +607,14 @@ function Seasonality({
                   return (
                     <td
                       key={selected[index]}
-                      style={
+                      data-volume={
                         value === null
                           ? undefined
-                          : {
-                              background: `hsl(var(--primary) / ${0.04 + (0.48 * value) / peak})`,
-                            }
+                          : value <= peak / 3
+                            ? "low"
+                            : value <= (2 * peak) / 3
+                              ? "mid"
+                              : "high"
                       }
                     >
                       {value === null ? (
@@ -614,6 +656,7 @@ export function TractorAnalysis(
   props: Period & {
     rows: Movement[];
     scoped: Movement[];
+    accumulatedScope: Movement[];
     end: number;
     month: number;
   },
@@ -622,7 +665,7 @@ export function TractorAnalysis(
     <div className="market-panels">
       <PowerOpportunity {...props} />
       <ModelPosition {...props} />
-      <FobBridge {...props} />
+      <ImportRhythm {...props} />
       <ImporterConcentration {...props} />
       <Seasonality {...props} />
     </div>

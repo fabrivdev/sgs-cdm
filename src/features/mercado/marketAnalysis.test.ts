@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { positioning, priceBridge, seasonality } from "./marketAnalysis";
+import { cumulativeUnits, positioning, seasonality } from "./marketAnalysis";
 import type { Movement } from "./model";
 
 function movement(
@@ -25,33 +25,28 @@ function movement(
 }
 
 describe("Análisis de mercado de tractores", () => {
-  it("concilia la cascada con los promedios de ambos períodos", () => {
-    const previous = [
-      movement(2025, 1, "A", 2, 200),
-      movement(2025, 1, "B", 2, 400),
-      movement(2025, 2, "SALE", 1, 500),
+  it("compara acumulados y cuartiles desde enero bajo el mismo filtro", () => {
+    const scoped = [
+      movement(2023, 1, "A", 10, 100),
+      movement(2023, 3, "A", 30, 300),
+      movement(2024, 1, "A", 20, 200),
+      movement(2024, 2, "A", 30, 300),
+      movement(2025, 1, "A", 30, 300),
+      movement(2025, 2, "A", 50, 500),
+      movement(2026, 1, "A", 40, 400),
+      movement(2026, 2, "A", 60, 0),
     ];
-    const current = [
-      movement(2026, 1, "A", 3, 360),
-      movement(2026, 1, "B", 1, 220),
-      movement(2026, 2, "ENTRA", 1, 250),
-      movement(2026, 2, "Sin FOB", 1, 0),
+    const rows = [
+      ...scoped,
+      movement(2022, 2, "A", 300, 0),
+      movement(2026, 3, "B", 1, 100),
     ];
-    const bridge = priceBridge(current, previous)!;
-    expect(bridge.coverage).toEqual({
-      priorUnits: 4,
-      recentUnits: 4,
-      priorTotal: 5,
-      recentTotal: 5,
-    });
-    expect(bridge.steps.map((step) => step.to - step.from)).toEqual([
-      -70, -25, 20, 21,
+    expect(cumulativeUnits(rows, scoped, 2026, 4)).toEqual([
+      { month: 1, current: 40, previous: 30, median: 20, range: [15, 25] },
+      { month: 2, current: 100, previous: 80, median: 50, range: [30, 65] },
+      { month: 3, current: 100, previous: null, median: 40, range: null },
+      { month: 4, current: null, previous: null, median: null, range: null },
     ]);
-    expect(
-      bridge.before +
-        bridge.steps.reduce((sum, step) => sum + step.to - step.from, 0),
-    ).toBe(bridge.after);
-    expect(priceBridge([current[2]], previous)?.steps).toEqual([]);
   });
 
   it("pondera el FOB por unidad y excluye los modelos sin potencia de la dispersión", () => {
