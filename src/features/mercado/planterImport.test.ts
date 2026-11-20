@@ -63,6 +63,28 @@ describe("Carga de sembradoras", () => {
         ["HORSCH", "MAESTRO 18.45 CF", "17–18 líneas", 18, "Grano grueso", "Autotransportable"],
       ]);
   });
+  it("lee configuraciones declaradas y asigna bandas seguras sin inventar líneas exactas", async () => {
+    const cases = [
+      ["STARA", "SEMBRADORA MOD. PRINCESA 18-20, SERIE N. PRUEBA, C/18 CUERPOS, 50 CM"],
+      ["TATU", "SEMBRADORA ABONADORA, MODELO PST PLUS FLEX 11/11E450 TIT ALP III"],
+      ["FRAVI", "SEMBRADORA DE GRANO MODELO SFR 27 SENIOR"],
+      ["MASSEY FERGUSON", "SEMBRADORA ABONADORA MF509XM"],
+      ["MASSEY FERGUSON", "SEMBRADORA ABONADORA MF511XM"],
+      ["KF", "UNA UNIDAD DE SEMBRADORA ABONADORA"],
+    ];
+    const result = await readPlanterUpload([extract(cases.map(([brand, description], Subitem) => ({
+      ...penta, Subitem, "Marca Subitem": brand, "Descripción Subitem": description,
+    })))]);
+    expect(result.rows.map((row) => [row[4], row[5], row[11]])).toEqual([
+      ["PRINCESA 18-20", "17–18 líneas", 18],
+      ["PST PLUS FLEX 11", "11–12 líneas", 11],
+      ["SFR 27 SENIOR", "25–29 surcos", 27],
+      ["MF509XM", "Hasta 10 líneas", null],
+      ["MF511XM", "Sin segmento informado", null],
+      ["Sin identificar", "Sin segmento informado", null],
+    ]);
+  });
+
   it("procesa solo el mes de un Penta mensual y usa la configuración guardada", async () => {
     const original = await readPlanterUpload([history]);
     const update = await readPlanterUpload([extract([{

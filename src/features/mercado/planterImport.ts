@@ -1,4 +1,5 @@
 import { parseMovements, type Movement, type PlantingMovement } from "./model";
+import { planterSpec, plantingLines } from "./planterSpecs";
 import {
   coarseGrain, fineGrain, mixedGrain, unknownGrain, unknownTransport, unknownPlantingSegment,
   marketFamilies, plantingPriceBand, plantingSegment,
@@ -30,7 +31,7 @@ function importerName(value: unknown, ruc: unknown) {
 function cropFrom(value: unknown) {
   const clean = textKey(value);
   const coarse = /\b(?:G(?:RAN?OS?)?\s+(?:GRUESOS?|GROSSOS?)|(?:PARA|DE) (?:MAIZ|MILHO|SOJA|MANI))\b/.test(clean);
-  const fine = /\b(?:G(?:RAN?OS?)?\s+FINOS?|(?:PARA|DE) (?:ARROZ|TRIGO|AVENA|INVIERNO))\b/.test(clean);
+  const fine = /\b(?:G(?:RAN?OS?)?\s+FINOS?|(?:PARA|DE) (?:ARROZ|TRIGO|AVENA|AVEIA|INVIERNO|INVERNO))\b/.test(clean);
   if ((coarse && fine) || /^(?:MIXTA|HIBRIDA)$/.test(clean)) return mixedGrain;
   return coarse ? coarseGrain : fine ? fineGrain : unknownGrain;
 }
@@ -55,6 +56,8 @@ function storedSegment(value: unknown) {
 function modelOf(raw: string, brand: string) {
   const text = sourceUpper(raw).replace(/\s+/g, " ");
   if (/^(?:SIN DATOS|SIN IDENTIFICAR|NO DISPONIBLE)?$/.test(text)) return unknown;
+  const technical = planterSpec(brand, text);
+  if (technical) return technical.model;
   if (brand === "HORSCH") {
     const variant = text.match(/\b(MAESTRO|DAKAR|PRONTO|SPRINTER|AVATAR)\s+(\d{1,2})(?:[.,](\d{2}))?\s*((?:EV\s*F|CF|GV(?:\s*F)?|CV|DC|SD|DUO|SW|NT|SV|SX)\b)?/);
     if (variant) {
@@ -86,8 +89,9 @@ function catalog(rows: Movement[]) {
   const byModel = new Map<string, ObservedConfig>();
   for (const row of rows) {
     if (row[4] === unknown) continue;
-    const key = modelKey(row[3], row[4]);
-    const seen = byModel.get(key) ?? { lines: new Set<number>(), grain: new Set<string>(), transport: new Set<string>(), model: row[4] };
+    const model = planterSpec(row[3], row[4])?.model ?? row[4];
+    const key = modelKey(row[3], model);
+    const seen = byModel.get(key) ?? { lines: new Set<number>(), grain: new Set<string>(), transport: new Set<string>(), model };
     if (row[11] != null) seen.lines.add(row[11]);
     if (row[12] && row[12] !== unknownGrain) seen.grain.add(row[12]);
     if (row[13] && row[13] !== unknownTransport) seen.transport.add(row[13]);
@@ -144,7 +148,12 @@ export async function readPlanterUpload(files: SourceFile[], existing: Movement[
   }
   if (!historical && extracts.length !== 1)
     throw new Error("Para actualizar meses, seleccioná un solo extracto Penta/PYimport.");
-  const known = catalog([...(historical ?? existing)]);
+  const reference = historical ?? existing.filter((row) => row[0].startsWith("ocit:"));
+  const known = catalog(reference);
+  const earlier = historical ? new Map<string, ObservedConfig>() : catalog(existing.filter((row) => {
+    const month = monthIndex(row[1], row[2]);
+    return !row[0].startsWith("ocit:") && !extracts.some((source) => month >= source.start && month <= source.end);
+  }));
   const incoming = new Map<string, PlantingMovement>();
   for (const source of extracts) {
     for (const row of source.rows) {
@@ -152,9 +161,16 @@ export async function readPlanterUpload(files: SourceFile[], existing: Movement[
           !["IC04", "IC07", "IC09"].includes(sourceUpper(row["Régimen Código"]))) continue;
       const description = sourceUpper(row["Descripción Subitem"] || row["Descripción"]).replace(/\s+/g, " ");
       const product = description.replace(/^\W*SEMBRADORAS?(?:[-\s]+ABONADORAS?)?[\s.;,:-]*EN\b/, "");
-      const brand = brandName(row["Marca Subitem"]);
-      const detectedModel = modelOf(description, brand);
-      const observed = known.get(modelKey(brand, detectedModel));
+      const declaredBrand = brandName(row["Marca Subitem"]);
+      const brand = declaredBrand === "CLAAS" && /\bMAESTRO\s+\d{1,2}(?:[.,]\d{2})?\s+CF\b/.test(description)
+        ? "HORSCH"
+        : declaredBrand === "ATV" && /\bAPV\s+PS\s*\d{3,4}\b/.test(description)
+          ? "APV"
+          : declaredBrand;
+      const spec = planterSpec(brand, description);
+      const detectedModel = spec?.model ?? modelOf(description, brand);
+      const key = modelKey(brand, detectedModel);
+      const observed = known.get(key) ?? earlier.get(key);
       const qty = Number(row.Cantidad);
       const fob = Number(row["U$S FOB"]);
       const ambiguousBulk = /^84323[19]900/.test(sourceText(row["Código NCM"])) &&
@@ -169,21 +185,25 @@ export async function readPlanterUpload(files: SourceFile[], existing: Movement[
       const maestroCF = brand === "HORSCH" && /^MAESTRO \d+(?:\.\d+)? CF$/.test(model);
       const dakarCF = brand === "HORSCH" && /^DAKAR \d+(?:\.\d+)? CF$/.test(model);
       const reported = cropFrom(description);
-      const grain = reported !== unknownGrain ? reported : unique(observed?.grain) ??
+      const grain = reported !== unknownGrain ? reported : spec?.grain ?? unique(observed?.grain) ??
         (maestroCF ? coarseGrain : dakarCF ? fineGrain : unknownGrain);
-      const statedLines = description.match(/\b(\d{1,3})\s*(?:LINEAS?|LINHAS?|SURCOS?|SULCOS?|HILERAS?|FILAS?)\b/)?.[1];
       const cfConfiguration = maestroCF ? model.match(/^MAESTRO (\d+)(?:\.(?:45|50|60|76|81))? CF$/)?.[1] : undefined;
-      const lines = count(statedLines) ?? count(cfConfiguration) ?? unique(observed?.lines) ?? null;
+      const lines = plantingLines(description) ?? spec?.lines ?? count(cfConfiguration) ??
+        (spec?.possibleLines ? null : unique(observed?.lines) ?? null);
+      const possibleLines = spec?.possibleLines ?? [...(observed?.lines ?? [])];
+      const possibleSegments = new Set(possibleLines.map((option) => plantingSegment(grain, option)));
+      const segment = lines === null && possibleSegments.size === 1
+        ? [...possibleSegments][0] : plantingSegment(grain, lines);
       const recordedTransport = transportFrom(product.trim());
-      const transport = recordedTransport !== unknownTransport ? recordedTransport : unique(observed?.transport) ??
-        (maestroCF ? "Autotransportable" : unknownTransport);
+      const transport = recordedTransport !== unknownTransport ? recordedTransport : spec?.transport ??
+        unique(observed?.transport) ?? (maestroCF ? "Autotransportable" : unknownTransport);
       const statedUnits = product.match(/^\W*(?:LOS DEMAS EN\s+)?(\d{1,2})\s*\)?[ -]*UN(?:ID(?:AD(?:ES)?)?|D)\b/)?.[1];
       // A subitem with its own declared unit keeps that quantity even if the parent description lists a shipment total.
       const units = Number(statedUnits) === 1 && /\b(?:CHASIS|CHASSI[SS]?|SERIE)\b/.test(product) ? 1 : qty;
       if (!row.Despacho || row.Item == null || row.Subitem == null)
         throw new Error(source.name + " contiene un subítem sin identificación.");
       const id = ["pyimport", sourceText(row.Despacho), sourceText(row.Item), sourceText(row.Subitem)].join(":");
-      const item: PlantingMovement = [id, year, month, brand, model, plantingSegment(grain, lines),
+      const item: PlantingMovement = [id, year, month, brand, model, segment,
         plantingPriceBand(fob / units), importerName(row["Probable Importador"], row.RUC),
         sourceUpper(row["Estado Mercadería"]) || unknown, units, fob, lines, grain, transport];
       const prior = incoming.get(id);
