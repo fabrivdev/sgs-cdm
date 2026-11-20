@@ -2,7 +2,7 @@ import { parseMovements, type Movement, type PlantingMovement } from "./model";
 import { planterSpec, plantingLines } from "./planterSpecs";
 import {
   coarseGrain, fineGrain, mixedGrain, unknownGrain, unknownTransport, unknownPlantingSegment,
-  marketFamilies, plantingPriceBand, plantingSegment,
+  plantingImportSegments, plantingPriceBand, plantingSegment,
 } from "./marketFamily";
 import { monthIndex, readSourceWorkbook, sourceText, sourceUpper, type MarketUpload, type SourceFile } from "./penta";
 
@@ -48,7 +48,7 @@ function count(value: unknown) {
 }
 function storedSegment(value: unknown) {
   const raw = textKey(value);
-  return marketFamilies.sembradoras.segments.find((label) =>
+  return plantingImportSegments.find((label) =>
     textKey(label).replace(/^MAS DE /, "MAYOR A ").replace(/ /g, "") ===
     raw.replace(/^MAYORES A /, "MAYOR A ").replace(/ /g, ""),
   ) ?? unknownPlantingSegment;

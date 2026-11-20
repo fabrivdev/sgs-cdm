@@ -1,4 +1,4 @@
-import { harvestClasses, harvestPriceBands, unknownHarvestClass } from "./model";
+import { harvestClasses, harvestPriceBands, unknownHarvestClass, type Movement } from "./model";
 import { hpBands } from "./marketAnalysis";
 
 export type MarketFamily = "tractores" | "cosechadoras" | "sembradoras";
@@ -18,21 +18,35 @@ const fineSegments = [
   "Hasta 20 surcos", "21–24 surcos", "25–29 surcos", "30–33 surcos",
   "34–37 surcos", "Más de 37 surcos",
 ];
+const coarseUpper = [10, 12, 14, 16, 18, 21, 23, 27];
+const fineUpper = [20, 24, 29, 33, 37];
 const plantingSummary = [
-  { label: "Grueso · hasta 14 líneas", bands: coarseSegments.slice(0, 3) },
-  { label: "Grueso · 15–18 líneas", bands: coarseSegments.slice(3, 5) },
-  { label: "Grueso · 19 líneas o más", bands: coarseSegments.slice(5) },
-  { label: "Fino · hasta 29 líneas", bands: fineSegments.slice(0, 3) },
-  { label: "Fino · 30 líneas o más", bands: fineSegments.slice(3) },
+  { label: "Hasta 14 líneas", upper: 14 },
+  { label: "15–18 líneas", upper: 18 },
+  { label: "19–24 líneas", upper: 24 },
+  { label: "25–29 líneas", upper: 29 },
+  { label: "30 líneas o más", upper: Infinity },
 ];
-const plantingSummaryByBand = new Map<string, string>(
-  plantingSummary.flatMap(({ label, bands }) => bands.map((band) => [band, label] as const)),
+const plantingSummaryOrder = plantingSummary.map(({ label }) => label);
+const bandAt = (lines: number) => plantingSummary.find(({ upper }) => lines <= upper)?.label;
+
+const storedPlantingBands = new Map(
+  ([[coarseSegments, coarseUpper], [fineSegments, fineUpper]] as const).flatMap(([bands, bounds]) =>
+    bands.map((band, i) => [
+      band, [(bounds[i - 1] ?? 0) + 1, bounds[i] ?? Infinity],
+    ] as const),
+  ),
 );
-export const plantingSummaryOrder = plantingSummary.map(({ label }) => label);
-export function plantingSummaryBand(band: string) {
-  return plantingSummaryByBand.get(band) ?? unknownPlantingSegment;
+export function plantingSummaryBand(row: Movement) {
+  if (row[11] != null) return bandAt(row[11]) ?? unknownPlantingSegment;
+  const bounds = storedPlantingBands.get(row[5]);
+  if (bounds && bandAt(bounds[0]) === bandAt(bounds[1])) {
+    return bandAt(bounds[0]) ?? unknownPlantingSegment;
+  }
+  return unknownPlantingSegment;
 }
 
+export const plantingImportSegments = [...coarseSegments, ...fineSegments];
 export const plantingPriceBands = [
   "Menos de $25.000", "$25.000 a <$50.000", "$50.000 a <$100.000",
   "$100.000 a <$200.000", "$200.000 o más",
@@ -47,7 +61,7 @@ export function plantingSegment(grain: string, count: number | null) {
     return unknownPlantingSegment;
   const fine = grain === fineGrain;
   const labels = fine ? fineSegments : coarseSegments;
-  const index = (fine ? [20, 24, 29, 33, 37] : [10, 12, 14, 16, 18, 21, 23, 27])
+  const index = (fine ? fineUpper : coarseUpper)
     .findIndex((upper) => count <= upper);
   return labels[index < 0 ? labels.length - 1 : index];
 }
@@ -66,7 +80,7 @@ export const marketFamilies = {
   },
   sembradoras: { title:"Sembradoras", table:"mercado_sembradoras", machine:"sembradora",
     benchmark:"HORSCH", segmentRoute:"segmentos", segmentTab:"Segmentos",
-    segmentHeader:"Líneas o surcos", segmentName:"segmento", segments:[...coarseSegments,...fineSegments],
+    segmentHeader:"Líneas de siembra", segmentName:"segmento", segments:plantingSummaryOrder,
     unknownSegment:unknownPlantingSegment, prices:plantingPriceBands,
   },
 } as const;

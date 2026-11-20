@@ -28,7 +28,6 @@ import {
   marketFamilies,
   plantingFilters,
   plantingSummaryBand,
-  plantingSummaryOrder,
   unknownPlantingSegment,
   type MarketFamily,
 } from "./marketFamily";
@@ -95,19 +94,33 @@ export function TractorDashboard({
     maxMonth,
     Math.max(1, Number(params.get("hasta")) || maxMonth),
   );
-  const state = params.get("estado") || "";
+  const requestedState = params.get("estado") || "";
   const brand = params.get("marcas");
   const rankingDimension = brand ? "modelos" : "marcas";
   const active = dimensionKeys.filter((d) => params.has(routeKey(d)));
   const monthOnly = Number(params.get("mes"));
   const extraFilters = planting ? plantingFilters : [];
-  const accumulatedScope = rows.filter(
-    (r) =>
-      r[2] <= end &&
-      (!state || r[8] === state) &&
-      active.every((d) => label(r, d) === params.get(routeKey(d))) &&
-      extraFilters.every(({ key, field }) => !params.has(key) || r[field] === params.get(key)),
+  const marketLabel = (row: Movement, dimension: Dimension) =>
+    planting && dimension === "potencia" ? plantingSummaryBand(row) : label(row, dimension);
+  const unfilteredByState = rows.filter(
+    (row) =>
+      row[2] <= end &&
+      active.every((dimension) => {
+        const selected = params.get(routeKey(dimension));
+        return marketLabel(row, dimension) === selected ||
+          (planting && dimension === "potencia" && selected !== null &&
+            !bands.potencia?.includes(selected) && row[5] === selected);
+      }) &&
+      extraFilters.every(({ key, field }) => !params.has(key) || row[field] === params.get(key)),
   );
+  const stateRows = planting
+    ? unfilteredByState.filter((row) => row[1] === year && (!monthOnly || row[2] === monthOnly))
+    : rows;
+  const availableStates = [...new Set(stateRows.map((row) => row[8]))].sort();
+  const state = !planting || availableStates.includes(requestedState) ? requestedState : "";
+  const accumulatedScope = state
+    ? unfilteredByState.filter((row) => row[8] === state)
+    : unfilteredByState;
   const scoped = monthOnly
     ? accumulatedScope.filter((r) => r[2] === monthOnly)
     : accumulatedScope;
@@ -123,6 +136,7 @@ export function TractorDashboard({
     b = totals(current);
   function href(target: View, changes: Record<string, string | null> = {}) {
     const p = new URLSearchParams(params);
+    if (planting && !state) p.delete("estado");
     for (const [k, v] of Object.entries(changes)) {
       if (v === null) p.delete(routeKey(k));
       else p.set(routeKey(k), v);
@@ -138,6 +152,7 @@ export function TractorDashboard({
   }
   function set(k: string, v: string) {
     const p = new URLSearchParams(params);
+    if (planting && !state) p.delete("estado");
     if (v) p.set(k, v);
     else p.delete(k);
     if (k === "marcas") p.delete("modelos");
@@ -209,7 +224,7 @@ export function TractorDashboard({
     ? compare(
         brandView === "precios" ? current.filter(priceEligible) : current,
         brandView === "precios" ? previous.filter(priceEligible) : previous,
-        (r) => label(r, brandView),
+        (r) => marketLabel(r, brandView),
       )
     : [];
   if (brandView && bands[brandView] && !params.has("orden")) {
@@ -224,7 +239,7 @@ export function TractorDashboard({
           compare(
             current.filter(priceEligible),
             previous.filter(priceEligible),
-            (row) => label(row, brandView),
+            (row) => marketLabel(row, brandView),
           ).map((g) => [g.name, g]),
         )
       : null;
@@ -254,7 +269,7 @@ export function TractorDashboard({
   const options = (values: string[]) =>
     values.map((value) => ({ value, label: value }));
   return (
-    <PageShell className="market-tractors">
+    <PageShell className={planting ? "market-tractors market-planters" : "market-tractors"}>
       <PageHeader
         title={equipment.title}
         titleAccessory={
@@ -329,16 +344,18 @@ export function TractorDashboard({
             .slice(0, maxMonth)
             .map((label, i) => ({ label, value: String(i + 1) }))}
         />
-        <FilterSelect
-          label="Estado"
-          placeholder="Estado"
-          value={state || "todos"}
-          onChange={(value) => set("estado", value === "todos" ? "" : value)}
-          options={[
-            { value: "todos", label: "Todos" },
-            ...options([...new Set(rows.map((r) => r[8]))].sort()),
-          ]}
-        />
+        {(!planting || availableStates.length > 1) && (
+          <FilterSelect
+            label="Estado"
+            placeholder="Estado"
+            value={state || "todos"}
+            onChange={(value) => set("estado", value === "todos" ? "" : value)}
+            options={[
+              { value: "todos", label: "Todos" },
+              ...options(availableStates),
+            ]}
+          />
+        )}
         {extraFilters.map(({key, label, field}) => (
           <FilterSelect
             key={key}
@@ -421,7 +438,7 @@ export function TractorDashboard({
               {leaders.map((g) => (
                 <div
                   className={
-                    "market-rank" + (isBenchmark(g.name) ? " market-claas" : "")
+                    "market-rank" + (isBenchmark(g.name) ? " market-benchmark" : "")
                   }
                   key={g.name}
                 >
@@ -508,13 +525,13 @@ export function TractorDashboard({
               const grouped = compare(
                 d === "precios" ? current.filter(priceEligible) : current,
                 d === "precios" ? previous.filter(priceEligible) : previous,
-                (r) => compactSegments ? plantingSummaryBand(label(r, d)) : label(r, d),
+                (r) => marketLabel(r, d),
               );
               const pending = compactSegments
                 ? grouped.find((group) => group.name === unknownPlantingSegment)
                 : undefined;
               const chart = pending ? grouped.filter((group) => group !== pending) : grouped;
-              const order = compactSegments ? plantingSummaryOrder : bands[d]!;
+              const order = bands[d]!;
               chart.sort(
                 (x, y) => order.indexOf(x.name) - order.indexOf(y.name),
               );
@@ -624,7 +641,7 @@ export function TractorDashboard({
                   return (
                     <tr
                       key={g.name}
-                      className={isBenchmark(g.name) ? "market-claas" : undefined}
+                      className={isBenchmark(g.name) ? "market-benchmark" : undefined}
                     >
                       <th>
                         {detail ? (

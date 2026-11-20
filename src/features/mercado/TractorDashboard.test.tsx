@@ -90,7 +90,7 @@ describe("Mercado de tractores", () => {
       .closest<HTMLElement>(".market-panel")!;
     expect(
       within(ranking).getByText("AXION").closest(".market-rank"),
-    ).toHaveClass("market-claas");
+    ).toHaveClass("market-benchmark");
   });
   it("oculta unidades sin FOB de la distribución y conserva el total de mercado", () => {
     const noFob: Movement = [...sample[0]];
@@ -231,12 +231,12 @@ it("conserva el tipo de grano al abrir un segmento de Sembradoras", () => {
   );
   expect(screen.getByRole("columnheader", { name: "Cuota HORSCH" })).toBeVisible();
   fireEvent.click(screen.getByRole("link", { name: "Segmentos" }));
-  fireEvent.click(screen.getByRole("link", { name: "17–18 líneas ›" }));
+  fireEvent.click(screen.getByRole("link", { name: "15–18 líneas ›" }));
   expect(screen.getByRole("link", { name: "HORSCH ›" })).toBeVisible();
   expect(screen.queryByText("OTRA")).toBeNull();
 });
 
-it("resume las bandas de sembradoras en el tablero y conserva el detalle en Segmentos", () => {
+it("agrupa los mismos números de líneas con independencia del grano", () => {
   const planter = (id: string, year: number, band: string, units: number): Movement =>
     [id, year, 1, "HORSCH", "MAESTRO", band, "$50.000 a <$100.000", "A", "NUEVO", units, 75_000];
   render(
@@ -248,24 +248,27 @@ it("resume las bandas de sembradoras en el tablero y conserva el detalle en Segm
         planter("D", 2026, "21–24 surcos", 6),
         planter("E", 2026, "25–29 surcos", 8),
         planter("F", 2026, "Sin segmento informado", 100),
+        ["G", 2026, 1, "HORSCH", "MAESTRO", "24–27 líneas", "$50.000 a <$100.000", "A", "NUEVO", 3, 75_000, 24, "Grano grueso", "Lateral"],
       ]} />
     </MemoryRouter>,
   );
   const panel = screen.getByRole("heading", { name: "Unidades por segmento" }).closest<HTMLElement>(".market-panel")!;
-  expect(within(panel).getByTitle("2025: 9 · 2026: 11")).toHaveTextContent("Grueso · hasta 14 líneas");
-  expect(within(panel).getByTitle("2025: 0 · 2026: 14")).toHaveTextContent("Fino · hasta 29 líneas");
+  expect(within(panel).getByTitle("2025: 9 · 2026: 11")).toHaveTextContent("Hasta 14 líneas");
+  expect(within(panel).getByTitle("2025: 0 · 2026: 8")).toHaveTextContent("25–29 líneas");
   expect(within(panel).getByText("2026 · 100")).toBeVisible();
+  expect(within(panel).getByTitle("2025: 0 · 2026: 9")).toHaveTextContent("19–24 líneas");
+  expect(screen.getByRole("heading", { name: "Tipo de grano" })).toBeVisible();
   expect(within(panel).queryByText("13–14 líneas")).toBeNull();
   expect(screen.queryByRole("heading", { name: "Líneas de siembra por segmento" })).toBeNull();
   const indicators = screen.getByRole("region", { name: "Comparación por segmento" });
-  const until14 = within(indicators).getByRole("row", { name: /Grueso · hasta 14 líneas/ });
+  const until14 = within(indicators).getByRole("row", { name: /Hasta 14 líneas/ });
   expect(within(until14).getByText("11")).toBeVisible();
   expect(within(until14).getByText("$13.636")).toBeVisible();
   expect(within(indicators).queryByText("13–14 líneas")).toBeNull();
   const fob = screen.getByTitle("HORSCH · MAESTRO · FOB $13.636");
-  expect(fob.closest(".market-range")).toHaveTextContent("Grueso · hasta 14 líneas");
+  expect(fob.closest(".market-range")).toHaveTextContent("Hasta 14 líneas");
   fireEvent.click(screen.getByRole("link", { name: "Segmentos" }));
-  expect(screen.getByRole("link", { name: "13–14 líneas ›" })).toBeVisible();
+  expect(screen.getByRole("link", { name: "Hasta 14 líneas ›" })).toBeVisible();
 });
 
 it("ubica una Maestro GV guardada en su banda y muestra su FOB original", () => {
@@ -279,8 +282,25 @@ it("ubica una Maestro GV guardada en su banda y muestra su FOB original", () => 
     </MemoryRouter>,
   );
   const maestro = screen.getByTitle("HORSCH · MAESTRO 40.45 GV F · FOB $447.301");
-  expect(maestro.closest(".market-range")).toHaveTextContent("Grueso · 19 líneas o más");
+  expect(maestro.closest(".market-range")).toHaveTextContent("30 líneas o más");
   const dakar = screen.getByTitle("HORSCH · DAKAR 8 CF · FOB $155.104");
-  expect(dakar.closest(".market-range")).toHaveTextContent("Fino · 30 líneas o más");
+  expect(dakar.closest(".market-range")).toHaveTextContent("30 líneas o más");
   expect(screen.getByText("$500.000")).toBeVisible();
+});
+
+it("oculta el filtro de estado en un período de sembradoras sin equipos usados", () => {
+  const rows: Movement[] = [
+    ["new", 2026, 1, "HORSCH", "MAESTRO", "17–18 líneas", "$100.000 a <$200.000", "A", "NUEVO", 2, 200_000, 18, "Grano grueso", "Lateral"],
+    ["old", 2025, 1, "HORSCH", "DAKAR", "Más de 37 surcos", "$100.000 a <$200.000", "A", "USADO", 1, 125_000, 60, "Grano fino", "Lateral"],
+  ];
+  render(
+    <MemoryRouter initialEntries={["/mercado/sembradoras?estado=USADO"]}>
+      <TractorDashboard family="sembradoras" rows={rows} />
+    </MemoryRouter>,
+  );
+  expect(screen.queryByText("Estado", { exact: true })).toBeNull();
+  expect(screen.getByRole("link", { name: /Unidades importadas/ })).toHaveTextContent("2");
+  const panel = screen.getByRole("heading", { name: "Tipo de grano" }).closest<HTMLElement>(".market-panel")!;
+  expect(within(panel).getByText("Grano grueso")).toBeVisible();
+  expect(within(panel).getByText("Grano fino")).toBeVisible();
 });

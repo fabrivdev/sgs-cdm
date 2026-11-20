@@ -282,8 +282,8 @@
 .peer-key {
   background: hsl(var(--muted-foreground) / 0.45);
 }
-.claas-key {
-  background: #78a912;
+.market-benchmark-key {
+  background: var(--market-benchmark, #78a912);
   border-radius: 50% !important;
 }
 .market-range {
@@ -328,8 +328,8 @@
   height: 13px;
   border: 2px solid hsl(var(--card));
   border-radius: 50%;
-  background: #78a912;
-  box-shadow: 0 0 0 1px #65920d;
+  background: var(--market-benchmark, #78a912);
+  box-shadow: 0 0 0 1px var(--market-benchmark, #65920d);
   transform: translate(-50%, -50%);
 }
 .market-range-values strong {
@@ -391,7 +391,7 @@
   color: hsl(var(--muted-foreground));
 }
 .market-panel td[data-opportunity] {
-  background: hsl(var(--primary) / 0.09);
+  background: var(--market-benchmark-tint, hsl(var(--primary) / 0.09));
   font-weight: 650;
 }
 .market-price-count {
@@ -514,12 +514,16 @@
 .market-paired b:first-child {
   background: hsl(var(--muted-foreground) / 0.45);
 }
-.market-tractors .market-claas {
-  background: #84b81824;
+.market-planters {
+  --market-benchmark: #c31727;
+  --market-benchmark-tint: #c317271a;
+}
+.market-tractors .market-benchmark {
+  background: var(--market-benchmark-tint, #84b81824);
   font-weight: 650;
 }
-.market-rank.market-claas b {
-  background: #78a912;
+.market-rank.market-benchmark b {
+  background: var(--market-benchmark, #78a912);
 }
 .market-tractors tbody th {
   font-weight: 550;

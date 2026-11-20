@@ -34,7 +34,10 @@ import {
 import {
   marketFamilies,
   plantingSummaryBand,
-  plantingSummaryOrder,
+  coarseGrain,
+  fineGrain,
+  mixedGrain,
+  unknownGrain,
   type MarketFamily,
 } from "./marketFamily";
 
@@ -50,10 +53,9 @@ function SegmentOpportunity({
   family,
   priorComplete,
 }: Period & { family: MarketFamily; priorComplete: boolean }) {
-  const { segments, unknownSegment, benchmark, segmentName, segmentHeader } = marketFamilies[family];
+  const { segments: bands, unknownSegment, benchmark, segmentName, segmentHeader } = marketFamilies[family];
   const compact = family === "sembradoras";
-  const bands = compact ? plantingSummaryOrder : segments;
-  const segmentOf = (row: Movement) => compact ? plantingSummaryBand(row[5]) : row[5];
+  const segmentOf = (row: Movement) => compact ? plantingSummaryBand(row) : row[5];
   const order = [...bands, unknownSegment];
   const groups = compare(current, previous, segmentOf).sort(
     (a, b) => order.indexOf(a.name) - order.indexOf(b.name),
@@ -80,7 +82,7 @@ function SegmentOpportunity({
         <table className="market-opportunity-table">
           <thead>
             <tr>
-              <th scope="col">{compact ? "Líneas de siembra" : segmentHeader}</th>
+              <th scope="col">{segmentHeader}</th>
               <th scope="col">Unidades</th>
               <th scope="col">Var. interanual</th>
               <th scope="col">FOB medio</th>
@@ -173,9 +175,8 @@ function ModelPosition({
   const pointLabel = (point: { model: string; price: number }) =>
     family === "sembradoras" ? `${point.model} · FOB ${money(point.price)}` : `${benchmark} · ${money(point.price)}`;
   const summary = family === "sembradoras";
-  const order = summary ? plantingSummaryOrder : segments;
-  const { points } = positioning(current, state, order, summary ? plantingSummaryBand : undefined);
-  const bands = order
+  const { points } = positioning(current, state, segments, summary ? plantingSummaryBand : undefined);
+  const bands = segments
     .map((band) => {
       const inBand = points.filter((point) => point.band === band);
       const peers = inBand.filter(
@@ -212,7 +213,7 @@ function ModelPosition({
             <i className="peer-key" /> Otras marcas
           </span>
           <span>
-            <i className="claas-key" /> {benchmark}
+            <i className="market-benchmark-key" /> {benchmark}
           </span>
         </div>
         {states.length > 1 && (
@@ -552,8 +553,13 @@ export function YearLegend({ year }: { year: number }) {
   );
 }
 
-function ConditionMix({ current, previous, year }: Period) {
-  const states = [
+function MarketMix({ current, previous, year, grain }: Period & { grain: boolean }) {
+  const categories = grain ? [
+    { key: coarseGrain, name: coarseGrain, color: "hsl(var(--primary))" },
+    { key: fineGrain, name: fineGrain, color: "#71869c" },
+    { key: mixedGrain, name: mixedGrain, color: "#a97837" },
+    { key: unknownGrain, name: unknownGrain, color: "hsl(var(--muted-foreground) / 0.45)" },
+  ] : [
     { key: "NUEVO", name: "Nuevas", color: "hsl(var(--primary))" },
     { key: "USADO", name: "Usadas", color: "#71869c" },
     {
@@ -566,18 +572,19 @@ function ConditionMix({ current, previous, year }: Period) {
     { year: year - 1, rows: previous },
     { year, rows: current },
   ];
-  const shown = states.filter(({ key }) =>
-    periods.some(({ rows }) => rows.some((row) => row[8] === key)),
+  const category = (row: Movement) => grain ? (row[12] || unknownGrain) : row[8];
+  const shown = categories.filter(({ key }) =>
+    periods.some(({ rows }) => rows.some((row) => category(row) === key)),
   );
   return (
     <Card className="market-panel market-condition-panel">
-      <h2>{marketChartTitles.conditionMix}</h2>
+      <h2>{grain ? marketChartTitles.grainMix : marketChartTitles.conditionMix}</h2>
       {shown.length ? (
         <div className="market-condition-mix">
           {periods.map(({ year: period, rows }) => {
             const { units } = totals(rows);
             const segments = shown.map((state) => {
-              const matching = rows.filter((row) => row[8] === state.key);
+              const matching = rows.filter((row) => category(row) === state.key);
               return {
                 ...state,
                 units: totals(matching).units,
@@ -755,7 +762,7 @@ export function TractorAnalysis(
       <ModelPosition {...props} />
       <ImportRhythm {...props} />
       <ImporterConcentration {...props} />
-      {props.family === "cosechadoras" && <ConditionMix {...props} />}
+      {props.family !== "tractores" && <MarketMix {...props} grain={props.family === "sembradoras"} />}
       <Seasonality {...props} />
     </div>
   );
