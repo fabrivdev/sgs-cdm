@@ -799,9 +799,6 @@
   .market-importer-ticks {
     grid-column: 1 / -1;
   }
-  .market-range-axis span:nth-child(even) {
-    display: none;
-  }
 }
 @media (max-width: 550px) {
   .market-range {
@@ -811,10 +808,6 @@
     margin-left: 113px;
   }
   .market-range-axis span:nth-child(even) {
-    display: none;
-  }
-  .market-range-axis span:nth-child(3),
-  .market-range-axis span:nth-child(7) {
     display: none;
   }
   .market-bridge-summary {

@@ -253,26 +253,20 @@ function ModelPosition({ current, year }: Omit<Period, "previous">) {
                       className="market-range-point"
                       key={point.model}
                       style={{ left: scale(point.price) }}
-                      title={`${point.model} · ${money(point.price)} · ${number(point.units)} uds.`}
-                      aria-label={`${point.model} · ${money(point.price)} · ${number(point.units)} uds.`}
+                      title={`CLAAS · ${money(point.price)}`}
+                      aria-label={`CLAAS · ${money(point.price)}`}
                     />
                   ))}
                 </div>
                 <div className="market-range-values">
                   {median !== null && <span>Mediana {money(median)}</span>}
-                  {claasModels.map((point) => (
-                    <strong key={point.model}>
-                      {point.model.replace("CLAAS · ", "")} ·{" "}
-                      {money(point.price)} · {number(point.units)} uds.
-                    </strong>
-                  ))}
                 </div>
               </div>
             ))}
             <div className="market-range-axis">
-              {Array.from({ length: 9 }, (_, index) => (
-                <span key={index} style={{ left: index * 12.5 + "%" }}>
-                  {money((limit * index) / 8)}
+              {Array.from({ length: 5 }, (_, index) => (
+                <span key={index} style={{ left: index * 25 + "%" }}>
+                  {money((limit * index) / 4)}
                 </span>
               ))}
             </div>
