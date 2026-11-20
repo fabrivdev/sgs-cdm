@@ -19,11 +19,11 @@ const fineSegments = [
   "34–37 surcos", "Más de 37 surcos",
 ];
 const plantingSummary = [
-  { label: "Hasta 14 líneas", bands: coarseSegments.slice(0, 3) },
-  { label: "15–18 líneas", bands: coarseSegments.slice(3, 5) },
-  { label: "19 líneas o más", bands: coarseSegments.slice(5) },
-  { label: "Hasta 29 surcos", bands: fineSegments.slice(0, 3) },
-  { label: "30 surcos o más", bands: fineSegments.slice(3) },
+  { label: "Grueso · hasta 14 líneas", bands: coarseSegments.slice(0, 3) },
+  { label: "Grueso · 15–18 líneas", bands: coarseSegments.slice(3, 5) },
+  { label: "Grueso · 19 líneas o más", bands: coarseSegments.slice(5) },
+  { label: "Fino · hasta 29 líneas", bands: fineSegments.slice(0, 3) },
+  { label: "Fino · 30 líneas o más", bands: fineSegments.slice(3) },
 ];
 const plantingSummaryByBand = new Map<string, string>(
   plantingSummary.flatMap(({ label, bands }) => bands.map((band) => [band, label] as const)),

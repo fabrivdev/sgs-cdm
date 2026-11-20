@@ -2,7 +2,7 @@
 
 Ruta `/mercado/sembradoras`. Comparte tarjetas, títulos de gráficos y navegación con Tractores y Cosechadoras. La marca de referencia es HORSCH y aparece en el ranking general aunque quede fuera de las primeras marcas. Las vistas incluyen unidades, participación y FOB, marcas, modelos, segmentos, importadores, acumulado y estacionalidad. Los filtros de grano y transporte se conservan al abrir un desglose.
 
-El desglose usa líneas de siembra para grano grueso y surcos para grano fino. Las líneas totales multiplican la configuración identificada por las unidades. Cuando la configuración falta o presenta variantes, se conserva el valor desconocido del campo. Las configuraciones explícitas del extracto prevalecen sobre coincidencias únicas por marca y modelo. HORSCH documenta la nomenclatura de [Maestro CF](https://www.horsch.com/es_py/productos/sembradoras-de-precision/maestro/maestro-cf) y las [barras intercambiables Dakar y Maestro](https://www.horsch.com/pt/home/detail/dakar-cf-e-maestro-cf-versatilidade-com-sistema-de-troca-de-barra).
+Las líneas y los surcos cuentan la misma magnitud. El desglose detallado conserva la nomenclatura histórica de líneas para grano grueso y surcos para grano fino. Cuando la configuración falta o presenta variantes, se conserva el valor desconocido del campo. Las configuraciones explícitas del extracto prevalecen sobre coincidencias únicas por marca y modelo. HORSCH documenta la nomenclatura de [Maestro CF](https://www.horsch.com/es_py/productos/sembradoras-de-precision/maestro/maestro-cf) y las [barras intercambiables Dakar y Maestro](https://www.horsch.com/pt/home/detail/dakar-cf-e-maestro-cf-versatilidade-com-sistema-de-troca-de-barra).
 
 - Inicialización en Administración → Datos con OCIT Plantadoras y el extracto Penta/PYimport que continúa su período. Fuentes verificadas para la primera carga: `OCIT_Plantadoras.xlsx` y `detalle_PYimport_2026-10-4-163928.xlsx`, con cobertura hasta septiembre de 2026.
 - Para actualizar, cargar solo el Excel original completo del mes o período elegido. El RPC reemplaza ese período y conserva el resto. El extracto puede incluir NCM sin equipos completos. La importación excluye repuestos y equipos manuales detectados.
@@ -10,7 +10,7 @@ El desglose usa líneas de siembra para grano grueso y surcos para grano fino. L
 
 Los gráficos históricos representan los huecos de cobertura y omiten la variación cuando falta algún mes del período comparado. El archivo PYimport con período agosto de 2025 completa el mes faltante de OCIT. El segundo extracto de esta revisión incorpora octubre de 2026. Ambos se pueden cargar por separado sin reemplazar los demás meses.
 
-En el tablero, **Unidades por segmento** resume grano grueso en tres bandas de líneas y grano fino en dos bandas de surcos. Las unidades pendientes aparecen debajo de las barras para conservar el total sin afectar la escala. La pestaña Segmentos mantiene los rangos detallados.
+En el tablero, **Unidades por segmento**, **Indicadores por segmento** y **FOB por segmento** usan líneas de siembra como unidad común, con tres bandas de grano grueso y dos de grano fino. Las unidades pendientes conservan su conteo sin afectar la escala. El FOB por modelo se calcula a partir de las unidades de cada banda resumida. La pestaña Segmentos mantiene los rangos detallados.
 
 ## Clasificación a partir del subítem
 

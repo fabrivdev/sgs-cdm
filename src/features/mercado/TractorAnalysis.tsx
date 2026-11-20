@@ -31,7 +31,12 @@ import {
   cumulativeUnits,
   seasonality,
 } from "./marketAnalysis";
-import { marketFamilies, type MarketFamily } from "./marketFamily";
+import {
+  marketFamilies,
+  plantingSummaryBand,
+  plantingSummaryOrder,
+  type MarketFamily,
+} from "./marketFamily";
 
 type Period = {
   current: Movement[];
@@ -45,26 +50,24 @@ function SegmentOpportunity({
   family,
   priorComplete,
 }: Period & { family: MarketFamily; priorComplete: boolean }) {
-  const { segments: bands, unknownSegment, benchmark, segmentName, segmentHeader } = marketFamilies[family];
+  const { segments, unknownSegment, benchmark, segmentName, segmentHeader } = marketFamilies[family];
+  const compact = family === "sembradoras";
+  const bands = compact ? plantingSummaryOrder : segments;
+  const segmentOf = (row: Movement) => compact ? plantingSummaryBand(row[5]) : row[5];
   const order = [...bands, unknownSegment];
-  const groups = compare(current, previous, (row) => row[5]).sort((a, b) => {
-    return order.indexOf(a.name) - order.indexOf(b.name);
-  });
+  const groups = compare(current, previous, segmentOf).sort(
+    (a, b) => order.indexOf(a.name) - order.indexOf(b.name),
+  );
   const brand = new Map(
-    compare(
-      current.filter((row) => row[3] === benchmark),
-      [],
-      (row) => row[5],
-    ).map((group) => [group.name, group.units]),
+    compare(current.filter((row) => row[3] === benchmark), [], segmentOf)
+      .map((group) => [group.name, group.units]),
   );
   const priced = new Map(
-    compare(
-      current.filter((row) => row[10] > 0),
-      [],
-      (row) => row[5],
-    ).map((group) => [group.name, group]),
+    compare(current.filter((row) => row[10] > 0), [], segmentOf)
+      .map((group) => [group.name, group]),
   );
-  const peak = Math.max(1, ...groups.map((group) => group.units));
+  const displayedBars = compact ? groups.filter((group) => bands.includes(group.name)) : groups;
+  const peak = Math.max(1, ...displayedBars.map((group) => group.units));
   return (
     <Card className="market-panel">
       <h2>{marketChartTitles.segmentIndicators}</h2>
@@ -77,7 +80,7 @@ function SegmentOpportunity({
         <table className="market-opportunity-table">
           <thead>
             <tr>
-              <th scope="col">{segmentHeader}</th>
+              <th scope="col">{compact ? "Líneas de siembra" : segmentHeader}</th>
               <th scope="col">Unidades</th>
               <th scope="col">Var. interanual</th>
               <th scope="col">FOB medio</th>
@@ -103,12 +106,11 @@ function SegmentOpportunity({
                     title={`${year - 1}: ${number(group.prior)} unidades`}
                   >
                     <span>{number(group.units)}</span>
-                    <span
-                      className="market-opportunity-track"
-                      aria-hidden="true"
-                    >
-                      <i style={{ width: (group.units / peak) * 100 + "%" }} />
-                    </span>
+                    {(!compact || classified) && (
+                      <span className="market-opportunity-track" aria-hidden="true">
+                        <i style={{ width: (group.units / peak) * 100 + "%" }} />
+                      </span>
+                    )}
                   </td>
                   <td
                     data-tone={
@@ -170,8 +172,10 @@ function ModelPosition({
   const benchmarkPrefix = benchmark + " · ";
   const pointLabel = (point: { model: string; price: number }) =>
     family === "sembradoras" ? `${point.model} · FOB ${money(point.price)}` : `${benchmark} · ${money(point.price)}`;
-  const { points } = positioning(current, state, segments);
-  const bands = segments
+  const summary = family === "sembradoras";
+  const order = summary ? plantingSummaryOrder : segments;
+  const { points } = positioning(current, state, order, summary ? plantingSummaryBand : undefined);
+  const bands = order
     .map((band) => {
       const inBand = points.filter((point) => point.band === band);
       const peers = inBand.filter(
@@ -548,51 +552,6 @@ export function YearLegend({ year }: { year: number }) {
   );
 }
 
-function PlantingRows({ current, previous, year }: Period) {
-  const countRows = (values: Movement[]) => {
-    const counts = new Map<string, number>();
-    for (const row of values) {
-      if (row[11] == null) continue;
-      counts.set(row[5], (counts.get(row[5]) ?? 0) + row[9] * row[11]);
-    }
-    return counts;
-  };
-  const recent = countRows(current);
-  const prior = countRows(previous);
-  const groups = marketFamilies.sembradoras.segments
-    .filter((segment) => recent.has(segment) || prior.has(segment));
-  const peak = Math.max(1, ...groups.flatMap((segment) => [recent.get(segment) ?? 0, prior.get(segment) ?? 0]));
-  return (
-    <Card className="market-panel market-condition-panel">
-      <h2>{marketChartTitles.plantingRows}</h2>
-      {groups.length ? (
-        <>
-          <div className="market-planting-rows">
-            {groups.map((segment) => {
-              const now = recent.get(segment);
-              const before = prior.get(segment);
-              return (
-                <div key={segment} className="market-rank market-band"
-                  title={`${year - 1}: ${before == null ? "—" : number(before)} · ${year}: ${now == null ? "—" : number(now)}`}>
-                  <span>{segment}</span>
-                  <i className="market-paired" aria-hidden="true">
-                    <b style={{ width: ((before ?? 0) / peak) * 100 + "%" }} />
-                    <b style={{ width: ((now ?? 0) / peak) * 100 + "%" }} />
-                  </i>
-                  <strong>{now == null ? "—" : number(now)}</strong>
-                </div>
-              );
-            })}
-          </div>
-          <YearLegend year={year} />
-        </>
-      ) : (
-        <p>Sin cantidad de líneas o surcos informada en este período.</p>
-      )}
-    </Card>
-  );
-}
-
 function ConditionMix({ current, previous, year }: Period) {
   const states = [
     { key: "NUEVO", name: "Nuevas", color: "hsl(var(--primary))" },
@@ -797,7 +756,6 @@ export function TractorAnalysis(
       <ImportRhythm {...props} />
       <ImporterConcentration {...props} />
       {props.family === "cosechadoras" && <ConditionMix {...props} />}
-      {props.family === "sembradoras" && <PlantingRows {...props} />}
       <Seasonality {...props} />
     </div>
   );

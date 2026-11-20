@@ -42,7 +42,6 @@ export const marketChartTitles = {
   cumulativeUnits: "Unidades acumuladas",
   importerConcentration: "Concentración por importador",
   conditionMix: "Nuevas y usadas",
-  plantingRows: "Líneas de siembra por segmento",
   seasonality: "Estacionalidad",
 } as const;
 

@@ -16,13 +16,14 @@ export function positioning(
   current: Movement[],
   state: string,
   bands: readonly string[] = hpBands,
+  groupBand = (band: string) => band,
 ) {
   const priced = current.filter((row) => row[10] > 0 && row[8] === state);
   const comparable = priced.filter(
-    (row) => identified(row) && bands.includes(row[5]),
+    (row) => identified(row) && bands.includes(groupBand(row[5])),
   );
   const points = compare(comparable, [], (row) =>
-    JSON.stringify([label(row, "modelos"), row[5]]),
+    JSON.stringify([label(row, "modelos"), groupBand(row[5])]),
   ).map((group) => {
     const [model, band] = JSON.parse(group.name) as [string, string];
     return {
