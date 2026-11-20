@@ -79,10 +79,10 @@ describe("Mercado de tractores", () => {
         <TractorDashboard rows={sample} />
       </MemoryRouter>,
     );
-    expect(
-      screen.getByRole("link", { name: "Modelos principales" }),
-    ).toBeTruthy();
-    expect(screen.getByRole("link", { name: /^AXION/ })).toHaveClass(
+    const ranking = screen
+      .getByRole("link", { name: "Modelos principales" })
+      .closest<HTMLElement>(".market-panel")!;
+    expect(within(ranking).getByRole("link", { name: /^AXION/ })).toHaveClass(
       "market-claas",
     );
   });

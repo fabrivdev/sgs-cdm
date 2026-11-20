@@ -1,19 +1,5 @@
 import { useState } from "react";
-import { Link, useNavigate } from "react-router-dom";
-import {
-  Bar,
-  CartesianGrid,
-  Cell,
-  ComposedChart,
-  Line,
-  ResponsiveContainer,
-  Scatter,
-  ScatterChart,
-  Tooltip,
-  XAxis,
-  YAxis,
-  ZAxis,
-} from "recharts";
+import { Link } from "react-router-dom";
 import { Card } from "@/components/ui/card";
 import {
   compare,
@@ -38,18 +24,6 @@ type LinkTo = (
     "marcas" | "modelos" | "importadores" | "historia" | "precios" | "potencia",
   filters?: Record<string, string | null>,
 ) => string;
-const primary = "hsl(var(--primary))";
-const claas = "#78a912";
-const grid = "hsl(var(--border))";
-const positive = "#15803d";
-const negative = "#b91c1c";
-const compact = (value: number) =>
-  Intl.NumberFormat("es-PY", {
-    notation: "compact",
-    maximumFractionDigits: 1,
-  }).format(value);
-const shortBands = ["≤80", "81–120", "121–170", "171–230", ">230"];
-
 function Heading({
   title,
   detail,
@@ -97,6 +71,7 @@ function PowerOpportunity({ current, previous, year, href }: Period) {
       (row) => row[5],
     ).map((group) => [group.name, group]),
   );
+  const peak = Math.max(1, ...groups.map((group) => group.units));
   return (
     <Card className="market-panel">
       <Heading
@@ -110,12 +85,12 @@ function PowerOpportunity({ current, previous, year, href }: Period) {
         role="region"
         aria-label="Comparación por potencia"
       >
-        <table>
+        <table className="market-opportunity-table">
           <thead>
             <tr>
               <th scope="col">Banda HP</th>
               <th scope="col">Unidades</th>
-              <th scope="col">Variación</th>
+              <th scope="col">Var. interanual</th>
               <th scope="col">FOB medio</th>
               <th scope="col">Cuota CLAAS</th>
             </tr>
@@ -123,16 +98,30 @@ function PowerOpportunity({ current, previous, year, href }: Period) {
           <tbody>
             {groups.map((group) => {
               const price = priced.get(group.name);
-              const change = group.prior ? group.units / group.prior - 1 : null;
+              const classified = hpBands.includes(group.name);
+              const change =
+                group.prior && classified
+                  ? group.units / group.prior - 1
+                  : null;
               return (
-                <tr key={group.name}>
+                <tr
+                  key={group.name}
+                  data-unclassified={!classified || undefined}
+                >
                   <th scope="row">
                     <Link to={href("marcas", { potencia: group.name })}>
                       {group.name} ›
                     </Link>
                   </th>
-                  <td title={`${year - 1}: ${number(group.prior)} unidades`}>
-                    {number(group.units)}
+                  <td
+                    className="market-opportunity-volume"
+                    title={`${year - 1}: ${number(group.prior)} unidades`}
+                  >
+                    <span>{number(group.units)}</span>
+                    <i
+                      aria-hidden="true"
+                      style={{ width: (group.units / peak) * 100 + "%" }}
+                    />
                   </td>
                   <td
                     data-tone={
@@ -153,7 +142,11 @@ function PowerOpportunity({ current, previous, year, href }: Period) {
                       </small>
                     )}
                   </td>
-                  <td>
+                  <td
+                    data-opportunity={
+                      Boolean(brand.get(group.name)) || undefined
+                    }
+                  >
                     {percent(ratio(brand.get(group.name) ?? 0, group.units))}
                   </td>
                 </tr>
@@ -168,152 +161,149 @@ function PowerOpportunity({ current, previous, year, href }: Period) {
 }
 
 function ModelPosition({ current, year, href }: Omit<Period, "previous">) {
-  const navigate = useNavigate();
   const states = [...new Set(current.map((row) => row[8]))];
   const [preferred, setPreferred] = useState("NUEVO");
   const state = states.includes(preferred)
     ? preferred
     : (states[0] ?? preferred);
   const { points, covered, priced } = positioning(current, state);
-  const peers = points.filter((point) => !point.model.startsWith("CLAAS · "));
-  const claasModels = points.filter((point) =>
-    point.model.startsWith("CLAAS · "),
-  );
+  const bands = hpBands
+    .map((band) => {
+      const inBand = points.filter((point) => point.band === band);
+      const peers = inBand.filter(
+        (point) => !point.model.startsWith("CLAAS · "),
+      );
+      const prices = peers.map((point) => point.price).sort((a, b) => a - b);
+      const middle = Math.floor(prices.length / 2);
+      const median = prices.length
+        ? (prices[middle] + prices[Math.floor((prices.length - 1) / 2)]) / 2
+        : null;
+      return {
+        band,
+        peers,
+        low: prices[0],
+        high: prices.at(-1),
+        median,
+        claasModels: inBand.filter((point) =>
+          point.model.startsWith("CLAAS · "),
+        ),
+      };
+    })
+    .filter((band) => band.peers.length || band.claasModels.length);
+  const maxPrice = Math.max(1, ...points.map((point) => point.price));
+  const magnitude = 10 ** Math.floor(Math.log10(maxPrice));
+  const limit = Math.ceil(maxPrice / magnitude) * magnitude;
+  const scale = (price: number) =>
+    Math.max(0, Math.min(100, (price / limit) * 100)) + "%";
   return (
     <Card className="market-panel">
       <Heading
-        title="CLAAS frente a modelos comparables"
-        detail={`FOB por tractor según banda de potencia · ${year}`}
+        title="CLAAS frente a otros modelos"
+        detail={`FOB medio por tractor · ${year}`}
         to={href("modelos")}
       />
-      {states.length > 1 && (
-        <label className="market-analysis-control">
-          Estado{" "}
-          <select
-            value={state}
-            onChange={(event) => setPreferred(event.target.value)}
-          >
-            {states.map((value) => (
-              <option key={value}>{value}</option>
-            ))}
-          </select>
-        </label>
-      )}
-      {points.length ? (
+      <div className="market-comparison-toolbar">
+        <div className="market-comparison-legend">
+          <span>
+            <i className="peer-key" /> Otras marcas
+          </span>
+          <span>
+            <i className="claas-key" /> CLAAS
+          </span>
+        </div>
+        {states.length > 1 && (
+          <label className="market-analysis-control">
+            Estado
+            <select
+              value={state}
+              onChange={(event) => setPreferred(event.target.value)}
+            >
+              {states.map((value) => (
+                <option key={value}>{value}</option>
+              ))}
+            </select>
+          </label>
+        )}
+      </div>
+      {bands.length ? (
         <>
-          <div
-            className="market-analysis-chart"
-            role="img"
-            aria-label="Comparación de modelos según banda HP y valor FOB medio"
-          >
-            <ResponsiveContainer>
-              <ScatterChart
-                margin={{ top: 10, right: 18, bottom: 4, left: 12 }}
-              >
-                <CartesianGrid stroke={grid} vertical={false} />
-                <XAxis
-                  dataKey="power"
-                  type="number"
-                  ticks={[0, 1, 2, 3, 4]}
-                  tickFormatter={(n) => shortBands[n]}
-                  domain={[-0.45, 4.45]}
-                  tick={{ fontSize: 11 }}
-                />
-                <YAxis
-                  dataKey="price"
-                  type="number"
-                  tickFormatter={(n) => "$" + compact(n)}
-                  tick={{ fontSize: 11 }}
-                  width={60}
-                />
-                <ZAxis dataKey="units" type="number" range={[28, 250]} />
-                <Tooltip
-                  content={({ payload }) => {
-                    const point = payload?.[0]?.payload as
-                      (typeof points)[number] | undefined;
-                    return point ? (
-                      <div className="market-chart-tooltip">
-                        <strong>{point.model}</strong>
-                        <div>
-                          {point.band} · {money(point.price)} ·{" "}
-                          {number(point.units)} uds.
-                        </div>
-                      </div>
-                    ) : null;
-                  }}
-                />
-                <Scatter
-                  name="Otras marcas"
-                  data={peers}
-                  fill="hsl(var(--muted-foreground))"
-                  fillOpacity={0.37}
-                  isAnimationActive={false}
-                  onClick={(point) =>
-                    navigate(
-                      href("importadores", {
-                        modelos: point.model,
-                        potencia: point.band,
-                        estado: state,
-                      }),
-                    )
+          <div className="market-price-ranges">
+            {bands.map(({ band, peers, low, high, median, claasModels }) => (
+              <div className="market-range" key={band}>
+                <div className="market-range-label">
+                  <strong>{band}</strong>
+                  <span>
+                    {peers.length
+                      ? `${number(peers.length)} modelos de otras marcas`
+                      : "Sin otras marcas"}
+                  </span>
+                </div>
+                <div
+                  className="market-range-track"
+                  aria-label={
+                    median === null
+                      ? "Sin otras marcas"
+                      : `Otras marcas: de ${money(low)} a ${money(high)}, mediana ${money(median)}`
                   }
-                />
-                <Scatter
-                  name="CLAAS"
-                  data={claasModels}
-                  fill={claas}
-                  stroke="hsl(var(--foreground))"
-                  isAnimationActive={false}
-                  onClick={(point) =>
-                    navigate(
-                      href("importadores", {
+                >
+                  {median !== null && (
+                    <>
+                      <span
+                        className="market-range-band"
+                        style={{ left: scale(low), width: scale(high - low) }}
+                        title={`Otras marcas: ${money(low)} a ${money(high)}`}
+                      />
+                      <span
+                        className="market-range-median"
+                        style={{ left: scale(median) }}
+                        title={`Mediana de modelos: ${money(median)}`}
+                      />
+                    </>
+                  )}
+                  {claasModels.map((point) => (
+                    <Link
+                      className="market-range-point"
+                      key={point.model}
+                      style={{ left: scale(point.price) }}
+                      title={`${point.model} · ${money(point.price)} · ${number(point.units)} uds.`}
+                      aria-label={`${point.model} · ${money(point.price)} · ${number(point.units)} uds.`}
+                      to={href("importadores", {
                         modelos: point.model,
-                        potencia: point.band,
+                        potencia: band,
                         estado: state,
-                      }),
-                    )
-                  }
-                />
-              </ScatterChart>
-            </ResponsiveContainer>
+                      })}
+                    />
+                  ))}
+                </div>
+                <div className="market-range-values">
+                  {median !== null && <span>Mediana {money(median)}</span>}
+                  {claasModels.map((point) => (
+                    <Link
+                      key={point.model}
+                      to={href("importadores", {
+                        modelos: point.model,
+                        potencia: band,
+                        estado: state,
+                      })}
+                    >
+                      {point.model.replace("CLAAS · ", "")} ·{" "}
+                      {money(point.price)} · {number(point.units)} uds.
+                    </Link>
+                  ))}
+                </div>
+              </div>
+            ))}
+            <div className="market-range-axis">
+              <span>$0</span>
+              <span>{money(limit / 2)}</span>
+              <span>{money(limit)}</span>
+            </div>
           </div>
           <p className="market-analysis-note">
-            Puntos verdes: CLAAS. Tamaño por unidades. {number(covered)} de{" "}
-            {number(priced)} unidades con FOB tienen modelo y HP.
+            La franja gris va del menor al mayor FOB medio por modelo.{" "}
+            {number(covered)} de {number(priced)} unidades con FOB tienen modelo
+            y HP.
           </p>
-          <details className="market-analysis-details">
-            <summary>Ver modelos y unidades</summary>
-            <div className="market-scroll">
-              <table>
-                <thead>
-                  <tr>
-                    <th scope="col">Modelo y banda</th>
-                    <th scope="col">Unidades</th>
-                    <th scope="col">FOB medio</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {[...claasModels, ...peers].map((point) => (
-                    <tr key={point.model + point.band}>
-                      <th scope="row">
-                        <Link
-                          to={href("importadores", {
-                            modelos: point.model,
-                            potencia: point.band,
-                            estado: state,
-                          })}
-                        >
-                          {point.model} · {point.band} ›
-                        </Link>
-                      </th>
-                      <td>{number(point.units)}</td>
-                      <td>{money(point.price)}</td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-          </details>
         </>
       ) : (
         <p>Sin modelos con potencia y FOB informado para este filtro.</p>
@@ -322,123 +312,105 @@ function ModelPosition({ current, year, href }: Omit<Period, "previous">) {
   );
 }
 
+const signedMoney = (value: number) =>
+  (Math.round(Math.abs(value)) === 0 ? "" : value < 0 ? "−" : "+") +
+  money(Math.abs(value));
+
 function FobBridge({ current, previous, year, href }: Period) {
   const bridge = priceBridge(current, previous);
-  const bars = bridge
+  const effects = bridge?.steps.length
     ? [
-        { name: String(year - 1), from: 0, to: bridge.before, endpoint: true },
-        ...bridge.steps.map((step) => ({ ...step, endpoint: false })),
-        { name: String(year), from: 0, to: bridge.after, endpoint: true },
-      ].map((step) => ({
-        ...step,
-        base: Math.min(step.from, step.to),
-        height: Math.abs(step.to - step.from),
-      }))
+        {
+          name: "Modelos sin comparación",
+          description: "Aparecen en un solo período o faltan datos",
+          delta:
+            bridge.steps[0].to -
+            bridge.steps[0].from +
+            (bridge.steps[3].to - bridge.steps[3].from),
+        },
+        {
+          name: "Mezcla de modelos comparables",
+          description: "Cambios en las unidades de los mismos modelos",
+          delta: bridge.steps[1].to - bridge.steps[1].from,
+        },
+        {
+          name: "FOB de los mismos modelos",
+          description: "Variación dentro de cada modelo comparable",
+          delta: bridge.steps[2].to - bridge.steps[2].from,
+        },
+      ]
     : [];
+  const max = Math.max(1, ...effects.map((effect) => Math.abs(effect.delta)));
+  const change = bridge ? bridge.after - bridge.before : 0;
   return (
     <Card className="market-panel">
       <Heading
-        title="Puente del FOB medio por tractor"
-        detail="Efecto de la mezcla, los valores FOB y los modelos sin par"
+        title="Qué cambió el FOB por tractor"
+        detail="Comparación interanual de unidades con FOB informado"
         to={href("precios")}
       />
       {bridge ? (
         <>
-          <div
-            className="market-analysis-chart"
-            role="img"
-            aria-label="Cascada del valor FOB medio entre períodos"
-          >
-            <ResponsiveContainer>
-              <ComposedChart
-                data={bars}
-                margin={{ top: 8, right: 10, bottom: 4, left: 12 }}
-              >
-                <CartesianGrid stroke={grid} vertical={false} />
-                <XAxis dataKey="name" interval={0} hide />
-                <YAxis
-                  width={56}
-                  tick={{ fontSize: 10 }}
-                  tickFormatter={(n) => "$" + compact(n)}
-                />
-                <Tooltip
-                  content={({ payload }) => {
-                    const bar = payload?.[0]?.payload as
-                      (typeof bars)[number] | undefined;
-                    return bar ? (
-                      <div className="market-chart-tooltip">
-                        <strong>{bar.name}</strong>
-                        <div>
-                          {money(bar.endpoint ? bar.to : bar.to - bar.from)}
-                        </div>
-                      </div>
-                    ) : null;
-                  }}
-                />
-                <Bar
-                  dataKey="base"
-                  stackId="bridge"
-                  fill="transparent"
-                  isAnimationActive={false}
-                />
-                <Bar
-                  dataKey="height"
-                  stackId="bridge"
-                  isAnimationActive={false}
-                  maxBarSize={42}
-                >
-                  {bars.map((bar) => (
-                    <Cell
-                      key={bar.name}
-                      fill={
-                        bar.endpoint
-                          ? primary
-                          : bar.to >= bar.from
-                            ? "#7299b2"
-                            : "#c59372"
-                      }
-                    />
-                  ))}
-                </Bar>
-              </ComposedChart>
-            </ResponsiveContainer>
+          <div className="market-bridge-summary">
+            <div>
+              <span>{year - 1}</span>
+              <strong>{money(bridge.before)}</strong>
+            </div>
+            <div>
+              <span>{year}</span>
+              <strong>{money(bridge.after)}</strong>
+            </div>
+            <div>
+              <span>Cambio por tractor</span>
+              <strong>{signedMoney(change)}</strong>
+              <small>{percent(change / bridge.before)}</small>
+            </div>
           </div>
-          <div
-            className="market-bridge-labels"
-            style={{
-              gridTemplateColumns: `repeat(${bars.length}, minmax(0, 1fr))`,
-            }}
-          >
-            {bars.map((bar, index) => (
-              <div key={bar.name} title={bar.name}>
-                <span>
-                  {bar.endpoint
-                    ? bar.name
-                    : ["Salen", "Mezcla", "FOB", "Entran"][index - 1]}
-                </span>
-                <strong>
-                  {!bar.endpoint && bar.to !== bar.from
-                    ? bar.to > bar.from
-                      ? "+"
-                      : "−"
-                    : ""}
-                  {money(bar.endpoint ? bar.to : Math.abs(bar.to - bar.from))}
-                </strong>
+          {effects.length ? (
+            <>
+              <div className="market-effect-axis">
+                <div>
+                  <span>Redujo</span>
+                  <span>Aumentó</span>
+                </div>
               </div>
-            ))}
-          </div>
-          {bridge.steps.length ? (
-            <p className="market-analysis-note">
-              Comparables por marca, modelo y estado. Cobertura sobre unidades
-              con FOB: {number(bridge.coverage.priorUnits)}/
-              {number(bridge.coverage.priorTotal)} en {year - 1} y{" "}
-              {number(bridge.coverage.recentUnits)}/
-              {number(bridge.coverage.recentTotal)} en {year}.
-            </p>
+              <ul className="market-effect-list">
+                {effects.map((effect) => (
+                  <li key={effect.name}>
+                    <div>
+                      <strong>{effect.name}</strong>
+                      <small>{effect.description}</small>
+                    </div>
+                    <div className="market-effect-track" aria-hidden="true">
+                      <i
+                        style={{
+                          left:
+                            effect.delta < 0
+                              ? 50 - (Math.abs(effect.delta) / max) * 50 + "%"
+                              : "50%",
+                          width: (Math.abs(effect.delta) / max) * 50 + "%",
+                        }}
+                        data-direction={effect.delta < 0 ? "down" : "up"}
+                      />
+                    </div>
+                    <strong className="market-effect-value">
+                      {signedMoney(effect.delta)}
+                    </strong>
+                  </li>
+                ))}
+              </ul>
+              <p className="market-analysis-note">
+                Para aislar mezcla y FOB, se comparan marca, modelo y estado.
+                Unidades comparables: {number(bridge.coverage.priorUnits)}/
+                {number(bridge.coverage.priorTotal)} en {year - 1} y{" "}
+                {number(bridge.coverage.recentUnits)}/
+                {number(bridge.coverage.recentTotal)} en {year}.
+              </p>
+            </>
           ) : (
             <p>
-              Sin modelos identificados en común. Se muestran los dos promedios
-              con FOB.
+              No hay modelos identificados en ambos períodos para separar los
+              efectos.
             </p>
           )}
         </>
@@ -455,115 +427,79 @@ function ImporterConcentration({
   href,
 }: Omit<Period, "previous">) {
   const groups = compare(current, [], (row) => label(row, "importadores"));
-  const unknown = (value: string) =>
-    ["", "sin identificar", "sin datos", "no informado", "n/d"].includes(
-      value.trim().toLowerCase(),
-    );
-  const identified = groups.filter((group) => !unknown(group.name));
-  const knownUnits = identified.reduce(
-    (count, group) => count + group.units,
-    0,
+  const identified = groups.filter(
+    (group) =>
+      !["", "sin identificar", "sin datos", "no informado", "n/d"].includes(
+        group.name.trim().toLowerCase(),
+      ),
   );
+  const knownUnits = identified.reduce((sum, group) => sum + group.units, 0);
   const total = totals(current).units;
   const heads = identified.slice(0, 7);
-  const rest =
-    knownUnits - heads.reduce((count, group) => count + group.units, 0);
+  const rest = knownUnits - heads.reduce((sum, group) => sum + group.units, 0);
+  const leaders = heads.slice(0, 3);
+  const leaderUnits = leaders.reduce((sum, row) => sum + row.units, 0);
   const displayed = [
-    ...heads,
-    ...(rest ? [{ name: "Otros importadores", units: rest }] : []),
+    ...heads.map((row) => ({ name: row.name, units: row.units, other: false })),
+    ...(rest ? [{ name: "Otros importadores", units: rest, other: true }] : []),
   ];
-  let running = 0;
-  const chart = displayed.map((row, index) => ({
-    ...row,
-    id: index < heads.length ? String(index + 1) : "Otros",
-    cumulative: (running += row.units) / knownUnits,
-  }));
   return (
     <Card className="market-panel">
       <Heading
-        title="Concentración por importador"
-        detail={`Unidades y cuota acumulada entre importadores identificados · ${year}`}
+        title="Quiénes concentran las importaciones"
+        detail={`Unidades por importador identificado · ${year}`}
         to={href("importadores")}
       />
-      {chart.length ? (
+      {displayed.length ? (
         <>
-          <div
-            className="market-analysis-chart"
-            role="img"
-            aria-label="Distribución de unidades y línea de participación acumulada por importador"
-          >
-            <ResponsiveContainer>
-              <ComposedChart
-                data={chart}
-                margin={{ top: 8, right: 6, left: 10 }}
-              >
-                <CartesianGrid stroke={grid} vertical={false} />
-                <XAxis dataKey="id" tick={{ fontSize: 11 }} />
-                <YAxis
-                  yAxisId="units"
-                  width={42}
-                  tick={{ fontSize: 10 }}
-                  allowDecimals={false}
-                />
-                <YAxis
-                  yAxisId="share"
-                  width={45}
-                  orientation="right"
-                  domain={[0, 1]}
-                  ticks={[0, 0.25, 0.5, 0.75, 1]}
-                  tickFormatter={(n) => Math.round(n * 100) + "%"}
-                  tick={{ fontSize: 10 }}
-                />
-                <Tooltip
-                  content={({ payload }) => {
-                    const row = payload?.[0]?.payload as
-                      (typeof chart)[number] | undefined;
-                    return row ? (
-                      <div className="market-chart-tooltip">
-                        <strong>{row.name}</strong>
-                        <div>
-                          {number(row.units)} uds. · {percent(row.cumulative)}{" "}
-                          acumulado
-                        </div>
-                      </div>
-                    ) : null;
-                  }}
-                />
-                <Bar
-                  yAxisId="units"
-                  dataKey="units"
-                  fill={primary}
-                  maxBarSize={30}
-                  isAnimationActive={false}
-                />
-                <Line
-                  yAxisId="share"
-                  dataKey="cumulative"
-                  stroke="#5685a3"
-                  strokeWidth={2}
-                  dot={{ r: 3 }}
-                  isAnimationActive={false}
-                />
-              </ComposedChart>
-            </ResponsiveContainer>
+          <div className="market-importer-summary">
+            <strong>{percent(ratio(leaderUnits, knownUnits))}</strong>
+            <span>
+              en{" "}
+              {leaders.length === 1
+                ? "el principal importador"
+                : `los ${leaders.length} principales importadores`}
+            </span>
           </div>
-          <p className="market-analysis-note">
-            {number(knownUnits)} de {number(total)} unidades con importador
-            identificado. Barras: unidades. Línea: cuota acumulada.
-          </p>
-          <details className="market-analysis-details">
-            <summary>Ver importadores del gráfico</summary>
-            <ol>
-              {heads.map((row) => (
-                <li key={row.name}>
-                  <Link to={href("marcas", { importadores: row.name })}>
-                    {row.name} ›
-                  </Link>{" "}
-                  · {number(row.units)} uds.
+          <ul className="market-importer-list">
+            {displayed.map((row, index) => {
+              const content = (
+                <>
+                  <span className="market-importer-name">{row.name}</span>
+                  <span className="market-importer-value">
+                    <strong>{number(row.units)}</strong> uds. ·{" "}
+                    {percent(ratio(row.units, knownUnits))}
+                  </span>
+                </>
+              );
+              return (
+                <li
+                  key={row.name}
+                  data-other={row.other || undefined}
+                  data-leading={index < leaders.length || undefined}
+                >
+                  <div className="market-importer-line">
+                    {row.other ? (
+                      <div>{content}</div>
+                    ) : (
+                      <Link to={href("marcas", { importadores: row.name })}>
+                        {content}
+                      </Link>
+                    )}
+                  </div>
+                  <div className="market-importer-track" aria-hidden="true">
+                    <i
+                      style={{ width: (row.units / knownUnits) * 100 + "%" }}
+                    />
+                  </div>
                 </li>
-              ))}
-            </ol>
-          </details>
+              );
+            })}
+          </ul>
+          <p className="market-analysis-note">
+            Cuota sobre {number(knownUnits)} unidades con importador
+            identificado. {number(total - knownUnits)} sin identificar.
+          </p>
         </>
       ) : (
         <p>Sin importadores identificados en el período seleccionado.</p>
