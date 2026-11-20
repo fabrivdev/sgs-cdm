@@ -18,6 +18,7 @@ import {
 } from "./model";
 import { FiltersBar, FilterSelect } from "@/components/filters/FiltersBar";
 import { Card } from "@/components/ui/card";
+import { PageHeader, PageShell } from "@/components/layout/AppPrimitives";
 import { completePower, powerSpec } from "./power";
 import "./tractores.css";
 
@@ -139,6 +140,7 @@ export function TractorDashboard({ rows: data }: { rows: Movement[] }) {
   const nav = (target: View) => (
     <Link
       className={view === target ? "chosen" : ""}
+      aria-current={view === target ? "page" : undefined}
       key={target}
       to={href(target)}
     >
@@ -221,11 +223,20 @@ export function TractorDashboard({ rows: data }: { rows: Movement[] }) {
   const options = (values: string[]) =>
     values.map((value) => ({ value, label: value }));
   return (
-    <main className="market-tractors">
-      <header className="market-heading">
-        <h1>Tractores</h1>
-        <span>Paraguay · Importaciones</span>
-      </header>
+    <PageShell className="market-tractors">
+      <PageHeader
+        title="Tractores"
+        titleAccessory={
+          <span className="text-xs text-muted-foreground">
+            Paraguay · Importaciones
+          </span>
+        }
+        tabs={
+          <nav className="market-tabs" aria-label="Secciones de tractores">
+            {(["resumen", ...dimensionKeys, "historia"] as View[]).map(nav)}
+          </nav>
+        }
+      />
       <FiltersBar
         activeCount={
           active.length +
@@ -310,9 +321,6 @@ export function TractorDashboard({ rows: data }: { rows: Movement[] }) {
           />
         )}
       </FiltersBar>
-      <nav aria-label="Secciones de tractores">
-        {(["resumen", ...dimensionKeys, "historia"] as View[]).map(nav)}
-      </nav>
       {active.length > 0 && (
         <div className="market-filters">
           {active.map((d) => (
@@ -659,6 +667,6 @@ export function TractorDashboard({ rows: data }: { rows: Movement[] }) {
           </div>
         </Card>
       )}
-    </main>
+    </PageShell>
   );
 }
