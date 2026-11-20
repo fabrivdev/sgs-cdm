@@ -4,7 +4,7 @@ import { Card } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { months, number, percent, ratio } from "./model";
 import { salesTotal, type SalesPeriod } from "./marketShareModel";
-import { pointsLabel, standings, type Dimension, type MarketStanding } from "./marketShareAnalytics";
+import { pointsLabel, standings, unattributedUnits, type Dimension, type MarketStanding } from "./marketShareAnalytics";
 import { Delta } from "./MarketShareCharts";
 
 const showUnits = (value: number | null) => value === null ? "—" : number(value);
@@ -54,6 +54,8 @@ export function StandingTable({ rows, by, current, previous, year, benchmark }: 
   const marketUnits = salesTotal(current);
   const priorUnits = previous.length ? salesTotal(previous) : null;
   const marketDelta = priorUnits === null ? null : marketUnits - priorUnits;
+  const missingPrior = by === "distribuidor" ? unattributedUnits(previous) : null;
+  const missingCurrent = by === "distribuidor" ? unattributedUnits(current) : null;
 
   function metricCells(row: MarketStanding) {
     return <>
@@ -69,7 +71,14 @@ export function StandingTable({ rows, by, current, previous, year, benchmark }: 
 
   return <Card className="ms-panel">
     <div className="ms-table-head">
-      <h2>{title}</h2>
+      <div>
+        <h2>{title}</h2>
+        {(!!missingPrior || !!missingCurrent) && <div className="ms-table-meta">
+          {!!missingPrior && <span>{year - 1} · {number(missingPrior)} uds. sin distribuidor</span>}
+          {!!missingPrior && !!missingCurrent && " / "}
+          {!!missingCurrent && <span>{year} · {number(missingCurrent)} uds. sin distribuidor</span>}
+        </div>}
+      </div>
       {!!rows.length && <label className="ms-search"><Search aria-hidden="true" />
         <Input type="search" placeholder={"Buscar " + entity.toLowerCase()} aria-label={"Buscar " + entity.toLowerCase()} value={query}
           onChange={(event) => setQuery(event.target.value)} />

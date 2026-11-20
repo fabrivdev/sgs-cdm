@@ -44,45 +44,43 @@ function group(periods: SalesPeriod[], by: Dimension, parent?: { by: Dimension; 
   return counts;
 }
 
+export function unattributedUnits(periods: SalesPeriod[], brand?: string) {
+  if (!periods.length || periods.some(({ detalle }) => detalle === null)) return null;
+  return periods.reduce((total, { detalle }) => total + (detalle ?? []).reduce((units, sale) =>
+    sale.distribuidor === null && (!brand || sale.marca === brand) ? units + sale.unidades : units, 0), 0);
+}
+
 export function standings(current: SalesPeriod[], previous: SalesPeriod[], by: Dimension, names: string[] = [],
   parent?: { by: Dimension; name: string }): MarketStanding[] {
   const now = group(current, by, parent);
   if (!now) return [];
   const before = group(previous, by, parent);
   const dealerAttribution = by === "distribuidor" || parent?.by === "distribuidor";
-  const comparable = before && (!dealerAttribution || ![...current, ...previous].some(({ detalle }) =>
-    detalle?.some((sale) => sale.distribuidor === null && (!parent || parent.by === "distribuidor" || sale.marca === parent.name))));
-  const priorCounts = comparable ? before : null;
+  const parentBrand = parent?.by === "marca" ? parent.name : undefined;
+  const priorUnknown = dealerAttribution ? unattributedUnits(previous, parentBrand) : 0;
+  const currentUnknown = dealerAttribution ? unattributedUnits(current, parentBrand) : 0;
+  const comparable = before !== null && !priorUnknown && !currentUnknown;
   const total = salesTotal(current);
   const priorTotal = salesTotal(previous);
   const rank = positions(now);
-  const priorRank = positions(priorCounts ?? new Map());
-  return [...new Set([...now.keys(), ...(priorCounts?.keys() ?? []), ...names])].map((name) => {
+  const priorRank = positions(comparable && before ? before : new Map());
+  return [...new Set([...now.keys(), ...(before?.keys() ?? []), ...names])].map((name) => {
     const units = now.get(name) ?? 0;
-    const priorUnits = priorCounts ? priorCounts.get(name) ?? 0 : null;
+    const priorUnits = before ? before.get(name) ?? (priorUnknown && name !== unknownDealer ? null : 0) : null;
     const share = ratio(units, total);
     const priorShare = priorUnits === null ? null : ratio(priorUnits, priorTotal);
     return {
       name, units, priorUnits, share, priorShare,
-      delta: priorUnits === null ? null : units - priorUnits,
-      points: share === null || priorShare === null ? null : (share - priorShare) * 100,
+      delta: !comparable || priorUnits === null ? null : units - priorUnits,
+      points: !comparable || share === null || priorShare === null ? null : (share - priorShare) * 100,
       rank: rank.get(name) ?? null, priorRank: priorRank.get(name) ?? null,
     };
   }).sort((a, b) => b.units - a.units || (b.priorUnits ?? 0) - (a.priorUnits ?? 0) || a.name.localeCompare(b.name, "es"));
 }
 
 export function marketContributions(brands: MarketStanding[], benchmark: string) {
-  const changes = brands.flatMap(({ name, delta }) => delta ? [{ name, delta }] : []);
-  const ascending = [...changes].sort((a, b) => a.delta - b.delta);
-  const gains = ascending.filter((row) => row.delta > 0);
-  const losses = ascending.filter((row) => row.delta < 0);
-  const leaders = [...gains.slice(losses.length ? -3 : -5).reverse(), ...losses.slice(0, gains.length ? 3 : 5)];
-  const reference = changes.find((row) => row.name === benchmark);
-  if (reference && !leaders.includes(reference)) leaders.push(reference);
-  const remaining = changes.filter((row) => !leaders.includes(row));
-  leaders.sort((a, b) => b.delta - a.delta);
-  if (remaining.length) leaders.push({ name: "Otras marcas", delta: remaining.reduce((sum, row) => sum + row.delta, 0) });
-  return leaders;
+  return brands.flatMap(({ name, delta }) => delta !== null && (delta !== 0 || name === benchmark)
+    ? [{ name, delta }] : []).sort((a, b) => Math.abs(b.delta) - Math.abs(a.delta) || b.delta - a.delta);
 }
 
 export function dealerConcentration(dealers: MarketStanding[], total: number) {
@@ -95,7 +93,7 @@ export function dealerConcentration(dealers: MarketStanding[], total: number) {
   let accumulated = 0;
   return {
     topThree: known.length ? ratio(known.slice(0, 3).reduce((sum, row) => sum + row.units, 0), total) : null,
-    priorTopThree: dealers.some((row) => row.priorShare !== null)
+    priorTopThree: dealers.some((row) => row.priorRank !== null)
       ? [...dealers].filter((row) => row.name !== unknownDealer).sort((a, b) => (b.priorShare ?? 0) - (a.priorShare ?? 0))
         .slice(0, 3).reduce((sum, row) => sum + (row.priorShare ?? 0), 0)
       : null,

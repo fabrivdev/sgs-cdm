@@ -64,6 +64,8 @@
 }
 
 .ms-drivers { min-height: 208px; padding-top: 2px; }
+.ms-driver-scroll { max-height: 225px; overflow-y: auto; scrollbar-width: thin; }
+.ms-driver-footer { position: sticky; bottom: 0; background: hsl(var(--card)); }
 .ms-driver {
   display: grid;
   grid-template-columns: minmax(94px, .8fr) minmax(0, 1.5fr) 51px;
@@ -84,7 +86,6 @@
 .ms-driver-track i { position: absolute; top: 6px; height: 13px; border-radius: 2px; }
 .ms-driver-track .up { background: hsl(var(--primary)); }
 .ms-driver-track .down { background: var(--ms-negative); }
-.ms-driver-track .other { background: hsl(var(--muted-foreground) / .55); }
 .ms-driver-axis { color: hsl(var(--muted-foreground)); font-size: .68rem; }
 .ms-driver-axis div { display: flex; justify-content: space-between; border-top: 1px solid hsl(var(--border)); padding-top: 3px; }
 .ms-chart-total { display: flex; justify-content: space-between; margin-top: 8px; border-top: 1px solid hsl(var(--border)); padding-top: 9px; font-size: .78rem; }
