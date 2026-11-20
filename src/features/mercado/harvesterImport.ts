@@ -54,6 +54,22 @@ const otherModelPatterns: Record<string, RegExp> = {
 const harvesterDescription =
   /COSECH|COSECAHD|COSCHAD|COSECCH|COLHEIT|\bCOMBINE\b/;
 
+function isStandaloneHeader(description: string) {
+  const product = description.replace(
+    /^\W*COSECHADORAS?[\s,]+TRILLADORAS?[\s.;,:-]*(?:EN\b|SE TRATA DE\b)/,
+    "",
+  );
+  const position = product.search(
+    /\b(?:PLATAFORMAS? (?:DE (?:CORTE|MAIZ)|COSECHADORAS?)|CABEZAL(?:ES)? DE CORTE)\b/,
+  );
+  if (position < 0) return false;
+  const prefix = product.slice(0, position);
+  return (
+    !harvesterDescription.test(prefix) &&
+    !/\bCON\s+(?:(?:SU|SUS|UN|UNA|EL|LA)\s+)?$/.test(prefix)
+  );
+}
+
 const text = (value: unknown) => String(value ?? "").trim();
 const uppercase = (value: unknown) =>
   text(value)
@@ -303,14 +319,11 @@ export async function readHarvesterReport(files: SourceFile[]) {
       const matchModel =
         pattern?.exec(modelText)?.[0] ?? pattern?.exec(description)?.[0];
       if (
+        isStandaloneHeader(description) ||
         otherEquipment.test(description) ||
         otherModelPatterns[brand]?.test(description) ||
         (ncm !== "84335100" && !matchModel) ||
-        (!matchModel &&
-          (!harvesterDescription.test(description) ||
-            /\b(?:PLATAFORMA COSECHADORA|CABEZAL DE CORTE)\b/.test(
-              description,
-            )))
+        (!matchModel && !harvesterDescription.test(description))
       )
         continue;
       const [year, month] = period(row["Fecha Canc."]);

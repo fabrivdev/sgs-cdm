@@ -128,6 +128,38 @@ describe("Carga de cosechadoras", () => {
     ).rejects.toThrow(/Falta un período/);
   });
 
+  it("excluye plataformas declaradas por separado aunque usen el modelo de la máquina", async () => {
+    const machine = {
+      ...recent,
+      "Marca Subitem": "JOHN DEERE",
+      "Descripción Subitem":
+        "COSECHADORA DE GRANOS MODELO S5 500 CON SU PLATAFORMA DE CORTE",
+    };
+    const rows = await readHarvesterReport([
+      base,
+      exportFile([
+        machine,
+        {
+          ...machine,
+          Subitem: 1,
+          "Código NCM": "84335990000E",
+          "Descripción Subitem":
+            "PLATAFORMA DE CORTE MARCA JOHN DEERE MODELO S5 500",
+        },
+        {
+          ...machine,
+          Subitem: 2,
+          "Descripción Subitem":
+            "--COSECHADORAS TRILLADORAS. EN: 01 UNIDAD DE PLATAFORMA COSECHADORA JOHN DEERE S5 500",
+        },
+      ]),
+    ]);
+    expect(rows.map((row) => row[0])).toEqual([
+      "ocit:histórico:2",
+      "pyimport:reciente:1:0",
+    ]);
+  });
+
   it("reconoce el modelo S 4400 de las descripciones aduaneras", async () => {
     const rows = await readHarvesterReport([
       base,
