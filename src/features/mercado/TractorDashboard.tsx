@@ -23,6 +23,7 @@ import { FiltersBar, FilterSelect } from "@/components/filters/FiltersBar";
 import { Card } from "@/components/ui/card";
 import { PageHeader, PageShell } from "@/components/layout/AppPrimitives";
 import { completePower, powerSpec } from "./power";
+import { completeHarvestClasses } from "./harvesterClasses";
 import { TractorAnalysis } from "./TractorAnalysis";
 import "./tractores.css";
 
@@ -89,7 +90,7 @@ export function TractorDashboard({
   harvester?: boolean;
 }) {
   const rows = useMemo(
-    () => (harvester ? data : completePower(data)),
+    () => (harvester ? completeHarvestClasses(data) : completePower(data)),
     [data, harvester],
   );
   const machine = harvester ? "cosechadora" : "tractor";

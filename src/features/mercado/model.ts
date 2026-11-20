@@ -71,7 +71,7 @@ export const dimensions = {
 export type Dimension = keyof typeof dimensions;
 export const dimensionKeys = Object.keys(dimensions) as Dimension[];
 export const harvestClasses = Array.from(
-  { length: 8 },
+  { length: 9 },
   (_, i) => `Clase ${i + 3}`,
 );
 export const unknownHarvestClass = "Sin clase informada";

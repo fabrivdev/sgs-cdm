@@ -4,6 +4,7 @@ import {
   unknownHarvestClass,
   type Movement,
 } from "./model";
+import { completeHarvestClasses } from "./harvesterClasses";
 
 type SourceRow = Record<string, unknown>;
 type SourceFile = Pick<File, "name" | "arrayBuffer">;
@@ -32,10 +33,10 @@ const importerAliases: Record<string, string> = {
 };
 const grainModelPatterns: Record<string, RegExp> = {
   "JOHN DEERE":
-    /\b(?:X9[ -]?1[01]00|S[457][ -]?[4-9]00|S[4-8][ -]?[1-9]0S?|9[5678][5678]0(?:[ -]?(?:STS|CTS|WTS))?|CTS[ -]?II|1175)(?:[ -]+(?:RICE|ARROCERA))?\b/,
+    /\b(?:X9[ -]?1[01]00|S[ -]?[457][ -]?[4-9]00|S[4-8][ -]?[1-9]0S?|9[5678][5678]0(?:[ -]?(?:STS|CTS|WTS))?|CTS[ -]?II|1175)(?:[ -]+(?:RICE|ARROCERA))?\b/,
   "NEW HOLLAND":
     /\b(?:CR|TC|TX|CS)\s*(?:[0-9]{1,2}[ .-][0-9]{2}|[0-9]{2,4}|[6-9])\b\+?(?:[ -]+(?:RICE|ARROCERA|ARROZ))?/,
-  "CASE IH": /\b(?:[4-9][12][356][0-9]|2799)(?:[ -]+(?:RICE|ARROCERA))?\b/,
+  "CASE IH": /\b(?:[4-9][12][3456][0-9]|2799)(?:[ -]+(?:RICE|ARROCERA))?\b/,
   "MASSEY FERGUSON": /\b(?:MF[ -]?)?(?:[56]69[05]|9[678]95)\b/,
   CLAAS: /\b(?:LEXION|TRION|TUCANO|AVERO|MEGA DOMINATOR)\s*[0-9]{3,4}\b/,
   FENDT: /\bIDEAL\s*(?:CL[789]|[789](?:T)?|10(?:T)?)\b/,
@@ -96,14 +97,15 @@ function condition(value: unknown, description = "") {
 function normalizeModel(brand: string, value: unknown) {
   let name = semantic(value)
     .replace(/\b(?:ARROCERA|ARROZ)\b/g, "RICE")
-    .replace(/S(6[67]0)S\b/g, "S$1")
+    .replace(/S([4-8][1-9]0)S\b/g, "S$1")
     .trim();
   if (!name || /^(?:SIN DATOS|NO DISPONIBLE|SIN IDENTIFICAR)$/.test(name))
     return "Sin identificar";
   if (brand === "MASSEY FERGUSON") name = "MF" + name.replace(/^MF[ -]?/, "");
   if (brand === "JOHN DEERE")
     name = name
-      .replace(/^(S[457]|X9)[ -]?(\d{3,4})\b/, "$1 $2")
+      .replace(/^S[ -]?([457])[ -]?([4-9]00)\b/, "S$1 $2")
+      .replace(/^X9[ -]?(1[01]00)\b/, "X9 $1")
       .replace(/^S[ -](\d{3})\b/, "S$1")
       .replace(/(\d)[ -](STS|CTS|WTS)\b/, "$1$2")
       .replace(/^(9570|9670|9770|9870)(?= |$)/, "$1STS");
@@ -113,22 +115,8 @@ function normalizeModel(brand: string, value: unknown) {
       .replace(/^([A-Z]+\d{1,2})[ -](\d{2})$/, "$1.$2");
   return name;
 }
-const familyKey = (brand: string, model: string) =>
-  brand + ":" + words(model.replace(/ RICE$/, "")).replace(/ /g, "");
-function observedClasses(history: Movement[]) {
-  const classes = new Map<string, Set<string>>();
-  for (const row of history) {
-    if (row[4] === "Sin identificar" || row[5] === unknownHarvestClass)
-      continue;
-    const key = familyKey(row[3], row[4]);
-    const values = classes.get(key) ?? new Set<string>();
-    values.add(row[5]);
-    classes.set(key, values);
-  }
-  return classes;
-}
 function explicitClass(value: unknown) {
-  const valueClass = words(value).match(/^CLASE (10|[3-9])$/)?.[1];
+  const valueClass = words(value).match(/^CLASE (1[01]|[3-9])$/)?.[1];
   return valueClass ? "Clase " + valueClass : unknownHarvestClass;
 }
 function movement(
@@ -279,7 +267,6 @@ export async function readHarvesterReport(files: SourceFile[]) {
   }
   if (!history?.length)
     throw new Error("Incluí el archivo histórico OCIT de cosechadoras.");
-  const classes = observedClasses(history);
   const sorted = exports.sort((a, b) => a.start - b.start || a.end - b.end);
   let coverageEnd = Math.max(
     ...history.map((row) => monthIndex(row[1], row[2])),
@@ -333,9 +320,6 @@ export async function readHarvesterReport(files: SourceFile[]) {
       )
         continue;
       const model = normalizeModel(brand, matchModel);
-      const seenClasses = classes.get(familyKey(brand, model));
-      const group =
-        seenClasses?.size === 1 ? [...seenClasses][0] : unknownHarvestClass;
       const count = Number(row.Cantidad);
       const declaredCount = description.match(
         /\b(\d{1,2})\s*\)?[ -]*(?:UNA?\s+)?UNI(?:DAD(?:ES)?|D)?\b/,
@@ -361,7 +345,7 @@ export async function readHarvesterReport(files: SourceFile[]) {
         month,
         brand,
         model,
-        group,
+        unknownHarvestClass,
         importerName(row["Probable Importador"]),
         condition(row["Estado Mercadería"], description),
         units,
@@ -379,13 +363,16 @@ export async function readHarvesterReport(files: SourceFile[]) {
     throw new Error(
       "En los extractos no se identificaron cosechadoras de granos importadas a consumo.",
     );
-  return parseMovements([
-    ...history.filter((row) => {
-      const month = monthIndex(row[1], row[2]);
-      return !sorted.some(
-        (source) => month >= source.start && month <= source.end,
-      );
-    }),
-    ...recent.values(),
-  ]);
+  return completeHarvestClasses(
+    parseMovements([
+      ...history.filter((row) => {
+        const month = monthIndex(row[1], row[2]);
+        return !sorted.some(
+          (source) => month >= source.start && month <= source.end,
+        );
+      }),
+      ...recent.values(),
+    ]),
+    history,
+  );
 }

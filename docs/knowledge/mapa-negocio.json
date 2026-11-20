@@ -1816,7 +1816,7 @@
       "title": "Explorar el mercado de cosechadoras de granos",
       "module": "mercado",
       "description": "Consolidar el histórico OCIT con subítems PYimport y comparar unidades, cuota y FOB por clase, estado y período.",
-      "sources": ["src/features/mercado/harvesterImport.ts", "src/features/mercado/TractorDashboard.tsx", "src/features/mercado/TractorAnalysis.tsx"]
+      "sources": ["src/features/mercado/harvesterImport.ts", "src/features/mercado/harvesterClasses.ts", "src/features/mercado/TractorDashboard.tsx", "src/features/mercado/TractorAnalysis.tsx"]
     },
     {
       "id": "panorama-periodo-automatico",
