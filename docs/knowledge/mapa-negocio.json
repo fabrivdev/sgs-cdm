@@ -4,7 +4,7 @@
       "id": "mercado",
       "title": "Mercado",
       "description": "Importaciones de maquinaria agrícola de Paraguay por familia.",
-      "notes": ["49-Mercado-tractores"],
+      "notes": ["49-Mercado-tractores", "50-Mercado-cosechadoras"],
       "related": ["datos", "administracion"]
     },
     {
@@ -1812,6 +1812,13 @@
       "sources": ["src/features/mercado/Tractores.tsx", "src/features/mercado/TractorDashboard.tsx", "src/features/mercado/model.ts"]
     },
     {
+      "id": "analizar-mercado-cosechadoras",
+      "title": "Explorar el mercado de cosechadoras de granos",
+      "module": "mercado",
+      "description": "Consolidar el histórico OCIT con subítems PYimport y comparar unidades, cuota y FOB por clase, estado y período.",
+      "sources": ["src/features/mercado/harvesterImport.ts", "src/features/mercado/TractorDashboard.tsx", "src/features/mercado/TractorAnalysis.tsx"]
+    },
+    {
       "id": "panorama-periodo-automatico",
       "title": "Periodo automatico de Panorama",
       "module": "asistente",
@@ -2566,6 +2573,14 @@
       "description": "Tablero y subsecciones navegables por marcas, modelos, HP, precios, importadores e historia. Incluye posicionamiento CLAAS, oportunidades por HP, ritmo acumulado de unidades, concentración y estacionalidad.",
       "sources": ["src/features/mercado/Tractores.tsx", "src/features/mercado/TractorAnalysis.tsx", "src/features/mercado/marketAnalysis.ts"],
       "flows": ["analizar-mercado-tractores"]
+    },
+    {
+      "id": "mercado.cosechadoras",
+      "title": "Mercado de cosechadoras",
+      "module": "mercado",
+      "description": "Tablero y desgloses por marca, modelo, clase, FOB e importador. Incluye nuevas y usadas, posicionamiento CLAAS, acumulado histórico y estacionalidad.",
+      "sources": ["src/App.tsx", "src/features/mercado/Tractores.tsx", "src/features/mercado/TractorDashboard.tsx", "supabase/migrations/20261120120000_mercado_cosechadoras.sql"],
+      "flows": ["analizar-mercado-cosechadoras"]
     },
     {
       "id": "asistente.panorama",

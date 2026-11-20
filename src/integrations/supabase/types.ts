@@ -20,6 +20,12 @@ export type Database = {
         Update: { datos?: Json }
         Relationships: []
       }
+      mercado_cosechadoras: {
+        Row: { id: number; datos: Json }
+        Insert: { id: number; datos: Json }
+        Update: { datos?: Json }
+        Relationships: []
+      }
       ai_conversations: {
         Row: {
           created_at: string

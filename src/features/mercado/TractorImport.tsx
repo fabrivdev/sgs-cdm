@@ -2,19 +2,23 @@ import { useState } from "react";
 import { useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
-import { number, readReport, totals, type Movement } from "./model";
+import { months, number, readReport, totals, type Movement } from "./model";
+import { readHarvesterReport } from "./harvesterImport";
 
-export function TractorImport() {
+export function TractorImport({ harvester = false }: { harvester?: boolean }) {
   const cache = useQueryClient();
+  const equipment = harvester ? "cosechadoras" : "tractores";
   const [pending, setPending] = useState<Movement[]>();
   const [busy, setBusy] = useState(false);
   const [message, setMessage] = useState("");
-  async function load(file: File) {
+  async function load(files: File[]) {
     setBusy(true);
     setMessage("");
     setPending(undefined);
     try {
-      setPending(await readReport(file));
+      setPending(
+        await (harvester ? readHarvesterReport(files) : readReport(files[0])),
+      );
     } catch (err) {
       setMessage(
         err instanceof Error && err.name !== "ZodError"
@@ -31,35 +35,46 @@ export function TractorImport() {
     setMessage("");
     try {
       const { error } = await supabase
-        .from("mercado_tractores")
+        .from(harvester ? "mercado_cosechadoras" : "mercado_tractores")
         .upsert({ id: 1, datos: pending });
       if (error) throw error;
       setPending(undefined);
-      await cache.invalidateQueries({ queryKey: ["mercado-tractores"] });
-      setMessage("Base de tractores guardada.");
+      await cache.invalidateQueries({ queryKey: ["mercado-" + equipment] });
+      setMessage("Base de " + equipment + " guardada.");
     } catch {
       setMessage("No se pudo guardar el informe. Podés volver a intentar.");
     } finally {
       setBusy(false);
     }
   }
+  const latest =
+    harvester && pending
+      ? pending.reduce((last, row) =>
+          row[1] > last[1] || (row[1] === last[1] && row[2] > last[2])
+            ? row
+            : last,
+        )
+      : undefined;
   return (
     <details className="rounded-lg border p-4">
       <summary className="cursor-pointer font-medium">
-        Mercado · Tractores
+        Mercado · {harvester ? "Cosechadoras" : "Tractores"}
       </summary>
       <div className="mt-4 space-y-3">
         <label className="block text-sm">
-          Importar el Excel con la hoja Base analítica
+          {harvester
+            ? "Seleccioná juntos el histórico OCIT de cosechadoras y todos los extractos PYimport que querés incorporar."
+            : "Importar el Excel con la hoja Base analítica"}
           <input
             className="block mt-2"
             type="file"
             accept=".xlsx"
+            multiple={harvester}
             disabled={busy}
             onChange={(e) => {
-              const file = e.target.files?.[0];
+              const files = Array.from(e.target.files ?? []);
               e.target.value = "";
-              if (file) void load(file);
+              if (files.length) void load(files);
             }}
           />
         </label>
@@ -69,8 +84,11 @@ export function TractorImport() {
           <div>
             <p>
               La nueva base contiene {number(pending.length)} movimientos y{" "}
-              {number(totals(pending).units)} unidades. Al confirmar,
-              reemplazará el informe compartido.
+              {number(totals(pending).units)} unidades
+              {latest
+                ? " hasta " + months[latest[2] - 1] + " " + latest[1]
+                : ""}
+              . Al confirmar, reemplazará el informe compartido.
             </p>
             <div className="mt-3 flex gap-2">
               <Button disabled={busy} onClick={save}>

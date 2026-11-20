@@ -70,6 +70,26 @@ export const dimensions = {
 } as const;
 export type Dimension = keyof typeof dimensions;
 export const dimensionKeys = Object.keys(dimensions) as Dimension[];
+export const harvestClasses = Array.from(
+  { length: 8 },
+  (_, i) => `Clase ${i + 3}`,
+);
+export const unknownHarvestClass = "Sin clase informada";
+const harvestPriceThresholds = [50_000, 100_000, 200_000, 300_000];
+export const harvestPriceBands = [
+  "Menos de $50.000",
+  "$50.000 a <$100.000",
+  "$100.000 a <$200.000",
+  "$200.000 a <$300.000",
+  "$300.000 o más",
+];
+export function harvestPriceBand(fobPerUnit: number) {
+  if (fobPerUnit <= 0) return "Sin FOB positivo";
+  const index = harvestPriceThresholds.findIndex(
+    (threshold) => fobPerUnit < threshold,
+  );
+  return harvestPriceBands[index < 0 ? harvestPriceBands.length - 1 : index];
+}
 export function label(r: Movement, d: Dimension) {
   return {
     marcas: r[3],
@@ -109,6 +129,10 @@ export function totals(rows: Movement[]) {
     (v, r) => ({ units: v.units + r[9], fob: v.fob + r[10] }),
     { units: 0, fob: 0 },
   );
+}
+export function pricedAverage(rows: Movement[]) {
+  const priced = totals(rows.filter((row) => row[10] > 0));
+  return ratio(priced.fob, priced.units);
 }
 export function compare(
   current: Movement[],

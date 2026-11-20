@@ -2,7 +2,12 @@ import { fireEvent, render, screen, within } from "@testing-library/react";
 import { MemoryRouter } from "react-router-dom";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { TractorDashboard } from "./TractorDashboard";
-import { leadingBrands, compare, type Movement } from "./model";
+import {
+  harvestPriceBand,
+  leadingBrands,
+  compare,
+  type Movement,
+} from "./model";
 import { completePower } from "./power";
 
 const sample: Movement[] = [
@@ -46,17 +51,18 @@ const sample: Movement[] = [
     30000,
   ],
 ];
+beforeEach(() => {
+  vi.stubGlobal(
+    "ResizeObserver",
+    class {
+      observe() {}
+      disconnect() {}
+    },
+  );
+});
+afterEach(() => vi.unstubAllGlobals());
+
 describe("Mercado de tractores", () => {
-  beforeEach(() => {
-    vi.stubGlobal(
-      "ResizeObserver",
-      class {
-        observe() {}
-        disconnect() {}
-      },
-    );
-  });
-  afterEach(() => vi.unstubAllGlobals());
   it("conserva el tramo de precio al abrir marca, modelo e importador", () => {
     render(
       <MemoryRouter initialEntries={["/mercado/tractores/precios"]}>
@@ -148,5 +154,38 @@ describe("Mercado de tractores", () => {
       "Más de 230 HP",
       "171–230 HP",
     ]);
+  });
+});
+
+describe("Mercado de cosechadoras", () => {
+  const harvesters: Movement[] = sample.map((row, i) => [
+    row[0],
+    row[1],
+    row[2],
+    row[3],
+    i === 0 ? "LEXION 7600" : "S550",
+    i === 0 ? "Clase 8" : "Clase 5",
+    harvestPriceBand(row[10] / row[9]),
+    row[7],
+    i === 0 ? "NUEVO" : "USADO",
+    row[9],
+    row[10],
+  ]);
+
+  it("abre las clases y conserva la clase al desglosar por marca", () => {
+    render(
+      <MemoryRouter initialEntries={["/mercado/cosechadoras/clases"]}>
+        <TractorDashboard rows={harvesters} harvester />
+      </MemoryRouter>,
+    );
+    expect(screen.getByRole("heading", { name: "Cosechadoras" })).toBeVisible();
+    expect(screen.getByRole("heading", { name: "Clases" })).toBeVisible();
+    fireEvent.click(screen.getByRole("link", { name: "Clase 8 ›" }));
+    expect(screen.getByRole("heading", { name: "Marcas" })).toBeVisible();
+    expect(screen.getByRole("link", { name: "CLAAS ›" })).toBeVisible();
+    expect(screen.queryByText("Marca B")).toBeNull();
+    expect(
+      screen.getByRole("link", { name: "Clases · Clase 8 ×" }),
+    ).toBeVisible();
   });
 });

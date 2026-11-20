@@ -69,6 +69,7 @@ const App = () => (
               >
                 <Route path="/" element={<ProtectedRoute requireModulo="servicios" requireSection="servicios.planificador"><Planificador /></ProtectedRoute>} />
                 <Route path="/mercado/tractores/:vista?" element={<ProtectedRoute requireModulo="mercado" requireSection="mercado.tractores"><MercadoTractores /></ProtectedRoute>} />
+                <Route path="/mercado/cosechadoras/:vista?" element={<ProtectedRoute requireModulo="mercado" requireSection="mercado.cosechadoras"><MercadoTractores harvester /></ProtectedRoute>} />
                 <Route path="/trabajos" element={<ProtectedRoute requireModulo="servicios" requireSection="servicios.trabajos"><Trabajos /></ProtectedRoute>} />
                 <Route path="/calendario" element={<ProtectedRoute requireModulo="servicios" requireSection="servicios.calendario"><Calendario /></ProtectedRoute>} />
                 <Route path="/repuestos/historico" element={<ProtectedRoute requireModulo="repuestos" requireSection="repuestos.historico"><RepuestosHistorico /></ProtectedRoute>} />

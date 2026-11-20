@@ -74,7 +74,10 @@ const navGroups: NavGroup[] = [
     modulo: "mercado",
     label: "Mercado",
     icon: ChartNoAxesCombined,
-    items: [{ to: "/mercado/tractores", label: "Tractores", icon: Tractor, section: "mercado.tractores" }],
+    items: [
+      { to: "/mercado/tractores", label: "Tractores", icon: Tractor, section: "mercado.tractores" },
+      { to: "/mercado/cosechadoras", label: "Cosechadoras", icon: Tractor, section: "mercado.cosechadoras" },
+    ],
   },
   {
     modulo: "servicios",

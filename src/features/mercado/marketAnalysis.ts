@@ -12,10 +12,14 @@ const identified = (row: Movement) =>
   Boolean(row[3].trim() && row[4].trim()) &&
   row[4].toLowerCase() !== "sin identificar";
 
-export function positioning(current: Movement[], state: string) {
+export function positioning(
+  current: Movement[],
+  state: string,
+  bands = hpBands,
+) {
   const priced = current.filter((row) => row[10] > 0 && row[8] === state);
   const comparable = priced.filter(
-    (row) => identified(row) && hpBands.includes(row[5]),
+    (row) => identified(row) && bands.includes(row[5]),
   );
   const points = compare(comparable, [], (row) =>
     JSON.stringify([label(row, "modelos"), row[5]]),
@@ -24,7 +28,7 @@ export function positioning(current: Movement[], state: string) {
     return {
       model,
       band,
-      power: hpBands.indexOf(band),
+      power: bands.indexOf(band),
       units: group.units,
       price: group.fob / group.units,
     };

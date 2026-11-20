@@ -980,7 +980,10 @@ export default function Admin() {
 
         <TabsContent value="importar" className="space-y-4">
           <ImportarTotvsTab onChanged={load} />
-          {hasSectionAccess("admin.importaciones") && <TractorImport />}
+          {hasSectionAccess("admin.importaciones") && <>
+            <TractorImport />
+            <TractorImport harvester />
+          </>}
 
           <Collapsible>
             <CollapsibleTrigger className="flex w-full items-center gap-1.5 rounded-md py-1 text-[12px] font-medium text-muted-foreground hover:text-foreground [&[data-state=open]>svg]:rotate-180">

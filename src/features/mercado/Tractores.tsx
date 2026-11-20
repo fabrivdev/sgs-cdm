@@ -5,13 +5,18 @@ import { Button } from "@/components/ui/button";
 import { TractorDashboard } from "./TractorDashboard";
 import { parseMovements } from "./model";
 
-export default function Tractores() {
+export default function Tractores({
+  harvester = false,
+}: {
+  harvester?: boolean;
+}) {
   const { user } = useAuth();
+  const equipment = harvester ? "cosechadoras" : "tractores";
   const query = useQuery({
-    queryKey: ["mercado-tractores", user?.id],
+    queryKey: ["mercado-" + equipment, user?.id],
     queryFn: async () => {
       const { data, error } = await supabase
-        .from("mercado_tractores")
+        .from(harvester ? "mercado_cosechadoras" : "mercado_tractores")
         .select("datos")
         .eq("id", 1)
         .maybeSingle();
@@ -22,23 +27,23 @@ export default function Tractores() {
   if (query.isLoading)
     return (
       <p className="p-6" role="status">
-        Cargando mercado de tractores…
+        Cargando mercado de {equipment}…
       </p>
     );
   if (query.isError)
     return (
       <div className="p-6 space-y-4">
-        <p>No se pudo consultar el mercado de tractores.</p>
+        <p>No se pudo consultar el mercado de {equipment}.</p>
         <Button onClick={() => query.refetch()}>Reintentar</Button>
       </div>
     );
   return (
     <>
       {query.data?.length ? (
-        <TractorDashboard rows={query.data} />
+        <TractorDashboard rows={query.data} harvester={harvester} />
       ) : (
         <div className="p-6">
-          <h1 className="text-2xl font-semibold">Mercado de tractores</h1>
+          <h1 className="text-2xl font-semibold">Mercado de {equipment}</h1>
           <p className="mt-2">Todavía no hay un informe cargado.</p>
         </div>
       )}

@@ -4,14 +4,18 @@ import {
   compare,
   dimensions,
   dimensionKeys,
+  harvestClasses,
+  harvestPriceBands,
   label,
   leadingBrands,
   money,
   months,
   number,
   percent,
+  pricedAverage,
   ratio,
   totals,
+  unknownHarvestClass,
   type Dimension,
   type Movement,
 } from "./model";
@@ -22,13 +26,12 @@ import { completePower, powerSpec } from "./power";
 import { TractorAnalysis } from "./TractorAnalysis";
 import "./tractores.css";
 
-const root = "/mercado/tractores";
-const titles = {
+const tractorTitles = {
   ...dimensions,
   historia: "Historia",
   resumen: "Tablero",
 };
-type View = keyof typeof titles;
+type View = keyof typeof tractorTitles;
 const next: Record<Dimension, Dimension[]> = {
   precios: ["marcas", "modelos", "importadores"],
   potencia: ["marcas", "modelos", "importadores"],
@@ -72,14 +75,35 @@ function YearLegend({ year }: { year: number }) {
   );
 }
 
-export function TractorDashboard({ rows: data }: { rows: Movement[] }) {
-  const rows = useMemo(() => completePower(data), [data]);
+const harvesterTitles = { ...tractorTitles, potencia: "Clases" };
+const harvesterBands = {
+  potencia: [...harvestClasses, unknownHarvestClass],
+  precios: harvestPriceBands,
+};
+
+export function TractorDashboard({
+  rows: data,
+  harvester = false,
+}: {
+  rows: Movement[];
+  harvester?: boolean;
+}) {
+  const rows = useMemo(
+    () => (harvester ? data : completePower(data)),
+    [data, harvester],
+  );
+  const machine = harvester ? "cosechadora" : "tractor";
+  const root = harvester ? "/mercado/cosechadoras" : "/mercado/tractores";
+  const titles = harvester ? harvesterTitles : tractorTitles;
+  const bands = harvester ? harvesterBands : orderedBands;
+  const routeKey = (key: string) =>
+    harvester && key === "potencia" ? "clases" : key;
   const [params, setParams] = useSearchParams();
   const location = useLocation();
   const slug = location.pathname.split("/").filter(Boolean).at(-1) || "";
-  const view: View = Object.prototype.hasOwnProperty.call(titles, slug)
-    ? (slug as View)
-    : "resumen";
+  const view =
+    (Object.keys(titles) as View[]).find((key) => routeKey(key) === slug) ??
+    "resumen";
   const years = useMemo(
     () => [...new Set(rows.map((r) => r[1]))].sort((a, b) => b - a),
     [rows],
@@ -98,13 +122,13 @@ export function TractorDashboard({ rows: data }: { rows: Movement[] }) {
   const state = params.get("estado") || "";
   const brand = params.get("marcas");
   const rankingDimension = brand ? "modelos" : "marcas";
-  const active = dimensionKeys.filter((d) => params.has(d));
+  const active = dimensionKeys.filter((d) => params.has(routeKey(d)));
   const monthOnly = Number(params.get("mes"));
   const accumulatedScope = rows.filter(
     (r) =>
       r[2] <= end &&
       (!state || r[8] === state) &&
-      active.every((d) => label(r, d) === params.get(d)),
+      active.every((d) => label(r, d) === params.get(routeKey(d))),
   );
   const scoped = monthOnly
     ? accumulatedScope.filter((r) => r[2] === monthOnly)
@@ -116,15 +140,15 @@ export function TractorDashboard({ rows: data }: { rows: Movement[] }) {
   function href(target: View, changes: Record<string, string | null> = {}) {
     const p = new URLSearchParams(params);
     for (const [k, v] of Object.entries(changes)) {
-      if (v === null) p.delete(k);
-      else p.set(k, v);
+      if (v === null) p.delete(routeKey(k));
+      else p.set(routeKey(k), v);
     }
     p.delete("buscar");
     p.delete("orden");
     const query = p.toString();
     return (
       root +
-      (target === "resumen" ? "" : "/" + target) +
+      (target === "resumen" ? "" : "/" + routeKey(target)) +
       (query ? "?" + query : "")
     );
   }
@@ -205,15 +229,29 @@ export function TractorDashboard({ rows: data }: { rows: Movement[] }) {
         (r) => label(r, brandView),
       )
     : [];
-  if (brandView && orderedBands[brandView] && !params.has("orden")) {
-    const order = orderedBands[brandView]!;
+  if (brandView && bands[brandView] && !params.has("orden")) {
+    const order = bands[brandView]!;
     groups = groups.sort(
       (x, y) => order.indexOf(x.name) - order.indexOf(y.name),
     );
   }
+  const pricedGroups =
+    harvester && brandView
+      ? new Map(
+          compare(
+            current.filter(priceEligible),
+            previous.filter(priceEligible),
+            (row) => label(row, brandView),
+          ).map((g) => [g.name, g]),
+        )
+      : null;
+  const currentAverage = (group: (typeof groups)[number]) => {
+    const priced = pricedGroups ? pricedGroups.get(group.name) : group;
+    return priced ? ratio(priced.fob, priced.units) : null;
+  };
   if (ordering === "fob") groups.sort((x, y) => y.fob - x.fob);
   if (ordering === "precio")
-    groups.sort((x, y) => (y.fob / y.units || 0) - (x.fob / x.units || 0));
+    groups.sort((x, y) => (currentAverage(y) ?? 0) - (currentAverage(x) ?? 0));
   if (ordering === "nombre")
     groups.sort((x, y) => x.name.localeCompare(y.name, "es"));
   groups = groups.filter((g) =>
@@ -221,20 +259,34 @@ export function TractorDashboard({ rows: data }: { rows: Movement[] }) {
   );
   const history = years
     .filter((y) => rows.some((r) => r[1] === y && r[2] >= end))
-    .map((y) => ({ year: y, ...totals(scoped.filter((r) => r[1] === y)) }));
+    .map((y) => {
+      const period = scoped.filter((r) => r[1] === y);
+      return {
+        year: y,
+        ...totals(period),
+        average: harvester ? pricedAverage(period) : undefined,
+      };
+    });
   const options = (values: string[]) =>
     values.map((value) => ({ value, label: value }));
   return (
     <PageShell className="market-tractors">
       <PageHeader
-        title="Tractores"
+        title={harvester ? "Cosechadoras" : "Tractores"}
         titleAccessory={
           <span className="text-xs text-muted-foreground">
-            Paraguay · Importaciones
+            {harvester
+              ? "Paraguay · Cosechadoras de granos"
+              : "Paraguay · Importaciones"}
           </span>
         }
         tabs={
-          <nav className="market-tabs" aria-label="Secciones de tractores">
+          <nav
+            className="market-tabs"
+            aria-label={
+              harvester ? "Secciones de cosechadoras" : "Secciones de tractores"
+            }
+          >
             {(["resumen", ...dimensionKeys, "historia"] as View[]).map(nav)}
           </nav>
         }
@@ -328,10 +380,10 @@ export function TractorDashboard({ rows: data }: { rows: Movement[] }) {
           {active.map((d) => (
             <Link
               key={d}
-              title={"Quitar filtro " + dimensions[d]}
+              title={"Quitar filtro " + titles[d]}
               to={href(view, { [d]: null })}
             >
-              {dimensions[d]} · {params.get(d)?.replace("USD ", "$")} ×
+              {titles[d]} · {params.get(routeKey(d))?.replace("USD ", "$")} ×
             </Link>
           ))}
         </div>
@@ -355,9 +407,12 @@ export function TractorDashboard({ rows: data }: { rows: Movement[] }) {
           "marcas",
         )}
         {metric(
-          "FOB medio por tractor",
-          money(ratio(b.fob, b.units)),
-          annualChange(ratio(b.fob, b.units), ratio(a.fob, a.units)),
+          "FOB medio por " + machine,
+          money(harvester ? pricedAverage(current) : ratio(b.fob, b.units)),
+          annualChange(
+            harvester ? pricedAverage(current) : ratio(b.fob, b.units),
+            harvester ? pricedAverage(previous) : ratio(a.fob, a.units),
+          ),
           "precios",
         )}
       </section>
@@ -459,7 +514,7 @@ export function TractorDashboard({ rows: data }: { rows: Movement[] }) {
                 d === "precios" ? previous.filter(priceEligible) : previous,
                 (r) => label(r, d),
               );
-              const order = orderedBands[d]!;
+              const order = bands[d]!;
               chart.sort(
                 (x, y) => order.indexOf(x.name) - order.indexOf(y.name),
               );
@@ -471,7 +526,9 @@ export function TractorDashboard({ rows: data }: { rows: Movement[] }) {
                 <Card className="market-panel" key={d}>
                   <h2>
                     {d === "potencia"
-                      ? "Unidades por potencia"
+                      ? harvester
+                        ? "Unidades por clase"
+                        : "Unidades por potencia"
                       : "Unidades por tramo FOB"}
                   </h2>
                   {chart.map((g) => (
@@ -515,6 +572,7 @@ export function TractorDashboard({ rows: data }: { rows: Movement[] }) {
             year={year}
             end={end}
             month={monthOnly}
+            harvester={harvester}
           />
         </>
       )}
@@ -532,15 +590,17 @@ export function TractorDashboard({ rows: data }: { rows: Movement[] }) {
                 <tr>
                   {[
                     titles[view],
-                    ...(brandView === "modelos" ? ["HP de ficha"] : []),
+                    ...(brandView === "modelos" && !harvester
+                      ? ["HP de ficha"]
+                      : []),
                     "Uds. " + (year - 1),
                     "Uds. " + year,
                     "Cuota uds.",
                     "Δ cuota (pp)",
                     "Valor FOB",
                     "Cuota FOB",
-                    "$/tractor " + (year - 1),
-                    "$/tractor " + year,
+                    "$/" + machine + " " + (year - 1),
+                    "$/" + machine + " " + year,
                   ].map((t) => (
                     <th key={t}>{t}</th>
                   ))}
@@ -549,9 +609,10 @@ export function TractorDashboard({ rows: data }: { rows: Movement[] }) {
               <tbody>
                 {groups.map((g) => {
                   const detail = drill(brandView, g.name);
+                  const priced = pricedGroups ? pricedGroups.get(g.name) : g;
                   const [modelBrand, model] = g.name.split(" · ");
                   const spec =
-                    brandView === "modelos" && model
+                    brandView === "modelos" && !harvester && model
                       ? powerSpec(modelBrand, model)
                       : undefined;
                   return (
@@ -568,7 +629,7 @@ export function TractorDashboard({ rows: data }: { rows: Movement[] }) {
                           g.name.replace("USD ", "$")
                         )}
                       </th>
-                      {brandView === "modelos" && (
+                      {brandView === "modelos" && !harvester && (
                         <td>
                           {spec ? (
                             <a
@@ -599,8 +660,12 @@ export function TractorDashboard({ rows: data }: { rows: Movement[] }) {
                       </td>
                       <td>{money(g.fob)}</td>
                       <td>{percent(ratio(g.fob, b.fob))}</td>
-                      <td>{money(ratio(g.priorFob, g.prior))}</td>
-                      <td>{money(ratio(g.fob, g.units))}</td>
+                      <td>
+                        {money(
+                          priced ? ratio(priced.priorFob, priced.prior) : null,
+                        )}
+                      </td>
+                      <td>{money(currentAverage(g))}</td>
                     </tr>
                   );
                 })}
@@ -626,7 +691,7 @@ export function TractorDashboard({ rows: data }: { rows: Movement[] }) {
                     "Unidades",
                     "Variación interanual",
                     "Valor FOB",
-                    "FOB medio por tractor",
+                    "FOB medio por " + machine,
                   ].map((t) => (
                     <th key={t}>{t}</th>
                   ))}
@@ -647,12 +712,17 @@ export function TractorDashboard({ rows: data }: { rows: Movement[] }) {
                     </th>
                     <td>{number(r.units)}</td>
                     <td>
-                      {history[i + 1]?.units
+                      {history[i + 1]?.units &&
+                      (!harvester || history[i + 1].year === r.year - 1)
                         ? percent(r.units / history[i + 1].units - 1)
                         : "—"}
                     </td>
                     <td>{money(r.fob)}</td>
-                    <td>{money(ratio(r.fob, r.units))}</td>
+                    <td>
+                      {money(
+                        harvester ? (r.average ?? null) : ratio(r.fob, r.units),
+                      )}
+                    </td>
                   </tr>
                 ))}
               </tbody>

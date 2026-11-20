@@ -623,6 +623,54 @@
   min-width: 0;
   margin-top: 9px;
 }
+.market-condition-panel {
+  grid-column: 1 / -1;
+}
+.market-condition-mix {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 15px 24px;
+}
+@media (max-width: 700px) {
+  .market-condition-mix {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
+.market-condition-year {
+  display: flex;
+  justify-content: space-between;
+  font-size: 0.78rem;
+}
+.market-condition-track {
+  display: flex;
+  height: 15px;
+  margin-block: 5px 7px;
+  overflow: hidden;
+  border-radius: 4px;
+  background: hsl(var(--muted));
+}
+.market-condition-mix ul {
+  display: flex;
+  flex-wrap: wrap;
+  column-gap: 16px;
+  padding: 0;
+  list-style: none;
+}
+.market-condition-mix li {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  font-size: 0.75rem;
+}
+.market-condition-mix li i {
+  width: 8px;
+  height: 8px;
+  border-radius: 2px;
+}
+.market-condition-year span,
+.market-condition-mix li span {
+  color: hsl(var(--muted-foreground));
+}
 .market-rhythm-legend,
 .market-season-legend {
   display: flex;

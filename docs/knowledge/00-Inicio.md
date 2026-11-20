@@ -1,6 +1,7 @@
 # SGS-CDM: inicio
 
 - [[49-Mercado-tractores|Mercado de tractores: tablero, desglose, permisos y carga]]
+- [[50-Mercado-cosechadoras|Mercado de cosechadoras: clases, estado, históricos y actualización]]
 
 - [[34-Flota|Flota: administración, corrección y recuperación de facturas por rol]] — implementación local del 10/11/2026; flota e historial se importan una sola vez, sin publicación ni SQL remoto.
 

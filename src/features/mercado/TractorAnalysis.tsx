@@ -15,12 +15,16 @@ import { useState } from "react";
 import { Card } from "@/components/ui/card";
 import {
   compare,
+  harvestClasses,
   label,
   money,
   months,
   number,
   percent,
+  pricedAverage,
   ratio,
+  totals,
+  unknownHarvestClass,
   type Movement,
 } from "./model";
 import {
@@ -35,9 +39,18 @@ type Period = {
   previous: Movement[];
   year: number;
 };
-function PowerOpportunity({ current, previous, year }: Period) {
+function SegmentOpportunity({
+  current,
+  previous,
+  year,
+  harvester,
+}: Period & { harvester: boolean }) {
+  const bands = harvester ? harvestClasses : hpBands;
+  const order = [
+    ...bands,
+    harvester ? unknownHarvestClass : "Sin potencia informada",
+  ];
   const groups = compare(current, previous, (row) => row[5]).sort((a, b) => {
-    const order = [...hpBands, "Sin potencia informada"];
     return order.indexOf(a.name) - order.indexOf(b.name);
   });
   const brand = new Map(
@@ -57,17 +70,21 @@ function PowerOpportunity({ current, previous, year }: Period) {
   const peak = Math.max(1, ...groups.map((group) => group.units));
   return (
     <Card className="market-panel">
-      <h2>Oportunidades por potencia</h2>
+      <h2>
+        {harvester ? "Participación por clase" : "Oportunidades por potencia"}
+      </h2>
       <div
         className="market-scroll"
         tabIndex={0}
         role="region"
-        aria-label="Comparación por potencia"
+        aria-label={
+          harvester ? "Comparación por clase" : "Comparación por potencia"
+        }
       >
         <table className="market-opportunity-table">
           <thead>
             <tr>
-              <th scope="col">Banda HP</th>
+              <th scope="col">{harvester ? "Clase" : "Banda HP"}</th>
               <th scope="col">Unidades</th>
               <th scope="col">Var. interanual</th>
               <th scope="col">FOB medio</th>
@@ -77,7 +94,7 @@ function PowerOpportunity({ current, previous, year }: Period) {
           <tbody>
             {groups.map((group) => {
               const price = priced.get(group.name);
-              const classified = hpBands.includes(group.name);
+              const classified = bands.includes(group.name);
               const change =
                 group.prior && classified
                   ? group.units / group.prior - 1
@@ -147,14 +164,18 @@ function PowerOpportunity({ current, previous, year }: Period) {
   );
 }
 
-function ModelPosition({ current }: Pick<Period, "current">) {
+function ModelPosition({
+  current,
+  harvester,
+}: Pick<Period, "current"> & { harvester: boolean }) {
   const states = [...new Set(current.map((row) => row[8]))];
   const [preferred, setPreferred] = useState("NUEVO");
   const state = states.includes(preferred)
     ? preferred
     : (states[0] ?? preferred);
-  const { points } = positioning(current, state);
-  const bands = hpBands
+  const segments = harvester ? harvestClasses : hpBands;
+  const { points } = positioning(current, state, segments);
+  const bands = segments
     .map((band) => {
       const inBand = points.filter((point) => point.band === band);
       const peers = inBand.filter(
@@ -184,7 +205,7 @@ function ModelPosition({ current }: Pick<Period, "current">) {
     Math.max(0, Math.min(100, (price / limit) * 100)) + "%";
   return (
     <Card className="market-panel">
-      <h2>FOB por banda de potencia</h2>
+      <h2>{harvester ? "FOB por clase" : "FOB por banda de potencia"}</h2>
       <div className="market-comparison-toolbar">
         <div className="market-comparison-legend">
           <span>
@@ -268,7 +289,11 @@ function ModelPosition({ current }: Pick<Period, "current">) {
           </div>
         </>
       ) : (
-        <p>Sin modelos con potencia y FOB informado para este filtro.</p>
+        <p>
+          {harvester
+            ? "Sin modelos con clase y FOB informado para este filtro."
+            : "Sin modelos con potencia y FOB informado para este filtro."}
+        </p>
       )}
     </Card>
   );
@@ -512,6 +537,81 @@ function ImporterConcentration({ current }: Pick<Period, "current">) {
   );
 }
 
+function ConditionMix({ current, previous, year }: Period) {
+  const states = [
+    { key: "NUEVO", name: "Nuevas", color: "hsl(var(--primary))" },
+    { key: "USADO", name: "Usadas", color: "#71869c" },
+    {
+      key: "Sin identificar",
+      name: "Sin estado",
+      color: "hsl(var(--muted-foreground) / 0.45)",
+    },
+  ];
+  const periods = [
+    { year: year - 1, rows: previous },
+    { year, rows: current },
+  ];
+  const shown = states.filter(({ key }) =>
+    periods.some(({ rows }) => rows.some((row) => row[8] === key)),
+  );
+  return (
+    <Card className="market-panel market-condition-panel">
+      <h2>Nuevas y usadas</h2>
+      {shown.length ? (
+        <div className="market-condition-mix">
+          {periods.map(({ year: period, rows }) => {
+            const { units } = totals(rows);
+            const segments = shown.map((state) => {
+              const matching = rows.filter((row) => row[8] === state.key);
+              return {
+                ...state,
+                units: totals(matching).units,
+                price: pricedAverage(matching),
+              };
+            });
+            return (
+              <div key={period}>
+                <div className="market-condition-year">
+                  <strong>{period}</strong>
+                  <span>{number(units)} uds.</span>
+                </div>
+                <div className="market-condition-track" aria-hidden="true">
+                  {segments.map((segment) => (
+                    <span
+                      key={segment.key}
+                      style={{
+                        width: (ratio(segment.units, units) ?? 0) * 100 + "%",
+                        backgroundColor: segment.color,
+                      }}
+                    />
+                  ))}
+                </div>
+                <ul>
+                  {segments
+                    .filter((segment) => segment.units > 0)
+                    .map((segment) => (
+                      <li key={segment.key}>
+                        <i
+                          aria-hidden="true"
+                          style={{ backgroundColor: segment.color }}
+                        />
+                        {segment.name}{" "}
+                        <strong>{percent(ratio(segment.units, units))}</strong>
+                        <span>{money(segment.price)} FOB medio</span>
+                      </li>
+                    ))}
+                </ul>
+              </div>
+            );
+          })}
+        </div>
+      ) : (
+        <p>Sin movimientos en este período.</p>
+      )}
+    </Card>
+  );
+}
+
 function Seasonality({
   rows,
   scoped,
@@ -628,14 +728,16 @@ export function TractorAnalysis(
     accumulatedScope: Movement[];
     end: number;
     month: number;
+    harvester: boolean;
   },
 ) {
   return (
     <div className="market-panels">
-      <PowerOpportunity {...props} />
+      <SegmentOpportunity {...props} />
       <ModelPosition {...props} />
       <ImportRhythm {...props} />
       <ImporterConcentration {...props} />
+      {props.harvester && <ConditionMix {...props} />}
       <Seasonality {...props} />
     </div>
   );
