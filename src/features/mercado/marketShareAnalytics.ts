@@ -79,8 +79,8 @@ export function standings(current: SalesPeriod[], previous: SalesPeriod[], by: D
 }
 
 export function marketContributions(brands: MarketStanding[], benchmark: string) {
-  return brands.flatMap(({ name, delta, units, priorUnits }) => delta !== null && priorUnits !== null && (delta !== 0 || name === benchmark)
-    ? [{ name, delta, units, priorUnits }] : []).sort((a, b) => Math.abs(b.delta) - Math.abs(a.delta) || b.delta - a.delta);
+  return brands.flatMap(({ name, delta }) => delta !== null && (delta !== 0 || name === benchmark)
+    ? [{ name, delta }] : []).sort((a, b) => Math.abs(b.delta) - Math.abs(a.delta) || b.delta - a.delta);
 }
 
 export function dealerConcentration(dealers: MarketStanding[], total: number) {

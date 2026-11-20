@@ -25,50 +25,42 @@ function ChartPanel({ title, children, className = "" }: { title: string; childr
   return <Card className={"ms-panel " + className}><h2>{title}</h2>{children}</Card>;
 }
 
-export function GrowthDrivers({ brands, benchmark, year, total, priorTotal, delta }: {
-  brands: MarketStanding[]; benchmark: string; year: number; total: number; priorTotal: number; delta: number | null;
-}) {
+export function GrowthDrivers({ brands, benchmark, delta }: { brands: MarketStanding[]; benchmark: string; delta: number | null }) {
   const rows = marketContributions(brands, benchmark);
-  const max = Math.max(1, ...rows.map(({ units, priorUnits }) => Math.max(units, priorUnits)));
+  const max = Math.max(1, ...rows.map((row) => Math.abs(row.delta)));
+  const minScale = rows.some((row) => row.delta < 0) ? -max : 0;
+  const maxScale = rows.some((row) => row.delta > 0) ? max : 0;
+  const range = maxScale - minScale || 1;
+  const zero = -minScale / range * 100;
+  const axis = minScale < 0 && maxScale > 0 ? [minScale, 0, maxScale] : [minScale, maxScale];
   const referenceIndex = rows.findIndex(({ name }) => name === benchmark);
   const pinned = referenceIndex >= 7 ? rows[referenceIndex] : undefined;
   const visibleRows = pinned ? rows.filter((row) => row !== pinned) : rows;
-  function contribution({ name, delta, units, priorUnits }: typeof rows[number]) {
-    const reference = name === benchmark;
-    return <div className={"ms-driver" + (reference ? " ms-driver-reference" : "")} role="listitem" key={name}>
-      <span title={name} className={reference ? "ms-reference" : undefined}>{name}</span>
-      <div className="ms-driver-pair">
-        {[priorUnits, units].map((count, index) => (
-          <div key={index} className={"ms-driver-period " + (index === 0 ? "prior" : "current")} title={`${year - 1 + index} · ${number(count)} uds.`}>
-            <div className="ms-driver-track" aria-hidden="true"><i style={{ width: count / max * 100 + "%" }} /></div>
-            <span><span className="sr-only">{year - 1 + index} · </span>{number(count)}</span>
-          </div>
-        ))}
+  function contribution({ name, delta }: typeof rows[number]) {
+    return <div className="ms-driver" role="listitem" key={name}>
+      <span title={name} className={name === benchmark ? "ms-reference" : undefined}>{name}</span>
+      <div className="ms-driver-track" style={{ "--ms-zero": zero + "%" } as React.CSSProperties} aria-hidden="true">
+        <i className={delta < 0 ? "down" : "up"}
+          style={{ left: delta < 0 ? undefined : zero + "%", right: delta < 0 ? (100 - zero) + "%" : undefined,
+            width: Math.abs(delta) / range * 100 + "%" }} />
       </div>
-      <strong><span className="sr-only">Variación </span><Delta value={delta} /></strong>
+      <strong><Delta value={delta} /></strong>
     </div>;
   }
-  return <ChartPanel title="Ventas y variación por marca">
+  return <ChartPanel title="Aporte de cada marca al crecimiento">
     {rows.length ? <>
-      <div className="ms-driver-head">
-        <div className="ms-driver-legend" aria-label="Años comparados">
-          <span className="prior"><i aria-hidden="true" />{year - 1}</span>
-          <span className="current"><i aria-hidden="true" />{year}</span>
-        </div>
-        <span>Δ uds.</span>
-      </div>
       <div className="ms-drivers">
-        <div className="ms-driver-scroll" role="list" tabIndex={rows.length > 7 ? 0 : undefined} aria-label="Variación interanual en unidades">
+        <div className="ms-driver-scroll" role="list" tabIndex={rows.length > 8 ? 0 : undefined} aria-label="Variación interanual en unidades">
           {visibleRows.map(contribution)}
           <div className="ms-driver-footer">
             {pinned && contribution(pinned)}
             <div className="ms-driver ms-driver-axis" aria-hidden="true">
-              <span /><div className="ms-driver-period"><div><span>0</span><span>{number(max)}</span></div></div><span />
+              <span /><div>{axis.map((value) => <span key={value}>{signedUnits(value)}</span>)}</div><span>uds.</span>
             </div>
           </div>
         </div>
       </div>
-      <div className="ms-chart-total"><span>Total del mercado</span><span>{number(priorTotal)} → {number(total)} uds.</span><strong><Delta value={delta} /> uds.</strong></div>
+      <div className="ms-chart-total"><span>Variación del mercado</span><strong><Delta value={delta} /> uds.</strong></div>
     </> : <p className="ms-unavailable">{brands.some((row) => row.delta !== null) ? "Sin cambios por marca." : "Sin desglose interanual por marca."}</p>}
   </ChartPanel>;
 }
