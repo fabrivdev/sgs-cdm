@@ -305,7 +305,7 @@ it("oculta el filtro de estado en un período de sembradoras sin equipos usados"
   expect(within(panel).getByText("Grano fino")).toBeVisible();
 });
 
-it.each(["tractores", "cosechadoras", "sembradoras"] as const)(
+it.each(["tractores", "cosechadoras", "sembradoras", "pulverizadores"] as const)(
   "marca la cuota del año anterior sobre la misma escala en %s",
   (family) => {
     const rows: Movement[] = [
@@ -327,3 +327,20 @@ it.each(["tractores", "cosechadoras", "sembradoras"] as const)(
     expect(within(panel).getByRole("img", { name: /2025 · 0,0/ })).toHaveStyle("--market-prior-share: 0%");
   },
 );
+
+it("abre la banda de tanque de Pulverizadores con el FOB y la referencia HORSCH", () => {
+  const rows: Movement[] = [
+    ["h", 2026, 1, "HORSCH", "LEEB 5.280 VL", "Más de 4.500 l", "$300.000 o más", "Campos del Mañana", "NUEVO", 1, 330_000, 5000, "Más de 27 a 36 m", "221–280 HP"],
+    ["j", 2026, 1, "JACTO", "UNIPORT 3030", "2.501–3.500 l", "$150.000 a <$200.000", "Jacto", "NUEVO", 1, 185_000, 3000, "Más de 27 a 36 m", "221–280 HP"],
+  ];
+  render(
+    <MemoryRouter initialEntries={["/mercado/pulverizadores"]}>
+      <TractorDashboard family="pulverizadores" rows={rows} />
+    </MemoryRouter>,
+  );
+  expect(screen.getByRole("heading", { name: "Ancho de barra" })).toBeVisible();
+  expect(screen.getByTitle("HORSCH · LEEB 5.280 VL · FOB $330.000")).toBeVisible();
+  fireEvent.click(screen.getByRole("link", { name: "Tanques" }));
+  fireEvent.click(screen.getByRole("link", { name: "Más de 4.500 l ›" }));
+  expect(screen.getByRole("link", { name: "HORSCH ›" })).toBeVisible();
+});

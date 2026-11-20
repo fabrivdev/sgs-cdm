@@ -78,6 +78,7 @@ const navGroups: NavGroup[] = [
       { to: "/mercado/tractores", label: "Tractores", icon: Tractor, section: "mercado.tractores" },
       { to: "/mercado/cosechadoras", label: "Cosechadoras", icon: Tractor, section: "mercado.cosechadoras" },
       { to: "/mercado/sembradoras", label: "Sembradoras", icon: Tractor, section: "mercado.sembradoras" },
+      { to: "/mercado/pulverizadores", label: "Pulverizadores", icon: Tractor, section: "mercado.pulverizadores" },
     ],
   },
   {

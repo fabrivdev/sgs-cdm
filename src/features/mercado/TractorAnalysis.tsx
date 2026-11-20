@@ -34,6 +34,8 @@ import {
 import {
   marketFamilies,
   plantingSummaryBand,
+  boomBands,
+  unknownSprayerBoom,
   coarseGrain,
   fineGrain,
   mixedGrain,
@@ -173,7 +175,7 @@ function ModelPosition({
   const { segments, benchmark, segmentName } = marketFamilies[family];
   const benchmarkPrefix = benchmark + " · ";
   const pointLabel = (point: { model: string; price: number }) =>
-    family === "sembradoras" ? `${point.model} · FOB ${money(point.price)}` : `${benchmark} · ${money(point.price)}`;
+    benchmark === "HORSCH" ? `${point.model} · FOB ${money(point.price)}` : `${benchmark} · ${money(point.price)}`;
   const summary = family === "sembradoras";
   const { points } = positioning(current, state, segments, summary ? plantingSummaryBand : undefined);
   const bands = segments
@@ -321,7 +323,7 @@ function ImportRhythm({
   family: MarketFamily;
 }) {
   const cutoff = month ? Math.min(end, month) : end;
-  const data = cumulativeUnits(rows, accumulatedScope, year, cutoff, family === "sembradoras");
+  const data = cumulativeUnits(rows, accumulatedScope, year, cutoff, (family === "sembradoras" || family === "pulverizadores"));
   const lines = [
     { key: "current", label: String(year), width: 3 },
     { key: "previous", label: String(year - 1), width: 2 },
@@ -553,8 +555,10 @@ export function YearLegend({ year }: { year: number }) {
   );
 }
 
-function MarketMix({ current, previous, year, grain }: Period & { grain: boolean }) {
-  const categories = grain ? [
+function MarketMix({ current, previous, year, mode }: Period & { mode: "grain" | "condition" | "boom" }) {
+  const categories = mode === "boom" ? [...boomBands, unknownSprayerBoom].map((name, i) => ({
+    key: name, name, color: ["hsl(var(--primary))", "#71869c", "#a97837", "hsl(var(--muted-foreground) / 0.45)"][i],
+  })) : mode === "grain" ? [
     { key: coarseGrain, name: coarseGrain, color: "hsl(var(--primary))" },
     { key: fineGrain, name: fineGrain, color: "#71869c" },
     { key: mixedGrain, name: mixedGrain, color: "#a97837" },
@@ -572,13 +576,14 @@ function MarketMix({ current, previous, year, grain }: Period & { grain: boolean
     { year: year - 1, rows: previous },
     { year, rows: current },
   ];
-  const category = (row: Movement) => grain ? (row[12] || unknownGrain) : row[8];
+  const category = (row: Movement) => mode === "boom" ? (row[12] || unknownSprayerBoom)
+    : mode === "grain" ? (row[12] || unknownGrain) : row[8];
   const shown = categories.filter(({ key }) =>
     periods.some(({ rows }) => rows.some((row) => category(row) === key)),
   );
   return (
     <Card className="market-panel market-condition-panel">
-      <h2>{grain ? marketChartTitles.grainMix : marketChartTitles.conditionMix}</h2>
+      <h2>{mode === "boom" ? marketChartTitles.boomMix : mode === "grain" ? marketChartTitles.grainMix : marketChartTitles.conditionMix}</h2>
       {shown.length ? (
         <div className="market-condition-mix">
           {periods.map(({ year: period, rows }) => {
@@ -652,7 +657,7 @@ function Seasonality({
   const selected = month
     ? [month]
     : Array.from({ length: end }, (_, index) => index + 1);
-  const { grid: periods, baseline } = seasonality(rows, scoped, year, selected, family === "sembradoras");
+  const { grid: periods, baseline } = seasonality(rows, scoped, year, selected, (family === "sembradoras" || family === "pulverizadores"));
   const peak = Math.max(
     1,
     ...periods.flatMap((period) => period.values.map((value) => value ?? 0)),
@@ -762,7 +767,9 @@ export function TractorAnalysis(
       <ModelPosition {...props} />
       <ImportRhythm {...props} />
       <ImporterConcentration {...props} />
-      {props.family !== "tractores" && <MarketMix {...props} grain={props.family === "sembradoras"} />}
+      {props.family === "sembradoras" && <MarketMix {...props} mode="grain" />}
+      {(props.family === "cosechadoras" || props.family === "pulverizadores") && <MarketMix {...props} mode="condition" />}
+      {props.family === "pulverizadores" && <MarketMix {...props} mode="boom" />}
       <Seasonality {...props} />
     </div>
   );

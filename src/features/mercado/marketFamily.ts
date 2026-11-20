@@ -2,7 +2,7 @@ import { harvestClasses, harvestPriceBands, unknownHarvestClass, type Movement }
 import { hpBands } from "./marketAnalysis";
 import { catalogLineOptions } from "./planterCatalog";
 
-export type MarketFamily = "tractores" | "cosechadoras" | "sembradoras";
+export type MarketFamily = "tractores" | "cosechadoras" | "sembradoras" | "pulverizadores";
 
 export const coarseGrain = "Grano grueso";
 export const fineGrain = "Grano fino";
@@ -67,6 +67,29 @@ export function plantingSegment(grain: string, count: number | null) {
     .findIndex((upper) => count <= upper);
   return labels[index < 0 ? labels.length - 1 : index];
 }
+export const unknownSprayerTank = "Sin tanque informado";
+export const unknownSprayerBoom = "Sin barra informada";
+export const unknownSprayerPower = "Sin HP informado";
+const tankBands = ["Hasta 2.000 l", "2.001–2.500 l", "2.501–3.500 l", "3.501–4.500 l", "Más de 4.500 l"];
+export const boomBands = ["Hasta 27 m", "Más de 27 a 36 m", "Más de 36 m"];
+const powerBands = ["Hasta 150 HP", "151–220 HP", "221–280 HP", "Más de 280 HP"];
+const sprayerPrices = ["Menos de $100.000", "$100.000 a <$150.000", "$150.000 a <$200.000", "$200.000 a <$300.000", "$300.000 o más"];
+export function sprayerTankBand(litres: number | null) {
+  if (litres === null) return unknownSprayerTank;
+  return tankBands[[2000, 2500, 3500, 4500, Infinity].findIndex((upper) => litres <= upper)];
+}
+export function sprayerBoomBand(width: number) {
+  return boomBands[[27, 36, Infinity].findIndex((upper) => width <= upper)];
+}
+export function sprayerPowerBand(hp: number | null) {
+  if (hp === null) return unknownSprayerPower;
+  return powerBands[[150, 220, 280, Infinity].findIndex((upper) => hp <= upper)];
+}
+export function sprayerPriceBand(fob: number) {
+  if (fob <= 0) return "Sin FOB positivo";
+  return sprayerPrices[[100_000, 150_000, 200_000, 300_000, Infinity].findIndex((upper) => fob < upper)];
+}
+
 export const marketFamilies = {
   tractores: { title:"Tractores", table:"mercado_tractores", machine:"tractor",
     benchmark:"CLAAS", segmentRoute:"potencia", segmentTab:"Potencia HP",
@@ -80,6 +103,11 @@ export const marketFamilies = {
     segmentHeader:"Clase", segmentName:"clase", segments:harvestClasses,
     unknownSegment:unknownHarvestClass, prices:harvestPriceBands,
   },
+  pulverizadores: { title:"Pulverizadores", table:"mercado_pulverizadores", machine:"pulverizador",
+    benchmark:"HORSCH", segmentRoute:"tanques", segmentTab:"Tanques",
+    segmentHeader:"Capacidad del tanque", segmentName:"tanque", segments:tankBands,
+    unknownSegment:unknownSprayerTank, prices:sprayerPrices,
+  },
   sembradoras: { title:"Sembradoras", table:"mercado_sembradoras", machine:"sembradora",
     benchmark:"HORSCH", segmentRoute:"segmentos", segmentTab:"Segmentos",
     segmentHeader:"Líneas de siembra", segmentName:"segmento", segments:plantingSummaryOrder,
@@ -89,4 +117,8 @@ export const marketFamilies = {
 export const plantingFilters = [
   {key:"grano", label:"Tipo de grano", field:12},
   {key:"transporte", label:"Transporte", field:13},
+] as const;
+export const sprayerFilters = [
+  {key:"barra", label:"Ancho de barra", field:12},
+  {key:"hp", label:"Potencia HP", field:13},
 ] as const;

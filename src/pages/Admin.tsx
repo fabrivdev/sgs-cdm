@@ -984,6 +984,7 @@ export default function Admin() {
             <TractorImport />
             <TractorImport family="cosechadoras" />
             <TractorImport family="sembradoras" />
+            <TractorImport family="pulverizadores" />
           </>}
 
           <Collapsible>

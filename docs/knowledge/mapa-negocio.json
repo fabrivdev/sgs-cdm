@@ -4,7 +4,7 @@
       "id": "mercado",
       "title": "Mercado",
       "description": "Importaciones de maquinaria agrícola de Paraguay por familia.",
-      "notes": ["49-Mercado-tractores", "50-Mercado-cosechadoras", "51-Mercado-sembradoras"],
+      "notes": ["49-Mercado-tractores", "50-Mercado-cosechadoras", "51-Mercado-sembradoras", "52-Mercado-pulverizadores"],
       "related": ["datos", "administracion"]
     },
     {
@@ -1819,6 +1819,13 @@
       "sources": ["src/features/mercado/harvesterImport.ts", "src/features/mercado/harvesterClasses.ts", "src/features/mercado/TractorDashboard.tsx", "src/features/mercado/TractorAnalysis.tsx"]
     },
     {
+      "id": "analizar-mercado-pulverizadores",
+      "title": "Explorar el mercado de pulverizadores autopropulsados",
+      "module": "mercado",
+      "description": "Cargar el período del Excel original y comparar unidades, cuota y FOB por capacidad del tanque, ancho de barra y potencia.",
+      "sources": ["src/features/mercado/sprayerImport.ts", "src/features/mercado/marketFamily.ts", "src/features/mercado/TractorAnalysis.tsx"]
+    },
+    {
       "id": "analizar-mercado-sembradoras",
       "title": "Explorar el mercado de sembradoras",
       "module": "mercado",
@@ -2588,6 +2595,14 @@
       "description": "Tablero y desgloses por marca, modelo, clase, FOB e importador. Incluye nuevas y usadas, posicionamiento CLAAS, acumulado histórico y estacionalidad.",
       "sources": ["src/App.tsx", "src/features/mercado/Tractores.tsx", "src/features/mercado/TractorDashboard.tsx", "supabase/migrations/20261120120000_mercado_cosechadoras.sql"],
       "flows": ["analizar-mercado-cosechadoras"]
+    },
+    {
+      "id": "mercado.pulverizadores",
+      "title": "Mercado de pulverizadores",
+      "module": "mercado",
+      "description": "Tablero y desgloses por marca, modelo, tanque, precio e importador. Incluye participación interanual, ancho de barra y posicionamiento HORSCH.",
+      "sources": ["src/features/mercado/TractorDashboard.tsx", "src/features/mercado/sprayerImport.ts", "supabase/migrations/20261120150000_mercado_pulverizadores.sql"],
+      "flows": ["analizar-mercado-pulverizadores"]
     },
     {
       "id": "mercado.sembradoras",

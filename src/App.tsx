@@ -71,6 +71,7 @@ const App = () => (
                 <Route path="/mercado/tractores/:vista?" element={<ProtectedRoute requireModulo="mercado" requireSection="mercado.tractores"><MercadoTractores /></ProtectedRoute>} />
                 <Route path="/mercado/cosechadoras/:vista?" element={<ProtectedRoute requireModulo="mercado" requireSection="mercado.cosechadoras"><MercadoTractores family="cosechadoras" /></ProtectedRoute>} />
                 <Route path="/mercado/sembradoras/:vista?" element={<ProtectedRoute requireModulo="mercado" requireSection="mercado.sembradoras"><MercadoTractores family="sembradoras" /></ProtectedRoute>} />
+                <Route path="/mercado/pulverizadores/:vista?" element={<ProtectedRoute requireModulo="mercado" requireSection="mercado.pulverizadores"><MercadoTractores family="pulverizadores" /></ProtectedRoute>} />
                 <Route path="/trabajos" element={<ProtectedRoute requireModulo="servicios" requireSection="servicios.trabajos"><Trabajos /></ProtectedRoute>} />
                 <Route path="/calendario" element={<ProtectedRoute requireModulo="servicios" requireSection="servicios.calendario"><Calendario /></ProtectedRoute>} />
                 <Route path="/repuestos/historico" element={<ProtectedRoute requireModulo="repuestos" requireSection="repuestos.historico"><RepuestosHistorico /></ProtectedRoute>} />

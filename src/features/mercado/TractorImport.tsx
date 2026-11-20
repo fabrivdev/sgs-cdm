@@ -6,6 +6,7 @@ import { months, number, parseMovements, totals } from "./model";
 import { readHarvesterUpload } from "./harvesterImport";
 import { readTractorUpload } from "./tractorPentaImport";
 import { readPlanterUpload } from "./planterImport";
+import { readSprayerUpload } from "./sprayerImport";
 import { marketFamilies, type MarketFamily } from "./marketFamily";
 import type { MarketUpload } from "./penta";
 
@@ -36,7 +37,9 @@ export function TractorImport({ family = "tractores" }: { family?: MarketFamily 
           ? readTractorUpload(files[0], existing)
           : family === "cosechadoras"
             ? readHarvesterUpload(files, existing)
-            : readPlanterUpload(files, existing)),
+            : family === "sembradoras"
+              ? readPlanterUpload(files, existing)
+              : readSprayerUpload(files, existing)),
       );
     } catch (err) {
       setMessage(

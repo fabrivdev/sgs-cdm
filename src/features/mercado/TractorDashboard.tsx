@@ -27,8 +27,8 @@ import { TractorAnalysis, YearLegend } from "./TractorAnalysis";
 import {
   marketFamilies,
   plantingFilters,
+  sprayerFilters,
   plantingSummaryBand,
-  unknownPlantingSegment,
   type MarketFamily,
 } from "./marketFamily";
 import "./tractores.css";
@@ -60,9 +60,11 @@ export function TractorDashboard({
   const rows = useMemo(() => {
     if (family === "tractores") return completePower(data);
     if (family === "cosechadoras") return completeHarvestClasses(data);
-    return completePlantingSegments(data);
+    return family === "sembradoras" ? completePlantingSegments(data) : data;
   }, [data, family]);
   const planting = family === "sembradoras";
+  const spraying = family === "pulverizadores";
+  const fieldEquipment = planting || spraying;
   const positivePriceOnly = family !== "tractores";
   const equipment = marketFamilies[family];
   const { machine, benchmark } = equipment;
@@ -99,7 +101,7 @@ export function TractorDashboard({
   const rankingDimension = brand ? "modelos" : "marcas";
   const active = dimensionKeys.filter((d) => params.has(routeKey(d)));
   const monthOnly = Number(params.get("mes"));
-  const extraFilters = planting ? plantingFilters : [];
+  const extraFilters = planting ? plantingFilters : spraying ? sprayerFilters : [];
   const marketLabel = (row: Movement, dimension: Dimension) =>
     planting && dimension === "potencia" ? plantingSummaryBand(row) : label(row, dimension);
   const unfilteredByState = rows.filter(
@@ -113,11 +115,11 @@ export function TractorDashboard({
       }) &&
       extraFilters.every(({ key, field }) => !params.has(key) || row[field] === params.get(key)),
   );
-  const stateRows = planting
+  const stateRows = fieldEquipment
     ? unfilteredByState.filter((row) => row[1] === year && (!monthOnly || row[2] === monthOnly))
     : rows;
   const availableStates = [...new Set(stateRows.map((row) => row[8]))].sort();
-  const state = !planting || availableStates.includes(requestedState) ? requestedState : "";
+  const state = !fieldEquipment || availableStates.includes(requestedState) ? requestedState : "";
   const accumulatedScope = state
     ? unfilteredByState.filter((row) => row[8] === state)
     : unfilteredByState;
@@ -131,12 +133,12 @@ export function TractorDashboard({
   const priorMonths = observedMonths(year - 1);
   const selectedMonths = monthOnly ? [monthOnly] : Array.from({ length: end }, (_, i) => i + 1);
   const includesPeriod = (months: Set<number>) => selectedMonths.every((month) => months.has(month));
-  const priorComplete = !planting || (includesPeriod(priorMonths) && includesPeriod(observedMonths(year)));
+  const priorComplete = !fieldEquipment || (includesPeriod(priorMonths) && includesPeriod(observedMonths(year)));
   const a = totals(previous),
     b = totals(current);
   function href(target: View, changes: Record<string, string | null> = {}) {
     const p = new URLSearchParams(params);
-    if (planting && !state) p.delete("estado");
+    if (fieldEquipment && !state) p.delete("estado");
     for (const [k, v] of Object.entries(changes)) {
       if (v === null) p.delete(routeKey(k));
       else p.set(routeKey(k), v);
@@ -152,7 +154,7 @@ export function TractorDashboard({
   }
   function set(k: string, v: string) {
     const p = new URLSearchParams(params);
-    if (planting && !state) p.delete("estado");
+    if (fieldEquipment && !state) p.delete("estado");
     if (v) p.set(k, v);
     else p.delete(k);
     if (k === "marcas") p.delete("modelos");
@@ -206,7 +208,7 @@ export function TractorDashboard({
           <strong>{value}</strong>
           <small className="market-metric-change" data-trend={trend}>
             {delta === null
-              ? planting && !priorComplete ? "Período incompleto" : "Sin base anterior"
+              ? fieldEquipment && !priorComplete ? "Período incompleto" : "Sin base anterior"
               : (delta > 0 ? "+" : "") + percent(delta) + " interanual"}
           </small>
         </Link>
@@ -269,12 +271,12 @@ export function TractorDashboard({
   const options = (values: string[]) =>
     values.map((value) => ({ value, label: value }));
   return (
-    <PageShell className={planting ? "market-tractors market-planters" : "market-tractors"}>
+    <PageShell className={fieldEquipment ? "market-tractors market-horsch" : "market-tractors"}>
       <PageHeader
         title={equipment.title}
         titleAccessory={
           <span className="text-xs text-muted-foreground">
-            {family === "cosechadoras" ? "Paraguay · Cosechadoras de granos" : "Paraguay · Importaciones"}
+            {family === "cosechadoras" ? "Paraguay · Cosechadoras de granos" : spraying ? "Paraguay · Autopropulsados" : "Paraguay · Importaciones"}
           </span>
         }
         tabs={
@@ -344,7 +346,7 @@ export function TractorDashboard({
             .slice(0, maxMonth)
             .map((label, i) => ({ label, value: String(i + 1) }))}
         />
-        {(!planting || availableStates.length > 1) && (
+        {(!fieldEquipment || availableStates.length > 1) && (
           <FilterSelect
             label="Estado"
             placeholder="Estado"
@@ -494,7 +496,7 @@ export function TractorDashboard({
                         " · " +
                         (year - 1) +
                         ": " +
-                        (planting && !priorMonths.has(Number(m.name)) ? "Sin registros" : number(m.prior)) +
+                        (fieldEquipment && !priorMonths.has(Number(m.name)) ? "Sin registros" : number(m.prior)) +
                         " · " +
                         year +
                         ": " +
@@ -534,14 +536,14 @@ export function TractorDashboard({
               <YearLegend year={year} />
             </Card>
             {(["potencia", "precios"] as const).map((d) => {
-              const compactSegments = planting && d === "potencia";
+              const compactSegments = fieldEquipment && d === "potencia";
               const grouped = compare(
                 d === "precios" ? current.filter(priceEligible) : current,
                 d === "precios" ? previous.filter(priceEligible) : previous,
                 (r) => marketLabel(r, d),
               );
               const pending = compactSegments
-                ? grouped.find((group) => group.name === unknownPlantingSegment)
+                ? grouped.find((group) => group.name === equipment.unknownSegment)
                 : undefined;
               const chart = pending ? grouped.filter((group) => group !== pending) : grouped;
               const order = bands[d]!;

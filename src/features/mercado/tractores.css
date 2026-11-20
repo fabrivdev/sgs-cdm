@@ -536,7 +536,7 @@
 .market-paired b:first-child {
   background: hsl(var(--muted-foreground) / 0.45);
 }
-.market-planters {
+.market-horsch {
   --market-benchmark: #c31727;
   --market-benchmark-tint: #c317271a;
 }

@@ -8,18 +8,19 @@ const movementFields = [
   z.number().int().positive(), z.number().finite().nonnegative(),
 ] as const;
 const standardMovement = z.tuple([...movementFields]);
-const plantingMovement = z.tuple([
+const equipmentMovement = z.tuple([
   ...movementFields,
   z.number().int().positive().nullable(),
   z.string(),
   z.string(),
 ]);
-export const movements = z.array(z.union([standardMovement, plantingMovement])).nonempty();
+export const movements = z.array(z.union([standardMovement, equipmentMovement])).nonempty();
 type StandardMovement = [
   string, number, number, string, string, string, string, string, string, number, number,
 ];
-export type PlantingMovement = [...StandardMovement, number | null, string, string];
-export type Movement = StandardMovement | PlantingMovement;
+export type EquipmentMovement = [...StandardMovement, number | null, string, string];
+export type PlantingMovement = EquipmentMovement;
+export type Movement = StandardMovement | EquipmentMovement;
 export const parseMovements = (value: unknown): Movement[] => movements.parse(value) as unknown as Movement[];
 
 export const dimensions = {
@@ -42,6 +43,7 @@ export const marketChartTitles = {
   cumulativeUnits: "Unidades acumuladas",
   importerConcentration: "Concentración por importador",
   conditionMix: "Nuevas y usadas",
+  boomMix: "Ancho de barra",
   grainMix: "Tipo de grano",
   seasonality: "Estacionalidad",
 } as const;
