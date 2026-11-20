@@ -8,7 +8,7 @@ El gráfico y el detalle por precio muestran unidades con FOB positivo. Los movi
 
 En las tarjetas del tablero, la variación interanual positiva se muestra en verde y la negativa en rojo. El cero y la ausencia de comparación se muestran en color neutro.
 
-Las tarjetas de gráficos usan títulos breves y uniformes, sin subtítulos. Las pestañas concentran la navegación del tablero. Las barras de importadores comparten origen cero y escala. La comparación por HP usa un eje monetario común con cinco marcas en escritorio y tres en pantallas angostas. Los puntos CLAAS muestran el FOB sin el detalle del modelo. Las cuotas y contribuciones se recalculan con los filtros.
+Las tarjetas de gráficos usan títulos breves, sin subtítulos. Todas las familias de Mercado reutilizan los nombres de `marketChartTitles` en `src/features/mercado/model.ts` para las mismas métricas. Unidades por segmento, Indicadores por segmento y FOB por segmento muestran bandas de potencia para tractores y clases para cosechadoras. Las pestañas concentran la navegación del tablero. Las barras de importadores comparten origen cero y escala. La comparación por HP usa un eje monetario común con cinco marcas en escritorio y tres en pantallas angostas. Los puntos CLAAS muestran el FOB sin el detalle del modelo. Las cuotas y contribuciones se recalculan con los filtros.
 
 El tablero agrega oportunidades por banda HP, posicionamiento CLAAS por banda y estado, ritmo acumulado de unidades, concentración por importador y estacionalidad. Los análisis respetan los filtros activos. La cuota CLAAS usa el total filtrado de la banda y el FOB de los nuevos análisis utiliza unidades con FOB positivo.
 

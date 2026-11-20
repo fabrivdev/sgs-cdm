@@ -172,6 +172,35 @@ describe("Mercado de cosechadoras", () => {
     row[10],
   ]);
 
+  it("usa los mismos títulos en los gráficos compartidos de las dos familias", () => {
+    const titles = () =>
+      screen
+        .getAllByRole("heading", { level: 2 })
+        .map((heading) => heading.textContent);
+    const tractors = render(
+      <MemoryRouter initialEntries={["/mercado/tractores"]}>
+        <TractorDashboard rows={sample} />
+      </MemoryRouter>,
+    );
+    const tractorTitles = titles();
+    tractors.unmount();
+    render(
+      <MemoryRouter initialEntries={["/mercado/cosechadoras"]}>
+        <TractorDashboard rows={harvesters} harvester />
+      </MemoryRouter>,
+    );
+    expect(titles().filter((title) => title !== "Nuevas y usadas")).toEqual(
+      tractorTitles,
+    );
+    expect(tractorTitles).toEqual(
+      expect.arrayContaining([
+        "Unidades por segmento",
+        "Indicadores por segmento",
+        "FOB por segmento",
+      ]),
+    );
+  });
+
   it("abre las clases y conserva la clase al desglosar por marca", () => {
     render(
       <MemoryRouter initialEntries={["/mercado/cosechadoras/clases"]}>

@@ -17,6 +17,7 @@ import {
   compare,
   harvestClasses,
   label,
+  marketChartTitles,
   money,
   months,
   number,
@@ -70,9 +71,7 @@ function SegmentOpportunity({
   const peak = Math.max(1, ...groups.map((group) => group.units));
   return (
     <Card className="market-panel">
-      <h2>
-        {harvester ? "Participación por clase" : "Oportunidades por potencia"}
-      </h2>
+      <h2>{marketChartTitles.segmentIndicators}</h2>
       <div
         className="market-scroll"
         tabIndex={0}
@@ -205,7 +204,7 @@ function ModelPosition({
     Math.max(0, Math.min(100, (price / limit) * 100)) + "%";
   return (
     <Card className="market-panel">
-      <h2>{harvester ? "FOB por clase" : "FOB por banda de potencia"}</h2>
+      <h2>{marketChartTitles.segmentPrice}</h2>
       <div className="market-comparison-toolbar">
         <div className="market-comparison-legend">
           <span>
@@ -333,7 +332,7 @@ function ImportRhythm({
   const tickColor = "hsl(var(--muted-foreground))";
   return (
     <Card className="market-panel">
-      <h2>Unidades acumuladas</h2>
+      <h2>{marketChartTitles.cumulativeUnits}</h2>
       {visibleLines.length ? (
         <>
           <div className="market-rhythm-chart">
@@ -470,7 +469,7 @@ function ImporterConcentration({ current }: Pick<Period, "current">) {
   const barMax = Math.ceil(largest / step) * step;
   return (
     <Card className="market-panel">
-      <h2>Concentración por importador</h2>
+      <h2>{marketChartTitles.importerConcentration}</h2>
       {displayed.length ? (
         <>
           <div className="market-importer-composition">
@@ -556,7 +555,7 @@ function ConditionMix({ current, previous, year }: Period) {
   );
   return (
     <Card className="market-panel market-condition-panel">
-      <h2>Nuevas y usadas</h2>
+      <h2>{marketChartTitles.conditionMix}</h2>
       {shown.length ? (
         <div className="market-condition-mix">
           {periods.map(({ year: period, rows }) => {
@@ -635,7 +634,7 @@ function Seasonality({
   );
   return (
     <Card className="market-panel market-seasonality">
-      <h2>Estacionalidad</h2>
+      <h2>{marketChartTitles.seasonality}</h2>
       <ul className="market-season-legend" aria-label="Escala de unidades">
         <li>
           <i data-volume="low" aria-hidden="true" />

@@ -1,6 +1,6 @@
 # Mercado de cosechadoras
 
-La sección Mercado → Cosechadoras reutiliza el encabezado, los filtros, las tarjetas y los desgloses de Tractores. Cubre cosechadoras de granos importadas en Paraguay, siguiendo el alcance de las tablas dinámicas históricas de OCIT.
+La sección Mercado → Cosechadoras reutiliza el encabezado, los filtros, las tarjetas, los títulos de los gráficos compartidos y los desgloses de Tractores. Cubre cosechadoras de granos importadas en Paraguay, siguiendo el alcance de las tablas dinámicas históricas de OCIT.
 
 El tablero muestra unidades, valor FOB y FOB medio por cosechadora. Las clases de máquina sustituyen las bandas HP. Los desgloses incluyen marcas, modelos, clases, precios, importadores e historia. La participación por marca incluye CLAAS si aparece en el período actual o el anterior y no entra en el ranking principal. El gráfico por clase y estado distingue los modelos CLAAS. La mezcla de nuevas y usadas compara cobertura, cuota de unidades y FOB medio al mismo corte. El acumulado compara ambos años con la mediana y el intervalo P25–P75 histórico. El semáforo de estacionalidad va de verde para menor volumen a rojo para mayor.
 

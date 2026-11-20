@@ -70,6 +70,20 @@ export const dimensions = {
 } as const;
 export type Dimension = keyof typeof dimensions;
 export const dimensionKeys = Object.keys(dimensions) as Dimension[];
+export const marketChartTitles = {
+  brandShare: "Participación por marca",
+  modelShare: "Participación por modelo",
+  monthlyUnits: "Unidades por mes",
+  segmentUnits: "Unidades por segmento",
+  priceBandUnits: "Unidades por tramo FOB",
+  segmentIndicators: "Indicadores por segmento",
+  segmentPrice: "FOB por segmento",
+  cumulativeUnits: "Unidades acumuladas",
+  importerConcentration: "Concentración por importador",
+  conditionMix: "Nuevas y usadas",
+  seasonality: "Estacionalidad",
+} as const;
+
 export const harvestClasses = Array.from(
   { length: 9 },
   (_, i) => `Clase ${i + 3}`,

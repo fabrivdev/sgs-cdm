@@ -8,6 +8,7 @@ import {
   harvestPriceBands,
   label,
   leadingBrands,
+  marketChartTitles,
   money,
   months,
   number,
@@ -422,7 +423,9 @@ export function TractorDashboard({
           <div className="market-panels">
             <Card className="market-panel">
               <h2>
-                {brand ? "Participación por modelo" : "Participación por marca"}
+                {brand
+                  ? marketChartTitles.modelShare
+                  : marketChartTitles.brandShare}
               </h2>
               {leaders.map((g) => (
                 <div
@@ -449,7 +452,7 @@ export function TractorDashboard({
               {!leaders.length && <p>Sin movimientos en este período.</p>}
             </Card>
             <Card className="market-panel">
-              <h2>Unidades por mes</h2>
+              <h2>{marketChartTitles.monthlyUnits}</h2>
               <div className="market-month-window">
                 <div className="market-month-plot">
                   <div className="market-grid" aria-hidden="true">
@@ -527,10 +530,8 @@ export function TractorDashboard({
                 <Card className="market-panel" key={d}>
                   <h2>
                     {d === "potencia"
-                      ? harvester
-                        ? "Unidades por clase"
-                        : "Unidades por potencia"
-                      : "Unidades por tramo FOB"}
+                      ? marketChartTitles.segmentUnits
+                      : marketChartTitles.priceBandUnits}
                   </h2>
                   {chart.map((g) => (
                     <div
