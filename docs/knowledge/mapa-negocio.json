@@ -1822,8 +1822,8 @@
       "id": "analizar-mercado-market-share",
       "title": "Explorar participación en ventas de maquinaria",
       "module": "mercado",
-      "description": "Importar ventas mensuales por equipo, marca y distribuidor y comparar cuotas a igual corte.",
-      "sources": ["src/features/mercado/marketShareImport.ts", "src/features/mercado/MarketShareDashboard.tsx"]
+      "description": "Importar ventas mensuales por equipo, marca y distribuidor. Comparar aporte en unidades y cambios de cuota a igual corte, concentración y ritmo histórico. Expandir marcas por distribuidor y distribuidores por marca.",
+      "sources": ["src/features/mercado/marketShareImport.ts", "src/features/mercado/marketShareDashboard.tsx", "src/features/mercado/marketShareAnalytics.ts", "src/features/mercado/MarketShareTables.tsx"]
     },
     {
       "id": "analizar-mercado-pulverizadores",
@@ -2607,7 +2607,7 @@
       "id": "mercado.market_share",
       "title": "Market Share",
       "module": "mercado",
-      "description": "Tablero de ventas reportadas, con comparaciones por equipo, marca, distribuidor y corte.",
+      "description": "Tablero de ventas reportadas, con aportes por marca, cambios de cuota, concentración de distribuidores y ritmo acumulado histórico. Incluye rankings con desglose recíproco y calendario mensual.",
       "sources": ["src/features/mercado/MarketShare.tsx", "src/features/mercado/MarketShareDashboard.tsx", "supabase/migrations/20261120160000_mercado_market_share.sql"],
       "flows": ["analizar-mercado-market-share"]
     },

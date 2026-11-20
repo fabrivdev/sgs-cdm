@@ -1,6 +1,10 @@
 # Mercado · Market Share
 
-Ruta `/mercado/market-share`. Analiza ventas de mercado en unidades desde el informe de ventas de maquinaria de Paraguay. Incluye equipo, año, corte acumulado, participación por marca y distribuidor, ventas mensuales e historia a igual corte. Los módulos de cada máquina conservan sus mediciones a partir de importaciones.
+Ruta `/mercado/market-share`. Analiza ventas de mercado en unidades desde el informe de ventas de maquinaria de Paraguay. Los módulos de cada máquina conservan sus mediciones a partir de importaciones.
+
+- El tablero muestra variación en unidades, cuota CLAAS/HORSCH, mayor ganancia de cuota, concentración de los tres distribuidores líderes y cuota de Campos del Mañana. Aporte por marca suma a la diferencia total interanual; el gráfico de cuota relaciona participación actual con el cambio en puntos porcentuales. Ritmo acumulado superpone hasta cuatro años, y concentración muestra cuota individual y acumulada de distribuidores, con los no identificados explícitos.
+- Los rankings son ordenables y consultables por nombre. Cada marca se puede ampliar por distribuidor y cada distribuidor por marca. Tanto las filas principales como el desglose calculan cuota sobre todas las unidades de ese equipo y corte. El indicador negro marca la cuota del año anterior, cuando está disponible. El calendario distingue ceros de meses sin datos y calcula año completo solo con doce meses.
+- Los cambios interanuales requieren cobertura mensual completa hasta el mismo corte. Si hay ventas sin distribuidor, se omite la comparación de las filas afectadas. Las curvas acumuladas se interrumpen ante un mes faltante.
 
 El archivo `Ventas Maquinarias Py-2026.xlsx` tiene hojas anuales principales 2025 y 2026. Se usan los bloques de tractores, cosechadoras y pulverizadores. Las vistas superpuestas 2026 (2), Tractores Tradicionales y 3ra Seman quedan fuera del cálculo. Los totales de fila mensual se cotejan con la fila Total. Las cuotas del tablero se calculan con las unidades mensuales sobre el total de la categoría. El Excel tiene celdas de cuota en cero con unidades positivas y subtotales de marcas que no reconcilian; se conservan las cantidades.
 
