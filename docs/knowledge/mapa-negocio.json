@@ -4,7 +4,7 @@
       "id": "mercado",
       "title": "Mercado",
       "description": "Importaciones de maquinaria agrícola de Paraguay por familia.",
-      "notes": ["49-Mercado-tractores", "50-Mercado-cosechadoras", "51-Mercado-sembradoras", "52-Mercado-pulverizadores"],
+      "notes": ["49-Mercado-tractores", "50-Mercado-cosechadoras", "51-Mercado-sembradoras", "52-Mercado-pulverizadores", "53-Mercado-market-share"],
       "related": ["datos", "administracion"]
     },
     {
@@ -1819,6 +1819,13 @@
       "sources": ["src/features/mercado/harvesterImport.ts", "src/features/mercado/harvesterClasses.ts", "src/features/mercado/TractorDashboard.tsx", "src/features/mercado/TractorAnalysis.tsx"]
     },
     {
+      "id": "analizar-mercado-market-share",
+      "title": "Explorar participación en ventas de maquinaria",
+      "module": "mercado",
+      "description": "Importar ventas mensuales por equipo, marca y distribuidor y comparar cuotas a igual corte.",
+      "sources": ["src/features/mercado/marketShareImport.ts", "src/features/mercado/MarketShareDashboard.tsx"]
+    },
+    {
       "id": "analizar-mercado-pulverizadores",
       "title": "Explorar el mercado de pulverizadores autopropulsados",
       "module": "mercado",
@@ -2595,6 +2602,14 @@
       "description": "Tablero y desgloses por marca, modelo, clase, FOB e importador. Incluye nuevas y usadas, posicionamiento CLAAS, acumulado histórico y estacionalidad.",
       "sources": ["src/App.tsx", "src/features/mercado/Tractores.tsx", "src/features/mercado/TractorDashboard.tsx", "supabase/migrations/20261120120000_mercado_cosechadoras.sql"],
       "flows": ["analizar-mercado-cosechadoras"]
+    },
+    {
+      "id": "mercado.market_share",
+      "title": "Market Share",
+      "module": "mercado",
+      "description": "Tablero de ventas reportadas, con comparaciones por equipo, marca, distribuidor y corte.",
+      "sources": ["src/features/mercado/MarketShare.tsx", "src/features/mercado/MarketShareDashboard.tsx", "supabase/migrations/20261120160000_mercado_market_share.sql"],
+      "flows": ["analizar-mercado-market-share"]
     },
     {
       "id": "mercado.pulverizadores",

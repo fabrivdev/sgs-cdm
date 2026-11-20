@@ -19,6 +19,7 @@ import {
   Boxes,
   ShoppingCart,
   ChartNoAxesCombined,
+  ChartPie,
   Sparkles,
   HandCoins,
   ClipboardList,
@@ -82,6 +83,7 @@ const navGroups: NavGroup[] = [
       { to: "/mercado/cosechadoras", label: "Cosechadoras", icon: Wheat, section: "mercado.cosechadoras" },
       { to: "/mercado/sembradoras", label: "Sembradoras", icon: Sprout, section: "mercado.sembradoras" },
       { to: "/mercado/pulverizadores", label: "Pulverizadores", icon: SprayCan, section: "mercado.pulverizadores" },
+      { to: "/mercado/market-share", label: "Market Share", icon: ChartPie, section: "mercado.market_share" },
     ],
   },
   {

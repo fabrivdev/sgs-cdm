@@ -1,4 +1,5 @@
 import { TractorImport } from "@/features/mercado/TractorImport";
+import { MarketShareImportPanel } from "@/features/mercado/MarketShareImportPanel";
 /* eslint-disable @typescript-eslint/no-explicit-any -- Administración consulta tablas nuevas antes de regenerar database.types. */
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
@@ -985,6 +986,7 @@ export default function Admin() {
             <TractorImport family="cosechadoras" />
             <TractorImport family="sembradoras" />
             <TractorImport family="pulverizadores" />
+            <MarketShareImportPanel />
           </>}
 
           <Collapsible>

@@ -32,6 +32,12 @@ export type Database = {
         Update: { datos?: Json }
         Relationships: []
       }
+      mercado_market_share: {
+        Row: { familia: string; anio: number; mes: number; total: number; detalle: Json | null }
+        Insert: { familia: string; anio: number; mes: number; total: number; detalle?: Json | null }
+        Update: { familia?: string; anio?: number; mes?: number; total?: number; detalle?: Json | null }
+        Relationships: []
+      }
       mercado_pulverizadores: {
         Row: { id: number; datos: Json }
         Insert: { id: number; datos: Json }
@@ -10501,6 +10507,7 @@ export type Database = {
       }
     }
     Functions: {
+      guardar_mercado_market_share: { Args: { p_periodos: Json }; Returns: undefined }
       actualizar_mercado_por_periodo: {
         Args: {
           p_familia: string

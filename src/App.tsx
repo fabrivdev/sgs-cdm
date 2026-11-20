@@ -14,6 +14,7 @@ import { OfflineExperience } from "@/components/offline/OfflineExperience";
 import { useOnlineStatus } from "@/hooks/useOnlineStatus";
 const Auth = lazy(() => import("./pages/Auth"));
 const MercadoTractores = lazy(() => import("./features/mercado/Tractores"));
+const MarketShare = lazy(() => import("./features/mercado/MarketShare"));
 const Planificador = lazy(() => import("./pages/Planificador"));
 const Calendario = lazy(() => import("./pages/Calendario"));
 const OrdenesServicio = lazy(() => import("./pages/OrdenesServicio"));
@@ -72,6 +73,7 @@ const App = () => (
                 <Route path="/mercado/cosechadoras/:vista?" element={<ProtectedRoute requireModulo="mercado" requireSection="mercado.cosechadoras"><MercadoTractores family="cosechadoras" /></ProtectedRoute>} />
                 <Route path="/mercado/sembradoras/:vista?" element={<ProtectedRoute requireModulo="mercado" requireSection="mercado.sembradoras"><MercadoTractores family="sembradoras" /></ProtectedRoute>} />
                 <Route path="/mercado/pulverizadores/:vista?" element={<ProtectedRoute requireModulo="mercado" requireSection="mercado.pulverizadores"><MercadoTractores family="pulverizadores" /></ProtectedRoute>} />
+                <Route path="/mercado/market-share/:vista?" element={<ProtectedRoute requireModulo="mercado" requireSection="mercado.market_share"><MarketShare /></ProtectedRoute>} />
                 <Route path="/trabajos" element={<ProtectedRoute requireModulo="servicios" requireSection="servicios.trabajos"><Trabajos /></ProtectedRoute>} />
                 <Route path="/calendario" element={<ProtectedRoute requireModulo="servicios" requireSection="servicios.calendario"><Calendario /></ProtectedRoute>} />
                 <Route path="/repuestos/historico" element={<ProtectedRoute requireModulo="repuestos" requireSection="repuestos.historico"><RepuestosHistorico /></ProtectedRoute>} />

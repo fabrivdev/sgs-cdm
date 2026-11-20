@@ -4,6 +4,7 @@
 - [[50-Mercado-cosechadoras|Mercado de cosechadoras: clases, estado, históricos y actualización]]
 - [[51-Mercado-sembradoras|Mercado de sembradoras: líneas, grano y actualización]]
 - [[52-Mercado-pulverizadores|Mercado de pulverizadores: tanques, barra y actualización]]
+- [[53-Mercado-market-share|Market Share: ventas, cuotas y actualización]]
 
 - [[34-Flota|Flota: administración, corrección y recuperación de facturas por rol]] — implementación local del 10/11/2026; flota e historial se importan una sola vez, sin publicación ni SQL remoto.
 

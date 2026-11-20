@@ -26,6 +26,7 @@ export const SECTION_ROUTES = [
   { id: "mercado.cosechadoras", module: "mercado", route: "/mercado/cosechadoras" },
   { id: "mercado.sembradoras", module: "mercado", route: "/mercado/sembradoras" },
   { id: "mercado.pulverizadores", module: "mercado", route: "/mercado/pulverizadores" },
+  { id: "mercado.market_share", module: "mercado", route: "/mercado/market-share" },
   { id: "admin.usuarios", module: "admin", route: "/admin" },
   { id: "admin.importaciones", module: "admin", route: "/admin" },
   { id: "admin.parametros", module: "admin", route: "/admin" },
