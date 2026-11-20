@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import * as XLSX from "xlsx";
-import { readHarvesterReport } from "./harvesterImport";
+import { readHarvesterReport, readHarvesterUpload } from "./harvesterImport";
 import { completeHarvestClasses } from "./harvesterClasses";
 import { unknownHarvestClass, type Movement } from "./model";
 
@@ -126,6 +126,20 @@ describe("Carga de cosechadoras", () => {
     await expect(
       readHarvesterReport([base, exportFile([recent], "11/2025 - 11/2025")]),
     ).rejects.toThrow(/Falta un período/);
+  });
+
+  it("prepara únicamente el mes de un extracto mensual sin volver a cargar OCIT", async () => {
+    const history = await readHarvesterReport([base]);
+    const upload = await readHarvesterUpload([exportFile([recent])], history);
+    expect(upload.period).toEqual({ start: 2025 * 12 + 9, end: 2025 * 12 + 9 });
+    expect(upload.rows).toHaveLength(1);
+    expect(upload.rows[0].slice(1, 6)).toEqual([
+      2025,
+      10,
+      "CLAAS",
+      "LEXION 7600",
+      "Clase 8",
+    ]);
   });
 
   it("excluye plataformas declaradas por separado aunque usen el modelo de la máquina", async () => {

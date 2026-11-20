@@ -10489,6 +10489,15 @@ export type Database = {
       }
     }
     Functions: {
+      actualizar_mercado_por_periodo: {
+        Args: {
+          p_familia: string
+          p_desde: number
+          p_hasta: number
+          p_datos: Json
+        }
+        Returns: undefined
+      }
       admin_actualizar_acceso_seccion: {
         Args: { p_activo: boolean; p_seccion_id: string; p_user_id: string }
         Returns: undefined

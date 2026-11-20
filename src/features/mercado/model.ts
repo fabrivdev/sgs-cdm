@@ -175,7 +175,9 @@ export function leadingBrands(groups: ReturnType<typeof compare>) {
     claas = groups.find((x) => x.name === "CLAAS");
   return claas && !top.includes(claas) ? [...top, claas] : top;
 }
-export async function readReport(file: File): Promise<Movement[]> {
+export async function readReport(
+  file: Pick<File, "arrayBuffer">,
+): Promise<Movement[]> {
   const XLSX = await import("xlsx");
   const book = XLSX.read(await file.arrayBuffer(), {
     sheets: ["Base analítica"],

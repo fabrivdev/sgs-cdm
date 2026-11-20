@@ -1808,14 +1808,14 @@
       "id": "analizar-mercado-tractores",
       "title": "Explorar el mercado de tractores",
       "module": "mercado",
-      "description": "Importar el informe validado, comparar períodos y abrir los movimientos de una categoría.",
+      "description": "Actualizar meses desde el Excel original de Penta/PYimport, comparar períodos y abrir los movimientos de una categoría.",
       "sources": ["src/features/mercado/Tractores.tsx", "src/features/mercado/TractorDashboard.tsx", "src/features/mercado/model.ts"]
     },
     {
       "id": "analizar-mercado-cosechadoras",
       "title": "Explorar el mercado de cosechadoras de granos",
       "module": "mercado",
-      "description": "Consolidar el histórico OCIT con subítems PYimport y comparar unidades, cuota y FOB por clase, estado y período.",
+      "description": "Actualizar meses por subítems PYimport conservando el histórico OCIT y comparar unidades, cuota y FOB por clase, estado y período.",
       "sources": ["src/features/mercado/harvesterImport.ts", "src/features/mercado/harvesterClasses.ts", "src/features/mercado/TractorDashboard.tsx", "src/features/mercado/TractorAnalysis.tsx"]
     },
     {

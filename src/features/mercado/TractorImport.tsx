@@ -2,13 +2,20 @@ import { useState } from "react";
 import { useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
-import { months, number, readReport, totals, type Movement } from "./model";
-import { readHarvesterReport } from "./harvesterImport";
+import { months, number, parseMovements, totals } from "./model";
+import { readHarvesterUpload } from "./harvesterImport";
+import { readTractorUpload } from "./tractorPentaImport";
+import type { MarketUpload } from "./penta";
+
+function formatMonth(index: number) {
+  return months[index % 12] + " " + Math.floor(index / 12);
+}
 
 export function TractorImport({ harvester = false }: { harvester?: boolean }) {
   const cache = useQueryClient();
   const equipment = harvester ? "cosechadoras" : "tractores";
-  const [pending, setPending] = useState<Movement[]>();
+  const table = harvester ? "mercado_cosechadoras" : "mercado_tractores";
+  const [pending, setPending] = useState<MarketUpload>();
   const [busy, setBusy] = useState(false);
   const [message, setMessage] = useState("");
   async function load(files: File[]) {
@@ -16,8 +23,17 @@ export function TractorImport({ harvester = false }: { harvester?: boolean }) {
     setMessage("");
     setPending(undefined);
     try {
+      const { data, error } = await supabase
+        .from(table)
+        .select("datos")
+        .eq("id", 1)
+        .maybeSingle();
+      if (error) throw new Error("No se pudo consultar la base guardada.");
+      const existing = data ? parseMovements(data.datos) : [];
       setPending(
-        await (harvester ? readHarvesterReport(files) : readReport(files[0])),
+        await (harvester
+          ? readHarvesterUpload(files, existing)
+          : readTractorUpload(files[0], existing)),
       );
     } catch (err) {
       setMessage(
@@ -34,27 +50,46 @@ export function TractorImport({ harvester = false }: { harvester?: boolean }) {
     setBusy(true);
     setMessage("");
     try {
-      const { error } = await supabase
-        .from(harvester ? "mercado_cosechadoras" : "mercado_tractores")
-        .upsert({ id: 1, datos: pending });
-      if (error) throw error;
+      const { error } = pending.period
+        ? await supabase.rpc("actualizar_mercado_por_periodo", {
+            p_familia: equipment,
+            p_desde: pending.period.start,
+            p_hasta: pending.period.end,
+            p_datos: pending.rows,
+          })
+        : await supabase.from(table).upsert({ id: 1, datos: pending.rows });
+      if (error) {
+        if (error.code === "PGRST202" || error.code === "42883")
+          throw new Error(
+            "Falta aplicar la migración de actualización por período en Supabase.",
+          );
+        if (error.code === "22023" || error.code === "42501")
+          throw new Error(error.message);
+        throw error;
+      }
       setPending(undefined);
       await cache.invalidateQueries({ queryKey: ["mercado-" + equipment] });
-      setMessage("Base de " + equipment + " guardada.");
-    } catch {
-      setMessage("No se pudo guardar el informe. Podés volver a intentar.");
+      setMessage(
+        pending.period
+          ? "Período de " + equipment + " actualizado."
+          : "Base de " + equipment + " guardada.",
+      );
+    } catch (err) {
+      setMessage(
+        err instanceof Error
+          ? err.message
+          : "No se pudo guardar el informe. Podés volver a intentar.",
+      );
     } finally {
       setBusy(false);
     }
   }
-  const latest =
-    harvester && pending
-      ? pending.reduce((last, row) =>
-          row[1] > last[1] || (row[1] === last[1] && row[2] > last[2])
-            ? row
-            : last,
-        )
-      : undefined;
+  const period = pending?.period;
+  const periodLabel =
+    period &&
+    (period.start === period.end
+      ? formatMonth(period.start)
+      : formatMonth(period.start) + " a " + formatMonth(period.end));
   return (
     <details className="rounded-lg border p-4">
       <summary className="cursor-pointer font-medium">
@@ -62,9 +97,8 @@ export function TractorImport({ harvester = false }: { harvester?: boolean }) {
       </summary>
       <div className="mt-4 space-y-3">
         <label className="block text-sm">
-          {harvester
-            ? "Seleccioná juntos el histórico OCIT de cosechadoras y todos los extractos PYimport que querés incorporar."
-            : "Importar el Excel con la hoja Base analítica"}
+          Seleccioná el Excel original de Penta/PYimport con los meses completos
+          que querés actualizar.
           <input
             className="block mt-2"
             type="file"
@@ -83,16 +117,16 @@ export function TractorImport({ harvester = false }: { harvester?: boolean }) {
         {pending && (
           <div>
             <p>
-              La nueva base contiene {number(pending.length)} movimientos y{" "}
-              {number(totals(pending).units)} unidades
-              {latest
-                ? " hasta " + months[latest[2] - 1] + " " + latest[1]
-                : ""}
-              . Al confirmar, reemplazará el informe compartido.
+              {periodLabel && <strong>{periodLabel} · </strong>}
+              {number(pending.rows.length)} movimientos y{" "}
+              {number(totals(pending.rows).units)} unidades.
+              {period
+                ? " Se reemplazarán los datos de esos meses y se conservará el resto del histórico."
+                : " Esta carga reemplazará la base completa."}
             </p>
             <div className="mt-3 flex gap-2">
               <Button disabled={busy} onClick={save}>
-                Guardar base
+                {period ? "Actualizar período" : "Guardar base"}
               </Button>
               <Button
                 variant="outline"

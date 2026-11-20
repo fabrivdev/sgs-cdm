@@ -92,7 +92,7 @@ const catalog = new Map(
 );
 export const powerSpec = (brand: string, model: string) =>
   catalog.get(modelKey(brand, model));
-function band(hp: number) {
+export function tractorPowerBand(hp: number) {
   if (hp <= 80) return "Hasta 80 HP";
   if (hp <= 120) return "81–120 HP";
   if (hp <= 170) return "121–170 HP";
@@ -115,7 +115,7 @@ export function completePower(rows: Movement[]): Movement[] {
     const spec = powerSpec(brand, model);
     const observed = known.get(modelKey(brand, model));
     const inferred = spec
-      ? band(spec.hp)
+      ? tractorPowerBand(spec.hp)
       : observed?.size === 1
         ? [...observed][0]
         : null;

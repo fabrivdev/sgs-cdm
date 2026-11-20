@@ -6,8 +6,13 @@ import {
 } from "./model";
 import { completeHarvestClasses } from "./harvesterClasses";
 
-type SourceRow = Record<string, unknown>;
-type SourceFile = Pick<File, "name" | "arrayBuffer">;
+import {
+  monthIndex,
+  readSourceWorkbook,
+  type MarketUpload,
+  type SourceRow,
+  type SourceFile,
+} from "./penta";
 
 const brandAliases: Record<string, string> = {
   CLASS: "CLAAS",
@@ -161,52 +166,30 @@ function movement(
     fob,
   ];
 }
-function monthIndex(year: number, month: number) {
-  return year * 12 + month - 1;
-}
-
-export async function readHarvesterReport(files: SourceFile[]) {
-  const XLSX = await import("xlsx");
-  const sourceRows = (sheet: import("xlsx").WorkSheet) =>
-    XLSX.utils
-      .sheet_to_json<SourceRow>(sheet)
-      .map((row) =>
-        Object.fromEntries(
-          Object.entries(row).map(([key, value]) => [
-            key.trim().replace(/\s+/g, " "),
-            value,
-          ]),
-        ),
-      );
-  const period = (value: unknown): [number, number] => {
-    if (typeof value === "number") {
-      const date = XLSX.SSF.parse_date_code(value);
-      if (date) return [date.y, date.m];
-    }
-    const iso = text(value).match(/^(\d{4})-(\d{2})-/);
-    if (iso) return [Number(iso[1]), Number(iso[2])];
-    const local = text(value).match(/^\d{1,2}[/-](\d{1,2})[/-](\d{4})/);
-    if (local) return [Number(local[2]), Number(local[1])];
-    throw new Error("Hay una fecha de despacho sin formato válido.");
-  };
-
+export async function readHarvesterUpload(
+  files: SourceFile[],
+  existing: Movement[] = [],
+): Promise<MarketUpload> {
   let history: Movement[] | undefined;
   const exports: {
     name: string;
     start: number;
     end: number;
     rows: SourceRow[];
+    date: (value: unknown) => [number, number];
   }[] = [];
   for (const file of files) {
-    const book = XLSX.read(await file.arrayBuffer(), {
-      sheets: ["BASE", "SubItems", "Parámetros"],
-    });
+    const { book, rows, date, extract } = await readSourceWorkbook(file, [
+      "BASE",
+      "SubItems",
+      "Parámetros",
+    ]);
     if (book.Sheets.BASE) {
       if (history)
         throw new Error(
           "Seleccioná una sola base histórica OCIT de cosechadoras.",
         );
-      const base = sourceRows(book.Sheets.BASE);
+      const base = rows(book.Sheets.BASE);
       if (!base.some((row) => words(row.TIPO) === "COS GRANOS"))
         throw new Error(
           file.name + " no contiene cosechadoras de granos en BASE.",
@@ -215,7 +198,7 @@ export async function readHarvesterReport(files: SourceFile[]) {
       history = [];
       for (const [index, row] of base.entries()) {
         if (words(row.TIPO) !== "COS GRANOS") continue;
-        const [year, month] = period(row["FECHA DESPACHO"]);
+        const [year, month] = date(row["FECHA DESPACHO"]);
         const signature = JSON.stringify([
           row.Despacho,
           row["FECHA DESPACHO"],
@@ -245,51 +228,19 @@ export async function readHarvesterReport(files: SourceFile[]) {
       }
       continue;
     }
-    const sheet = book.Sheets.SubItems;
-    const parameters = book.Sheets["Parámetros"];
-    if (!sheet || !parameters)
-      throw new Error(
-        file.name + " no corresponde a una base OCIT o un export PYimport.",
-      );
-    const metadata = XLSX.utils
-      .sheet_to_json<unknown[]>(parameters, { header: 1 })
-      .flat()
-      .map(text);
-    const match = uppercase(
-      metadata.find((entry) => /^PER[IÍ]ODO/i.test(entry)),
-    ).match(/(\d{1,2})\/(\d{4})\s*-\s*(\d{1,2})\/(\d{4})/);
-    if (
-      !match ||
-      !metadata.some(
-        (entry) => /^C[oó]digo NCM:/i.test(entry) && /\b843351/.test(entry),
-      )
-    )
-      throw new Error(
-        file.name +
-          " debe cubrir el NCM 843351 y declarar su período en Parámetros.",
-      );
-    const [, startMonth, startYear, endMonth, endYear] = match.map(Number);
-    const start = monthIndex(startYear, startMonth);
-    const end = monthIndex(endYear, endMonth);
-    if (
-      startMonth < 1 ||
-      endMonth > 12 ||
-      startMonth > 12 ||
-      endMonth < 1 ||
-      start > end
-    )
-      throw new Error(file.name + " declara un período inválido.");
-    exports.push({ name: file.name, start, end, rows: sourceRows(sheet) });
+    exports.push({ ...extract(/\b843351/), date });
   }
-  if (!history?.length)
-    throw new Error("Incluí el archivo histórico OCIT de cosechadoras.");
+  if (!history && exports.length !== 1)
+    throw new Error(
+      "Para actualizar un período, seleccioná un solo extracto de Penta/PYimport.",
+    );
   const sorted = exports.sort((a, b) => a.start - b.start || a.end - b.end);
   let coverageEnd = Math.max(
-    ...history.map((row) => monthIndex(row[1], row[2])),
+    ...(history ?? []).map((row) => monthIndex(row[1], row[2])),
   );
   const recent = new Map<string, Movement>();
   for (const source of sorted) {
-    if (source.start > coverageEnd + 1)
+    if (history && source.start > coverageEnd + 1)
       throw new Error(
         "Falta un período entre el histórico y " + source.name + ".",
       );
@@ -326,7 +277,7 @@ export async function readHarvesterReport(files: SourceFile[]) {
         (!matchModel && !harvesterDescription.test(description))
       )
         continue;
-      const [year, month] = period(row["Fecha Canc."]);
+      const [year, month] = source.date(row["Fecha Canc."]);
       if (
         monthIndex(year, month) < source.start ||
         monthIndex(year, month) > source.end
@@ -376,7 +327,17 @@ export async function readHarvesterReport(files: SourceFile[]) {
     throw new Error(
       "En los extractos no se identificaron cosechadoras de granos importadas a consumo.",
     );
-  return completeHarvestClasses(
+  if (!history) {
+    const [{ start, end }] = sorted;
+    return {
+      rows: completeHarvestClasses(
+        parseMovements([...recent.values()]),
+        existing.filter((row) => row[0].startsWith("ocit:")),
+      ),
+      period: { start, end },
+    };
+  }
+  const rows = completeHarvestClasses(
     parseMovements([
       ...history.filter((row) => {
         const month = monthIndex(row[1], row[2]);
@@ -388,4 +349,9 @@ export async function readHarvesterReport(files: SourceFile[]) {
     ]),
     history,
   );
+  return { rows };
+}
+
+export async function readHarvesterReport(files: SourceFile[]) {
+  return (await readHarvesterUpload(files)).rows;
 }
