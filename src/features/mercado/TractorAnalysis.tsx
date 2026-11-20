@@ -1,4 +1,6 @@
-import { useState } from "react";
+import { BarChart3, Layers, Tag, Tractor } from "lucide-react";
+import { Cell, Pie, PieChart, ResponsiveContainer } from "recharts";
+import { useState, type ReactNode } from "react";
 import { Link } from "react-router-dom";
 import { Card } from "@/components/ui/card";
 import {
@@ -28,16 +30,21 @@ function Heading({
   title,
   detail,
   to,
+  icon,
 }: {
   title: string;
   detail: string;
   to: string;
+  icon?: ReactNode;
 }) {
   return (
     <>
       <h2>
         <Link to={to}>
-          {title}
+          <span className="market-analysis-title">
+            {icon}
+            {title}
+          </span>
           <span aria-hidden="true">›</span>
         </Link>
       </h2>
@@ -76,6 +83,7 @@ function PowerOpportunity({ current, previous, year, href }: Period) {
     <Card className="market-panel">
       <Heading
         title="Mapa de oportunidades por potencia"
+        icon={<Tractor aria-hidden="true" />}
         detail={`Volumen y cuota CLAAS dentro del filtro · ${year}`}
         to={href("potencia")}
       />
@@ -118,10 +126,12 @@ function PowerOpportunity({ current, previous, year, href }: Period) {
                     title={`${year - 1}: ${number(group.prior)} unidades`}
                   >
                     <span>{number(group.units)}</span>
-                    <i
+                    <span
+                      className="market-opportunity-track"
                       aria-hidden="true"
-                      style={{ width: (group.units / peak) * 100 + "%" }}
-                    />
+                    >
+                      <i style={{ width: (group.units / peak) * 100 + "%" }} />
+                    </span>
                   </td>
                   <td
                     data-tone={
@@ -132,15 +142,25 @@ function PowerOpportunity({ current, previous, year, href }: Period) {
                           : undefined
                     }
                   >
-                    {percent(change)}
+                    <span className="market-opportunity-change">
+                      {change !== null && change !== 0 && (
+                        <span aria-hidden="true">
+                          {change > 0 ? "▲ " : "▼ "}
+                        </span>
+                      )}
+                      {percent(change)}
+                    </span>
                   </td>
                   <td>
-                    {money(price ? ratio(price.fob, price.units) : null)}
-                    {price && (
-                      <small className="market-price-count">
-                        {number(price.units)} uds.
-                      </small>
-                    )}
+                    <strong
+                      title={
+                        price
+                          ? number(price.units) + " unidades con FOB"
+                          : undefined
+                      }
+                    >
+                      {money(price ? ratio(price.fob, price.units) : null)}
+                    </strong>
                   </td>
                   <td
                     data-opportunity={
@@ -199,6 +219,7 @@ function ModelPosition({ current, year, href }: Omit<Period, "previous">) {
     <Card className="market-panel">
       <Heading
         title="CLAAS frente a otros modelos"
+        icon={<BarChart3 aria-hidden="true" />}
         detail={`FOB medio por tractor · ${year}`}
         to={href("modelos")}
       />
@@ -294,9 +315,9 @@ function ModelPosition({ current, year, href }: Omit<Period, "previous">) {
               </div>
             ))}
             <div className="market-range-axis">
-              <span>$0</span>
-              <span>{money(limit / 2)}</span>
-              <span>{money(limit)}</span>
+              {Array.from({ length: 9 }, (_, index) => (
+                <span key={index}>{money((limit * index) / 8)}</span>
+              ))}
             </div>
           </div>
           <p className="market-analysis-note">
@@ -340,12 +361,34 @@ function FobBridge({ current, previous, year, href }: Period) {
         },
       ]
     : [];
-  const max = Math.max(1, ...effects.map((effect) => Math.abs(effect.delta)));
   const change = bridge ? bridge.after - bridge.before : 0;
+  const stages = bridge
+    ? [
+        { name: String(year - 1), from: 0, to: bridge.before, total: true },
+        ...effects.map((effect, index) => {
+          const from =
+            bridge.before +
+            effects.slice(0, index).reduce((sum, item) => sum + item.delta, 0);
+          return {
+            name: effect.name,
+            description: effect.description,
+            from,
+            to: from + effect.delta,
+            total: false,
+          };
+        }),
+        { name: String(year), from: 0, to: bridge.after, total: true },
+      ]
+    : [];
+  const scale = Math.max(
+    1,
+    ...stages.flatMap((stage) => [stage.from, stage.to]),
+  );
   return (
     <Card className="market-panel">
       <Heading
         title="Qué cambió el FOB por tractor"
+        icon={<Tag aria-hidden="true" />}
         detail="Comparación interanual de unidades con FOB informado"
         to={href("precios")}
       />
@@ -360,45 +403,60 @@ function FobBridge({ current, previous, year, href }: Period) {
               <span>{year}</span>
               <strong>{money(bridge.after)}</strong>
             </div>
-            <div>
-              <span>Cambio por tractor</span>
-              <strong>{signedMoney(change)}</strong>
-              <small>{percent(change / bridge.before)}</small>
+            <div
+              className="market-bridge-change"
+              data-direction={change < 0 ? "down" : "up"}
+            >
+              <span>Variación por tractor</span>
+              <strong>{percent(change / bridge.before)}</strong>
+              <small>{signedMoney(change)}</small>
             </div>
           </div>
           {effects.length ? (
             <>
-              <div className="market-effect-axis">
-                <div>
-                  <span>Redujo</span>
-                  <span>Aumentó</span>
-                </div>
+              <div
+                className="market-waterfall"
+                aria-label="Contribuciones al cambio del FOB medio"
+              >
+                {stages.map((stage, index) => {
+                  const delta = stage.to - stage.from;
+                  const height = (Math.abs(delta) / scale) * 100;
+                  const bottom = (Math.min(stage.from, stage.to) / scale) * 100;
+                  return (
+                    <div
+                      className="market-waterfall-stage"
+                      key={stage.name}
+                      title={
+                        "description" in stage ? stage.description : undefined
+                      }
+                    >
+                      <div className="market-waterfall-plot">
+                        {index < stages.length - 1 && (
+                          <i
+                            className="market-waterfall-connector"
+                            aria-hidden="true"
+                            style={{ bottom: (stage.to / scale) * 100 + "%" }}
+                          />
+                        )}
+                        <div
+                          className="market-waterfall-bar"
+                          data-kind={
+                            stage.total ? "total" : delta < 0 ? "down" : "up"
+                          }
+                          style={{ bottom: bottom + "%", height: height + "%" }}
+                        >
+                          <strong className="market-waterfall-value">
+                            {stage.total ? money(stage.to) : signedMoney(delta)}
+                          </strong>
+                        </div>
+                      </div>
+                      <span className="market-waterfall-label">
+                        {stage.name}
+                      </span>
+                    </div>
+                  );
+                })}
               </div>
-              <ul className="market-effect-list">
-                {effects.map((effect) => (
-                  <li key={effect.name}>
-                    <div>
-                      <strong>{effect.name}</strong>
-                      <small>{effect.description}</small>
-                    </div>
-                    <div className="market-effect-track" aria-hidden="true">
-                      <i
-                        style={{
-                          left:
-                            effect.delta < 0
-                              ? 50 - (Math.abs(effect.delta) / max) * 50 + "%"
-                              : "50%",
-                          width: (Math.abs(effect.delta) / max) * 50 + "%",
-                        }}
-                        data-direction={effect.delta < 0 ? "down" : "up"}
-                      />
-                    </div>
-                    <strong className="market-effect-value">
-                      {signedMoney(effect.delta)}
-                    </strong>
-                  </li>
-                ))}
-              </ul>
               <p className="market-analysis-note">
                 Para aislar mezcla y FOB, se comparan marca, modelo y estado.
                 Unidades comparables: {number(bridge.coverage.priorUnits)}/
@@ -443,61 +501,92 @@ function ImporterConcentration({
     ...heads.map((row) => ({ name: row.name, units: row.units, other: false })),
     ...(rest ? [{ name: "Otros importadores", units: rest, other: true }] : []),
   ];
+  const palette = [
+    "#507914",
+    "#648a1a",
+    "#7e9f21",
+    "#91aa27",
+    "#9eaf50",
+    "#a9b76b",
+    "#b7c185",
+  ];
+  const slices = displayed.map((row, index) => ({
+    ...row,
+    color: row.other ? "#aeaeae" : palette[index],
+  }));
+  const barMax = Math.max(1, ...slices.map((row) => row.units));
   return (
     <Card className="market-panel">
       <Heading
         title="Quiénes concentran las importaciones"
+        icon={<Layers aria-hidden="true" />}
         detail={`Unidades por importador identificado · ${year}`}
         to={href("importadores")}
       />
       {displayed.length ? (
         <>
-          <div className="market-importer-summary">
-            <strong>{percent(ratio(leaderUnits, knownUnits))}</strong>
-            <span>
-              en{" "}
-              {leaders.length === 1
-                ? "el principal importador"
-                : `los ${leaders.length} principales importadores`}
-            </span>
-          </div>
-          <ul className="market-importer-list">
-            {displayed.map((row, index) => {
-              const content = (
-                <>
-                  <span className="market-importer-name">{row.name}</span>
-                  <span className="market-importer-value">
-                    <strong>{number(row.units)}</strong> uds. ·{" "}
-                    {percent(ratio(row.units, knownUnits))}
-                  </span>
-                </>
-              );
-              return (
-                <li
-                  key={row.name}
-                  data-other={row.other || undefined}
-                  data-leading={index < leaders.length || undefined}
-                >
+          <div className="market-importer-composition">
+            <div className="market-importer-donut" aria-hidden="true">
+              <ResponsiveContainer>
+                <PieChart>
+                  <Pie
+                    data={slices}
+                    dataKey="units"
+                    nameKey="name"
+                    innerRadius="53%"
+                    outerRadius="96%"
+                    stroke="hsl(var(--card))"
+                    strokeWidth={2}
+                    isAnimationActive={false}
+                  >
+                    {slices.map((row) => (
+                      <Cell key={row.name} fill={row.color} />
+                    ))}
+                  </Pie>
+                </PieChart>
+              </ResponsiveContainer>
+              <div className="market-importer-donut-label">
+                <strong>{number(knownUnits)}</strong>
+                <span>unidades</span>
+              </div>
+            </div>
+            <ul className="market-importer-list">
+              {slices.map((row) => (
+                <li key={row.name} data-other={row.other || undefined}>
                   <div className="market-importer-line">
                     {row.other ? (
-                      <div>{content}</div>
+                      <span className="market-importer-name">{row.name}</span>
                     ) : (
-                      <Link to={href("marcas", { importadores: row.name })}>
-                        {content}
+                      <Link
+                        className="market-importer-name"
+                        to={href("marcas", { importadores: row.name })}
+                      >
+                        {row.name}
                       </Link>
                     )}
-                  </div>
-                  <div className="market-importer-track" aria-hidden="true">
-                    <i
-                      style={{ width: (row.units / knownUnits) * 100 + "%" }}
-                    />
+                    <span className="market-importer-value">
+                      <strong>{number(row.units)}</strong> uds. ·{" "}
+                      {percent(ratio(row.units, knownUnits))}
+                    </span>
+                    <div className="market-importer-track" aria-hidden="true">
+                      <i
+                        style={{
+                          width: (row.units / barMax) * 100 + "%",
+                          background: row.color,
+                        }}
+                      />
+                    </div>
                   </div>
                 </li>
-              );
-            })}
-          </ul>
+              ))}
+            </ul>
+          </div>
           <p className="market-analysis-note">
-            Cuota sobre {number(knownUnits)} unidades con importador
+            {percent(ratio(leaderUnits, knownUnits))} en{" "}
+            {leaders.length === 1
+              ? "el principal importador"
+              : "los " + leaders.length + " principales"}
+            . Cuota sobre {number(knownUnits)} unidades con importador
             identificado. {number(total - knownUnits)} sin identificar.
           </p>
         </>

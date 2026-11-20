@@ -8,6 +8,8 @@ El gráfico y el detalle por precio muestran unidades con FOB positivo. Los movi
 
 En las tarjetas del tablero, la variación interanual positiva se muestra en verde y la negativa en rojo. El cero y la ausencia de comparación se muestran en color neutro.
 
+Las tarjetas de diagnóstico usan una escala monetaria común para comparar modelos, una cascada acumulada para explicar el FOB medio y un anillo con barras enlazadas para la concentración por importador. Las cuotas y contribuciones se recalculan con los filtros.
+
 El tablero agrega oportunidades por banda HP, posicionamiento CLAAS por banda y estado, puente de FOB, concentración por importador y estacionalidad. Los análisis respetan los filtros activos. La cuota CLAAS usa el total filtrado de la banda y el FOB de los nuevos análisis utiliza unidades con FOB positivo.
 
 La comparación CLAAS muestra por banda el rango y la mediana de los FOB medios de modelos de otras marcas y marca con puntos los modelos CLAAS. El puente reúne en un efecto neto los modelos que entran y salen. Distingue ese efecto de la mezcla y los valores FOB de pares por marca, modelo y estado. El ranking de importadores muestra nombres, unidades, cuota y concentración de los principales importadores sobre las unidades identificadas. El mapa de calor estima el intervalo cubierto a partir del primer y último mes de cada año presentes en la base e informa la mediana de años anteriores por mes.
