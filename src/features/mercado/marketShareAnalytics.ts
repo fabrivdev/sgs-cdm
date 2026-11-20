@@ -79,8 +79,8 @@ export function standings(current: SalesPeriod[], previous: SalesPeriod[], by: D
 }
 
 export function marketContributions(brands: MarketStanding[], benchmark: string) {
-  return brands.flatMap(({ name, delta, priorUnits, units }) => delta !== null && priorUnits !== null && (delta !== 0 || name === benchmark)
-    ? [{ name, delta, priorUnits, units }] : []).sort((a, b) => Math.abs(b.delta) - Math.abs(a.delta) || b.delta - a.delta);
+  return brands.flatMap(({ name, delta, priorUnits, units, share }) => delta !== null && priorUnits !== null && (delta !== 0 || name === benchmark)
+    ? [{ name, delta, priorUnits, units, share }] : []).sort((a, b) => Math.abs(b.delta) - Math.abs(a.delta) || b.delta - a.delta);
 }
 
 export function dealerConcentration(dealers: MarketStanding[], total: number) {
@@ -92,11 +92,6 @@ export function dealerConcentration(dealers: MarketStanding[], total: number) {
   if (unknown) leaders.push({ name: "Sin identificar", units: unknown });
   let accumulated = 0;
   return {
-    topThree: known.length ? ratio(known.slice(0, 3).reduce((sum, row) => sum + row.units, 0), total) : null,
-    priorTopThree: dealers.some((row) => row.priorRank !== null)
-      ? [...dealers].filter((row) => row.name !== unknownDealer).sort((a, b) => (b.priorShare ?? 0) - (a.priorShare ?? 0))
-        .slice(0, 3).reduce((sum, row) => sum + (row.priorShare ?? 0), 0)
-      : null,
     rows: leaders.map((row) => {
       accumulated += row.units;
       return { ...row, share: 100 * (ratio(row.units, total) ?? 0), cumulative: 100 * (ratio(accumulated, total) ?? 0) };

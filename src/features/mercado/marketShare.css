@@ -16,8 +16,6 @@
 .ms-dashboard .ms-positive { color: var(--ms-positive); }
 .ms-dashboard .ms-negative { color: var(--ms-negative); }
 .ms-dashboard .ms-reference { color: var(--ms-reference); font-weight: 700; }
-.ms-dashboard .ms-kpis .kpi-item { gap: 3px; }
-.ms-dashboard .ms-kpis .kpi-item > div:nth-child(3) { font-size: .72rem; }
 
 .ms-grid {
   display: grid;
@@ -67,11 +65,11 @@
 .ms-driver-legend { display: flex; flex-wrap: wrap; gap: 4px 12px; margin-bottom: 6px; color: hsl(var(--muted-foreground)); font-size: .7rem; }
 .ms-driver-legend span { display: flex; align-items: center; gap: 4px; }
 .ms-driver-legend i { display: block; width: 10px; height: 7px; border-radius: 2px; }
-.ms-driver-scroll { max-height: 225px; overflow-y: auto; scrollbar-width: thin; }
-.ms-driver-footer { position: sticky; bottom: 0; background: hsl(var(--card)); }
+.ms-driver-scroll { max-height: 250px; overflow-y: auto; scrollbar-width: thin; }
+.ms-driver-footer { position: sticky; bottom: 0; z-index: 1; background: hsl(var(--card)); }
 .ms-driver {
   display: grid;
-  grid-template-columns: minmax(94px, .8fr) minmax(0, 1.5fr) 51px;
+  grid-template-columns: minmax(90px, 1fr) minmax(40px, 1.35fr) 48px 61px 48px;
   align-items: center;
   column-gap: 9px;
   min-height: 25px;
@@ -79,7 +77,16 @@
 }
 
 .ms-driver > span:first-child { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.ms-driver > :last-child { text-align: right; }
+.ms-driver > :nth-child(n+3) { text-align: right; white-space: nowrap; }
+.ms-driver-columns {
+  position: sticky;
+  top: 0;
+  z-index: 2;
+  color: hsl(var(--muted-foreground));
+  background: hsl(var(--card));
+  border-bottom: 1px solid hsl(var(--border));
+  font-size: .68rem;
+}
 .ms-driver-track {
   height: 25px;
   position: relative;
@@ -176,22 +183,15 @@
 .ms-calendar .ms-reference-row > :first-child { background: color-mix(in srgb, var(--ms-row-bg), var(--ms-reference) 9%); }
 .ms-calendar .ms-cutoff { border-right: 2px solid hsl(var(--primary) / .48); }
 
-@media (max-width: 1050px) {
-  .ms-dashboard .ms-kpis { grid-auto-columns: minmax(0, 1fr); }
-  .ms-dashboard .ms-kpis .kpi-item > div:first-child > span:first-child { white-space: normal; }
-}
-
 @media (max-width: 800px) {
   .ms-grid { grid-template-columns: minmax(0, 1fr); }
 }
 
 @media (max-width: 639px) {
   .ms-panel { padding: 12px; }
-  .ms-dashboard .ms-kpis .kpi-item > div:nth-child(3) { line-height: 1.15; }
-  .ms-dashboard .ms-kpis .kpi-item > div:nth-child(3):empty { min-height: 0; }
   .ms-standing th button { min-height: 43px; }
   .ms-standing .ms-child th, .ms-standing .ms-child td { height: 37px; }
   .ms-standing .ms-share-track { display: none; }
   .ms-drivers { min-height: 0; }
-  .ms-driver { grid-template-columns: minmax(88px, .85fr) minmax(0, 1.5fr) 43px; gap: 7px; }
+  .ms-driver { grid-template-columns: minmax(75px, 1fr) minmax(28px, 1fr) 36px 47px 36px; gap: 5px; }
 }

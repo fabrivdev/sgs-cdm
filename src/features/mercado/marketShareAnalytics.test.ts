@@ -17,7 +17,8 @@ describe("Market Share analytics", () => {
       { name: "A", delta: 24 }, { name: "C", delta: -10 }, { name: "E", delta: 9 },
       { name: "D", delta: 8 }, { name: "F", delta: 3 }, { name: "B", delta: 1 },
     ]);
-    expect(drivers.find(({ name }) => name === "C")).toEqual({ name: "C", delta: -10, priorUnits: 10, units: 0 });
+    expect(drivers.find(({ name }) => name === "A")).toEqual({ name: "A", delta: 24, priorUnits: 6, units: 30, share: 30 / 71 });
+    expect(drivers.find(({ name }) => name === "C")).toEqual({ name: "C", delta: -10, priorUnits: 10, units: 0, share: 0 });
     expect(drivers.reduce((sum, row) => sum + row.delta, 0)).toBe(71 - 36);
     expect(brands.find(({ name }) => name === "B")?.points).toBeLessThan(0);
     expect(brands.find(({ name }) => name === "G")?.share).toBe(0);
@@ -35,8 +36,7 @@ describe("Market Share analytics", () => {
     expect(standings(current, previous, "marca", [], { by: "distribuidor", name: "D1" }))
       .toContainEqual(expect.objectContaining({ name: "B", priorUnits: 30, delta: null }));
     const concentration = dealerConcentration(dealers, 100);
-    expect(concentration.topThree).toBe(.7);
-    expect(concentration.priorTopThree).toBeNull();
+    expect(concentration.rows[1]).toMatchObject({ name: "D2", cumulative: 70 });
     expect(concentration.rows.at(-1)).toMatchObject({ name: "Sin identificar", cumulative: 100 });
   });
 

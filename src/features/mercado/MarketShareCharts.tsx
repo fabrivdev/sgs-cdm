@@ -32,7 +32,7 @@ export function GrowthDrivers({ brands, benchmark, delta, year }: { brands: Mark
   const referenceIndex = rows.findIndex(({ name }) => name === benchmark);
   const pinned = referenceIndex >= 7 ? rows[referenceIndex] : undefined;
   const visibleRows = pinned ? rows.filter((row) => row !== pinned) : rows;
-  function contribution({ name, delta, priorUnits, units }: typeof rows[number]) {
+  function contribution({ name, delta, priorUnits, units, share }: typeof rows[number]) {
     const label = `${year - 1} · ${number(priorUnits)} uds. → ${year} · ${number(units)} uds.`;
     return <div className="ms-driver" role="listitem" key={name}>
       <span title={name} className={name === benchmark ? "ms-reference" : undefined}>{name}</span>
@@ -41,7 +41,9 @@ export function GrowthDrivers({ brands, benchmark, delta, year }: { brands: Mark
         {delta !== 0 && <i className={delta < 0 ? "down" : "up"}
           style={{ left: width(Math.min(priorUnits, units)), width: width(Math.abs(delta)) }} />}
       </div>
-      <strong><Delta value={delta} /></strong>
+      <strong><span className="sr-only">Variación </span><Delta value={delta} /></strong>
+      <span><span className="sr-only">Cuota </span>{percent(share)}</span>
+      <strong><span className="sr-only">Unidades </span>{number(units)}</strong>
     </div>;
   }
   return <ChartPanel title="Aporte de cada marca al crecimiento">
@@ -53,11 +55,14 @@ export function GrowthDrivers({ brands, benchmark, delta, year }: { brands: Mark
           <span><i className="down" aria-hidden="true" /> Caída {year}</span>
         </div>
         <div className="ms-driver-scroll" role="list" tabIndex={rows.length > 8 ? 0 : undefined} aria-label="Variación interanual en unidades">
+          <div className="ms-driver ms-driver-columns" aria-hidden="true">
+            <span>Marca</span><span /><span>Δ uds.</span><span>Cuota</span><span>Uds.</span>
+          </div>
           {visibleRows.map(contribution)}
           <div className="ms-driver-footer">
             {pinned && contribution(pinned)}
             <div className="ms-driver ms-driver-axis" aria-hidden="true">
-              <span /><div><span>0</span><span>{number(max)}</span></div><span>uds.</span>
+              <span /><div><span>0</span><span>{number(max)}</span></div>
             </div>
           </div>
         </div>

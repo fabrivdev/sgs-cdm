@@ -1,11 +1,10 @@
 import { Link, useLocation, useSearchParams } from "react-router-dom";
-import { ChartNoAxesCombined, ChartPie, Flag, Store, TrendingUp } from "lucide-react";
 import { FiltersBar, FilterSelect } from "@/components/filters/FiltersBar";
 import { KpiItem, KpiStrip, PageHeader, PageShell } from "@/components/layout/AppPrimitives";
-import { months, number, percent, ratio } from "./model";
+import { months, number, percent } from "./model";
 import { salesFamilies, salesTotal, type SalesFamily, type SalesPeriod } from "./marketShareModel";
-import { dealerConcentration, marketHistory, pointsLabel, signedUnits, standings, unknownDealer } from "./marketShareAnalytics";
-import { Delta, DistributorPareto, GrowthDrivers, SalesPace, SharePosition } from "./MarketShareCharts";
+import { dealerConcentration, marketHistory, pointsLabel, standings } from "./marketShareAnalytics";
+import { DistributorPareto, GrowthDrivers, SalesPace, SharePosition } from "./MarketShareCharts";
 import { SalesCalendar, StandingTable } from "./MarketShareTables";
 import "./tractores.css";
 import "./marketShare.css";
@@ -38,16 +37,11 @@ export function MarketShareDashboard({ periods }: { periods: SalesPeriod[] }) {
   const total = salesTotal(current);
   const priorTotal = salesTotal(previous);
   const delta = comparable ? total - priorTotal : null;
-  const change = delta === null ? null : ratio(delta, priorTotal);
   const brands = standings(current, previous, "marca", [benchmark]);
   const dealers = standings(current, previous, "distribuidor");
   const benchmarkRow = brands.find(({ name }) => name === benchmark);
-  const cdm = dealers.find(({ name }) => name === referenceDealer);
-  const cdmShare = cdm?.share ?? (dealers.length && !dealers.some(({ name }) => name === unknownDealer) ? ratio(0, total) : null);
-  const winner = [...brands].filter((row) => (row.points ?? 0) > 0).sort((a, b) => (b.points ?? 0) - (a.points ?? 0))[0];
+  const benchmarkChange = benchmarkRow?.points ?? null;
   const concentration = dealerConcentration(dealers, total);
-  const concentrationChange = concentration.topThree === null || concentration.priorTopThree === null
-    ? null : (concentration.topThree - concentration.priorTopThree) * 100;
   const chartYears = years.filter((entry) => entry <= year && selected(entry).some((period) => period.mes === 1)).slice(0, 4);
 
   function set(name: string, value: string) {
@@ -76,19 +70,12 @@ export function MarketShareDashboard({ periods }: { periods: SalesPeriod[] }) {
           options={months.slice(0, lastMonth).map((label, i) => ({ label, value: String(i + 1) }))} />
       </FiltersBar>
       {view === "tablero" ? <>
-        <KpiStrip className="ms-kpis">
-          <KpiItem label="Unidades vendidas" value={number(total)} icon={<TrendingUp />}
-            detail={current.length !== cutoff ? current.length + " de " + cutoff + " meses reportados"
-              : delta === null ? undefined : <Delta value={delta} format={(value) =>
-              signedUnits(value) + " uds." + (change === null ? "" : " · " + (change > 0 ? "+" : "") + percent(change))} />} />
-          <KpiItem label={"Cuota " + benchmark} value={percent(benchmarkRow?.share ?? null)} icon={<Flag />}
-            detail={benchmarkRow && <>{number(benchmarkRow.units)} uds. {benchmarkRow.points !== null && <>· <Delta value={benchmarkRow.points} format={pointsLabel} /></>}</>} />
-          <KpiItem label="Mayor ganancia de cuota" value={pointsLabel(winner?.points ?? null)} icon={<ChartNoAxesCombined />}
-            tone={winner ? "positive" : "default"} detail={winner?.name} />
-          <KpiItem label="Concentración de distribuidores" value={percent(concentration.topThree)} icon={<ChartPie />}
-            detail={concentration.topThree !== null && <>3 líderes {concentrationChange !== null && <>· <Delta value={concentrationChange} format={pointsLabel} /></>}</>} />
-          <KpiItem label="Cuota Campos del Mañana" value={percent(cdmShare)} icon={<Store />}
-            detail={cdmShare !== null && <>{number(cdm?.units ?? 0)} uds. {cdm?.points != null && <>· <Delta value={cdm.points} format={pointsLabel} /></>}</>} />
+        <KpiStrip>
+          <KpiItem label="Total vendido" value={number(total)}
+            detail={current.length !== cutoff ? current.length + " de " + cutoff + " meses reportados" : undefined} />
+          <KpiItem label={"Cuota " + benchmark} value={percent(benchmarkRow?.share ?? null)} />
+          <KpiItem label="Variación de cuota" value={pointsLabel(benchmarkChange)}
+            tone={!benchmarkChange ? "default" : benchmarkChange > 0 ? "positive" : "danger"} />
         </KpiStrip>
         <div className="ms-grid">
           <GrowthDrivers brands={brands} benchmark={benchmark} delta={delta} year={year} />
