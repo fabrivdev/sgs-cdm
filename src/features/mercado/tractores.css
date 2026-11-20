@@ -294,6 +294,20 @@
 .market-metric > a {
   display: block;
 }
+.market-metric .market-metric-change[data-trend="up"] {
+  color: #15803d;
+  font-weight: 600;
+}
+.market-metric .market-metric-change[data-trend="down"] {
+  color: #b91c1c;
+  font-weight: 600;
+}
+.dark .market-metric .market-metric-change[data-trend="up"] {
+  color: #86efac;
+}
+.dark .market-metric .market-metric-change[data-trend="down"] {
+  color: #fca5a5;
+}
 .market-panel h2 {
   margin: 0;
 }

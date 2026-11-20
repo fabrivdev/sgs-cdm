@@ -164,17 +164,31 @@ export function TractorDashboard({ rows: data }: { rows: Movement[] }) {
   );
   const tickCount = Math.ceil(monthlyMax / tickStep);
   const plotMax = tickStep * tickCount;
-  const metric = (name: string, value: string, detail: string, to: View) => (
-    <Card className="market-metric">
-      <Link to={href(to)}>
-        <span>{name}</span>
-        <strong>{value}</strong>
-        <small>{detail}</small>
-      </Link>
-    </Card>
-  );
-  const annualChange = (now: number, old: number) =>
-    old ? percent(now / old - 1) + " interanual" : "Sin base anterior";
+  const metric = (
+    name: string,
+    value: string,
+    change: number | null,
+    to: View,
+  ) => {
+    const delta = change !== null && Math.abs(change) < 0.0005 ? 0 : change;
+    const trend =
+      delta === null || delta === 0 ? "neutral" : delta > 0 ? "up" : "down";
+    return (
+      <Card className="market-metric">
+        <Link to={href(to)}>
+          <span>{name}</span>
+          <strong>{value}</strong>
+          <small className="market-metric-change" data-trend={trend}>
+            {delta === null
+              ? "Sin base anterior"
+              : (delta > 0 ? "+" : "") + percent(delta) + " interanual"}
+          </small>
+        </Link>
+      </Card>
+    );
+  };
+  const annualChange = (now: number | null, old: number | null) =>
+    now !== null && old ? now / old - 1 : null;
   const brandView = dimensionKeys.includes(view as Dimension)
     ? (view as Dimension)
     : null;
@@ -333,10 +347,7 @@ export function TractorDashboard({ rows: data }: { rows: Movement[] }) {
         {metric(
           "FOB medio por tractor",
           money(ratio(b.fob, b.units)),
-          annualChange(
-            b.units ? b.fob / b.units : 0,
-            a.units ? a.fob / a.units : 0,
-          ),
+          annualChange(ratio(b.fob, b.units), ratio(a.fob, a.units)),
           "precios",
         )}
       </section>
