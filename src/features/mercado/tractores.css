@@ -482,6 +482,11 @@
 .market-panel h2 {
   margin: 0;
 }
+.market-panels > .market-panel > h2 {
+  margin-bottom: 10px;
+  font-size: 0.95rem;
+  line-height: 1.35;
+}
 .market-rank {
   grid-template-columns: minmax(124px, 0.75fr) minmax(40px, 1.6fr) 55px;
 }

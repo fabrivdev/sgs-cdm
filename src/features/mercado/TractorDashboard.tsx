@@ -366,9 +366,8 @@ export function TractorDashboard({ rows: data }: { rows: Movement[] }) {
           <div className="market-panels">
             <Card className="market-panel">
               <h2>
-                {brand ? "Modelos principales" : "Participación por marca"}{" "}
+                {brand ? "Participación por modelo" : "Participación por marca"}
               </h2>
-              <p>Cuota de unidades · {year}</p>
               {leaders.map((g) => (
                 <div
                   className={
@@ -394,10 +393,7 @@ export function TractorDashboard({ rows: data }: { rows: Movement[] }) {
               {!leaders.length && <p>Sin movimientos en este período.</p>}
             </Card>
             <Card className="market-panel">
-              <h2>Evolución mensual</h2>
-              <p>
-                Unidades · {year - 1} y {year}
-              </p>
+              <h2>Unidades por mes</h2>
               <div className="market-month-window">
                 <div className="market-month-plot">
                   <div className="market-grid" aria-hidden="true">
@@ -475,12 +471,9 @@ export function TractorDashboard({ rows: data }: { rows: Movement[] }) {
                 <Card className="market-panel" key={d}>
                   <h2>
                     {d === "potencia"
-                      ? "Tractores por potencia"
-                      : "Distribución por precio FOB"}
+                      ? "Unidades por potencia"
+                      : "Unidades por tramo FOB"}
                   </h2>
-                  <p>
-                    Unidades · {year - 1} y {year}
-                  </p>
                   {chart.map((g) => (
                     <div
                       key={g.name}

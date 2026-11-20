@@ -80,7 +80,7 @@ describe("Mercado de tractores", () => {
       </MemoryRouter>,
     );
     const ranking = screen
-      .getByRole("heading", { name: "Modelos principales" })
+      .getByRole("heading", { name: "Participación por modelo" })
       .closest<HTMLElement>(".market-panel")!;
     expect(
       within(ranking).getByText("AXION").closest(".market-rank"),
@@ -109,7 +109,7 @@ describe("Mercado de tractores", () => {
       october.querySelector(".market-year-current strong"),
     ).toHaveTextContent("4");
     const importers = screen
-      .getByRole("heading", { name: "Quiénes concentran las importaciones" })
+      .getByRole("heading", { name: "Concentración por importador" })
       .closest<HTMLElement>(".market-panel")!;
     expect(within(importers).getByText("0")).toBeVisible();
     expect(within(importers).queryByRole("link")).toBeNull();

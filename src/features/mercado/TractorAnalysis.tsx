@@ -30,15 +30,6 @@ import {
   seasonality,
 } from "./marketAnalysis";
 
-function Heading({ title, detail }: { title: string; detail: string }) {
-  return (
-    <>
-      <h2>{title}</h2>
-      <p>{detail}</p>
-    </>
-  );
-}
-
 type Period = {
   current: Movement[];
   previous: Movement[];
@@ -66,11 +57,7 @@ function PowerOpportunity({ current, previous, year }: Period) {
   const peak = Math.max(1, ...groups.map((group) => group.units));
   return (
     <Card className="market-panel">
-      <Heading
-        title="Mapa de oportunidades por potencia"
-
-        detail={`Unidades y FOB por banda · ${year}`}
-      />
+      <h2>Oportunidades por potencia</h2>
       <div
         className="market-scroll"
         tabIndex={0}
@@ -160,7 +147,7 @@ function PowerOpportunity({ current, previous, year }: Period) {
   );
 }
 
-function ModelPosition({ current, year }: Omit<Period, "previous">) {
+function ModelPosition({ current }: Pick<Period, "current">) {
   const states = [...new Set(current.map((row) => row[8]))];
   const [preferred, setPreferred] = useState("NUEVO");
   const state = states.includes(preferred)
@@ -197,11 +184,7 @@ function ModelPosition({ current, year }: Omit<Period, "previous">) {
     Math.max(0, Math.min(100, (price / limit) * 100)) + "%";
   return (
     <Card className="market-panel">
-      <Heading
-        title="CLAAS frente a otros modelos"
-
-        detail={`FOB medio por tractor · ${year}`}
-      />
+      <h2>FOB por banda de potencia</h2>
       <div className="market-comparison-toolbar">
         <div className="market-comparison-legend">
           <span>
@@ -325,14 +308,7 @@ function ImportRhythm({
   const tickColor = "hsl(var(--muted-foreground))";
   return (
     <Card className="market-panel">
-      <Heading
-        title="Ritmo acumulado de importaciones"
-        detail={
-          cutoff === 1
-            ? "Unidades · Ene"
-            : `Unidades · Ene–${months[cutoff - 1]}`
-        }
-      />
+      <h2>Unidades acumuladas</h2>
       {visibleLines.length ? (
         <>
           <div className="market-rhythm-chart">
@@ -436,7 +412,7 @@ function ImportRhythm({
   );
 }
 
-function ImporterConcentration({ current, year }: Omit<Period, "previous">) {
+function ImporterConcentration({ current }: Pick<Period, "current">) {
   const groups = compare(current, [], (row) => label(row, "importadores"));
   const identified = groups.filter(
     (group) =>
@@ -469,11 +445,7 @@ function ImporterConcentration({ current, year }: Omit<Period, "previous">) {
   const barMax = Math.ceil(largest / step) * step;
   return (
     <Card className="market-panel">
-      <Heading
-        title="Quiénes concentran las importaciones"
-
-        detail={`Unidades por importador identificado · ${year}`}
-      />
+      <h2>Concentración por importador</h2>
       {displayed.length ? (
         <>
           <div className="market-importer-composition">
@@ -563,10 +535,7 @@ function Seasonality({
   );
   return (
     <Card className="market-panel market-seasonality">
-      <Heading
-        title="Estacionalidad de importación"
-        detail="Unidades por mes y mediana de años anteriores"
-      />
+      <h2>Estacionalidad</h2>
       <ul className="market-season-legend" aria-label="Escala de unidades">
         <li>
           <i data-volume="low" aria-hidden="true" />
