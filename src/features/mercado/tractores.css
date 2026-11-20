@@ -493,6 +493,18 @@
 .market-band {
   grid-template-columns: minmax(143px, 0.85fr) minmax(35px, 1.6fr) 44px;
 }
+.market-panel .market-segment-pending {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px 12px;
+  padding-top: 8px;
+  border-top: 1px solid hsl(var(--border));
+  margin: 8px 0 0;
+  font-size: 0.8rem;
+}
+.market-segment-pending span:first-child {
+  margin-inline-end: auto;
+}
 .market-rank .market-paired {
   display: grid;
   height: 19px;

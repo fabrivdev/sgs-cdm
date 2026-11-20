@@ -18,6 +18,21 @@ const fineSegments = [
   "Hasta 20 surcos", "21–24 surcos", "25–29 surcos", "30–33 surcos",
   "34–37 surcos", "Más de 37 surcos",
 ];
+const plantingSummary = [
+  { label: "Hasta 14 líneas", bands: coarseSegments.slice(0, 3) },
+  { label: "15–18 líneas", bands: coarseSegments.slice(3, 5) },
+  { label: "19 líneas o más", bands: coarseSegments.slice(5) },
+  { label: "Hasta 29 surcos", bands: fineSegments.slice(0, 3) },
+  { label: "30 surcos o más", bands: fineSegments.slice(3) },
+];
+const plantingSummaryByBand = new Map<string, string>(
+  plantingSummary.flatMap(({ label, bands }) => bands.map((band) => [band, label] as const)),
+);
+export const plantingSummaryOrder = plantingSummary.map(({ label }) => label);
+export function plantingSummaryBand(band: string) {
+  return plantingSummaryByBand.get(band) ?? unknownPlantingSegment;
+}
+
 export const plantingPriceBands = [
   "Menos de $25.000", "$25.000 a <$50.000", "$50.000 a <$100.000",
   "$100.000 a <$200.000", "$200.000 o más",

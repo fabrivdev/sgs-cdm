@@ -238,3 +238,27 @@ it("conserva el tipo de grano al abrir un segmento de Sembradoras", () => {
   expect(screen.getByRole("link", { name: "HORSCH ›" })).toBeVisible();
   expect(screen.queryByText("OTRA")).toBeNull();
 });
+
+it("resume las bandas de sembradoras en el tablero y conserva el detalle en Segmentos", () => {
+  const planter = (id: string, year: number, band: string, units: number): Movement =>
+    [id, year, 1, "HORSCH", "MAESTRO", band, "$50.000 a <$100.000", "A", "NUEVO", units, 75_000];
+  render(
+    <MemoryRouter initialEntries={["/mercado/sembradoras"]}>
+      <TractorDashboard family="sembradoras" rows={[
+        planter("A", 2026, "11–12 líneas", 4),
+        planter("B", 2026, "13–14 líneas", 7),
+        planter("C", 2025, "Hasta 10 líneas", 9),
+        planter("D", 2026, "21–24 surcos", 6),
+        planter("E", 2026, "25–29 surcos", 8),
+        planter("F", 2026, "Sin segmento informado", 100),
+      ]} />
+    </MemoryRouter>,
+  );
+  const panel = screen.getByRole("heading", { name: "Unidades por segmento" }).closest<HTMLElement>(".market-panel")!;
+  expect(within(panel).getByTitle("2025: 9 · 2026: 11")).toHaveTextContent("Hasta 14 líneas");
+  expect(within(panel).getByTitle("2025: 0 · 2026: 14")).toHaveTextContent("Hasta 29 surcos");
+  expect(within(panel).getByText("2026 · 100")).toBeVisible();
+  expect(within(panel).queryByText("13–14 líneas")).toBeNull();
+  fireEvent.click(screen.getByRole("link", { name: "Segmentos" }));
+  expect(screen.getByRole("link", { name: "13–14 líneas ›" })).toBeVisible();
+});

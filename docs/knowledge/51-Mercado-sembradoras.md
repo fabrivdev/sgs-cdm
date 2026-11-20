@@ -10,6 +10,8 @@ El desglose usa líneas de siembra para grano grueso y surcos para grano fino. L
 
 Los gráficos históricos representan los huecos de cobertura y omiten la variación cuando falta algún mes del período comparado. El archivo PYimport con período agosto de 2025 completa el mes faltante de OCIT. El segundo extracto de esta revisión incorpora octubre de 2026. Ambos se pueden cargar por separado sin reemplazar los demás meses.
 
+En el tablero, **Unidades por segmento** resume grano grueso en tres bandas de líneas y grano fino en dos bandas de surcos. Las unidades pendientes aparecen debajo de las barras para conservar el total sin afectar la escala. La pestaña Segmentos mantiene los rangos detallados.
+
 ## Clasificación a partir del subítem
 
 Los cuerpos, líneas o surcos declarados prevalecen. La nomenclatura de modelos se contrasta con OCIT y fichas regionales. Si las configuraciones de catálogo caen todas en la misma banda, se registra ese segmento manteniendo vacío el número de líneas. Si abarcan bandas distintas, queda pendiente el segmento hasta contar con la configuración. Por ejemplo, MF 509 admite 8 o 9 líneas y queda en Hasta 10 líneas. MF 511 admite 10 u 11 y necesita evidencia adicional. Las familias de grano se validan por producto, en especial cuando el despacho solo dice siembra directa o sembradora-abonadora.

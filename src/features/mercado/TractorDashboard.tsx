@@ -23,7 +23,14 @@ import { PageHeader, PageShell } from "@/components/layout/AppPrimitives";
 import { completePower, powerSpec } from "./power";
 import { completeHarvestClasses } from "./harvesterClasses";
 import { TractorAnalysis, YearLegend } from "./TractorAnalysis";
-import { marketFamilies, plantingFilters, type MarketFamily } from "./marketFamily";
+import {
+  marketFamilies,
+  plantingFilters,
+  plantingSummaryBand,
+  plantingSummaryOrder,
+  unknownPlantingSegment,
+  type MarketFamily,
+} from "./marketFamily";
 import "./tractores.css";
 
 const tractorTitles = {
@@ -496,12 +503,17 @@ export function TractorDashboard({
               <YearLegend year={year} />
             </Card>
             {(["potencia", "precios"] as const).map((d) => {
-              const chart = compare(
+              const compactSegments = planting && d === "potencia";
+              const grouped = compare(
                 d === "precios" ? current.filter(priceEligible) : current,
                 d === "precios" ? previous.filter(priceEligible) : previous,
-                (r) => label(r, d),
+                (r) => compactSegments ? plantingSummaryBand(label(r, d)) : label(r, d),
               );
-              const order = bands[d]!;
+              const pending = compactSegments
+                ? grouped.find((group) => group.name === unknownPlantingSegment)
+                : undefined;
+              const chart = pending ? grouped.filter((group) => group !== pending) : grouped;
+              const order = compactSegments ? plantingSummaryOrder : bands[d]!;
               chart.sort(
                 (x, y) => order.indexOf(x.name) - order.indexOf(y.name),
               );
@@ -542,7 +554,14 @@ export function TractorDashboard({
                   {chart.length ? (
                     <YearLegend year={year} />
                   ) : (
-                    <p>Sin datos en este período.</p>
+                    !pending && <p>Sin datos en este período.</p>
+                  )}
+                  {pending && (
+                    <p className="market-segment-pending">
+                      <span>{pending.name}</span>
+                      <span>{year - 1} · {number(pending.prior)}</span>
+                      <span>{year} · {number(pending.units)}</span>
+                    </p>
                   )}
                 </Card>
               );
