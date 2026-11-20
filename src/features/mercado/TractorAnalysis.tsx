@@ -1,7 +1,5 @@
-import { BarChart3, Layers, Tag, Tractor } from "lucide-react";
 import { Cell, Pie, PieChart, ResponsiveContainer } from "recharts";
-import { useState, type ReactNode } from "react";
-import { Link } from "react-router-dom";
+import { useState } from "react";
 import { Card } from "@/components/ui/card";
 import {
   compare,
@@ -11,7 +9,6 @@ import {
   number,
   percent,
   ratio,
-  totals,
   type Movement,
 } from "./model";
 import {
@@ -21,33 +18,10 @@ import {
   seasonality,
 } from "./marketAnalysis";
 
-type LinkTo = (
-  view:
-    "marcas" | "modelos" | "importadores" | "historia" | "precios" | "potencia",
-  filters?: Record<string, string | null>,
-) => string;
-function Heading({
-  title,
-  detail,
-  to,
-  icon,
-}: {
-  title: string;
-  detail: string;
-  to: string;
-  icon?: ReactNode;
-}) {
+function Heading({ title, detail }: { title: string; detail: string }) {
   return (
     <>
-      <h2>
-        <Link to={to}>
-          <span className="market-analysis-title">
-            {icon}
-            {title}
-          </span>
-          <span aria-hidden="true">›</span>
-        </Link>
-      </h2>
+      <h2>{title}</h2>
       <p>{detail}</p>
     </>
   );
@@ -57,9 +31,8 @@ type Period = {
   current: Movement[];
   previous: Movement[];
   year: number;
-  href: LinkTo;
 };
-function PowerOpportunity({ current, previous, year, href }: Period) {
+function PowerOpportunity({ current, previous, year }: Period) {
   const groups = compare(current, previous, (row) => row[5]).sort((a, b) => {
     const order = [...hpBands, "Sin potencia informada"];
     return order.indexOf(a.name) - order.indexOf(b.name);
@@ -83,9 +56,8 @@ function PowerOpportunity({ current, previous, year, href }: Period) {
     <Card className="market-panel">
       <Heading
         title="Mapa de oportunidades por potencia"
-        icon={<Tractor aria-hidden="true" />}
-        detail={`Volumen y cuota CLAAS dentro del filtro · ${year}`}
-        to={href("potencia")}
+
+        detail={`Unidades y FOB por banda · ${year}`}
       />
       <div
         className="market-scroll"
@@ -116,11 +88,7 @@ function PowerOpportunity({ current, previous, year, href }: Period) {
                   key={group.name}
                   data-unclassified={!classified || undefined}
                 >
-                  <th scope="row">
-                    <Link to={href("marcas", { potencia: group.name })}>
-                      {group.name} ›
-                    </Link>
-                  </th>
+                  <th scope="row">{group.name}</th>
                   <td
                     className="market-opportunity-volume"
                     title={`${year - 1}: ${number(group.prior)} unidades`}
@@ -180,13 +148,13 @@ function PowerOpportunity({ current, previous, year, href }: Period) {
   );
 }
 
-function ModelPosition({ current, year, href }: Omit<Period, "previous">) {
+function ModelPosition({ current, year }: Omit<Period, "previous">) {
   const states = [...new Set(current.map((row) => row[8]))];
   const [preferred, setPreferred] = useState("NUEVO");
   const state = states.includes(preferred)
     ? preferred
     : (states[0] ?? preferred);
-  const { points, covered, priced } = positioning(current, state);
+  const { points } = positioning(current, state);
   const bands = hpBands
     .map((band) => {
       const inBand = points.filter((point) => point.band === band);
@@ -219,9 +187,8 @@ function ModelPosition({ current, year, href }: Omit<Period, "previous">) {
     <Card className="market-panel">
       <Heading
         title="CLAAS frente a otros modelos"
-        icon={<BarChart3 aria-hidden="true" />}
+
         detail={`FOB medio por tractor · ${year}`}
-        to={href("modelos")}
       />
       <div className="market-comparison-toolbar">
         <div className="market-comparison-legend">
@@ -282,49 +249,34 @@ function ModelPosition({ current, year, href }: Omit<Period, "previous">) {
                     </>
                   )}
                   {claasModels.map((point) => (
-                    <Link
+                    <span
                       className="market-range-point"
                       key={point.model}
                       style={{ left: scale(point.price) }}
                       title={`${point.model} · ${money(point.price)} · ${number(point.units)} uds.`}
                       aria-label={`${point.model} · ${money(point.price)} · ${number(point.units)} uds.`}
-                      to={href("importadores", {
-                        modelos: point.model,
-                        potencia: band,
-                        estado: state,
-                      })}
                     />
                   ))}
                 </div>
                 <div className="market-range-values">
                   {median !== null && <span>Mediana {money(median)}</span>}
                   {claasModels.map((point) => (
-                    <Link
-                      key={point.model}
-                      to={href("importadores", {
-                        modelos: point.model,
-                        potencia: band,
-                        estado: state,
-                      })}
-                    >
+                    <strong key={point.model}>
                       {point.model.replace("CLAAS · ", "")} ·{" "}
                       {money(point.price)} · {number(point.units)} uds.
-                    </Link>
+                    </strong>
                   ))}
                 </div>
               </div>
             ))}
             <div className="market-range-axis">
               {Array.from({ length: 9 }, (_, index) => (
-                <span key={index}>{money((limit * index) / 8)}</span>
+                <span key={index} style={{ left: index * 12.5 + "%" }}>
+                  {money((limit * index) / 8)}
+                </span>
               ))}
             </div>
           </div>
-          <p className="market-analysis-note">
-            La franja gris va del menor al mayor FOB medio por modelo.{" "}
-            {number(covered)} de {number(priced)} unidades con FOB tienen modelo
-            y HP.
-          </p>
         </>
       ) : (
         <p>Sin modelos con potencia y FOB informado para este filtro.</p>
@@ -337,13 +289,12 @@ const signedMoney = (value: number) =>
   (Math.round(Math.abs(value)) === 0 ? "" : value < 0 ? "−" : "+") +
   money(Math.abs(value));
 
-function FobBridge({ current, previous, year, href }: Period) {
+function FobBridge({ current, previous, year }: Period) {
   const bridge = priceBridge(current, previous);
   const effects = bridge?.steps.length
     ? [
         {
           name: "Modelos sin comparación",
-          description: "Aparecen en un solo período o faltan datos",
           delta:
             bridge.steps[0].to -
             bridge.steps[0].from +
@@ -351,12 +302,10 @@ function FobBridge({ current, previous, year, href }: Period) {
         },
         {
           name: "Mezcla de modelos comparables",
-          description: "Cambios en las unidades de los mismos modelos",
           delta: bridge.steps[1].to - bridge.steps[1].from,
         },
         {
           name: "FOB de los mismos modelos",
-          description: "Variación dentro de cada modelo comparable",
           delta: bridge.steps[2].to - bridge.steps[2].from,
         },
       ]
@@ -371,7 +320,6 @@ function FobBridge({ current, previous, year, href }: Period) {
             effects.slice(0, index).reduce((sum, item) => sum + item.delta, 0);
           return {
             name: effect.name,
-            description: effect.description,
             from,
             to: from + effect.delta,
             total: false,
@@ -388,9 +336,8 @@ function FobBridge({ current, previous, year, href }: Period) {
     <Card className="market-panel">
       <Heading
         title="Qué cambió el FOB por tractor"
-        icon={<Tag aria-hidden="true" />}
-        detail="Comparación interanual de unidades con FOB informado"
-        to={href("precios")}
+
+        detail="FOB por tractor · Comparación interanual"
       />
       {bridge ? (
         <>
@@ -423,14 +370,11 @@ function FobBridge({ current, previous, year, href }: Period) {
                   const height = (Math.abs(delta) / scale) * 100;
                   const bottom = (Math.min(stage.from, stage.to) / scale) * 100;
                   return (
-                    <div
-                      className="market-waterfall-stage"
-                      key={stage.name}
-                      title={
-                        "description" in stage ? stage.description : undefined
-                      }
-                    >
+                    <div className="market-waterfall-stage" key={stage.name}>
                       <div className="market-waterfall-plot">
+                        {index === 0 && (
+                          <span className="market-waterfall-zero">$0</span>
+                        )}
                         {index < stages.length - 1 && (
                           <i
                             className="market-waterfall-connector"
@@ -457,13 +401,6 @@ function FobBridge({ current, previous, year, href }: Period) {
                   );
                 })}
               </div>
-              <p className="market-analysis-note">
-                Para aislar mezcla y FOB, se comparan marca, modelo y estado.
-                Unidades comparables: {number(bridge.coverage.priorUnits)}/
-                {number(bridge.coverage.priorTotal)} en {year - 1} y{" "}
-                {number(bridge.coverage.recentUnits)}/
-                {number(bridge.coverage.recentTotal)} en {year}.
-              </p>
             </>
           ) : (
             <p>
@@ -479,11 +416,7 @@ function FobBridge({ current, previous, year, href }: Period) {
   );
 }
 
-function ImporterConcentration({
-  current,
-  year,
-  href,
-}: Omit<Period, "previous">) {
+function ImporterConcentration({ current, year }: Omit<Period, "previous">) {
   const groups = compare(current, [], (row) => label(row, "importadores"));
   const identified = groups.filter(
     (group) =>
@@ -492,11 +425,8 @@ function ImporterConcentration({
       ),
   );
   const knownUnits = identified.reduce((sum, group) => sum + group.units, 0);
-  const total = totals(current).units;
   const heads = identified.slice(0, 7);
   const rest = knownUnits - heads.reduce((sum, group) => sum + group.units, 0);
-  const leaders = heads.slice(0, 3);
-  const leaderUnits = leaders.reduce((sum, row) => sum + row.units, 0);
   const displayed = [
     ...heads.map((row) => ({ name: row.name, units: row.units, other: false })),
     ...(rest ? [{ name: "Otros importadores", units: rest, other: true }] : []),
@@ -514,14 +444,15 @@ function ImporterConcentration({
     ...row,
     color: row.other ? "#aeaeae" : palette[index],
   }));
-  const barMax = Math.max(1, ...slices.map((row) => row.units));
+  const largest = Math.max(1, ...slices.map((row) => row.units));
+  const step = 10 ** Math.floor(Math.log10(largest));
+  const barMax = Math.ceil(largest / step) * step;
   return (
     <Card className="market-panel">
       <Heading
         title="Quiénes concentran las importaciones"
-        icon={<Layers aria-hidden="true" />}
+
         detail={`Unidades por importador identificado · ${year}`}
-        to={href("importadores")}
       />
       {displayed.length ? (
         <>
@@ -554,16 +485,7 @@ function ImporterConcentration({
               {slices.map((row) => (
                 <li key={row.name} data-other={row.other || undefined}>
                   <div className="market-importer-line">
-                    {row.other ? (
-                      <span className="market-importer-name">{row.name}</span>
-                    ) : (
-                      <Link
-                        className="market-importer-name"
-                        to={href("marcas", { importadores: row.name })}
-                      >
-                        {row.name}
-                      </Link>
-                    )}
+                    <span className="market-importer-name">{row.name}</span>
                     <span className="market-importer-value">
                       <strong>{number(row.units)}</strong> uds. ·{" "}
                       {percent(ratio(row.units, knownUnits))}
@@ -579,16 +501,17 @@ function ImporterConcentration({
                   </div>
                 </li>
               ))}
+              <li
+                className="market-importer-line market-importer-scale"
+                aria-label="Escala de unidades"
+              >
+                <span className="market-importer-ticks">
+                  <span>0</span>
+                  <span>{number(barMax)} uds.</span>
+                </span>
+              </li>
             </ul>
           </div>
-          <p className="market-analysis-note">
-            {percent(ratio(leaderUnits, knownUnits))} en{" "}
-            {leaders.length === 1
-              ? "el principal importador"
-              : "los " + leaders.length + " principales"}
-            . Cuota sobre {number(knownUnits)} unidades con importador
-            identificado. {number(total - knownUnits)} sin identificar.
-          </p>
         </>
       ) : (
         <p>Sin importadores identificados en el período seleccionado.</p>
@@ -603,14 +526,12 @@ function Seasonality({
   year,
   end,
   month,
-  href,
 }: {
   rows: Movement[];
   scoped: Movement[];
   year: number;
   end: number;
   month: number;
-  href: LinkTo;
 }) {
   const selected = month
     ? [month]
@@ -625,7 +546,6 @@ function Seasonality({
       <Heading
         title="Estacionalidad de importación"
         detail="Unidades por mes y mediana de años anteriores"
-        to={href("historia")}
       />
       <div
         className="market-scroll"
@@ -664,11 +584,7 @@ function Seasonality({
                       {value === null ? (
                         "—"
                       ) : (
-                        <Link
-                          to={href("marcas", {
-                            año: String(period.year),
-                            mes: String(selected[index]),
-                          })}
+                        <span
                           title={
                             historical === null
                               ? "Sin mediana histórica"
@@ -676,7 +592,7 @@ function Seasonality({
                           }
                         >
                           {number(value)}
-                        </Link>
+                        </span>
                       )}
                     </td>
                   );

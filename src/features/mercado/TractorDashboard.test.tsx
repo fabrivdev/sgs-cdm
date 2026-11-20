@@ -80,11 +80,11 @@ describe("Mercado de tractores", () => {
       </MemoryRouter>,
     );
     const ranking = screen
-      .getByRole("link", { name: "Modelos principales" })
+      .getByRole("heading", { name: "Modelos principales" })
       .closest<HTMLElement>(".market-panel")!;
-    expect(within(ranking).getByRole("link", { name: /^AXION/ })).toHaveClass(
-      "market-claas",
-    );
+    expect(
+      within(ranking).getByText("AXION").closest(".market-rank"),
+    ).toHaveClass("market-claas");
   });
   it("oculta unidades sin FOB de la distribución y conserva el total de mercado", () => {
     const noFob: Movement = [...sample[0]];
@@ -102,12 +102,17 @@ describe("Mercado de tractores", () => {
         screen.getByRole("link", { name: /Unidades importadas/ }),
       ).getByText("5"),
     ).toBeTruthy();
-    const october = screen.getByRole("link", {
+    const october = screen.getByRole("img", {
       name: "Oct · 2025: 3 · 2026: 4",
     });
     expect(
       october.querySelector(".market-year-current strong"),
     ).toHaveTextContent("4");
+    const importers = screen
+      .getByRole("heading", { name: "Quiénes concentran las importaciones" })
+      .closest<HTMLElement>(".market-panel")!;
+    expect(within(importers).getByText("0")).toBeVisible();
+    expect(within(importers).queryByRole("link")).toBeNull();
     fireEvent.click(screen.getByRole("link", { name: "Precios" }));
     expect(
       within(screen.getByRole("table")).queryByText("Sin FOB positivo"),

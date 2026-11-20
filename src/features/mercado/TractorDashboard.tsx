@@ -1,6 +1,5 @@
 import { useMemo } from "react";
 import { Link, useLocation, useSearchParams } from "react-router-dom";
-import { ChevronRight } from "lucide-react";
 import {
   compare,
   dimensions,
@@ -365,19 +364,15 @@ export function TractorDashboard({ rows: data }: { rows: Movement[] }) {
           <div className="market-panels">
             <Card className="market-panel">
               <h2>
-                <Link to={href(rankingDimension)}>
-                  {brand ? "Modelos principales" : "Participación por marca"}{" "}
-                  <ChevronRight />
-                </Link>
+                {brand ? "Modelos principales" : "Participación por marca"}{" "}
               </h2>
               <p>Cuota de unidades · {year}</p>
               {leaders.map((g) => (
-                <Link
+                <div
                   className={
                     "market-rank" + (isClaas(g.name) ? " market-claas" : "")
                   }
                   key={g.name}
-                  to={drill(rankingDimension, g.name) ?? href(rankingDimension)}
                 >
                   <span>
                     {brand
@@ -392,16 +387,12 @@ export function TractorDashboard({ rows: data }: { rows: Movement[] }) {
                     />
                   </i>
                   <strong>{percent(ratio(g.units, b.units))}</strong>
-                </Link>
+                </div>
               ))}
               {!leaders.length && <p>Sin movimientos en este período.</p>}
             </Card>
             <Card className="market-panel">
-              <h2>
-                <Link to={href("historia")}>
-                  Evolución mensual <ChevronRight />
-                </Link>
-              </h2>
+              <h2>Evolución mensual</h2>
               <p>
                 Unidades · {year - 1} y {year}
               </p>
@@ -431,9 +422,9 @@ export function TractorDashboard({ rows: data }: { rows: Movement[] }) {
                         ": " +
                         number(m.units);
                       return (
-                        <Link
+                        <div
                           key={m.name}
-                          to={href("marcas", { mes: m.name })}
+                          role="img"
                           aria-label={description}
                           title={description}
                         >
@@ -456,7 +447,7 @@ export function TractorDashboard({ rows: data }: { rows: Movement[] }) {
                             </div>
                           </div>
                           <small>{month}</small>
-                        </Link>
+                        </div>
                       );
                     })}
                   </div>
@@ -481,18 +472,15 @@ export function TractorDashboard({ rows: data }: { rows: Movement[] }) {
               return (
                 <Card className="market-panel" key={d}>
                   <h2>
-                    <Link to={href(d)}>
-                      {d === "potencia"
-                        ? "Tractores por potencia"
-                        : "Distribución por precio FOB"}
-                      <ChevronRight />
-                    </Link>
+                    {d === "potencia"
+                      ? "Tractores por potencia"
+                      : "Distribución por precio FOB"}
                   </h2>
                   <p>
                     Unidades · {year - 1} y {year}
                   </p>
                   {chart.map((g) => (
-                    <Link
+                    <div
                       key={g.name}
                       className="market-rank market-band"
                       title={
@@ -505,7 +493,6 @@ export function TractorDashboard({ rows: data }: { rows: Movement[] }) {
                         ": " +
                         number(g.units)
                       }
-                      to={drill(d, g.name) ?? href(d)}
                     >
                       <span>{g.name.replace("USD ", "$")}</span>
                       <i className="market-paired">
@@ -513,7 +500,7 @@ export function TractorDashboard({ rows: data }: { rows: Movement[] }) {
                         <b style={{ width: (g.units / max) * 100 + "%" }} />
                       </i>
                       <strong>{number(g.units)}</strong>
-                    </Link>
+                    </div>
                   ))}
                   {chart.length ? (
                     <YearLegend year={year} />
@@ -532,7 +519,6 @@ export function TractorDashboard({ rows: data }: { rows: Movement[] }) {
             year={year}
             end={end}
             month={monthOnly}
-            href={href}
           />
         </>
       )}
