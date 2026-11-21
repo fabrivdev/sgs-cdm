@@ -140,26 +140,41 @@ export async function printMarketTabs(sections: HTMLElement[], title: string) {
       new Promise<void>((resolve) => window.setTimeout(resolve, 2000)),
     ]);
     // Normal-flow rows avoid the large breaks Chromium can place inside a chart grid.
-    const rules = clones.map((clone, index) => {
+    const sizes = clones.map((clone) => {
       keepDashboardRows(clone);
-      const pageWidth = Math.max(Math.ceil(clone.getBoundingClientRect().width), clone.scrollWidth);
-      const fullHeight = Math.max(clone.scrollHeight, Math.ceil(clone.getBoundingClientRect().height));
-      const fitsPage = fullHeight <= 4096;
-      const pageHeight = fitsPage ? fullHeight + 8 : 1123;
-      const pageName = clones.length === 1 ? "" : " mercado-" + (index + 1);
+      const bounds = clone.getBoundingClientRect();
+      return {
+        width: Math.max(Math.ceil(bounds.width), clone.scrollWidth),
+        height: Math.max(Math.ceil(bounds.height), clone.scrollHeight) + 8,
+      };
+    });
+    const combined = sizes.length > 1;
+    const pageWidth = Math.max(...sizes.map(({ width }) => width));
+    // The native print preview uses a single paper size for the document.
+    const pageHeight = combined
+      ? Math.min(2200, Math.max(1123, sizes[0].height))
+      : sizes[0].height <= 4096 ? sizes[0].height : 1123;
+    clones.forEach((clone, index) => {
+      const fitsPage = sizes[index].height <= pageHeight;
+      const keepTogether = fitsPage && (index === 0 || sizes[index].height <= pageHeight / 3);
       const sheet = printDocument.createElement("div");
-      sheet.className = fitsPage ? "market-print-sheet market-print-fit" : "market-print-sheet";
-      if (pageName) sheet.style.setProperty("page", pageName.trim());
+      sheet.className = keepTogether ? "market-print-sheet market-print-fit" : "market-print-sheet";
       clone.replaceWith(sheet);
       sheet.append(clone);
-      return `@page${pageName} { size: ${pageWidth}px ${pageHeight}px; margin: 0; }`;
     });
     const paper = printDocument.createElement("style");
-    paper.textContent = rules.join("\n") + `
+    paper.textContent = `@page { size: ${pageWidth}px ${pageHeight}px; margin: 0; }
       @media print {
         .market-print-sheet { display: flow-root; }
-        .market-print-sheet + .market-print-sheet { break-before: page; }
+        .market-print-sheet + .market-print-sheet { padding-top: 12px; }
+        .market-print-fit { break-inside: avoid; }
         .market-print-fit > main { display: inline-block; vertical-align: top; }
+        .market-print-sheet main > :not(.market-panel, .ms-panel, .market-panels, .ms-grid),
+        .market-print-sheet .ms-table-head {
+          break-inside: avoid;
+          break-after: avoid;
+        }
+        .market-print-sheet h2 { break-after: avoid; }
         tr, .ms-driver, .market-print-row { break-inside: avoid; }
       }
     `;

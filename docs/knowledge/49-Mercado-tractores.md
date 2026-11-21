@@ -4,7 +4,7 @@ Tractores usa el encabezado y el contenedor compartidos de SIG CDM. Las pestaña
 
 El menú de tres puntos exporta a Excel en las cuatro familias de importaciones de Mercado con el permiso `datos:exportar`. Cada archivo incluye el resumen o tabla de la pestaña activa y el detalle de importaciones filtrado. Respeta los períodos comparados, la búsqueda y el orden de las tablas, los filtros técnicos y la exclusión de FOB cero en Precios.
 
-El mismo menú incluye Imprimir PDF en cada pestaña e Imprimir todas las pestañas para reunir la sección abierta en un solo PDF. Mantiene los filtros compartidos y conserva el detalle de la pestaña activa. Conserva la distribución y escala de pantalla y extiende las tablas con desplazamiento para que se vean sus filas. El papel se mide sobre el contenido final. Las tarjetas se imprimen por filas para evitar saltos en blanco del navegador.
+El mismo menú incluye Imprimir PDF en cada pestaña e Imprimir todas las pestañas para reunir la sección abierta en un solo PDF. Mantiene los filtros compartidos, el detalle de la pestaña activa y la escala de pantalla. El PDF combinado usa un solo tamaño de papel y aprovecha el espacio para las pestañas cortas. Las tarjetas se imprimen por filas y las tablas se extienden para mostrar todos sus registros.
 
 En el tablero, el filtro Marca cambia el ranking a modelos. La tabla se desplaza con el encabezado fijo y hasta 20 filas visibles. Los importes con $ conservan la moneda de origen del FOB (dólares estadounidenses).
 
