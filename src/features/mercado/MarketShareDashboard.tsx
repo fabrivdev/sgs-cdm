@@ -1,9 +1,11 @@
+import { useState } from "react";
 import { Link, useLocation, useSearchParams } from "react-router-dom";
+import { SectionActionsMenu } from "@/components/exports/SectionActionsMenu";
 import { FiltersBar, FilterSelect } from "@/components/filters/FiltersBar";
 import { KpiItem, KpiStrip, PageHeader, PageShell } from "@/components/layout/AppPrimitives";
 import { months, number, percent } from "./model";
 import { salesFamilies, salesTotal, type SalesFamily, type SalesPeriod } from "./marketShareModel";
-import { dealerConcentration, marketHistory, pointsLabel, standings } from "./marketShareAnalytics";
+import { dealerConcentration, defaultStandingSort, marketHistory, pointsLabel, standings, visibleStandings, type StandingSort } from "./marketShareAnalytics";
 import { DistributorPareto, GrowthDrivers, SalesPace, SharePosition } from "./MarketShareCharts";
 import { DistributorHistory, SalesCalendar, StandingTable } from "./MarketShareTables";
 import "./tractores.css";
@@ -16,8 +18,9 @@ const tabs = {
 type View = keyof typeof tabs;
 const referenceDealer = "Campos del Mañana";
 
-export function MarketShareDashboard({ periods }: { periods: SalesPeriod[] }) {
+export function MarketShareDashboard({ periods, canExport = false }: { periods: SalesPeriod[]; canExport?: boolean }) {
   const [params, setParams] = useSearchParams();
+  const [ranking, setRanking] = useState<{ key: string; query: string; sort: StandingSort } | null>(null);
   const slug = useLocation().pathname.split("/").filter(Boolean).at(-1);
   const view = slug && Object.prototype.hasOwnProperty.call(tabs, slug) ? slug as View : "tablero";
   const families = (Object.keys(salesFamilies) as SalesFamily[]).filter((key) => periods.some((p) => p.familia === key));
@@ -39,6 +42,10 @@ export function MarketShareDashboard({ periods }: { periods: SalesPeriod[] }) {
   const delta = comparable ? total - priorTotal : null;
   const brands = standings(current, previous, "marca", [benchmark]);
   const dealers = standings(current, previous, "distribuidor");
+  const rankingKey = view + ":" + family;
+  const { query, sort } = ranking?.key === rankingKey ? ranking : { query: "", sort: defaultStandingSort };
+  const rankingRows = view === "marcas" ? brands : dealers;
+  const shown = visibleStandings(rankingRows, query, sort);
   const benchmarkRow = brands.find(({ name }) => name === benchmark);
   const benchmarkChange = benchmarkRow?.points ?? null;
   const concentration = dealerConcentration(dealers, total);
@@ -61,7 +68,17 @@ export function MarketShareDashboard({ periods }: { periods: SalesPeriod[] }) {
           className={view === item ? "chosen" : undefined}
           aria-current={view === item ? "page" : undefined}>{tabs[item]}</Link>)}
       </nav>} />
-      <FiltersBar mobileLeading={family && <span className="self-center text-xs text-muted-foreground">{salesFamilies[family]} · {year} · Hasta {months[cutoff - 1].toLowerCase()}</span>}>
+      <FiltersBar
+        mobileLeading={family && <span className="self-center text-xs text-muted-foreground">{salesFamilies[family]} · {year} · Hasta {months[cutoff - 1].toLowerCase()}</span>}
+        secondaryActions={canExport && family && <SectionActionsMenu options={[{
+          id: "market-share-excel", label: "Exportar a Excel",
+          disabled: (view === "marcas" || view === "distribuidores") && !shown.length,
+          onSelect: async () => {
+            const { exportMarketShare } = await import("./marketShareExport");
+            await exportMarketShare({ view, family, year, cutoff, dataset, current, previous, brands, dealers, shown, benchmark });
+          },
+        }]} />}
+      >
         <FilterSelect label="Equipo" placeholder="Equipo" value={family ?? ""} onChange={(v) => set("equipo", v)}
           options={families.map((value) => ({ value, label: salesFamilies[value] }))} />
         <FilterSelect label="Año" placeholder="Año" value={String(year)} onChange={(v) => set("año", v)} width="w-[105px]"
@@ -87,8 +104,10 @@ export function MarketShareDashboard({ periods }: { periods: SalesPeriod[] }) {
         <DistributorHistory dataset={dataset} years={years} year={year} cutoff={cutoff} benchmark={referenceDealer} />
         <SalesCalendar dataset={dataset} years={years} year={year} cutoff={cutoff} />
       </> : (
-        <StandingTable key={view + ":" + family} rows={view === "marcas" ? brands : dealers} by={view === "marcas" ? "marca" : "distribuidor"}
-          current={current} previous={previous} year={year} benchmark={view === "marcas" ? benchmark : referenceDealer} />
+        <StandingTable key={rankingKey} rows={rankingRows} shown={shown} by={view === "marcas" ? "marca" : "distribuidor"}
+          current={current} previous={previous} year={year} benchmark={view === "marcas" ? benchmark : referenceDealer}
+          query={query} onQuery={(query) => setRanking({ key: rankingKey, query, sort })}
+          sort={sort} onSort={(sort) => setRanking({ key: rankingKey, query, sort })} />
       )}
     </PageShell>
   );

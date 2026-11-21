@@ -8,7 +8,7 @@ import { parseSalesPeriods } from "./marketShareModel";
 import { combineMarketShareSources } from "./marketShareSources";
 
 export default function MarketShare() {
-  const { user } = useAuth();
+  const { user, can } = useAuth();
   const query = useQuery({
     queryKey: ["mercado-market-share", user?.id],
     queryFn: async () => {
@@ -22,7 +22,7 @@ export default function MarketShare() {
       return combineMarketShareSources(parseSalesPeriods(report.data), parseSalesPeriods(cadam.data ?? []));
     },
   });
-  if (query.data?.length) return <MarketShareDashboard periods={query.data} />;
+  if (query.data?.length) return <MarketShareDashboard periods={query.data} canExport={can("datos:exportar")} />;
   return (
     <PageShell>
       <PageHeader title="Market Share" />

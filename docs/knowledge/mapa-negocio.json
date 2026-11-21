@@ -2607,8 +2607,8 @@
       "id": "mercado.market_share",
       "title": "Market Share",
       "module": "mercado",
-      "description": "Tablero de ventas reportadas con aportes por marca, cambios de cuota, concentración de distribuidores y ritmo acumulado. Los rankings tienen desglose recíproco. Historia incluye todos los años disponibles en la matriz por distribuidor y un calendario mensual.",
-      "sources": ["src/features/mercado/MarketShare.tsx", "src/features/mercado/MarketShareDashboard.tsx", "supabase/migrations/20261120160000_mercado_market_share.sql", "supabase/migrations/20261121110000_mercado_market_share_cadam.sql"],
+      "description": "Tablero de ventas reportadas con aportes por marca, cambios de cuota, concentración de distribuidores y ritmo acumulado. Los rankings tienen desglose recíproco. Historia incluye matriz anual y calendario mensual. El menú de sección exporta la vista a Excel con los filtros vigentes.",
+      "sources": ["src/features/mercado/MarketShare.tsx", "src/features/mercado/MarketShareDashboard.tsx", "src/features/mercado/marketShareExport.ts", "supabase/migrations/20261120160000_mercado_market_share.sql", "supabase/migrations/20261121110000_mercado_market_share_cadam.sql"],
       "flows": ["analizar-mercado-market-share"]
     },
     {

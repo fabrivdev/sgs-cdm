@@ -22,6 +22,37 @@ export type MarketStanding = {
   partialComparison: boolean;
 };
 
+export type StandingColumn = "rank" | "name" | "priorUnits" | "units" | "delta" | "growth" | "priorShare" | "share" | "points";
+export type StandingSort = { key: StandingColumn; asc: boolean };
+export const defaultStandingSort: StandingSort = { key: "units", asc: false };
+export const standingGrowth = (row: MarketStanding) => row.delta === null ? null : ratio(row.delta, row.priorUnits ?? 0);
+const searchable = (name: string) => name.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase();
+
+export function visibleStandings(rows: MarketStanding[], query: string, sort: StandingSort) {
+  const term = searchable(query.trim());
+  return rows.filter(({ name }) => searchable(name).includes(term)).sort((a, b) => {
+    const left = sort.key === "growth" ? standingGrowth(a) : a[sort.key];
+    const right = sort.key === "growth" ? standingGrowth(b) : b[sort.key];
+    if (left === null || right === null) return left === right ? 0 : left === null ? 1 : -1;
+    const order = typeof left === "string" ? left.localeCompare(String(right), "es") : left - Number(right);
+    return sort.asc ? order : -order;
+  });
+}
+
+export function salesCalendar(dataset: SalesPeriod[], years: number[], cutoff: number) {
+  const rows = years.map((year) => {
+    const reported = new Map(dataset.filter((period) => period.anio === year).map((period) => [period.mes, period.total]));
+    const values = months.map((_, index) => reported.get(index + 1) ?? null);
+    const accumulate = (limit: number) => values.slice(0, limit).every((value) => value !== null)
+      ? values.slice(0, limit).reduce<number>((sum, value) => sum + (value ?? 0), 0) : null;
+    return { year, values, total: accumulate(cutoff), fullYear: accumulate(12) };
+  });
+  return rows.map((row) => {
+    const prior = rows.find((candidate) => candidate.year === row.year - 1)?.total ?? null;
+    return { ...row, growth: row.total === null || prior === null ? null : ratio(row.total - prior, prior) };
+  });
+}
+
 function positions(counts: Map<string, number>) {
   const sorted = [...counts].filter(([name, units]) => name !== unknownDealer && units > 0)
     .sort((a, b) => b[1] - a[1]);

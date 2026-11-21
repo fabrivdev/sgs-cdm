@@ -4,14 +4,11 @@ import { Card } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { months, number, percent, ratio } from "./model";
 import { salesTotal, type SalesPeriod } from "./marketShareModel";
-import { distributorHistory, pointsLabel, standings, unknownDealer, type Dimension, type MarketStanding } from "./marketShareAnalytics";
+import { distributorHistory, pointsLabel, salesCalendar, standingGrowth, standings, unknownDealer, type Dimension, type MarketStanding, type StandingColumn, type StandingSort } from "./marketShareAnalytics";
 import { Delta } from "./MarketShareCharts";
 
 const showUnits = (value: number | null) => value === null ? "—" : number(value);
-const changeRate = (item: MarketStanding) => item.delta === null ? null : ratio(item.delta, item.priorUnits ?? 0);
 const signedRate = (value: number | null) => (value && value > 0 ? "+" : "") + percent(value);
-const searchable = (name: string) => name.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase();
-type Column = "rank" | "name" | "priorUnits" | "units" | "delta" | "growth" | "priorShare" | "share" | "points";
 
 function ShareCell({ row, scale, year }: { row: MarketStanding; scale: number; year: number }) {
   const priorLabel = String(year - 1) + " · " + percent(row.priorShare);
@@ -25,30 +22,21 @@ function ShareCell({ row, scale, year }: { row: MarketStanding; scale: number; y
   </div>;
 }
 
-export function StandingTable({ rows, by, current, previous, year, benchmark }: {
+export function StandingTable({ rows, shown, by, current, previous, year, benchmark, query, onQuery, sort, onSort }: {
   rows: MarketStanding[]; by: Dimension; current: SalesPeriod[]; previous: SalesPeriod[]; year: number; benchmark: string;
+  shown: MarketStanding[]; query: string; onQuery: (query: string) => void; sort: StandingSort; onSort: (sort: StandingSort) => void;
 }) {
-  const [query, setQuery] = useState("");
   const [expanded, setExpanded] = useState<string | null>(null);
-  const [sort, setSort] = useState<{ key: Column; asc: boolean }>({ key: "units", asc: false });
   const other = by === "marca" ? "distribuidor" : "marca";
   const entity = by === "marca" ? "Marca" : "Distribuidor";
   const title = by === "marca" ? "Ranking de marcas" : "Ranking de distribuidores";
-  const cols: { key: Column; label: string; name?: string }[] = [
+  const cols: { key: StandingColumn; label: string; name?: string }[] = [
     { key: "rank", label: "Pos.", name: "Posición" }, { key: "name", label: entity },
     { key: "priorUnits", label: "Uds. " + (year - 1) }, { key: "units", label: "Uds. " + year },
     { key: "delta", label: "Δ uds.", name: "Cambio en unidades" }, { key: "growth", label: "Δ %", name: "Variación porcentual" },
     { key: "priorShare", label: "Cuota " + (year - 1) }, { key: "share", label: "Cuota " + year },
     { key: "points", label: "Δ p. p.", name: "Cambio de cuota en puntos porcentuales" },
   ];
-  const shown = rows.filter(({ name }) => searchable(name).includes(searchable(query.trim())))
-    .sort((a, b) => {
-      const left = sort.key === "growth" ? changeRate(a) : a[sort.key];
-      const right = sort.key === "growth" ? changeRate(b) : b[sort.key];
-      if (left === null || right === null) return left === right ? 0 : left === null ? 1 : -1;
-      const order = typeof left === "string" ? left.localeCompare(String(right), "es") : left - Number(right);
-      return sort.asc ? order : -order;
-    });
   const detail = expanded ? standings(current, previous, other, [], { by, name: expanded }) : [];
   const scale = Math.max(.01, ...rows.flatMap((row) => [row.share ?? 0, row.priorShare ?? 0]));
   const marketUnits = salesTotal(current);
@@ -61,7 +49,7 @@ export function StandingTable({ rows, by, current, previous, year, benchmark }: 
       <td>{showUnits(row.priorUnits)}</td>
       <td className="ms-current">{showUnits(row.units)}</td>
       <td title={comparison}><Delta value={row.delta} /></td>
-      <td title={comparison}><Delta value={changeRate(row)} format={signedRate} /></td>
+      <td title={comparison}><Delta value={standingGrowth(row)} format={signedRate} /></td>
       <td>{percent(row.priorShare)}</td>
       <td className="ms-current"><ShareCell row={row} scale={scale} year={year} /></td>
       <td title={comparison}><Delta value={row.points} format={pointsLabel} /></td>
@@ -73,7 +61,7 @@ export function StandingTable({ rows, by, current, previous, year, benchmark }: 
       <h2>{title}</h2>
       {!!rows.length && <label className="ms-search"><Search aria-hidden="true" />
         <Input type="search" placeholder={"Buscar " + entity.toLowerCase()} aria-label={"Buscar " + entity.toLowerCase()} value={query}
-          onChange={(event) => setQuery(event.target.value)} />
+          onChange={(event) => onQuery(event.target.value)} />
       </label>}
     </div>
     {!rows.length ? <p className="ms-unavailable">Sin desglose para este período.</p> :
@@ -84,7 +72,7 @@ export function StandingTable({ rows, by, current, previous, year, benchmark }: 
             const Icon = active ? (sort.asc ? ArrowUp : ArrowDown) : ArrowUpDown;
             return <th key={key} scope="col" aria-sort={active ? (sort.asc ? "ascending" : "descending") : undefined}
               className={key === "units" || key === "share" ? "ms-current" : undefined}>
-              <button type="button" aria-label={name ?? label} onClick={() => setSort({ key, asc: active ? !sort.asc : key === "name" || key === "rank" })}>
+              <button type="button" aria-label={name ?? label} onClick={() => onSort({ key, asc: active ? !sort.asc : key === "name" || key === "rank" })}>
                 {label}<Icon aria-hidden="true" />
               </button>
             </th>;
@@ -181,15 +169,8 @@ export function DistributorHistory({ dataset, years, year, cutoff, benchmark }: 
 }
 
 export function SalesCalendar({ dataset, years, year, cutoff }: HistoryProps) {
-  const rows = years.map((entry) => {
-    const periods = dataset.filter((period) => period.anio === entry);
-    return { year: entry, months: new Map(periods.map((period) => [period.mes, period.total])) };
-  });
+  const rows = salesCalendar(dataset, years, cutoff);
   const max = Math.max(1, ...dataset.map((period) => period.total));
-  function accumulated(row: (typeof rows)[number] | undefined, through: number) {
-    const values = months.slice(0, through).map((_, index) => row?.months.get(index + 1));
-    return values.some((value) => value === undefined) ? null : values.reduce<number>((sum, value) => sum + (value ?? 0), 0);
-  }
   return <Card className="ms-panel">
     <h2>Calendario de ventas</h2>
     <div className="ms-table-scroll" tabIndex={0} role="region" aria-label="Calendario de ventas">
@@ -198,21 +179,19 @@ export function SalesCalendar({ dataset, years, year, cutoff }: HistoryProps) {
           {months.map((month, index) => <th scope="col" key={month} className={index + 1 === cutoff ? "ms-cutoff" : undefined}>{month}</th>)}
           <th scope="col">Al corte ({months[cutoff - 1]})</th><th scope="col">Δ %</th><th scope="col">Año completo</th>
         </tr></thead>
-        <tbody>{rows.map((row) => {
-          const total = accumulated(row, cutoff);
-          const prior = accumulated(rows.find((entry) => entry.year === row.year - 1), cutoff);
-          return <tr key={row.year} className={row.year === year ? "ms-reference-row" : undefined}>
+        <tbody>{rows.map((row) => (
+          <tr key={row.year} className={row.year === year ? "ms-reference-row" : undefined}>
             <th scope="row">{row.year}</th>
             {months.map((month, index) => {
-              const units = row.months.get(index + 1);
+              const units = row.values[index];
               return <td key={month} className={index + 1 === cutoff ? "ms-cutoff" : undefined}
                 style={units ? { backgroundColor: `hsl(var(--primary) / ${.06 + .37 * units / max})` } : undefined}>{showUnits(units ?? null)}</td>;
             })}
-            <td className="ms-current">{showUnits(total)}</td>
-            <td><Delta value={total === null || !prior ? null : ratio(total - prior, prior)} format={signedRate} /></td>
-            <td>{showUnits(accumulated(row, 12))}</td>
-          </tr>;
-        })}</tbody>
+            <td className="ms-current">{showUnits(row.total)}</td>
+            <td><Delta value={row.growth} format={signedRate} /></td>
+            <td>{showUnits(row.fullYear)}</td>
+          </tr>
+        ))}</tbody>
       </table>
     </div>
   </Card>;
