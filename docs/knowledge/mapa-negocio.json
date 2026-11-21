@@ -1808,8 +1808,8 @@
       "id": "analizar-mercado-tractores",
       "title": "Explorar el mercado de tractores",
       "module": "mercado",
-      "description": "Actualizar meses desde el Excel original de Penta/PYimport, comparar períodos y abrir los movimientos de una categoría.",
-      "sources": ["src/features/mercado/Tractores.tsx", "src/features/mercado/TractorDashboard.tsx", "src/features/mercado/model.ts"]
+      "description": "Actualizar meses desde el Excel original de Penta/PYimport, comparar períodos y exportar la pestaña activa y su detalle filtrado. El exportador es compartido por las cuatro familias de importaciones de Mercado.",
+      "sources": ["src/features/mercado/Tractores.tsx", "src/features/mercado/TractorDashboard.tsx", "src/features/mercado/marketImportExport.ts", "src/features/mercado/model.ts"]
     },
     {
       "id": "analizar-mercado-cosechadoras",

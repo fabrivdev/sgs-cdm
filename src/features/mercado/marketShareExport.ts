@@ -1,4 +1,4 @@
-import type { ExportCell } from "@/components/exports/TableExportButton";
+import { appendMarketSheet, type MarketExcelRow } from "./marketExcel";
 import { distributorHistory, salesCalendar, standingGrowth, unknownDealer, type MarketStanding } from "./marketShareAnalytics";
 import { months, ratio } from "./model";
 import { salesFamilies, salesTotal, type SalesFamily, type SalesPeriod } from "./marketShareModel";
@@ -26,21 +26,8 @@ export async function exportMarketShare({ view, family, year, cutoff, dataset, c
   const delta = priorTotal === null ? null : total - priorTotal;
   const yearLabel = `Al corte (${months[cutoff - 1]})`;
 
-  function sheet(name: string, rows: ExportCell[][]) {
-    const data = xlsx.utils.aoa_to_sheet(rows);
-    data["!cols"] = rows[0].map((header, index) => ({
-      wch: Math.min(42, Math.max(10, String(header).length + 3, ...rows.slice(1).map((row) => String(row[index] ?? "").length + 2))),
-    }));
-    rows[0].forEach((header, column) => {
-      const title = String(header);
-      const format = title === "Δ %" || title.startsWith("Cuota ") ? "0.0%" : title === "Δ p. p." ? "0.0" : null;
-      if (!format) return;
-      for (let row = 1; row < rows.length; row++) {
-        const cell = data[xlsx.utils.encode_cell({ r: row, c: column })];
-        if (cell?.t === "n") cell.z = format;
-      }
-    });
-    xlsx.utils.book_append_sheet(book, data, name);
+  function sheet(name: string, rows: MarketExcelRow[]) {
+    appendMarketSheet(xlsx, book, name, rows);
   }
 
   function ranking(name: string, entity: string, rows: MarketStanding[]) {

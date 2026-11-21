@@ -18,6 +18,7 @@ import {
   type Movement,
 } from "./model";
 import { FiltersBar, FilterSelect } from "@/components/filters/FiltersBar";
+import { SectionActionsMenu } from "@/components/exports/SectionActionsMenu";
 import { Card } from "@/components/ui/card";
 import { PageHeader, PageShell } from "@/components/layout/AppPrimitives";
 import { completePower, powerSpec } from "./power";
@@ -32,6 +33,7 @@ import {
   type MarketFamily,
 } from "./marketFamily";
 import "./tractores.css";
+import type { MarketExcelRow } from "./marketExcel";
 
 const tractorTitles = {
   ...dimensions,
@@ -53,9 +55,11 @@ function priceEligible(row: Movement) {
 export function TractorDashboard({
   rows: data,
   family = "tractores",
+  canExport = false,
 }: {
   rows: Movement[];
   family?: MarketFamily;
+  canExport?: boolean;
 }) {
   const rows = useMemo(() => {
     if (family === "tractores") return completePower(data);
@@ -268,6 +272,56 @@ export function TractorDashboard({
         complete: !planting || includesPeriod(observedMonths(y)),
       };
     });
+  function historyVariation(index: number) {
+    const entry = history[index], prior = history[index + 1];
+    return entry.complete && prior?.complete && prior.units && (!positivePriceOnly || prior.year === entry.year - 1)
+      ? entry.units / prior.units - 1 : null;
+  }
+  const historyAverage = (entry: (typeof history)[number]) => positivePriceOnly ? entry.average ?? null : ratio(entry.fob, entry.units);
+  const shareVariation = (group: (typeof groups)[number]) => priorComplete && a.units && b.units
+    ? (group.units / b.units - group.prior / a.units) * 100 : null;
+  const priorAverage = (group: (typeof groups)[number]) => {
+    const priced = pricedGroups ? pricedGroups.get(group.name) : group;
+    return priced ? ratio(priced.priorFob, priced.prior) : null;
+  };
+  const modelPower = (group: (typeof groups)[number]) => {
+    const [modelBrand, model] = group.name.split(" · ");
+    return brandView === "modelos" && !positivePriceOnly && model ? powerSpec(modelBrand, model) : undefined;
+  };
+
+  async function exportExcel() {
+    let summary: MarketExcelRow[];
+    let detail = [...current, ...previous];
+    if (brandView) {
+      const names = new Set(groups.map((group) => group.name));
+      detail = detail.filter((row) => names.has(marketLabel(row, brandView)) && (brandView !== "precios" || priceEligible(row)));
+      const includeHp = brandView === "modelos" && !positivePriceOnly;
+      summary = [
+        [titles[view], ...(includeHp ? ["HP de ficha"] : []), "Uds. " + (year - 1), "Uds. " + year,
+          "Cuota uds.", "Δ cuota (pp)", "Valor FOB", "Cuota FOB", "FOB unitario anterior", "FOB unitario"],
+        ...groups.map((group) => [
+          group.name.replace("USD ", "$"), ...(includeHp ? [modelPower(group)?.hp] : []), group.prior, group.units,
+          ratio(group.units, b.units), shareVariation(group), group.fob, ratio(group.fob, b.fob), priorAverage(group), currentAverage(group),
+        ]),
+      ];
+    } else if (view === "historia") {
+      const included = new Set(history.map((entry) => entry.year));
+      detail = scoped.filter((row) => included.has(row[1]));
+      summary = [
+        ["Año", "Unidades", "Variación interanual", "Valor FOB", "FOB unitario", "Corte completo"],
+        ...history.map((entry, index) => [entry.year, entry.units, historyVariation(index), entry.fob, historyAverage(entry), entry.complete]),
+      ];
+    } else {
+      summary = [
+        ["Año", "Unidades", "Variación interanual", "Valor FOB", "FOB unitario"],
+        [year, b.units, annualChange(b.units, a.units), b.fob, positivePriceOnly ? pricedAverage(current) : ratio(b.fob, b.units)],
+        [year - 1, priorComplete ? a.units : null, null, priorComplete ? a.fob : null,
+          priorComplete ? (positivePriceOnly ? pricedAverage(previous) : ratio(a.fob, a.units)) : null],
+      ];
+    }
+    const { exportMarketImports } = await import("./marketImportExport");
+    await exportMarketImports({ family, view: routeKey(view), year, end, month: monthOnly, title: titles[view], summary, detail });
+  }
   const options = (values: string[]) =>
     values.map((value) => ({ value, label: value }));
   return (
@@ -284,6 +338,11 @@ export function TractorDashboard({
         }
       />
       <FiltersBar
+        secondaryActions={canExport && <SectionActionsMenu options={[{
+          id: "market-import-excel", label: "Exportar a Excel",
+          disabled: brandView ? !groups.length : view === "historia" ? !history.length : !current.length && !previous.length,
+          onSelect: exportExcel,
+        }]} />}
         activeCount={
           active.length + extraFilters.filter(({ key }) => params.has(key)).length +
           Number(Boolean(state)) +
@@ -642,12 +701,7 @@ export function TractorDashboard({
               <tbody>
                 {groups.map((g) => {
                   const detail = drill(brandView, g.name);
-                  const priced = pricedGroups ? pricedGroups.get(g.name) : g;
-                  const [modelBrand, model] = g.name.split(" · ");
-                  const spec =
-                    brandView === "modelos" && !positivePriceOnly && model
-                      ? powerSpec(modelBrand, model)
-                      : undefined;
+                  const spec = modelPower(g);
                   return (
                     <tr
                       key={g.name}
@@ -682,21 +736,12 @@ export function TractorDashboard({
                       <td>{number(g.units)}</td>
                       <td>{percent(ratio(g.units, b.units))}</td>
                       <td>
-                        {priorComplete && a.units && b.units
-                          ? (
-                              (g.units / b.units - g.prior / a.units) *
-                              100
-                            ).toLocaleString("de-DE", {
-                              maximumFractionDigits: 1,
-                            })
-                          : "—"}
+                        {shareVariation(g)?.toLocaleString("de-DE", { maximumFractionDigits: 1 }) ?? "—"}
                       </td>
                       <td>{money(g.fob)}</td>
                       <td>{percent(ratio(g.fob, b.fob))}</td>
                       <td>
-                        {money(
-                          priced ? ratio(priced.priorFob, priced.prior) : null,
-                        )}
+                        {money(priorAverage(g))}
                       </td>
                       <td>{money(currentAverage(g))}</td>
                     </tr>
@@ -745,16 +790,11 @@ export function TractorDashboard({
                     </th>
                     <td>{number(r.units)}</td>
                     <td>
-                      {r.complete && history[i + 1]?.complete && history[i + 1]?.units &&
-                      (!positivePriceOnly || history[i + 1].year === r.year - 1)
-                        ? percent(r.units / history[i + 1].units - 1)
-                        : "—"}
+                      {percent(historyVariation(i))}
                     </td>
                     <td>{money(r.fob)}</td>
                     <td>
-                      {money(
-                        positivePriceOnly ? (r.average ?? null) : ratio(r.fob, r.units),
-                      )}
+                      {money(historyAverage(r))}
                     </td>
                   </tr>
                 ))}

@@ -2,6 +2,8 @@
 
 Tractores usa el encabezado y el contenedor compartidos de SIG CDM. Las pestañas están a la derecha del título cuando hay espacio y se desplazan horizontalmente debajo del título en móvil.
 
+El menú de tres puntos exporta a Excel en las cuatro familias de importaciones de Mercado con el permiso `datos:exportar`. Cada archivo incluye el resumen o tabla de la pestaña activa y el detalle de importaciones filtrado. Respeta los períodos comparados, la búsqueda y el orden de las tablas, los filtros técnicos y la exclusión de FOB cero en Precios.
+
 En el tablero, el filtro Marca cambia el ranking a modelos. La tabla se desplaza con el encabezado fijo y hasta 20 filas visibles. Los importes con $ conservan la moneda de origen del FOB (dólares estadounidenses).
 
 El gráfico y el detalle por precio muestran unidades con FOB positivo. Los movimientos sin FOB positivo siguen en la base y en el total de unidades del mercado.

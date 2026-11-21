@@ -11,7 +11,7 @@ export default function Tractores({
 }: {
   family?: MarketFamily;
 }) {
-  const { user } = useAuth();
+  const { user, can } = useAuth();
   const equipment = marketFamilies[family];
   const query = useQuery({
     queryKey: ["mercado-" + family, user?.id],
@@ -41,7 +41,7 @@ export default function Tractores({
   return (
     <>
       {query.data?.length ? (
-        <TractorDashboard rows={query.data} family={family} />
+        <TractorDashboard rows={query.data} family={family} canExport={can("datos:exportar")} />
       ) : (
         <div className="p-6">
           <h1 className="text-2xl font-semibold">Mercado de {family}</h1>
