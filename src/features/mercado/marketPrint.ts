@@ -40,9 +40,53 @@ function screenRules(rules: CSSRuleList): string {
   }).join("\n");
 }
 
-export async function printMarketTab(section: HTMLElement, title: string) {
+function keepDashboardRows(root: HTMLElement) {
+  for (const grid of root.querySelectorAll<HTMLElement>(".market-panels, .ms-grid")) {
+    const cards = Array.from(grid.children, (card) => ({
+      card: card as HTMLElement,
+      bounds: card.getBoundingClientRect(),
+    }));
+    if (!cards.length) continue;
+    const rowGap = grid.ownerDocument.defaultView!.getComputedStyle(grid).rowGap;
+    const rows: { element: HTMLDivElement; top: number; right: number }[] = [];
+    for (const { card, bounds } of cards) {
+      let row = rows.at(-1);
+      if (!row || Math.abs(row.top - bounds.top) >= 1) {
+        const element = grid.ownerDocument.createElement("div");
+        element.className = "market-print-row";
+        if (row) element.style.marginTop = rowGap;
+        row = { element, top: bounds.top, right: bounds.left };
+        rows.push(row);
+      }
+      card.style.flex = `0 0 ${bounds.width}px`;
+      card.style.marginLeft = Math.max(0, bounds.left - row.right) + "px";
+      row.right = bounds.right;
+      row.element.append(card);
+    }
+    grid.style.display = "block";
+    grid.replaceChildren(...rows.map(({ element }) => element));
+  }
+}
+
+function copyTab(section: HTMLElement) {
   const width = Math.ceil(section.getBoundingClientRect().width);
   if (!width) throw new Error("La pestaña no está visible.");
+  const clone = section.cloneNode(true) as HTMLElement;
+  clone.style.width = width + "px";
+  const original = Array.from(section.querySelectorAll<HTMLElement>(scrollableData));
+  clone.querySelectorAll<HTMLElement>(scrollableData).forEach((element, index) => {
+    const table = original[index].querySelector("table");
+    const copy = element.querySelector("table");
+    if (table && copy) copy.style.width = table.getBoundingClientRect().width + "px";
+  });
+  clone.querySelectorAll<HTMLElement>("[data-market-print-hide]").forEach((node) => {
+    node.style.visibility = "hidden";
+  });
+  return clone;
+}
+
+export async function printMarketTabs(sections: HTMLElement[], title: string) {
+  const clones = sections.map(copyTab);
   const frame = document.createElement("iframe");
   frame.tabIndex = -1;
   frame.setAttribute("aria-hidden", "true");
@@ -63,24 +107,13 @@ export async function printMarketTab(section: HTMLElement, title: string) {
     printDocument.documentElement.lang = document.documentElement.lang || "es";
     printDocument.body.className = document.body.className;
 
-    const clone = section.cloneNode(true) as HTMLElement;
-    clone.style.width = width + "px";
-    const original = Array.from(section.querySelectorAll<HTMLElement>(scrollableData));
-    clone.querySelectorAll<HTMLElement>(scrollableData).forEach((element, index) => {
-      const table = original[index].querySelector("table");
-      const copy = element.querySelector("table");
-      if (table && copy) copy.style.width = table.getBoundingClientRect().width + "px";
-    });
-    clone.querySelectorAll("[data-market-print-hide]").forEach((node) => {
-      // The button still occupies its original space in the filter bar.
-      (node as HTMLElement).style.visibility = "hidden";
-    });
-    printDocument.body.append(clone);
+    printDocument.body.append(...clones);
 
     const styles = printDocument.createElement("style");
     styles.textContent = Array.from(document.styleSheets, stylesheetForScreen).join("\n") + `
       html, body { margin: 0; padding: 0; height: auto; min-height: 0; }
       body { display: block; print-color-adjust: exact; -webkit-print-color-adjust: exact; }
+      .market-print-row { display: flex; align-items: stretch; }
       *, *::before, *::after { animation: none !important; transition: none !important; }
       ${scrollableData} { max-height: none !important; overflow: visible !important; }
       .market-tractors .market-scroll thead th,
@@ -101,22 +134,35 @@ export async function printMarketTab(section: HTMLElement, title: string) {
       }
     `;
     printDocument.head.append(styles);
-    clone.getBoundingClientRect();
+    printDocument.body.getBoundingClientRect();
     await Promise.race([
       printDocument.fonts?.ready,
       new Promise<void>((resolve) => window.setTimeout(resolve, 2000)),
     ]);
-    const pageWidth = Math.max(width, clone.scrollWidth);
-    const fullHeight = Math.ceil(clone.getBoundingClientRect().height);
-    const paginate = fullHeight > 4096;
-    const pageHeight = paginate ? 1123 : fullHeight + 2;
+    // Normal-flow rows avoid the large breaks Chromium can place inside a chart grid.
+    const rules = clones.map((clone, index) => {
+      keepDashboardRows(clone);
+      const pageWidth = Math.max(Math.ceil(clone.getBoundingClientRect().width), clone.scrollWidth);
+      const fullHeight = Math.max(clone.scrollHeight, Math.ceil(clone.getBoundingClientRect().height));
+      const fitsPage = fullHeight <= 4096;
+      const pageHeight = fitsPage ? fullHeight + 8 : 1123;
+      const pageName = clones.length === 1 ? "" : " mercado-" + (index + 1);
+      const sheet = printDocument.createElement("div");
+      sheet.className = fitsPage ? "market-print-sheet market-print-fit" : "market-print-sheet";
+      if (pageName) sheet.style.setProperty("page", pageName.trim());
+      clone.replaceWith(sheet);
+      sheet.append(clone);
+      return `@page${pageName} { size: ${pageWidth}px ${pageHeight}px; margin: 0; }`;
+    });
     const paper = printDocument.createElement("style");
-    paper.textContent = `@page { size: ${pageWidth}px ${pageHeight}px; margin: 0; }` + (paginate ? `
+    paper.textContent = rules.join("\n") + `
       @media print {
-        tr, .ms-driver { break-inside: avoid; }
-        .market-panel:not(:has(.market-scroll)), .ms-panel:not(:has(.ms-table-scroll)) { break-inside: avoid; }
+        .market-print-sheet { display: flow-root; }
+        .market-print-sheet + .market-print-sheet { break-before: page; }
+        .market-print-fit > main { display: inline-block; vertical-align: top; }
+        tr, .ms-driver, .market-print-row { break-inside: avoid; }
       }
-    ` : "");
+    `;
     printDocument.head.append(paper);
     printWindow.addEventListener("afterprint", () => frame.remove(), { once: true });
     printWindow.focus();

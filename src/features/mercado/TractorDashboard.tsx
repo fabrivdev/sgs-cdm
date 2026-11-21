@@ -42,6 +42,7 @@ const tractorTitles = {
   resumen: "Tablero",
 };
 type View = keyof typeof tractorTitles;
+const tractorTabs: View[] = ["resumen", ...dimensionKeys, "historia"];
 const next: Record<Dimension, Dimension[]> = {
   precios: ["marcas", "modelos", "importadores"],
   potencia: ["marcas", "modelos", "importadores"],
@@ -86,7 +87,14 @@ export function TractorDashboard({
   const view =
     (Object.keys(titles) as View[]).find((key) => routeKey(key) === slug) ??
     "resumen";
-  const printing = useMarketPrintAction(equipment.title + " - " + titles[view]);
+  const printing = useMarketPrintAction({
+    section: equipment.title,
+    active: view,
+    activeTitle: titles[view],
+    tabs: tractorTabs,
+    href,
+    render: () => <TractorDashboard rows={data} family={family} canExport={canExport} />,
+  });
   const years = useMemo(
     () => [...new Set(rows.map((r) => r[1]))].sort((a, b) => b - a),
     [rows],
@@ -335,7 +343,7 @@ export function TractorDashboard({
             className="market-tabs"
             aria-label={"Secciones de " + family}
           >
-            {(["resumen", ...dimensionKeys, "historia"] as View[]).map(nav)}
+            {tractorTabs.map(nav)}
           </nav>
         }
       />
@@ -344,7 +352,7 @@ export function TractorDashboard({
           id: "market-import-excel", label: "Exportar a Excel",
           disabled: brandView ? !groups.length : view === "historia" ? !history.length : !current.length && !previous.length,
           onSelect: exportExcel,
-        }, printing.action]} /></div>}
+        }, ...printing.actions]} /></div>}
         activeCount={
           active.length + extraFilters.filter(({ key }) => params.has(key)).length +
           Number(Boolean(state)) +

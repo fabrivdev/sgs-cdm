@@ -504,7 +504,7 @@
 .market-panel h2 {
   margin: 0;
 }
-.market-panels > .market-panel > h2 {
+:is(.market-panels, .market-print-row) > .market-panel > h2 {
   margin-bottom: 10px;
   font-size: 0.95rem;
   line-height: 1.35;

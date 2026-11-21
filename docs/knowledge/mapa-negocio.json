@@ -1808,7 +1808,7 @@
       "id": "analizar-mercado-tractores",
       "title": "Explorar el mercado de tractores",
       "module": "mercado",
-      "description": "Actualizar meses desde el Excel original de Penta/PYimport, comparar períodos y exportar la pestaña activa y su detalle filtrado. Las cuatro familias de importaciones pueden imprimir cualquier pestaña en PDF a su escala de pantalla.",
+      "description": "Actualizar meses desde el Excel original de Penta/PYimport, comparar períodos y exportar la pestaña activa y su detalle filtrado. Las cuatro familias de importaciones pueden imprimir la pestaña activa o reunir todas las pestañas de una familia en un PDF a su escala de pantalla.",
       "sources": ["src/features/mercado/Tractores.tsx", "src/features/mercado/TractorDashboard.tsx", "src/features/mercado/marketImportExport.ts", "src/features/mercado/marketPrint.ts", "src/features/mercado/model.ts"]
     },
     {
@@ -1822,7 +1822,7 @@
       "id": "analizar-mercado-market-share",
       "title": "Explorar participación en ventas de maquinaria",
       "module": "mercado",
-      "description": "Importar el informe mensual y el histórico CADAM por equipo, marca y distribuidor. Tomar CADAM hasta 2024 y completar atribución de 2025 por marca conciliada. Comparar unidades, cuota, concentración e histórico a igual corte e imprimir en PDF la pestaña activa.",
+      "description": "Importar el informe mensual y el histórico CADAM por equipo, marca y distribuidor. Tomar CADAM hasta 2024 y completar atribución de 2025 por marca conciliada. Comparar unidades, cuota, concentración e histórico a igual corte e imprimir la pestaña activa o todas las pestañas en un PDF.",
       "sources": ["src/features/mercado/marketShareImport.ts", "src/features/mercado/marketShareSources.ts", "src/features/mercado/MarketShareDashboard.tsx", "src/features/mercado/marketShareAnalytics.ts", "src/features/mercado/MarketShareTables.tsx", "src/features/mercado/marketPrint.ts"]
     },
     {

@@ -17,6 +17,7 @@ const tabs = {
   tablero: "Tablero", marcas: "Marcas", distribuidores: "Distribuidores", historia: "Historia",
 };
 type View = keyof typeof tabs;
+const shareTabs = Object.keys(tabs) as View[];
 const referenceDealer = "Campos del Mañana";
 
 export function MarketShareDashboard({ periods, canExport = false }: { periods: SalesPeriod[]; canExport?: boolean }) {
@@ -24,7 +25,6 @@ export function MarketShareDashboard({ periods, canExport = false }: { periods: 
   const [ranking, setRanking] = useState<{ key: string; query: string; sort: StandingSort } | null>(null);
   const slug = useLocation().pathname.split("/").filter(Boolean).at(-1);
   const view = slug && Object.prototype.hasOwnProperty.call(tabs, slug) ? slug as View : "tablero";
-  const printing = useMarketPrintAction("Market Share - " + tabs[view]);
   const families = (Object.keys(salesFamilies) as SalesFamily[]).filter((key) => periods.some((p) => p.familia === key));
   const requested = params.get("equipo") as SalesFamily | null;
   const family = requested && families.includes(requested) ? requested : families[0];
@@ -62,11 +62,19 @@ export function MarketShareDashboard({ periods, canExport = false }: { periods: 
 
   const href = (target: View) => basePath + (target === "tablero" ? "" : "/" + target)
     + (params.size ? "?" + params.toString() : "");
+  const printing = useMarketPrintAction({
+    section: "Market Share",
+    active: view,
+    activeTitle: tabs[view],
+    tabs: shareTabs,
+    href,
+    render: () => <MarketShareDashboard periods={periods} canExport={canExport} />,
+  });
 
   return (
     <PageShell rootRef={printing.rootRef} className={"market-tractors ms-dashboard" + (family === "pulverizadores" ? " market-horsch" : "")}>
       <PageHeader title="Market Share" tabs={<nav className="market-tabs" aria-label="Secciones de Market Share">
-        {(Object.keys(tabs) as View[]).map((item) => <Link key={item} to={href(item)}
+        {shareTabs.map((item) => <Link key={item} to={href(item)}
           className={view === item ? "chosen" : undefined}
           aria-current={view === item ? "page" : undefined}>{tabs[item]}</Link>)}
       </nav>} />
@@ -79,7 +87,7 @@ export function MarketShareDashboard({ periods, canExport = false }: { periods: 
             const { exportMarketShare } = await import("./marketShareExport");
             await exportMarketShare({ view, family, year, cutoff, dataset, current, previous, brands, dealers, shown, benchmark });
           },
-        }, printing.action]} /></div>}
+        }, ...printing.actions]} /></div>}
       >
         <FilterSelect label="Equipo" placeholder="Equipo" value={family ?? ""} onChange={(v) => set("equipo", v)}
           options={families.map((value) => ({ value, label: salesFamilies[value] }))} />
