@@ -1873,6 +1873,7 @@
       "description": "El usuario autorizado ordena hasta cuatro preguntas con historia implementada; el catálogo objetivo de veinte preguntas no se expone como opciones vacías. Cada tarjeta responde una pregunta y lleva a su sección de origen con filtros; los consolidados dejan elegir el sector autorizado.",
       "steps": [
         "Filtrar temas específicos por permisos de su fuente real.",
+        "Abrir el selector directamente cuando el usuario todavía no guardó prioridades.",
         "Guardar orden en navegador con namespace independiente.",
         "Consultar y conciliar agregados completos autorizados.",
         "Mostrar las cuatro prioridades seleccionadas, manteniendo su lugar durante carga o error.",
@@ -2631,7 +2632,7 @@
       "id": "asistente.panorama",
       "title": "Panorama de Campi",
       "module": "asistente",
-      "description": "Alternativa local: doce temas vigentes con fuente y permiso, hasta cuatro prioridades visibles; el catálogo objetivo contiene veinte preguntas y no ofrece opciones vacías. Cada tarjeta muestra KPI, hasta dos apoyos y un gráfico; las acciones van a su módulo. Ventas consolidadas elige antes el área autorizada. Campi sintetiza hallazgos comprobados. La rama no está publicada en Lovable público ni integrada a main.",
+      "description": "Hasta cuatro prioridades por usuario de los temas habilitados por sus permisos. El primer acceso abre el selector y los usuarios con prioridades guardadas entran a su Panorama. Cada tarjeta muestra sus indicadores y lleva a su módulo de origen.",
       "sources": [
         "src/pages/CampiPanorama.tsx",
         "src/components/campi/PanoramaDashboard.tsx",
@@ -2639,7 +2640,7 @@
         "src/lib/campi/storyCardFacts.ts",
         "src/lib/campi/panoramaPreferences.ts",
         "src/lib/campi/storyNavigation.ts",
-        "docs/knowledge/36-Campi-bienvenida.md"
+        "docs/knowledge/44-Panorama-integracion-main.md"
       ],
       "flows": [
         "configurar-y-leer-panorama"

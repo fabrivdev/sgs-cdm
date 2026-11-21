@@ -1,6 +1,8 @@
 # Panorama: integración a main — 30/10/2026
 
-Se retira el control temporal **Probar recorrido inicial**, su navegación de prueba y el estado de preview. La primera visita conserva la bienvenida V12, el selector real, la continuación de una selección pendiente y el guardado por usuario. Los usuarios con preferencias guardadas abren su Panorama y pueden editar prioridades normalmente.
+Desde el 21/11/2026, el primer acceso a Panorama abre directamente el selector de temas, también para usuarios que habían empezado la bienvenida. Las prioridades se guardan al pulsar «Ver mi Panorama». Las cuentas con prioridades guardadas entran a su tablero.
+
+La integración de octubre retiró el control temporal **Probar recorrido inicial**, su navegación de prueba y el estado de preview. En esa versión, el primer acceso todavía empezaba con la bienvenida V12 antes del selector.
 
 La integración parte de main `17089e5c` y conserva Anular pedido, Stock proyectado, Ventas e importadores ya presentes allí. El checkout original se conserva; los cambios se concilian en la rama aislada `integration/panorama-20261030`. No se copian `.env.local`, ZIP de trabajo, snapshots de clientes ni resultados privados de consultas.
 

@@ -3,8 +3,6 @@ import type { StoryTopicId } from '@/lib/campi/panoramaStoryTypes';
 import { Activity, ArrowDown, ArrowUp, BarChart3, Boxes, CalendarDays, Check, ClipboardList, GripVertical, HandCoins, Package, Plus, Ship, ShoppingCart, Tractor, Truck, Wrench, X } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { PageHeader, PageShell, Panel } from '@/components/layout/AppPrimitives';
-import type { CampiPanoramaReaction } from '@/components/campi/CampiPanoramaAvatar';
-import { CampiOnboardingScene } from '@/components/campi/CampiOnboardingScene';
 import { PanoramaDashboard } from '@/components/campi/PanoramaDashboard';
 import { useAuth } from '@/hooks/useAuth';
 import { cn } from '@/lib/utils';
@@ -54,7 +52,6 @@ const topicIcons: Record<PanoramaTopicId, typeof BarChart3> = {
   clientes_retencion: Activity,
   clientes_cobertura_posventa: Activity,
 };
-function resumeSelector(id:string){try{return localStorage.getItem(`sig-cdm:campi:onboarding:${id}`)==='selector';}catch{return false;}}
 export default function CampiPanorama() {
   const { user, profile, isAdmin, isSuperAdmin, hasModuloAccess, hasSectionAccess } = useAuth();
   const userId = user?.id ?? '';
@@ -66,17 +63,14 @@ export default function CampiPanorama() {
   const [editing, setEditing] = useState(() => readPanoramaPreferences(userId) === null);
   const [draft, setDraft] = useState<PanoramaTopicId[]>(() => reconcilePanoramaOrder(readPanoramaPreferences(userId), available));
   const [dragged, setDragged] = useState<StoryTopicId | null>(null);
-  const [reaction, setReaction] = useState<CampiPanoramaReaction | null>(null);
   const [replacing, setReplacing] = useState<StoryTopicId | null>(null);
   const [saveError, setSaveError] = useState(false);
-  const [selectorStarted,setSelectorStarted]=useState(()=>resumeSelector(userId));
   const firstTime = saved === null;
   const activeUserId = useRef(userId);
   useEffect(() => {
     if (activeUserId.current === userId) return;
     activeUserId.current = userId;
     const preference = readPanoramaPreferences(userId);
-    setSelectorStarted(resumeSelector(userId));
     setSaved(preference);
     setDraft(reconcilePanoramaOrder(preference, available));
     setEditing(preference === null);
@@ -88,33 +82,27 @@ export default function CampiPanorama() {
   const changed = saved === null || selected.join('|') !== persisted.join('|');
   const topicById = new Map(available.map(topic => [topic.id, topic]));
   const unselected = available.filter(topic => !selected.includes(topic.id));
-  const react = (kind: CampiPanoramaReaction['kind']) => setReaction(current => ({ kind, token: (current?.token ?? 0) + 1 }));
-
   const add = (id: StoryTopicId) => {
-    if (selected.length >= MAX_PANORAMA_TOPICS) { setReplacing(id); react('remove'); return; }
+    if (selected.length >= MAX_PANORAMA_TOPICS) { setReplacing(id); return; }
     setDraft(current => {
       const permitted = reconcilePanoramaOrder(current, available);
       return permitted.includes(id) ? permitted : [...permitted, id];
     });
-    react('select');
   };
   const replace = (index: number) => {
     if (!replacing || !available.some(topic => topic.id === replacing)) return;
     setDraft(selected.map((id, position) => position === index ? replacing : id));
     setReplacing(null);
-    react('select');
   };
   const remove = (id: PanoramaTopicId) => {
     setDraft(current => reconcilePanoramaOrder(current, available).filter(item => item !== id));
     setReplacing(null);
-    react('remove');
   };
   const move = (from: number, to: number) => {
     if (from === to || to < 0 || to >= selected.length) return;
     const next = [...selected];
     next.splice(to, 0, next.splice(from, 1)[0]);
     setDraft(next);
-    react('reorder');
   };
   const save = () => {
     if (!savePanoramaPreferences(userId, selected)) { setSaveError(true); return; }
@@ -124,7 +112,6 @@ export default function CampiPanorama() {
     } catch { /* Motion cue is optional. */ }
     setSaved(selected);
     setSaveError(false);
-    react('save');
     setEditing(false);
     setReplacing(null);
   };
@@ -132,7 +119,7 @@ export default function CampiPanorama() {
   if (!editing && persisted.length) return <PanoramaDashboard userId={userId} superadmin={isSuperAdmin} greetingName={panoramaGreetingName(userId, profile)} topics={persisted} available={available}
     hasAccess={section => hasModuloAccess(section.split('.')[0]) && hasSectionAccess(section)} onEdit={() => setEditing(true)} />;
 
-  const selector=<PageShell className="panorama-topic-editor max-w-[1600px] space-y-3">
+  return <PageShell className="panorama-topic-editor max-w-[1600px] space-y-3">
     <div data-selector-title><PageHeader title={firstTime ? "¿En qué querés enfocarte?" : "Editar prioridades"} />{firstTime&&<p className="text-sm text-muted-foreground">Elegí hasta 4 temas. Podés cambiarlo después.</p>}</div>
     <div className="grid items-start gap-4 lg:grid-cols-[minmax(0,1.55fr)_minmax(360px,0.85fr)]">
       <div data-selector-topics><Panel className="min-w-0 space-y-3">
@@ -185,9 +172,4 @@ export default function CampiPanorama() {
       </Panel></div>
     </div>
   </PageShell>;
-  const beginSelection=()=>{
-    setSelectorStarted(true);
-    try{localStorage.setItem(`sig-cdm:campi:onboarding:${userId}`,'selector');}catch{/* Navigation remains available. */}
-  };
-  return <>{firstTime?<CampiOnboardingScene key={userId} reactionKey={reaction?.token??0} name={panoramaGreetingName(userId,profile)} selecting={selectorStarted} onSelect={beginSelection}>{selector}</CampiOnboardingScene>:selector}</>;
 }
