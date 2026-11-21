@@ -1,5 +1,6 @@
 import { parseMovements, readReport, type Movement } from "./model";
-import { completePower, tractorPowerBand } from "./power";
+import { completePower, findTractorPowerModel, powerSpec, sourceTractorPowerBand } from "./power";
+import type { WorkSheet } from "xlsx";
 import {
   monthIndex,
   readSourceWorkbook,
@@ -113,6 +114,40 @@ function modelFrom(text: string, brand: string, catalog: Map<string, string>) {
   return inDescription(text) ?? unknown;
 }
 
+async function readTractorReport(file: SourceFile, original?: WorkSheet) {
+  const analytical = await readReport(file);
+  if (!original) return completePower(analytical);
+
+  const { utils } = await import("xlsx");
+  const declarations = new Map<string, { description: string; ncm: string } | null>();
+  for (const row of utils.sheet_to_json<Record<string, unknown>>(original)) {
+    if (!row.Despacho || row.Item == null || row.Subitem == null) continue;
+    const key = [row.Despacho, row.Item, row.Subitem].map(sourceText).join("|");
+    const ncm = sourceText(row["Código NCM"]);
+    const description = sourceUpper(row["Descripción Subitem"] || row.Descripción);
+    const prior = declarations.get(key);
+    const conflicted = prior === null ||
+      (prior && (prior.ncm !== ncm || prior.description !== description));
+    declarations.set(key, conflicted ? null : { description, ncm });
+  }
+  const enriched = analytical.map((row): Movement => {
+    const [id, , , brand, model, power] = row;
+    if (power !== missingPower) return row;
+    const declaration = declarations.get(id);
+    if (!declaration) return row;
+    const { description, ncm } = declaration;
+    const resolvedModel = model === unknown
+      ? findTractorPowerModel(brand, description) ?? model
+      : model;
+    const segment = sourceTractorPowerBand(description, ncm, powerSpec(brand, resolvedModel)?.hp);
+    const updated: Movement = [...row];
+    updated[4] = resolvedModel;
+    updated[5] = segment ?? power;
+    return updated;
+  });
+  return completePower(enriched);
+}
+
 export async function readTractorUpload(
   file: SourceFile,
   existing: Movement[],
@@ -120,10 +155,11 @@ export async function readTractorUpload(
   const { book, date, extract } = await readSourceWorkbook(file, [
     "Base analítica",
     "SubItems",
+    "Original SubItems",
     "Parámetros",
   ]);
   if (!book.Sheets.SubItems && book.Sheets["Base analítica"])
-    return { rows: await readReport(file) };
+    return { rows: await readTractorReport(file, book.Sheets["Original SubItems"]) };
   const { start, end, rows } = extract(/\b87019[1-5]/);
   const existingById = new Map(existing.map((row) => [row[0], row]));
   const existingImporters = new Map(
@@ -174,18 +210,12 @@ export async function readTractorUpload(
     const model =
       matching?.[4] && matching[4] !== unknown
         ? matching[4]
-        : modelFrom(description, brand, models.get(brand) ?? new Map());
-    const rated = description.match(/\b(\d{2,3}(?:[.,]\d+)?)\s*(HP|CV|KW)\b/);
-    const horsepower = rated
-      ? Number(rated[1].replace(",", ".")) *
-        (rated[2] === "KW" ? 1.341 : rated[2] === "CV" ? 0.9863 : 1)
-      : 0;
-    const ratedBand =
-      horsepower >= 10 && horsepower < 1_000
-        ? tractorPowerBand(horsepower)
-        : missingPower;
+        : findTractorPowerModel(brand, description) ??
+          modelFrom(description, brand, models.get(brand) ?? new Map());
     const power =
-      matching?.[5] && matching[5] !== missingPower ? matching[5] : ratedBand;
+      matching?.[5] && matching[5] !== missingPower
+        ? matching[5]
+        : sourceTractorPowerBand(description, ncm, powerSpec(brand, model)?.hp) ?? missingPower;
     const declaredUnits = description.match(
       /\b(\d{1,2})\s*[.)-]?\s*(?:UNA?\s+)?UNI(?:DAD(?:ES)?|D)?\b/,
     )?.[1];

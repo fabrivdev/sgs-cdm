@@ -18,6 +18,8 @@ La comparación CLAAS muestra por banda el rango y la mediana de los FOB medios 
 
 El catálogo técnico de potencia en src/features/mercado/power.ts enlaza fichas de fabricante y completa las bandas faltantes al consultar la base. En ausencia de ficha, reutiliza una banda observada si es única para la misma marca y modelo. La potencia informada prevalece y los casos ambiguos quedan pendientes.
 
+La carga reconoce los modelos técnicos escritos con espacios, separadores o junto al prefijo MODELO. Un informe con Base analítica y Original SubItems completa los campos faltantes cruzando por despacho, ítem y subítem. Los límites en kW del texto arancelario no son potencias de motor. Para los NCM 8701.91 y 8701.92, la banda de hasta 80 HP se puede determinar por el rango arancelario completo, siempre que la descripción sea compatible. Los rangos que cruzan más de una banda quedan pendientes si falta otra evidencia.
+
 La sección `mercado.tractores` abre el tablero y sus vistas de marcas, modelos, potencia, precios, importadores, e historia. Los enlaces conservan el período, el estado y los filtros elegidos. Una fila de precios abre sus marcas y permite desglosar por modelo e importador.
 
 El corte inicial es el último mes con movimientos. Las comparaciones usan los mismos meses del año anterior y los mismos filtros. La cuota usa el total del conjunto filtrado. El precio FOB se calcula como valor dividido por unidades. El gráfico de marcas incluye CLAAS como categoría si tiene movimientos en los períodos comparados.
