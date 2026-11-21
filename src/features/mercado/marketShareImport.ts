@@ -16,11 +16,20 @@ const dealerAliases: Readonly<Record<string, string>> = {
   "H PETERSEN": "H. Petersen", HP: "H. Petersen", CIABAY: "Ciabay", CIABBAY: "Ciabay",
   "CAMPOS D M": "Campos del Mañana", CDM: "Campos del Mañana", "TRACTO AGROVIAL": "Tracto Agrovial",
   "TRACTO A VIAL": "Tracto Agrovial", TRACTO: "Tracto Agrovial",
+  "DE LA SOBERA HNOS SA": "De La Sobera", "DLS MOTORS SA": "DLS Motors",
+  "AUTOM Y MAQUINARIA SA": "Automaq", "KUROSU CIA SA": "Kurosu", "RIEDER Y CIA SA": "Rieder",
+  "TAPE RUVICHA SA": "Tape Ruvicha", "CIABAY SA": "Ciabay", "PETERSEN H SA": "H. Petersen",
+  "COMERCIO DE TRACT E IMPL": "Cotripar", "CAMPOS DEL MANANA SA": "Campos del Mañana",
+  "TRACTO AGRO VIAL SA": "Tracto Agrovial", "ENGINE SA": "ENGINE", "AUTOMOTOR S A": "Automotor",
+  "RANPAR CARRETAS E IMPLEMENTOS SA": "RAMPAR",
 };
 const dealer = (value: unknown) => dealerAliases[key(value)] ?? (label(value) || null);
 const brandAliases: Readonly<Record<string, string>> = {
   FARMATRAC: "FARMTRAC", DEUTZ: "DEUTZ-FAHR", "DEUTZ FAHR": "DEUTZ-FAHR",
   CASE: "CASE IH", NH: "NEW HOLLAND", "J DEERE": "JOHN DEERE",
+  "JOHN DEERE AUTOMAQ": "JOHN DEERE", "JOHN DEERE KUROSU": "JOHN DEERE",
+  "NEW HOLLAND TAPE": "NEW HOLLAND", "NEW HOLLAND AGROBAY": "NEW HOLLAND",
+  "PLA KUROSU": "PLA", "PLA AUTOMAQ": "PLA",
 };
 const brand = (value: unknown) => brandAliases[key(value)] ?? label(value);
 
@@ -106,9 +115,56 @@ function mergedBrandRow(sheet: WorkSheet, row: number, column: number) {
   const merge = sheet["!merges"]?.find(({ s, e }) => s.c === column && e.c === column && row >= s.r && row <= e.r);
   return merge?.s.r ?? row;
 }
-export async function readMarketShareUpload(file: SourceFile): Promise<SalesPeriod[]> {
+const cadamFamilies: Record<string, SalesFamily> = {
+  "TRACTOR AGRICOLA": "tractores", COSECHADORA: "cosechadoras", "PULVERIZADORA AUTOPROP": "pulverizadores",
+};
+
+function readCadam(sheet: WorkSheet, book: WorkBook, xlsx: typeof import("xlsx")) {
+  const [meta, header, ...detail] = xlsx.utils.sheet_to_json<unknown[]>(sheet, { header: 1, range: 0, blankrows: true });
+  const columns = ["IMPORTADOR", "MARCAS", "MES", "ANO", "CANTIDAD", "MAQUINA"];
+  const start = header?.findIndex((_, index) => columns.every((name, i) => key(header[index + i]) === name)) ?? -1;
+  if (start < 0) {
+    throw new Error("La hoja Cadam Ventas necesita las columnas Importador, Marcas, Mes, Año, Cantidad y Máquina.");
+  }
+  const periods = new Map<string, SalesPeriod>();
+  let recordedTotal = 0;
+  for (const [index, row] of detail.entries()) {
+    const cells = row.slice(start, start + columns.length);
+    if (cells.every((value) => value == null || value === "")) continue;
+    const [rawDealer, rawBrand, serial, year, rawUnits, machine] = cells;
+    const family = cadamFamilies[key(machine)];
+    const date = typeof serial === "number" ? xlsx.SSF.parse_date_code(serial, { date1904: !!book.Workbook?.WBProps?.date1904 }) : null;
+    const units = String(rawUnits).trim() === "-" ? 0 : quantity(rawUnits);
+    const name = brand(rawBrand);
+    const distributor = dealer(rawDealer);
+    if (!family || !date || date.y !== year || units === null || (units > 0 && (!name || !distributor))) {
+      throw new Error("Revisá la fecha, máquina, unidades, marca o distribuidor de la fila " + (index + 3) + " de Cadam Ventas.");
+    }
+    recordedTotal += units;
+    if (date.y > 2025) continue;
+    const id = family + ":" + date.y + ":" + date.m;
+    const period = periods.get(id) ?? { familia: family, anio: date.y, mes: date.m, total: 0, detalle: [] as Sale[] };
+    period.total += units;
+    if (units > 0) {
+      const entry = period.detalle?.find((sale) => sale.marca === name && sale.distribuidor === distributor);
+      if (entry) entry.unidades += units;
+      else period.detalle?.push({ marca: name, distribuidor: distributor, unidades: units });
+    }
+    periods.set(id, period);
+  }
+  const declaredTotal = meta?.[start + 4];
+  if (typeof declaredTotal === "number" && recordedTotal !== declaredTotal) {
+    throw new Error("El total de Cadam Ventas no coincide con la suma de las filas de detalle.");
+  }
+  if (!periods.size) throw new Error("No hay ventas históricas hasta 2025 en Cadam Ventas.");
+  return parseSalesPeriods([...periods.values()]);
+}
+
+export async function readMarketShareUpload(file: SourceFile): Promise<{ source: "cadam" | "informe"; periods: SalesPeriod[] }> {
   const xlsx = await import("xlsx");
   const book = xlsx.read(await file.arrayBuffer(), { bookFiles: true }) as WorkbookParts;
+  const cadamSheet = book.SheetNames.find((name) => key(name) === "CADAM VENTAS");
+  if (cadamSheet) return { source: "cadam", periods: readCadam(book.Sheets[cadamSheet], book, xlsx) };
   const annual = book.SheetNames.filter((name) => /^20\d{2}$/.test(name));
   const periods = new Map<string, SalesPeriod>();
   const historical: SalesPeriod[] = [];
@@ -172,5 +228,5 @@ export async function readMarketShareUpload(file: SourceFile): Promise<SalesPeri
     const id = period.familia + ":" + period.anio + ":" + period.mes;
     if (!periods.has(id)) periods.set(id, period);
   }
-  return parseSalesPeriods([...periods.values()]);
+  return { source: "informe", periods: parseSalesPeriods([...periods.values()]) };
 }

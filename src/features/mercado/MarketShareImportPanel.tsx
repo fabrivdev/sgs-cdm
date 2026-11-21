@@ -4,15 +4,14 @@ import { Button } from "@/components/ui/button";
 import { supabase } from "@/integrations/supabase/client";
 import { number } from "./model";
 import { readMarketShareUpload } from "./marketShareImport";
-import type { SalesPeriod } from "./marketShareModel";
 
 export function MarketShareImportPanel() {
   const cache = useQueryClient();
-  const [pending, setPending] = useState<SalesPeriod[]>([]);
+  const [pending, setPending] = useState<Awaited<ReturnType<typeof readMarketShareUpload>> | null>(null);
   const [busy, setBusy] = useState(false);
   const [feedback, setFeedback] = useState("");
   async function read(file: File) {
-    setPending([]);
+    setPending(null);
     setFeedback("");
     setBusy(true);
     try {
@@ -24,19 +23,22 @@ export function MarketShareImportPanel() {
     }
   }
   async function save() {
-    if (!pending.length) return;
+    if (!pending) return;
     setBusy(true);
     setFeedback("");
     try {
-      const { error } = await supabase.rpc("guardar_mercado_market_share", { p_periodos: pending });
+      const { error } = pending.source === "cadam"
+        ? await supabase.from("mercado_market_share_cadam").upsert(pending.periods.map(({ familia, anio, mes, total, detalle }) =>
+          ({ familia, anio, mes, total, detalle })))
+        : await supabase.rpc("guardar_mercado_market_share", { p_periodos: pending.periods });
       if (error) {
-        setFeedback(error.code === "PGRST202"
-          ? "Falta aplicar la migración de Market Share en Supabase."
+        setFeedback(["PGRST202", "PGRST205", "42P01"].includes(error.code)
+          ? pending.source === "cadam" ? "Falta aplicar la migración del histórico CADAM en Supabase." : "Falta aplicar la migración de Market Share en Supabase."
           : "No se pudo guardar el informe de Market Share.");
         return;
       }
-      setPending([]);
-      setFeedback("Informe de Market Share actualizado.");
+      setPending(null);
+      setFeedback(pending.source === "cadam" ? "Histórico CADAM actualizado." : "Informe de Market Share actualizado.");
       await cache.invalidateQueries({ queryKey: ["mercado-market-share"] });
     } catch {
       setFeedback("No se pudo guardar el informe de Market Share.");
@@ -57,10 +59,10 @@ export function MarketShareImportPanel() {
               if (file) void read(file);
             }} />
         </label>
-        {pending.length > 0 && (
+        {pending && (
           <div className="space-y-2">
-            <p className="text-sm">{number(pending.length)} meses por equipo listos para guardar.</p>
-            <Button size="sm" disabled={busy} onClick={() => void save()}>Guardar informe</Button>
+            <p className="text-sm">{number(pending.periods.length)} meses por equipo listos para guardar.</p>
+            <Button size="sm" disabled={busy} onClick={() => void save()}>{pending.source === "cadam" ? "Guardar histórico CADAM" : "Guardar informe"}</Button>
           </div>
         )}
         {feedback && <p className="text-sm" role="status">{feedback}</p>}

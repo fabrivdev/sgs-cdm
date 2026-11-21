@@ -1822,8 +1822,8 @@
       "id": "analizar-mercado-market-share",
       "title": "Explorar participación en ventas de maquinaria",
       "module": "mercado",
-      "description": "Importar ventas mensuales por equipo, marca y distribuidor. Comparar aporte en unidades y cambios de cuota a igual corte, concentración e histórico por distribuidor y año. Expandir marcas por distribuidor y distribuidores por marca.",
-      "sources": ["src/features/mercado/marketShareImport.ts", "src/features/mercado/marketShareDashboard.tsx", "src/features/mercado/marketShareAnalytics.ts", "src/features/mercado/MarketShareTables.tsx"]
+      "description": "Importar el informe mensual y el histórico CADAM por equipo, marca y distribuidor. Tomar CADAM hasta 2024 y completar atribución de 2025 por marca conciliada. Comparar unidades, cuota, concentración e histórico a igual corte.",
+      "sources": ["src/features/mercado/marketShareImport.ts", "src/features/mercado/marketShareSources.ts", "src/features/mercado/MarketShareDashboard.tsx", "src/features/mercado/marketShareAnalytics.ts", "src/features/mercado/MarketShareTables.tsx"]
     },
     {
       "id": "analizar-mercado-pulverizadores",
@@ -2608,7 +2608,7 @@
       "title": "Market Share",
       "module": "mercado",
       "description": "Tablero de ventas reportadas con aportes por marca, cambios de cuota, concentración de distribuidores y ritmo acumulado. Los rankings tienen desglose recíproco. Historia incluye todos los años disponibles en la matriz por distribuidor y un calendario mensual.",
-      "sources": ["src/features/mercado/MarketShare.tsx", "src/features/mercado/MarketShareDashboard.tsx", "supabase/migrations/20261120160000_mercado_market_share.sql"],
+      "sources": ["src/features/mercado/MarketShare.tsx", "src/features/mercado/MarketShareDashboard.tsx", "supabase/migrations/20261120160000_mercado_market_share.sql", "supabase/migrations/20261121110000_mercado_market_share_cadam.sql"],
       "flows": ["analizar-mercado-market-share"]
     },
     {

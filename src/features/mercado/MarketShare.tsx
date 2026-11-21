@@ -5,15 +5,21 @@ import { Button } from "@/components/ui/button";
 import { PageHeader, PageShell } from "@/components/layout/AppPrimitives";
 import { MarketShareDashboard } from "./MarketShareDashboard";
 import { parseSalesPeriods } from "./marketShareModel";
+import { combineMarketShareSources } from "./marketShareSources";
 
 export default function MarketShare() {
   const { user } = useAuth();
   const query = useQuery({
     queryKey: ["mercado-market-share", user?.id],
     queryFn: async () => {
-      const { data, error } = await supabase.from("mercado_market_share").select("familia,anio,mes,total,detalle");
-      if (error) throw error;
-      return parseSalesPeriods(data);
+      const fields = "familia,anio,mes,total,detalle";
+      const [report, cadam] = await Promise.all([
+        supabase.from("mercado_market_share").select(fields),
+        supabase.from("mercado_market_share_cadam").select(fields),
+      ]);
+      if (report.error) throw report.error;
+      if (cadam.error && cadam.error.code !== "PGRST205" && cadam.error.code !== "42P01") throw cadam.error;
+      return combineMarketShareSources(parseSalesPeriods(report.data), parseSalesPeriods(cadam.data ?? []));
     },
   });
   if (query.data?.length) return <MarketShareDashboard periods={query.data} />;

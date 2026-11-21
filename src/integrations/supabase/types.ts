@@ -38,6 +38,12 @@ export type Database = {
         Update: { familia?: string; anio?: number; mes?: number; total?: number; detalle?: Json | null }
         Relationships: []
       }
+      mercado_market_share_cadam: {
+        Row: { familia: string; anio: number; mes: number; total: number; detalle: Json }
+        Insert: { familia: string; anio: number; mes: number; total: number; detalle: Json }
+        Update: { familia?: string; anio?: number; mes?: number; total?: number; detalle?: Json }
+        Relationships: []
+      }
       mercado_pulverizadores: {
         Row: { id: number; datos: Json }
         Insert: { id: number; datos: Json }
