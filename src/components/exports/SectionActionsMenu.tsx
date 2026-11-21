@@ -1,5 +1,5 @@
 import { useRef, useState } from "react";
-import { Download, Loader2, MoreVertical } from "lucide-react";
+import { Download, Loader2, MoreVertical, type LucideIcon } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { cn } from "@/lib/utils";
@@ -7,6 +7,7 @@ import { cn } from "@/lib/utils";
 export type SectionAction = {
   id: string;
   label: string;
+  icon?: LucideIcon;
   disabled?: boolean;
   onSelect: () => void | Promise<void>;
 };
@@ -37,10 +38,13 @@ export function SectionActionsMenu({ options, busy = false, className }: {
         </Button>
       </DropdownMenuTrigger>
       <DropdownMenuContent align="end" className="max-w-[calc(100vw-2rem)]">
-        {options.map(option => <DropdownMenuItem key={option.id} disabled={busy || pending || option.disabled}
-          onSelect={() => void select(option)} className="gap-2 text-[12px]" title={option.label}>
-          <Download aria-hidden="true" className="h-3.5 w-3.5 shrink-0" /><span className="truncate">{option.label}</span>
-        </DropdownMenuItem>)}
+        {options.map(option => {
+          const Icon = option.icon ?? Download;
+          return <DropdownMenuItem key={option.id} disabled={busy || pending || option.disabled}
+            onSelect={() => void select(option)} className="gap-2 text-[12px]" title={option.label}>
+            <Icon aria-hidden="true" className="h-3.5 w-3.5 shrink-0" /><span className="truncate">{option.label}</span>
+          </DropdownMenuItem>;
+        })}
       </DropdownMenuContent>
     </DropdownMenu>
   </div>;

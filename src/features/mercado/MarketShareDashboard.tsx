@@ -8,6 +8,7 @@ import { salesFamilies, salesTotal, type SalesFamily, type SalesPeriod } from ".
 import { dealerConcentration, defaultStandingSort, marketHistory, pointsLabel, standings, visibleStandings, type StandingSort } from "./marketShareAnalytics";
 import { DistributorPareto, GrowthDrivers, SalesPace, SharePosition } from "./MarketShareCharts";
 import { DistributorHistory, SalesCalendar, StandingTable } from "./MarketShareTables";
+import { useMarketPrintAction } from "./marketPrintAction";
 import "./tractores.css";
 import "./marketShare.css";
 
@@ -23,6 +24,7 @@ export function MarketShareDashboard({ periods, canExport = false }: { periods: 
   const [ranking, setRanking] = useState<{ key: string; query: string; sort: StandingSort } | null>(null);
   const slug = useLocation().pathname.split("/").filter(Boolean).at(-1);
   const view = slug && Object.prototype.hasOwnProperty.call(tabs, slug) ? slug as View : "tablero";
+  const printing = useMarketPrintAction("Market Share - " + tabs[view]);
   const families = (Object.keys(salesFamilies) as SalesFamily[]).filter((key) => periods.some((p) => p.familia === key));
   const requested = params.get("equipo") as SalesFamily | null;
   const family = requested && families.includes(requested) ? requested : families[0];
@@ -62,7 +64,7 @@ export function MarketShareDashboard({ periods, canExport = false }: { periods: 
     + (params.size ? "?" + params.toString() : "");
 
   return (
-    <PageShell className={"market-tractors ms-dashboard" + (family === "pulverizadores" ? " market-horsch" : "")}>
+    <PageShell rootRef={printing.rootRef} className={"market-tractors ms-dashboard" + (family === "pulverizadores" ? " market-horsch" : "")}>
       <PageHeader title="Market Share" tabs={<nav className="market-tabs" aria-label="Secciones de Market Share">
         {(Object.keys(tabs) as View[]).map((item) => <Link key={item} to={href(item)}
           className={view === item ? "chosen" : undefined}
@@ -70,14 +72,14 @@ export function MarketShareDashboard({ periods, canExport = false }: { periods: 
       </nav>} />
       <FiltersBar
         mobileLeading={family && <span className="self-center text-xs text-muted-foreground">{salesFamilies[family]} · {year} · Hasta {months[cutoff - 1].toLowerCase()}</span>}
-        secondaryActions={canExport && family && <SectionActionsMenu options={[{
+        secondaryActions={canExport && family && <div data-market-print-hide><SectionActionsMenu options={[{
           id: "market-share-excel", label: "Exportar a Excel",
           disabled: (view === "marcas" || view === "distribuidores") && !shown.length,
           onSelect: async () => {
             const { exportMarketShare } = await import("./marketShareExport");
             await exportMarketShare({ view, family, year, cutoff, dataset, current, previous, brands, dealers, shown, benchmark });
           },
-        }]} />}
+        }, printing.action]} /></div>}
       >
         <FilterSelect label="Equipo" placeholder="Equipo" value={family ?? ""} onChange={(v) => set("equipo", v)}
           options={families.map((value) => ({ value, label: salesFamilies[value] }))} />

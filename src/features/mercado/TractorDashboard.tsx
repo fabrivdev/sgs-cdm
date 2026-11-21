@@ -34,6 +34,7 @@ import {
 } from "./marketFamily";
 import "./tractores.css";
 import type { MarketExcelRow } from "./marketExcel";
+import { useMarketPrintAction } from "./marketPrintAction";
 
 const tractorTitles = {
   ...dimensions,
@@ -85,6 +86,7 @@ export function TractorDashboard({
   const view =
     (Object.keys(titles) as View[]).find((key) => routeKey(key) === slug) ??
     "resumen";
+  const printing = useMarketPrintAction(equipment.title + " - " + titles[view]);
   const years = useMemo(
     () => [...new Set(rows.map((r) => r[1]))].sort((a, b) => b - a),
     [rows],
@@ -325,7 +327,7 @@ export function TractorDashboard({
   const options = (values: string[]) =>
     values.map((value) => ({ value, label: value }));
   return (
-    <PageShell className={fieldEquipment ? "market-tractors market-horsch" : "market-tractors"}>
+    <PageShell rootRef={printing.rootRef} className={fieldEquipment ? "market-tractors market-horsch" : "market-tractors"}>
       <PageHeader
         title={equipment.title}
         tabs={
@@ -338,11 +340,11 @@ export function TractorDashboard({
         }
       />
       <FiltersBar
-        secondaryActions={canExport && <SectionActionsMenu options={[{
+        secondaryActions={canExport && <div data-market-print-hide><SectionActionsMenu options={[{
           id: "market-import-excel", label: "Exportar a Excel",
           disabled: brandView ? !groups.length : view === "historia" ? !history.length : !current.length && !previous.length,
           onSelect: exportExcel,
-        }]} />}
+        }, printing.action]} /></div>}
         activeCount={
           active.length + extraFilters.filter(({ key }) => params.has(key)).length +
           Number(Boolean(state)) +

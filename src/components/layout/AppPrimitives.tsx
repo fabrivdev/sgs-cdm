@@ -1,10 +1,10 @@
-import { Children, type ReactNode } from "react";
+import { Children, type ReactNode, type Ref } from "react";
 import { useIsMobile } from "@/hooks/use-mobile";
 import { cn } from "@/lib/utils";
 import { cardLabel, kpiValue, metaText, sectionTitle } from "@/lib/ui-classes";
 
-export function PageShell({ children, className }: { children: ReactNode; className?: string }) {
-  return <main className={cn("w-full min-w-0 space-y-3 px-4 py-3 sm:px-5 sm:py-4 lg:px-6", className)}>{children}</main>;
+export function PageShell({ children, className, rootRef }: { children: ReactNode; className?: string; rootRef?: Ref<HTMLElement> }) {
+  return <main ref={rootRef} className={cn("w-full min-w-0 space-y-3 px-4 py-3 sm:px-5 sm:py-4 lg:px-6", className)}>{children}</main>;
 }
 
 export function PageHeader({ title, titleAccessory, actions, tabs, meta, className }: { title: ReactNode; titleAccessory?: ReactNode; actions?: ReactNode; tabs?: ReactNode; meta?: ReactNode; className?: string }) {
