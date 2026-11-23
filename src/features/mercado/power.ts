@@ -43,6 +43,11 @@ const specs = [
     "https://assets.cnhindustrial.com/nhag/lar/pt-br/Documents/Folheto-tecnico-newholland-agriculture-tratores-T6.pdf",
   ],
   [
+    "NEW HOLLAND",
+    { "T9.470": 425 },
+    "https://agriculture.newholland.com/en-au/oceania/products/tractors-telehandlers/new-t9-with-plm-intelligence",
+  ],
+  [
     "JOHN DEERE",
     { "7M200": 200, "7M230": 230, "6135J": 135 },
     "https://www.deere.com/latin-america/es/tractores/tractores-medianos/7200j-200hp/",
@@ -140,6 +145,11 @@ const specs = [
     "https://www.landini.it/wp-content/uploads/2019/02/7-Series_ENG_2019-OK-3.pdf",
   ],
   [
+    "LANDINI",
+    { "LANDFORCE 130": 120.7 },
+    "https://maquinac.com/wp-content/uploads/2018/03/Tractores-Landini-Serie-Landforce-Folleto.pdf",
+  ],
+  [
     "LS",
     { PLUSP90: 93 },
     "https://lstractor.com.br/produto/serie-plus/",
@@ -155,6 +165,16 @@ const specs = [
     "https://www.valtra.com.br/produtos/tratores/serie-a4-hitech.html",
   ],
   [
+    "VALTRA",
+    { BH205: 210, BH205I: 210 },
+    "https://agromazzuchelli.com/images/uploads/54806e0f05864.pdf",
+  ],
+  [
+    "VOLVO",
+    { T650: 74.9 },
+    "https://www.solhem9.se/broschyrbank_lantbruk/Volvo_BM_T650.pdf",
+  ],
+  [
     "TDER",
     { TE704: 70 },
     "https://www.tiderchina.com/product/agricultural-machinery/tractor/TE70-2.html",
@@ -163,6 +183,46 @@ const specs = [
     "TDER",
     { TE604: 60 },
     "https://www.tiderchina.com/cn/product1/agricultural-machinery/tractor/TE60-1.html",
+  ],
+  [
+    "TDER",
+    { TE404: 40 },
+    "https://www.tiderchina.com/product/agricultural-machinery/tractor/TE40-2.html",
+  ],
+  [
+    "ALLPHA",
+    { AP804: 80 },
+    "https://www.allphah.com/article/read/57.html",
+  ],
+  [
+    "YTO",
+    { "YTO-E1954": 193.1 },
+    "https://cdn.carguide.com.cn/syqc/1577776112209515.pdf",
+  ],
+  [
+    "YTO",
+    { NLY1154: 114.3 },
+    "https://ytocorp.com/5-5-3-97-115hp-tractor-nlx-nly-series.html",
+  ],
+  [
+    "LUTONG",
+    { LTB904: 88.8 },
+    "https://www.lylutong.com.cn/product-details/ltb904-tractor-ltb904-tractor/",
+  ],
+  [
+    "QILU",
+    { "QL-704E": 70 },
+    "https://qilutractor.com/product/ql704e/",
+  ],
+  [
+    "SOLIS",
+    { "WT 125-4WD": 125 },
+    "https://www.diskubota.com/wp-content/uploads/2024/05/FT-Sonalika-125-.pdf",
+  ],
+  [
+    "MULLER",
+    { TM14: 152.9 },
+    "https://www.scribd.com/document/675913000/Muller-TM-14",
   ],
   [
     "ZOOMLION",
@@ -177,6 +237,7 @@ const specs = [
   ["LOVOL", { TB604: 60 }, "https://lovolglobal.com/shop/tractor-tb604"],
   ["LOVOL", { TD1304: 130 }, "https://lovolglobal.com/shop/tractor-td1304"],
   ["LOVOL", { TR1504: 150 }, "https://lovolglobal.com/shop/tractor-tr1504"],
+  ["LOVOL", { TD1504: 150 }, "https://wwcm.com.au/product/td1504-tractor/"],
   [
     "LOVOL",
     { TR2204: 220 },
