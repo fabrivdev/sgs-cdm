@@ -26,25 +26,41 @@ function checkAborted(signal?: AbortSignal) {
 }
 
 /** Compare complete, billed, closed orders, not technicians or invoice rows. */
-export function billingEfficiency(rows: Pick<ServicioOSRow, 'os' | 'estadoOS' | 'horas' | 'billing'>[]) {
-  let billedHours = 0, workedHours = 0, orders = 0, incomplete = 0;
+export function billingEfficiency(
+  rows: Pick<ServicioOSRow, 'os' | 'estadoOS' | 'horas' | 'billing'>[],
+  { allowPartial = false } = {},
+) {
+  let billedHours = 0, workedHours = 0, orders = 0;
+  const issues: { os: string; reasons: string[] }[] = [];
   const seen = new Set<string>();
   for (const row of rows) {
     const key = billingKey(row.os);
     if (seen.has(key) || row.estadoOS !== "Cerrada") continue;
     seen.add(key);
     const bill = row.billing;
-    if (!bill || bill.ambiguous) { incomplete++; continue; }
+    if (!bill || bill.ambiguous) {
+      issues.push({ os: row.os, reasons: [bill ? "Identificación de la OS sin confirmar" : "Conciliación de facturación no disponible"] });
+      continue;
+    }
     // Orders without billed labor are not treated as zero-efficiency work.
     if (!bill.matched || !bill.laborLines) continue;
-    if (bill.billedHours === null || !Number.isFinite(bill.billedHours) || bill.missingRates > 0 ||
-        !Number.isFinite(row.horas) || row.horas <= 0) { incomplete++; continue; }
-    billedHours += bill.billedHours;
+    const hours = bill.billedHours;
+    const invalidHours = hours === null || !Number.isFinite(hours);
+    const invalidWorkedHours = !Number.isFinite(row.horas) || row.horas <= 0;
+    if (invalidHours || bill.missingRates > 0 || invalidWorkedHours) {
+      const reasons: string[] = [];
+      if (bill.missingRates > 0) reasons.push("Tarifa de mano de obra sin conciliar");
+      else if (invalidHours) reasons.push("Horas facturadas sin conciliar");
+      if (invalidWorkedHours) reasons.push("Horas de trabajo de la OS faltantes o inválidas");
+      issues.push({ os: row.os, reasons });
+      continue;
+    }
+    billedHours += hours;
     workedHours += row.horas;
     orders++;
   }
-  return { billedHours, workedHours, orders, incomplete,
-    percentage: incomplete === 0 && workedHours > 0 ? billedHours / workedHours * 100 : null };
+  return { billedHours, workedHours, orders, incomplete: issues.length, issues,
+    percentage: (allowPartial || !issues.length) && workedHours > 0 ? billedHours / workedHours * 100 : null };
 }
 
 /** Attribute billed OS to their operational period (closure date), never to work-log dates. */

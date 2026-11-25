@@ -1,5 +1,9 @@
 # Carga financiera de Órdenes de servicio
 
+## Eficiencia con cobertura parcial en Productividad
+
+Cuando la consulta financiera termina correctamente, la tarjeta de Productividad calcula la eficiencia con las OS cerradas conciliadas. Suma únicamente las horas facturadas y trabajadas de esas mismas OS. Si quedan OS sin cálculo, la tarjeta indica «Parcial» y el contador abre el detalle con el número de cada OS y el motivo. Sin ninguna OS comparable se muestra «—». La evolución por período y Campi conservan su criterio de cobertura completa. Si falla una parte de la consulta financiera, sigue bloqueado el cálculo de la tarjeta y se conserva el reintento. El cambio no requiere migración.
+
 Amplía [[26-Ordenes-servicio-y-analitica]] y la fuente de Ventas de [[03-Ventas-y-conciliacion]]. La facturación de la pestaña Órdenes y la eficiencia de Productividad leen `service_orders_billing_v2` por separado de las jornadas y de los indicadores operativos. Un error de esa consulta no demuestra ausencia de factura en cada OS.
 
 - `billing.ts` solicita las identidades filtradas en lotes disjuntos de hasta 250 OS. Los lotes se procesan con un máximo de **dos RPC simultáneas** en lugar de esperar cada una antes de iniciar la siguiente. Se mantienen la cancelación al cambiar población, el límite global de 25 segundos, la validación de identidad y respuesta completa, y la prohibición de volver a v1 por su cálculo horario incorrecto. Si un lote falla, se cancela el resto y no se publica dinero parcial. Esta concurrencia reduce espera acumulada del cliente, pero no certifica el tiempo de una RPC o de la base productiva.

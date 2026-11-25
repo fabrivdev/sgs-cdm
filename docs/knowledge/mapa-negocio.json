@@ -1936,7 +1936,7 @@
       "steps": [
         "Filtrar órdenes y abrir ficha por os_numero sin perder ceros ni confundir cierre operativo con factura.",
         "Para Productividad, recortar el tramo medible desde julio y calcular horas válidas, capacidad e incidencias por técnico y período.",
-        "Conciliar MO y tarifas por tipo para eficiencia de OS cerradas; si una respuesta financiera es incompleta, no publicar importe ni porcentaje parcial.",
+        "Conciliar MO y tarifas por tipo para eficiencia de OS cerradas. Con una respuesta financiera completa, la tarjeta muestra la tasa sobre OS conciliadas con aviso de cobertura parcial y detalle por OS excluida. Si falla la consulta no se publica el indicador.",
         "Para Cumplimiento, agrupar automáticamente jornadas por día/semana/mes/año y consultar detalle de la matriz sin liquidar ni alterar estados."
       ],
       "entities": [

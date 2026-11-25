@@ -624,6 +624,23 @@ describe("orders workspace", () => {
     expect(screen.queryByText("% de meta", { selector: ".kpi-item span" })).not.toBeInTheDocument();
     expect(screen.getByText("Meta disponible", { selector: ".kpi-item span" })).toBeVisible();
   });
+  it.each([320, 1280])("shows a partial efficiency and its excluded OS at %i px", width => {
+    mocks.width = width;
+    Object.assign(response.data.data.ordenesServicio[0], { servicios_cantidad: 20 });
+    Object.assign(response.data.data.ordenesServicio[1], { servicios_cantidad: 10, situacion_os: "Cerrada", fecha_cierre_os: "2026-09-15" });
+    response.data.data.billing = {
+      "01-00000001": demoBilling({ billedHours: 12 }),
+      "01-00000002": demoBilling({ os: "01-00000002", billedHours: null, missingRates: 1 }),
+    };
+    setup(); tab("Productividad"); technicianStatus("Todos");
+    const card = screen.getByText("Eficiencia", { selector: ".kpi-item span" }).closest(".kpi-item")!;
+    expect(card).toHaveTextContent("60%");
+    fireEvent.click(within(card).getByRole("button", { name: "Parcial · 1 OS sin cálculo" }));
+    const detail = within(screen.getByRole("dialog", { name: "Órdenes sin cálculo de eficiencia" }));
+    expect(detail.getByText("1 OS incluidas · 1 excluidas")).toBeVisible();
+    expect(detail.getByText("01-00000002")).toBeVisible();
+    expect(detail.getByText("Tarifa de mano de obra sin conciliar")).toBeVisible();
+  });
   it("exports financial values separately from reported OS amounts and preserves unknowns", async () => {
     response.data.data.ordenesServicio[0].servicios_valor = 1.66;
     response.data.data.billing = { "01-00000001": demoBilling({ labor: 1000, total: 1161.3, parts: -18.7, billedHours: 5 }) };

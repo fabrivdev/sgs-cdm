@@ -18,7 +18,7 @@ describe("OS billing efficiency", () => {
   });
   it("uses OS hours once, never person-hours, and a ratio of sums instead of averaging percentages", () => {
     const rows = [order(), order(), order({ os: "02-00000001", horas: 10, billing: bill({ billedHours: 9 }) })];
-    expect(billingEfficiency(rows)).toEqual({ orders: 2, incomplete: 0, billedHours: 21, workedHours: 30, percentage: 70 });
+    expect(billingEfficiency(rows)).toEqual({ orders: 2, incomplete: 0, issues: [], billedHours: 21, workedHours: 30, percentage: 70 });
     expect(billingEfficiency(rows.slice(0, 1)).percentage).toBe(60);
   });
   it("does not treat unbilled, open, cancelled or non-labor orders as zero efficiency", () => {
@@ -33,6 +33,23 @@ describe("OS billing efficiency", () => {
   });
   it.each([0, -1, NaN, Infinity])("leaves invalid worked hours %s unknown", horas => {
     expect(billingEfficiency([order({ horas })]).percentage).toBeNull();
+  });
+  it("uses only reconciled hours on both sides of a partial ratio and identifies exclusions", () => {
+    const invalid = [
+      order({ os: "TARIFA", horas: 100, billing: bill({ billedHours: 120, missingRates: 1 }) }),
+      order({ os: "HORAS", horas: 0, billing: bill({ billedHours: null }) }),
+      order({ os: "IDENTIDAD", billing: bill({ ambiguous: true }) }),
+    ];
+    const options = { allowPartial: true };
+    expect(billingEfficiency([order(), ...invalid], options)).toEqual({
+      billedHours: 12, workedHours: 20, orders: 1, incomplete: 3, percentage: 60,
+      issues: [
+        { os: "TARIFA", reasons: ["Tarifa de mano de obra sin conciliar"] },
+        { os: "HORAS", reasons: ["Horas facturadas sin conciliar", "Horas de trabajo de la OS faltantes o inválidas"] },
+        { os: "IDENTIDAD", reasons: ["Identificación de la OS sin confirmar"] },
+      ],
+    });
+    expect(billingEfficiency(invalid, options).percentage).toBeNull();
   });
   it("preserves credits, zero and over-100 percentages without capping or rounding the calculation", () => {
     for (const [hours, percentage] of [[0, 0], [-2, -10], [24, 120]]) {

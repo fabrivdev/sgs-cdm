@@ -54,6 +54,7 @@ export function OrdersWorkspace() {
   const [tab, setTab] = useState(() => searchParams.get("tab") === "productividad" ? "productividad" : "ordenes");
   const [technicianStatus, setTechnicianStatus] = useState<TechnicianStatus>("activos");
   const [selectedTechnician, setSelectedTechnician] = useState<string | null>(null);
+  const [showEfficiencyIssues, setShowEfficiencyIssues] = useState(false);
   const [matrixMetric, setMatrixMetric] = useState<"trabajos" | "horas">("trabajos");
   const [complianceBucket, setComplianceBucket] = useState("");
   const defaults = useMemo<OperationsFilters>(() => {
@@ -114,7 +115,7 @@ export function OrdersWorkspace() {
   })), [data.ordenes, billingEnabled, billingLoading, financial.isError, financial.data]);
   const closure = useMemo(() => orderClosureMetrics(data.ordenes), [data.ordenes]);
   const efficiency = useMemo(() => billingFailed || billingLoading
-    ? { percentage: null, incomplete: 0 } : billingEfficiency(financialRows.filter(row => efficiencyKeys.has(billingKey(row.os)))),
+    ? null : billingEfficiency(financialRows.filter(row => efficiencyKeys.has(billingKey(row.os))), { allowPartial: true }),
     [financialRows, efficiencyKeys, billingFailed, billingLoading]);
   const periodEfficiency = useMemo(() => billingFailed || billingLoading
     ? productivity.evolucion.map(() => null)
@@ -163,8 +164,13 @@ export function OrdersWorkspace() {
           <KpiItem key="horas" label="Horas-persona" value={workReady ? decimal.format(productivity.horasPersona) : "—"} icon={<Clock3 />} />,
           <KpiItem key="meta" label="Meta disponible" value={workReady && productivity.capacidad.horasDisponibles > 0 ? decimal.format(productivity.capacidad.horasDisponibles) : "—"} icon={<Target />} />,
           <KpiItem key="porcentaje" label="Productividad" value={workReady && productivity.capacidad.horasDisponibles > 0 ? `${decimal.format(productivity.capacidad.porcentaje)}%` : "—"} icon={<CircleCheck />} />,
-          <KpiItem key="eficiencia" label="Eficiencia" value={efficiency.percentage === null ? "—" : `${decimal.format(efficiency.percentage)}%`} icon={<Percent />}
-            detail={billingLoading ? "Calculando…" : billingFailed ? undefined : efficiency.incomplete ? `${efficiency.incomplete} OS sin cálculo` : undefined} />,
+          <KpiItem key="eficiencia" label="Eficiencia" value={efficiency?.percentage == null ? "—" : `${decimal.format(efficiency.percentage)}%`} icon={<Percent />}
+            detail={billingLoading ? "Calculando…" : efficiency?.incomplete ? (
+              <button type="button" className="text-left underline underline-offset-2 hover:text-foreground max-sm:min-h-11"
+                onClick={() => setShowEfficiencyIssues(true)}>
+                {efficiency.percentage !== null && "Parcial · "}{efficiency.incomplete} OS sin cálculo
+              </button>
+            ) : undefined} />,
         ] : null}
       </KpiStrip>}
       <FiltersBar search={{ value: filters.q, onChange: v => change("q", v), placeholder: tab === "cumplimiento" ? "Cliente, trabajo o TR…" : "OS, cliente o chasis…" }} activeCount={active} onClear={clearFilters} secondaryActions={!blocked ? <SalesSectionExportMenu /> : undefined}
@@ -228,6 +234,22 @@ export function OrdersWorkspace() {
         </TabsContent>
       </>}
     </Tabs>
+    <ResponsiveDrawer title="Órdenes sin cálculo de eficiencia"
+      open={showEfficiencyIssues && !blocked && tab === "productividad" && Boolean(efficiency?.incomplete)}
+      onOpenChange={setShowEfficiencyIssues}>
+      <ResponsiveDrawerHeader><h2 className="text-[14px] font-semibold">Órdenes sin cálculo de eficiencia</h2></ResponsiveDrawerHeader>
+      <ResponsiveDrawerBody>
+        <p className="text-sm text-muted-foreground">{efficiency?.orders ?? 0} OS incluidas · {efficiency?.incomplete ?? 0} excluidas</p>
+        <ul className="mt-3 divide-y border-y text-sm">
+          {efficiency?.issues.map(({ os, reasons }) => (
+            <li key={os} className="flex flex-wrap items-baseline justify-between gap-x-4 gap-y-1 py-2.5">
+              <span className="font-medium tabular-nums">{os}</span>
+              <span className="text-muted-foreground">{reasons.join(" · ")}</span>
+            </li>
+          ))}
+        </ul>
+      </ResponsiveDrawerBody>
+    </ResponsiveDrawer>
     <ResponsiveDrawer open={Boolean(selectedTechnician) && tab === "productividad" && workReady} onOpenChange={open => !open && setSelectedTechnician(null)}>
       <ResponsiveDrawerHeader><h2 className="text-[14px] font-semibold">{selectedTechnician === "__issues__" ? "Incidencias de jornadas" : selectedTechnician}</h2></ResponsiveDrawerHeader>
       <ResponsiveDrawerBody>
