@@ -158,7 +158,7 @@ const fixture=async(key,rates,ledger)=>{
   for (const [i,l] of ledger.entries()) {
     await db.query(`INSERT INTO facturacion_lineas_importadas(id,fecha_factura,factura,codigo_interno_factura,raw_data,grupo_normalizado,total_venta,valor_unitario,moneda)
       VALUES ($1,$2,$3,$3,$4,'Servicio',$5,$5,'USD')`,[`${key}-${i}`,l.date??'2026-09-01',l.doc,
-      JSON.stringify({linked_service_order:key,DOCUMENTO:l.doc,original_invoice_number:l.original,canonical_document_kind:l.credit?'NotaCredito':'Factura'}),l.amount]);
+      JSON.stringify({linked_service_order:key,DOCUMENTO:l.doc,original_invoice_number:l.original,NFORI:l.nfori,canonical_document_kind:l.credit?'NotaCredito':'Factura'}),l.amount]);
   }
   return (await callV2([key]))[0];
 };
@@ -238,6 +238,37 @@ assert.deepEqual(await callV2([]),[]);
 const correctedCanonical=(await callV2(['CANONICAL']))[0];
 for(const field of ['labor','parts','travel','thirdParty','total','documents','date']) assert.deepEqual(correctedCanonical[field],fast[field]);
 await assert.rejects(()=>callV2(Array.from({length:251},(_,i)=>String(i))),/Parametros/);
+// A series prefix in TOTVS NFORI must resolve to the same OS's exact invoice.
+const electronicInvoice = '0990010000010';
+const prefixedFull = await fixture('CREDIT-FE-FULL', [rate(electronicInvoice,'Cliente',70,140)], [
+  {doc:electronicInvoice,amount:140},
+  {doc:'FE-CREDIT-1',original:`FE1 - ${electronicInvoice}`,amount:-140,credit:true,date:'2026-09-02'},
+]);
+assert.equal(prefixedFull.billedHours,null);
+assert.equal(prefixedFull.missingRates,1);
+assert.equal(prefixedFull.labor,0);
+const prefixedPartial = await fixture('CREDIT-FE-PARTIAL', [rate(electronicInvoice,'Cliente',70,140)], [
+  {doc:electronicInvoice,amount:140},
+  {doc:'FE-CREDIT-2',nfori:`fe1  -  ${electronicInvoice}`,amount:-35,credit:true},
+]);
+assert.equal(prefixedPartial.billedHours,null);
+await fixture('CREDIT-FE-FOREIGN', [rate(electronicInvoice,'Cliente',70,140)], [
+  {doc:'FE-CREDIT-3',original:`FE1 - ${electronicInvoice}`,amount:-140,credit:true},
+]);
+const exactInvoice = `FE1 - ${electronicInvoice}`;
+await fixture('CREDIT-FE-EXACT', [rate(electronicInvoice,'Cliente',70,140),rate(exactInvoice,'Cliente',50,50)], [
+  {doc:electronicInvoice,amount:140}, {doc:exactInvoice,amount:50},
+  {doc:'FE-CREDIT-4',original:exactInvoice,amount:-50,credit:true},
+]);
+const creditPrefixSql=readFileSync('supabase/migrations/20261125153000_reconcile_service_order_credit_invoice_prefix.sql','utf8');
+await db.exec(creditPrefixSql); await db.exec(creditPrefixSql);
+const [conciledFull] = await callV2(['CREDIT-FE-FULL']);
+assert.deepEqual(conciledFull,{...prefixedFull,billedHours:0,missingRates:0});
+assert.equal((await callV2(['CREDIT-FE-FULL'],'2026-09-01'))[0].billedHours,2);
+const [conciledPartial] = await callV2(['CREDIT-FE-PARTIAL']);
+assert.deepEqual(conciledPartial,{...prefixedPartial,billedHours:1.5,missingRates:0});
+assert.equal((await callV2(['CREDIT-FE-FOREIGN']))[0].billedHours,null);
+assert.equal((await callV2(['CREDIT-FE-EXACT']))[0].billedHours,2);
 for (const section of ['servicios.ordenes','servicios.ventas']) {
  await db.query("SELECT set_config('fixture.denied_section',$1,false)",[section]);
  await assert.rejects(()=>callV2(['RATE-JOB']),/Sin acceso/);
