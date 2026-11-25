@@ -1,6 +1,6 @@
 import type { WorkBook, WorkSheet } from "xlsx";
 import { marketShareLogos } from "./marketShareLogos";
-import { parseSalesPeriods, type Sale, type SalesFamily, type SalesPeriod } from "./marketShareModel";
+import { camposDealer, parseSalesPeriods, type Sale, type SalesFamily, type SalesPeriod } from "./marketShareModel";
 import { sourceUpper, type SourceFile } from "./penta";
 
 const label = (value: unknown) => sourceUpper(value).replace(/\s+/g, " ").trim();
@@ -14,12 +14,13 @@ const dealerAliases: Readonly<Record<string, string>> = {
   AUTOMAQ: "Automaq", KUROSU: "Kurosu", "TAPE RUVICHA": "Tape Ruvicha",
   AGROBAY: "Agrobay", RIEDER: "Rieder", COTRIPAR: "Cotripar", "COTRIPAR II": "Cotripar",
   "H PETERSEN": "H. Petersen", HP: "H. Petersen", CIABAY: "Ciabay", CIABBAY: "Ciabay",
-  "CAMPOS D M": "Campos del Mañana", CDM: "Campos del Mañana", "TRACTO AGROVIAL": "Tracto Agrovial",
+  "CAMPOS D M": camposDealer, CDM: camposDealer, "TRACTO AGROVIAL": "Tracto Agrovial",
   "TRACTO A VIAL": "Tracto Agrovial", TRACTO: "Tracto Agrovial",
   "DE LA SOBERA HNOS SA": "De La Sobera", "DLS MOTORS SA": "DLS Motors",
   "AUTOM Y MAQUINARIA SA": "Automaq", "KUROSU CIA SA": "Kurosu", "RIEDER Y CIA SA": "Rieder",
   "TAPE RUVICHA SA": "Tape Ruvicha", "CIABAY SA": "Ciabay", "PETERSEN H SA": "H. Petersen",
-  "COMERCIO DE TRACT E IMPL": "Cotripar", "CAMPOS DEL MANANA SA": "Campos del Mañana",
+  "COMERCIO DE TRACT E IMPL": "Cotripar", "CAMPOS DEL MANANA": camposDealer,
+  "CAMPOS DEL MANANA SA": camposDealer, "CAMPOS DEL MANANA S A": camposDealer,
   "TRACTO AGRO VIAL SA": "Tracto Agrovial", "ENGINE SA": "ENGINE", "AUTOMOTOR S A": "Automotor",
   "RANPAR CARRETAS E IMPLEMENTOS SA": "RAMPAR",
 };
@@ -37,7 +38,7 @@ function oldEntry(value: unknown): Pick<Sale, "marca" | "distribuidor"> {
   const normalized = key(value);
   const john = normalized.match(/^J DEERE(?: (.+))?$/);
   if (john) return { marca: "JOHN DEERE", distribuidor: john[1] === "A" ? "Automaq" : john[1] === "K" ? "Kurosu" : dealer(john[1]) };
-  const pair = normalized.match(/^(NH|CASE|VALTRA|FENDT|LOVOL|YTO|HANOMAG|LS|CLAAS|JACTO|KS|KUHN|PLA|METALFOR) (.+)$/);
+  const pair = normalized.match(/^(NH|CASE|VALTRA|FENDT|LOVOL|YTO|HANOMAG|LS|CLAAS|HORSCH|JACTO|KS|KUHN|PLA|METALFOR) (.+)$/);
   return pair ? { marca: brand(pair[1]), distribuidor: dealer(pair[2] === "TAPE" ? "TAPE RUVICHA" : pair[2]) }
     : { marca: brand(value), distribuidor: null };
 }

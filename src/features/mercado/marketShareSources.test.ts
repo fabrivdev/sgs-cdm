@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import type { Sale, SalesPeriod } from "./marketShareModel";
+import { parseSalesPeriods, type Sale, type SalesPeriod } from "./marketShareModel";
 import { combineMarketShareSources } from "./marketShareSources";
 
 const a = (dealer: string | null, units: number, marca = "A"): Sale => ({ marca, distribuidor: dealer, unidades: units });
@@ -8,6 +8,22 @@ const period = (anio: number, mes: number, detalle: Sale[]): SalesPeriod => ({
 });
 
 describe("Market Share sources", () => {
+  it("attributes Campos del Mañana sprayers to HORSCH across imports and stored records", () => {
+    const rows = [
+      a("CAMPOS DEL MANANA S.A.", 1, "CLAAS"), a("Campos del Mañana", 2, "HORSCH"),
+      a("Otro distribuidor", 1, "CLAAS"), a(null, 2, "CLAAS"),
+    ];
+    const tractors = period(2026, 9, rows);
+    const sprayers = { ...tractors, familia: "pulverizadores" as const };
+    const harvesters = { ...tractors, familia: "cosechadoras" as const };
+    const parsed = parseSalesPeriods([tractors, harvesters, sprayers]);
+    expect(parsed).toEqual([tractors, harvesters, {
+      ...sprayers, detalle: [rows[2], rows[3], a("Campos del Mañana", 3, "HORSCH")],
+    }]);
+    expect(parseSalesPeriods(parsed)).toEqual(parsed);
+    expect(sprayers.detalle?.[0].marca).toBe("CLAAS");
+  });
+
   it("uses detailed historical months and reconciles missing distributors without changing the 2025 market totals", () => {
     const old = period(2024, 1, [a("D1", 5)]);
     const current = period(2025, 1, [a("D1", 2), a(null, 3), a(null, 1, "B")]);

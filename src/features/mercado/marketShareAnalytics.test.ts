@@ -29,7 +29,7 @@ describe("Market Share analytics", () => {
     const current = [period(2026, 1, [["A", "D1", 35], ["A", "D2", 35], ["B", null, 30]])];
     const dealers = standings(current, previous, "distribuidor");
     expect(dealers.map(({ name, rank, priorUnits }) => [name, rank, priorUnits]))
-      .toEqual([["D1", 1, 30], ["D2", 1, null], [unknownDealer, null, 40]]);
+      .toEqual([["D1", 1, 30], ["D2", 2, null], [unknownDealer, null, 40]]);
     expect(dealers[0]).toMatchObject({ delta: 5, partialComparison: true, priorRank: null });
     expect(dealers.slice(1).every((row) => row.delta === null && row.priorRank === null)).toBe(true);
     const details = standings(current, previous, "distribuidor", [], { by: "marca", name: "A" });
@@ -39,6 +39,19 @@ describe("Market Share analytics", () => {
     const concentration = dealerConcentration(dealers, 100);
     expect(concentration.rows[1]).toMatchObject({ name: "D2", cumulative: 70 });
     expect(concentration.rows.at(-1)).toMatchObject({ name: "Sin identificar", cumulative: 100 });
+  });
+
+  it.each(["marca", "distribuidor"] as const)("assigns consecutive positions for %s and keeps ties stable across years", (by) => {
+    const rows: [string, string, number][] = [["C", "D3", 2], ["B", "D2", 5], ["A", "D1", 5]];
+    const current = [period(2026, 1, rows)];
+    const previous = [period(2025, 1, [...rows].reverse())];
+    const ranked = standings(current, previous, by);
+    expect(ranked.map(({ name }) => name)).toEqual(by === "marca" ? ["A", "B", "C"] : ["D1", "D2", "D3"]);
+    expect(ranked.map(({ rank, priorRank }) => [rank, priorRank])).toEqual([[1, 1], [2, 2], [3, 3]]);
+
+    const differentPrevious = [period(2025, 1, [["B", "D2", 6], ["A", "D1", 4]])];
+    expect(standings(current, differentPrevious, by).map(({ rank, priorRank }) => [rank, priorRank]))
+      .toEqual([[1, 2], [2, 1], [3, null]]);
   });
 
   it("keeps all source years in history without assigning aggregate sales or treating missing detail as zero", () => {

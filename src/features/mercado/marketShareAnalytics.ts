@@ -27,6 +27,7 @@ export type StandingSort = { key: StandingColumn; asc: boolean };
 export const defaultStandingSort: StandingSort = { key: "units", asc: false };
 export const standingGrowth = (row: MarketStanding) => row.delta === null ? null : ratio(row.delta, row.priorUnits ?? 0);
 const searchable = (name: string) => name.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase();
+const compareNames = (a: string, b: string) => a.localeCompare(b, "es");
 
 export function visibleStandings(rows: MarketStanding[], query: string, sort: StandingSort) {
   const term = searchable(query.trim());
@@ -55,12 +56,8 @@ export function salesCalendar(dataset: SalesPeriod[], years: number[], cutoff: n
 
 function positions(counts: Map<string, number>) {
   const sorted = [...counts].filter(([name, units]) => name !== unknownDealer && units > 0)
-    .sort((a, b) => b[1] - a[1]);
-  let rank = 0;
-  return new Map(sorted.map(([name, units], index) => {
-    if (units !== sorted[index - 1]?.[1]) rank = index + 1;
-    return [name, rank];
-  }));
+    .sort(([nameA, unitsA], [nameB, unitsB]) => unitsB - unitsA || compareNames(nameA, nameB));
+  return new Map(sorted.map(([name], index) => [name, index + 1]));
 }
 
 function group(periods: SalesPeriod[], by: Dimension, parent?: { by: Dimension; name: string }) {
@@ -109,7 +106,7 @@ export function standings(current: SalesPeriod[], previous: SalesPeriod[], by: D
       rank: rank.get(name) ?? null, priorRank: priorRank.get(name) ?? null,
       partialComparison: canCompare && !comparable,
     };
-  }).sort((a, b) => b.units - a.units || (b.priorUnits ?? 0) - (a.priorUnits ?? 0) || a.name.localeCompare(b.name, "es"));
+  }).sort((a, b) => b.units - a.units || compareNames(a.name, b.name));
 }
 
 export function distributorHistory(dataset: SalesPeriod[], years: number[], cutoff: number) {
