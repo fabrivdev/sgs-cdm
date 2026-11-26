@@ -1,5 +1,11 @@
 # Facturación filtrada de Clientes del parque
 
+## Optimización del 26/11/2026
+
+Aplicar manualmente `supabase/migrations/20261126200000_optimize_park_brand_billing.sql` para los filtros de marca (incluido C/Ambas) y rubro. La migración incorpora la corrección de septiembre y resuelve la coincidencia de factura por conjunto de claves distintas (número de factura, código interno, fecha y sucursal), en vez de repetirla por cada renglón. El respaldo histórico posterior al corte usa dos comprobaciones indexables para omitir documentos presentes en TOTVS.
+
+El ensayo aislado conserva la atribución de los movimientos y los resultados de 40 combinaciones. También compara 4.808 líneas con documentos repetidos y sucursal informada o vacía. El rendimiento en la base de producción se verifica después de ejecutar el SQL.
+
 ## Problema y alcance
 
 Al filtrar por Rubro o Marca, `ParqueTab` utiliza `parque_resumen_facturacion_filtros`. La atribución de las líneas nuevas recorría de manera correlacionada el conjunto materializado de propietarios por factura para cada línea. Además, un error PostgreSQL `57014` provocaba una repetición automática de la misma consulta y las coberturas podían conservar valores de la respuesta anterior.

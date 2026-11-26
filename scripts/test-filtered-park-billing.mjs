@@ -5,6 +5,7 @@ import {readFileSync} from 'node:fs';
 const {PGlite}=await import(process.argv[2]??'@electric-sql/pglite');
 const db=new PGlite();
 const migration='supabase/migrations/20260918220000_optimize_filtered_park_billing.sql';
+const nextMigration='supabase/migrations/20261126200000_optimize_park_brand_billing.sql';
 const definition=(file,name)=>readFileSync(file,'utf8').match(new RegExp(`CREATE OR REPLACE FUNCTION public\\.${name}\\([\\s\\S]*?\\$\\$;`))[0];
 try {
  await db.exec(`
@@ -52,9 +53,12 @@ try {
  await db.exec(readFileSync(migration,'utf8'));
  assert.deepEqual(await rows(),beforeRows,'line-level amounts/owner/brand must not change');
  for(const brand of brands)for(const rubro of rubros)assert.deepEqual(await run(brand,rubro),before.get(`${brand}/${rubro}`),`${brand}/${rubro}`);
+ await db.exec(readFileSync(nextMigration,'utf8'));
+ assert.deepEqual(await rows(),beforeRows,'set-based billing must preserve lines');
+ for(const brand of brands)for(const rubro of rubros)assert.deepEqual(await run(brand,rubro),before.get(`${brand}/${rubro}`),`set-based ${brand}/${rubro}`);
  const claas=await run('CLAAS','REPUESTOS');assert.equal(Number(claas[0].fact_actual),133.45);assert.equal(Number(claas[0].fact_prev),100.25);
  assert.equal(claas[0].tiene_srv_rango,true,'OS activity must survive monetary rubro filter');
- await db.exec(readFileSync(migration,'utf8'));assert.deepEqual(await rows(),beforeRows,'idempotent');
+ await db.exec(readFileSync(nextMigration,'utf8'));assert.deepEqual(await rows(),beforeRows,'idempotent');
  await db.exec(`SET test.uid='00000000-0000-0000-0000-000000000099';SET test.allowed='false'`);
  assert.deepEqual(await run('ALL','REPUESTOS'),[],'unauthorized session');
  await db.exec(`SET test.allowed='true'`);assert.deepEqual(await run('ALL','REPUESTOS'),before.get('ALL/REPUESTOS'));
@@ -67,5 +71,21 @@ try {
  const bench=async fn=>{const start=performance.now();const res=await db.query(`SELECT count(*) n,sum(total_venta) importe FROM ${fn}('2025-01-01','2026-12-31')`);return{ms:Math.round(performance.now()-start),rows:res.rows};};
  const old=await bench('parque_facturacion_atribuida_rango_baseline');const optimized=await bench('parque_facturacion_atribuida_rango');
  assert.deepEqual(optimized.rows,old.rows,'larger fixture remains financially identical');
- console.log(JSON.stringify({fixtureLines:808,baselineMs:old.ms,optimizedMs:optimized.ms}));
+ await db.exec(`
+ INSERT INTO facturacion VALUES
+ (md5('scope1')::uuid,'DOC1','00000000-0000-0000-0000-000000000001','2026-08-05',990,'repuestos','REPUESTOS - CLAAS',NULL,'Santa Rita','2026-08-07',false),
+ (md5('scope2')::uuid,'DOC1','00000000-0000-0000-0000-000000000002','2026-08-05',990,'repuestos','REPUESTOS - CLAAS',NULL,'Katuete','2026-08-08',false),
+ (md5('scope3')::uuid,'DOC2','00000000-0000-0000-0000-000000000002','2026-08-05',991,'repuestos','REPUESTOS - HORSCH',NULL,'Santa Rita','2026-08-05',false);
+ INSERT INTO facturacion_lineas_importadas SELECT md5('repeat'||i)::uuid,'DOC1','DOC2',NULL,'2026-08-05',1,'repuestos',NULL,'CLAAS','Cliente dos',
+    CASE i % 3 WHEN 0 THEN NULL WHEN 1 THEN 'Santa Rita' ELSE 'Katuete' END
+ FROM generate_series(1,4000) i;
+ ANALYZE;
+ `);
+ const setBased=await bench('parque_facturacion_atribuida_rango');
+ const setBasedRows=await run('AMBAS','ALL');
+ await db.exec(readFileSync(migration,'utf8'));
+ const priorOptimized=await bench('parque_facturacion_atribuida_rango');
+ assert.deepEqual(setBased.rows,priorOptimized.rows,'all source amounts must reconcile');
+ assert.deepEqual(await run('AMBAS','ALL'),setBasedRows,'repeated lines, invoice key priority, branch and null compatibility');
+ console.log(JSON.stringify({fixtureLines:4808,baselineMs:old.ms,initialSetBasedMs:optimized.ms,priorFilteredMs:priorOptimized.ms,setBasedMs:setBased.ms}));
 }finally{await db.close();}
