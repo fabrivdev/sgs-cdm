@@ -11,14 +11,18 @@ import MaquinariaOperaciones, { OrdersTable } from "@/pages/MaquinariaOperacione
 const mocks=vi.hoisted(()=>({tables:{} as Record<string,Record<string,unknown>[]>,can:vi.fn(),errorTable:"",rpc:vi.fn(),transfer:vi.fn(),
   sheet:vi.fn((rows:unknown[][])=>({"!ref":"A1:Z3",rows})),json:vi.fn((rows:Record<string,unknown>[])=>({rows})),write:vi.fn()}));
 vi.mock("pdfjs-dist",()=>({getDocument:vi.fn(),GlobalWorkerOptions:{}}));
-vi.mock("@/hooks/useAuth",()=>({useAuth:()=>({can:mocks.can,isAdmin:false,roles:[]})}));
+vi.mock("@/hooks/useAuth",()=>({useAuth:()=>({user:{id:"U1"},can:mocks.can,isAdmin:false,roles:[],hasSectionAccess:()=>true})}));
 vi.mock("@/hooks/useMachineCatalog",()=>({useMachineCatalog:()=>({data:{brands:[],models:[],aliases:[]},isLoading:false})}));
 vi.mock("./TransferirMaquinaDialog",()=>({TransferirMaquinaDialog:(props:unknown)=>{mocks.transfer(props);return null;}}));
 vi.mock("./NuevaMaquinaDialog",()=>({NuevaMaquinaDialog:()=>null}));
 vi.mock("./ClientePanel",()=>({ClientePanel:()=>null}));
-vi.mock("@/integrations/supabase/client",()=>({supabase:{rpc:mocks.rpc,from:(table:string)=>{
-  const result=()=>({data:mocks.tables[table]??[],error:table===mocks.errorTable?{message:"Fixture read error"}:null});
-  const chain={select:()=>chain,order:()=>chain,eq:()=>chain,in:()=>chain,range:()=>Promise.resolve(result()),then:(resolve:(value:ReturnType<typeof result>)=>unknown)=>Promise.resolve(result()).then(resolve)};
+vi.mock("@/integrations/supabase/client",()=>({supabase:{rpc:(...args: unknown[])=>{
+  const result=mocks.rpc(...args);
+  return Object.assign(result,{order:()=>({range:(from:number,to:number)=>typeof result.then!=="function" ? result : result.then((page:{data?:unknown[];error?:unknown})=>({...page,data:page.data?.slice(from,to+1)??null}))})});
+},from:(table:string)=>{
+  let rows=mocks.tables[table]??[];
+  const result=()=>({data:rows,error:table===mocks.errorTable?{message:"Fixture read error"}:null});
+  const chain={select:()=>chain,order:()=>chain,eq:()=>chain,not:()=>chain,in:(key:string,values:unknown[])=>{rows=rows.filter(row=>values.includes(row[key]));return chain;},range:()=>Promise.resolve(result()),then:(resolve:(value:ReturnType<typeof result>)=>unknown)=>Promise.resolve(result()).then(resolve)};
   return chain;
 }}}));
 vi.mock("xlsx",()=>({utils:{aoa_to_sheet:mocks.sheet,json_to_sheet:mocks.json,encode_cell:()=>"A1",book_new:()=>({}),book_append_sheet:vi.fn()},writeFile:mocks.write}));
@@ -45,6 +49,19 @@ async function exportTable(label:string){
   await waitFor(()=>expect(mocks.write).toHaveBeenCalled());
 }
 describe("Parque and imports compact lists",()=>{
+  it("adds billing from the inactive RUC alias even when the RPC splits it to a second page",async()=>{
+    mocks.tables.clientes[0].ruc="1234567-0";
+    mocks.tables.clientes.push({id:"C3",nombre:"CLIENTE HISTÓRICO",ruc:"12345670",activo:false});
+    const filler=Array.from({length:1000},(_,i)=>({
+      cliente_id:"B"+i,fact_actual:0,fact_prev:0,tiene_rep_rango:false,tiene_srv_rango:false,
+    }));
+    mocks.rpc.mockImplementation((name:string)=>Promise.resolve({error:null,data:name.includes("ultimas")
+      ? [] : [...filler,{cliente_id:"C3",fact_actual:1234,fact_prev:1200,tiene_rep_rango:true,tiene_srv_rango:false}]}));
+    setup(<ParqueTab/>);
+    const row=await screen.findByRole("row",{name:/CLIENTE CON NOMBRE MUY LARGO/});
+    await waitFor(()=>expect(row).toHaveTextContent("$ 1.234"));
+    expect(screen.queryByText("CLIENTE HISTÓRICO")).not.toBeInTheDocument();
+  });
   it("phone park rows identify the chassis and owner without merging records or authorizing a transfer",async()=>{
     vi.stubGlobal("innerWidth", 390);
     const open=vi.fn(); setup(<MaquinasTab onOpenCliente={open}/>);
@@ -213,7 +230,7 @@ describe("Parque and imports compact lists",()=>{
     vi.spyOn(console,"error").mockImplementation(()=>undefined);
     const state=vi.fn();mocks.rpc.mockResolvedValue({data:null,error:{code:"57014",message:"canceling statement due to statement timeout"}});
     setup(<ParqueTab onFacturacionEstadoChange={state}/>);
-    await screen.findByText(/57014/);expect(mocks.rpc).toHaveBeenCalledTimes(1);expect(state).toHaveBeenLastCalledWith("error");
+    await screen.findByText(/57014/);expect(mocks.rpc.mock.calls.filter(([name])=>name==="parque_resumen_facturacion")).toHaveLength(1);expect(state).toHaveBeenLastCalledWith("error");
     fireEvent.keyDown(screen.getByRole("button",{name:"Acciones de la sección"}),{key:"Enter"});
     expect(await screen.findByRole("menuitem",{name:"Exportar clientes"})).toHaveAttribute("data-disabled");
     fireEvent.keyDown(screen.getByRole("menuitem",{name:"Exportar clientes"}),{key:"Escape"});

@@ -2,6 +2,8 @@ import { loadUnifiedCoverage, unifiedCoverageEnabled, unifiedCoverageProjection,
 import { sortSalesRows, type SalesColumn } from "@/components/ventas/salesTableInteraction";
 import { SectionActionsMenu } from "@/components/exports/SectionActionsMenu";
 import { useEffect, useMemo, useState } from "react";
+import { useQuery } from "@tanstack/react-query";
+import { groupParkBilling, loadParkBillingIdentities, parkBillingIdentityKey } from "@/lib/parkBillingIdentity";
 import { useLocation } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
 import { Input } from "@/components/ui/input";
@@ -168,6 +170,20 @@ async function cargarRpcConReintento<T>(
   throw new Error(detalle || "No se pudo cargar la facturación");
 }
 
+async function cargarPaginasRpc<T>(
+  request: (from: number, to: number) => ParqueRpcRequest<T[]>,
+  signal: AbortSignal,
+) {
+  const pageSize = 1000;
+  const rows: T[] = [];
+  for (let from = 0; ; from += pageSize) {
+    const pageRequest = () => request(from, from + pageSize - 1);
+    const page = await cargarRpcConReintento([pageRequest, pageRequest], signal) ?? [];
+    rows.push(...page);
+    if (page.length < pageSize) return rows;
+  }
+}
+
 const normText = (v: unknown) => String(v ?? "").trim().toLowerCase().replace(/\s+/g, " ");
 
 const esPlataformaOCabezal = (subgrupo: string | null | undefined) => {
@@ -234,7 +250,7 @@ export function ParqueTab({
   const [clientes, setClientes] = useState<Cliente[]>([]);
   const [contactos, setContactos] = useState<Contacto[]>([]);
   const [maquinas, setMaquinas] = useState<Maquina[]>([]);
-  const [factAgregados, setFactAgregados] = useState<Map<string, FactAgregado>>(new Map());
+  const [facturacionPorFicha, setFactAgregados] = useState<Map<string, FactAgregado>>(new Map());
   const [seguimientos, setSeguimientos] = useState<Seguimiento[]>([]);
   const [trabajos, setTrabajos] = useState<TrabajoParque[]>([]);
 
@@ -391,6 +407,18 @@ export function ParqueTab({
     return ()=>{live=false;controller.abort();};
   },[coverageFrom,coverageTo,user?.id,coverageAllowed,coverageRequestKey,factReloadKey]);
 
+  const billingIdentities = useQuery({
+    queryKey: parkBillingIdentityKey(user?.id),
+    queryFn: loadParkBillingIdentities,
+    enabled: !!user?.id,
+    staleTime: 60_000,
+  });
+  const factAgregados = useMemo(() => groupParkBilling(
+    facturacionPorFicha, clientes, billingIdentities.data ?? [],
+  ), [facturacionPorFicha, clientes, billingIdentities.data]);
+  const billingLoading = factLoading || billingIdentities.isLoading || (billingIdentities.isError && billingIdentities.isFetching);
+  const billingError = factError || (billingIdentities.isError ? "No se pudieron conciliar las fichas de facturación." : null);
+
   // Fase B: agregados de facturación (RPC) — depende del rango
   useEffect(() => {
     let cancelado = false;
@@ -410,35 +438,16 @@ export function ParqueTab({
           p_prev_desde: fmt(prevDesdeDate),
           p_prev_hasta: fmt(prevHastaDate),
         };
-        const resumenRequests = fRubro !== "all"
-          ? [
-              () => supabase.rpc("parque_resumen_facturacion_filtros", {
-                ...fechas,
-                p_marca: marcaFacturacion,
-                p_rubro: rubroFacturacion,
-              }),
-              () => supabase.rpc("parque_resumen_facturacion_filtros", {
-                ...fechas,
-                p_marca: marcaFacturacion,
-                p_rubro: rubroFacturacion,
-              }),
-            ]
-          : fMarca !== "all"
-            ? [
-                () => supabase.rpc("parque_resumen_facturacion_marca", {
-                  ...fechas,
-                  p_marca: marcaFacturacion,
-                }),
-                () => supabase.rpc("parque_resumen_facturacion_marca", {
-                  ...fechas,
-                  p_marca: marcaFacturacion,
-                }),
-              ]
-            : [
-                () => supabase.rpc("parque_resumen_facturacion", fechas),
-                () => supabase.rpc("parque_resumen_facturacion", fechas),
-              ];
-        const resumen = await cargarRpcConReintento(resumenRequests, abortController.signal);
+        const resumen = await cargarPaginasRpc((from, to) => {
+          const request = fRubro !== "all"
+            ? supabase.rpc("parque_resumen_facturacion_filtros", {
+                ...fechas, p_marca: marcaFacturacion, p_rubro: rubroFacturacion,
+              })
+            : fMarca !== "all"
+              ? supabase.rpc("parque_resumen_facturacion_marca", { ...fechas, p_marca: marcaFacturacion })
+              : supabase.rpc("parque_resumen_facturacion", fechas);
+          return request.order("cliente_id").range(from, to);
+        }, abortController.signal);
         if (cancelado) return;
 
         const map = new Map<string, FactAgregado>();
@@ -461,16 +470,12 @@ export function ParqueTab({
         setFactAgregados(new Map(map));
 
         try {
-          const ultimasRequests = fMarca === "all"
-            ? [
-                () => supabase.rpc("parque_ultimas_facturas"),
-                () => supabase.rpc("parque_ultimas_facturas"),
-              ]
-            : [
-                () => supabase.rpc("parque_ultimas_facturas_marca", { p_marca: marcaFacturacion }),
-                () => supabase.rpc("parque_ultimas_facturas_marca", { p_marca: marcaFacturacion }),
-              ];
-          const ultimas = await cargarRpcConReintento(ultimasRequests, abortController.signal);
+          const ultimas = await cargarPaginasRpc((from, to) => {
+            const request = fMarca === "all"
+              ? supabase.rpc("parque_ultimas_facturas")
+              : supabase.rpc("parque_ultimas_facturas_marca", { p_marca: marcaFacturacion });
+            return request.order("cliente_id").range(from, to);
+          }, abortController.signal);
           if (cancelado) return;
 
           for (const r of (ultimas ?? []) as Array<{
@@ -516,11 +521,11 @@ export function ParqueTab({
       cancelado = true;
       abortController.abort();
     };
-  }, [desdeDate, hastaDate, prevDesdeDate, prevHastaDate, fMarca, fRubro, factReloadKey]);
+  }, [desdeDate, hastaDate, prevDesdeDate, prevHastaDate, fMarca, fRubro, factReloadKey, user?.id]);
 
   useEffect(() => {
-    onFacturacionEstadoChange?.(factLoading ? "loading" : factError ? "error" : "ready");
-  }, [factLoading, factError, onFacturacionEstadoChange]);
+    onFacturacionEstadoChange?.(billingLoading ? "loading" : billingError ? "error" : "ready");
+  }, [billingLoading, billingError, onFacturacionEstadoChange]);
 
   const subgrupoOptions = useMemo(() => {
     const values = new Set<string>(MACHINE_SUBGROUPS.filter((subgrupo) => subgrupo !== "OTRO"));
@@ -717,7 +722,7 @@ export function ParqueTab({
   return (
     <div className="space-y-3">
       <FiltersBar
-        secondaryActions={can("datos:exportar") ? <SectionActionsMenu options={[{ id: "excel", label: "Exportar clientes", disabled: loading || loadError || factLoading || !!factError || !ordenadas.length, onSelect: exportar }]} /> : undefined}
+        secondaryActions={can("datos:exportar") ? <SectionActionsMenu options={[{ id: "excel", label: "Exportar clientes", disabled: loading || loadError || billingLoading || !!billingError || !ordenadas.length, onSelect: exportar }]} /> : undefined}
         search={{ value: q, onChange: setQ, placeholder: "Nombre, RUC o código de cliente…", label: "Buscar" }}
         activeCount={filtrosActivos + (q ? 1 : 0)}
         onClear={() => { setQ(""); limpiarFiltros(); }}
@@ -795,7 +800,7 @@ export function ParqueTab({
         <div>
           {ordenadas.length} cliente{ordenadas.length === 1 ? "" : "s"} · Período:{" "}
           {format(desdeDate, "dd/MM")} – {format(hastaDate, "dd/MM")}
-          {factLoading && !loading && (
+          {billingLoading && !loading && (
             <span className="ml-2 inline-flex items-center gap-1 text-[11px] text-muted-foreground/80">
               · cargando facturación...
             </span>
@@ -803,15 +808,18 @@ export function ParqueTab({
         </div>
       </div>
 
-      {factError && !factLoading && (
+      {billingError && !billingLoading && (
         <div className="flex flex-col gap-2 rounded-md border border-destructive/30 bg-destructive/5 px-3 py-2 text-[12px] text-destructive sm:flex-row sm:items-center sm:justify-between">
-          <span>{factError}</span>
+          <span>{billingError}</span>
           <Button
             type="button"
             variant="outline"
             size="sm"
             className="h-7 border-destructive/30 text-destructive hover:bg-destructive/10 hover:text-destructive"
-            onClick={() => setFactReloadKey((value) => value + 1)}
+            onClick={() => {
+              if (billingIdentities.isError) void billingIdentities.refetch();
+              setFactReloadKey((value) => value + 1);
+            }}
           >
             <RefreshCw className="mr-1 h-3.5 w-3.5" /> Reintentar
           </Button>
@@ -819,7 +827,7 @@ export function ParqueTab({
       )}
 
 
-      {!loading && !factLoading && factAgregados.size > 0 && !servicioInfo.hayEnRango && (
+      {!loading && !billingLoading && factAgregados.size > 0 && !servicioInfo.hayEnRango && (
         <div className="rounded-md border border-amber-500/40 bg-amber-500/10 px-3 py-2 text-[12px] text-amber-900 dark:text-amber-200">
           ⚠️ No hay facturas de <strong>Servicio</strong> (Mano de Obra / Kilometraje) en el período seleccionado.
           {servicioInfo.ultimaServicio
@@ -831,7 +839,7 @@ export function ParqueTab({
       <div className="hidden text-[12px] text-muted-foreground">
         {ordenadas.length} cliente{ordenadas.length === 1 ? "" : "s"} · Período:{" "}
         {format(desdeDate, "dd/MM")} – {format(hastaDate, "dd/MM")}
-        {factLoading && !loading && (
+        {billingLoading && !loading && (
           <span className="ml-2 inline-flex items-center gap-1 text-[11px] text-muted-foreground/80">
             · cargando facturación…
           </span>
@@ -857,8 +865,8 @@ export function ParqueTab({
               varPct:{width:"md:w-[10%] xl:w-[7%]",label:"Var.",align:"right",hiddenBelow:"md"},
             };
             return {...column,...layout[key],title:(r:Row)=>{
-              if(key==="factYTD")return factLoading?"Cargando facturación…":factError??`$ ${fmtMoney(r.factYTD)}`;
-              if(key==="factPrev")return factLoading?"Cargando facturación…":factError??`$ ${fmtMoney(r.factPrev)}`;
+              if(key==="factYTD")return billingLoading?"Cargando facturación…":billingError??`$ ${fmtMoney(r.factYTD)}`;
+              if(key==="factPrev")return billingLoading?"Cargando facturación…":billingError??`$ ${fmtMoney(r.factPrev)}`;
               if(key==="marcas")return `CLAAS: ${r.cantClaas} · HORSCH: ${r.cantHorsch} · Orden por participación CLAAS`;
               return String(column.value(r)??"—");
             },render:(r:Row)=>{
@@ -869,8 +877,8 @@ export function ParqueTab({
               if(key==="antiguedadProm")return r.antiguedadProm!=null?<Badge className={cn("max-w-full whitespace-nowrap px-1.5 tabular-nums",antiguedadColor(r.antiguedadProm))}>{r.antiguedadProm}</Badge>:"—";
               if(key==="marcas")return r.cantTotal?<span className="inline-flex max-w-full gap-1 tabular-nums"><span className="text-marca-claas">{Math.round(r.cantClaas/r.cantTotal*100)}%</span><span>/</span><span className="text-marca-horsch">{Math.round(r.cantHorsch/r.cantTotal*100)}%</span></span>:"—";
               if(key==="diasUltRepuesto"||key==="diasUltServicio"){const value=r[key];return value!=null?<span className="inline-flex items-center gap-1">{value>365&&<Flag className="h-3 w-3 shrink-0 text-destructive" aria-label="Más de un año" />}{value}</span>:"—";}
-              if(key==="factYTD"||key==="factPrev")return factLoading?"…":factError?"—":r[key]!==0?`$ ${fmtMoney(r[key])}`:"—";
-              if(key==="varPct")return factLoading?"…":factError||r.varPct==null?"—":<span className={r.varPct>=0?"text-emerald-600":"text-destructive"}>{r.varPct>0?"+":""}{r.varPct}%</span>;
+              if(key==="factYTD"||key==="factPrev")return billingLoading?"…":billingError?"—":r[key]!==0?`$ ${fmtMoney(r[key])}`:"—";
+              if(key==="varPct")return billingLoading?"…":billingError||r.varPct==null?"—":<span className={r.varPct>=0?"text-emerald-600":"text-destructive"}>{r.varPct>0?"+":""}{r.varPct}%</span>;
               return String(column.value(r)??"—");
             }};
           })} />

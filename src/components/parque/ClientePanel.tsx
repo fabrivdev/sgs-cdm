@@ -1,4 +1,5 @@
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { loadParkBillingIdentities, parkBillingClientIds, parkBillingIdentityKey } from "@/lib/parkBillingIdentity";
 import { useQueryClient } from "@tanstack/react-query";
 import { useMachineCatalog } from "@/hooks/useMachineCatalog";
 import { reviewCatalogLine } from "@/lib/machineOrderValidation";
@@ -170,14 +171,14 @@ const initials = (s: string) =>
 
 const BILLING_PAGE_SIZE = 1000;
 
-async function fetchLegacyClientBilling(clientId: string) {
+async function fetchLegacyClientBilling(clientIds: string[]) {
   const rows: Factura[] = [];
   for (let from = 0; ; from += BILLING_PAGE_SIZE) {
     const result = await supabase
       .from("facturacion")
       .select("id, fecha, tipo, total_venta, grupo, grupo_fx, cod_factura")
-      .eq("cliente_id", clientId)
-      .eq("excluido_de_reportes", false)
+      .in("cliente_id", clientIds)
+      .or("excluido_de_reportes.is.null,excluido_de_reportes.eq.false")
       .lt("fecha", TOTVS_BILLING_START)
       .order("id", { ascending: true })
       .range(from, from + BILLING_PAGE_SIZE - 1);
@@ -188,13 +189,13 @@ async function fetchLegacyClientBilling(clientId: string) {
   }
 }
 
-async function fetchTotvsClientBilling(clientId: string) {
+async function fetchTotvsClientBilling(clientIds: string[]) {
   const rows: TotvsBillingLine[] = [];
   for (let from = 0; ; from += BILLING_PAGE_SIZE) {
     const result = await supabase
       .from("facturacion_lineas_importadas")
       .select("id, fecha_factura, factura, codigo_interno_factura, grupo_normalizado, subgrupo_original, total_venta")
-      .eq("cliente_id", clientId)
+      .in("cliente_id", clientIds)
       .gte("fecha_factura", `${TOTVS_BILLING_START}T00:00:00Z`)
       .order("id", { ascending: true })
       .range(from, from + BILLING_PAGE_SIZE - 1);
@@ -243,10 +244,22 @@ export function ClientePanel({ clienteId, open, onOpenChange, onChanged, onCrear
   const [segResultado, setSegResultado] = useState<string>("Contactado");
   const [segObs, setSegObs] = useState("");
 
-  const cargar = async (id: string) => {
+  const billingLoadId = useRef(0);
+  const cargar = useCallback(async (id: string) => {
+    const loadId = ++billingLoadId.current;
     setLoading(true);
     setFacturacionError("");
-    const [c, ct, m, s, fLegacy, fTotvs, t, p] = await Promise.all([
+    const billing = queryClient.fetchQuery({
+      queryKey: parkBillingIdentityKey(user?.id),
+      queryFn: loadParkBillingIdentities,
+      staleTime: 60_000,
+    }).then(async (identities) => {
+      const ids = parkBillingClientIds(id, identities);
+      const [legacy, totvs] = await Promise.all([fetchLegacyClientBilling(ids), fetchTotvsClientBilling(ids)]);
+      if (legacy.error || totvs.error) return null;
+      return mergeClientBilling(legacy.data, totvs.data);
+    }).catch(() => null);
+    const [c, ct, m, s, facturacion, t, p] = await Promise.all([
       supabase
         .from("clientes")
         .select("id, nombre, ruc, region, direccion, localidad, correo_principal, telefono, sucursal")
@@ -255,8 +268,7 @@ export function ClientePanel({ clienteId, open, onOpenChange, onChanged, onCrear
       supabase.from("contactos_cliente").select("*").eq("cliente_id", id).order("es_principal", { ascending: false }),
       supabase.from("parque_maquinas").select("*").eq("cliente_id", id),
       supabase.from("seguimiento_comercial").select("*").eq("cliente_id", id).order("fecha", { ascending: false }),
-      fetchLegacyClientBilling(id),
-      fetchTotvsClientBilling(id),
+      billing,
       supabase
         .from("trabajos")
         .select("id, cliente_id, codigo, os_numero, creado_en, estado_general, descripcion_problema")
@@ -264,25 +276,19 @@ export function ClientePanel({ clienteId, open, onOpenChange, onChanged, onCrear
         .order("creado_en", { ascending: false }),
       supabase.from("profiles").select("id, nombre"),
     ]);
+    if (loadId !== billingLoadId.current) return;
     setCliente((c.data ?? null) as Cliente | null);
     setContactos((ct.data ?? []) as Contacto[]);
     setMaquinas((m.data ?? []) as Maquina[]);
     setSeguimientos((s.data ?? []) as Seguimiento[]);
-    if (fLegacy.error || fTotvs.error) {
-      setFacturas([]);
-      setFacturacionError("No se pudo cargar la facturación completa del cliente.");
-    } else {
-      setFacturas(mergeClientBilling(
-        (fLegacy.data ?? []) as Factura[],
-        (fTotvs.data ?? []) as TotvsBillingLine[],
-      ));
-    }
+    setFacturas(facturacion ?? []);
+    if (!facturacion) setFacturacionError("No se pudo cargar la facturación completa del cliente.");
     setTrabajos((t.data ?? []) as TrabajoCliente[]);
     setProfiles(
       Object.fromEntries(((p.data ?? []) as { id: string; nombre: string }[]).map((u) => [u.id, u.nombre])),
     );
     setLoading(false);
-  };
+  }, [queryClient, user?.id]);
 
   useEffect(() => {
     if (open && clienteId) {
@@ -295,7 +301,8 @@ export function ClientePanel({ clienteId, open, onOpenChange, onChanged, onCrear
       setSegResultado("Contactado");
       setSegObs("");
     }
-  }, [open, clienteId]);
+    return () => { billingLoadId.current += 1; };
+  }, [open, clienteId, cargar]);
 
   // ===== Cliente =====
   const guardarCliente = async () => {

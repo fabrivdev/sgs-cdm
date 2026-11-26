@@ -98,7 +98,7 @@ export function calculateClientBillingStats(
   const matching = rows.filter((row) => {
     if (row.tipo !== type) return false;
     const group = (row.grupo_fx ?? "").trim().toUpperCase();
-    return type !== "Servicio" || group === "MANO DE OBRA" || group === "KILOMETRAJE";
+    return type !== "Servicio" || ["MANO DE OBRA", "KILOMETRAJE", "SERVICIO", "SERVICIOS"].includes(group);
   });
 
   for (const row of matching) {

@@ -86,6 +86,15 @@ describe("mergeClientBilling", () => {
     });
   });
 
+  it("incluye servicios históricos con grupo genérico en la ficha", () => {
+    const rows = mergeClientBilling([
+      legacy({ tipo: "Servicio", grupo_fx: "Servicio", total_venta: 140 }),
+      legacy({ id: "km", tipo: "Servicio", grupo_fx: "Kilometraje", total_venta: 54 }),
+      legacy({ id: "otro", tipo: "Servicio", grupo_fx: "Terceros", total_venta: 200 }),
+    ], []);
+    expect(calculateClientBillingStats(rows, "Servicio", 2026).ytd).toBe(194);
+  });
+
   it("ordena globalmente las últimas ventas y limita la lista después de combinar", () => {
     const lines = Array.from({ length: 11 }, (_, index) => totvs({
       id: `line-${index}`,

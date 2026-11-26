@@ -14,6 +14,10 @@ Catálogo común de marca, tipo y modelo para Parque, pedidos e importaciones. M
 
 Fuente: `docs/shared-machine-catalog.md`, `src/pages/ParqueClientes.tsx`, `src/pages/MaquinariaOperaciones.tsx`.
 
+## Facturación por cliente
+
+Parque consolida el resumen y el detalle de facturación de fichas visibles con el mismo RUC completo. En el listado, si hay más de un titular visible para el RUC, se conserva el reparto de origen para evitar duplicar importes y exportaciones. Las consultas del listado recorren todas las páginas, incluso cuando los filtros producen más de 1.000 fichas. La consulta del detalle conserva las exclusiones de facturas y las fechas de corte de cada sistema. La reparación se aplica al mostrar los datos y no cambia los comprobantes ni los propietarios.
+
 ## Ventas de máquinas
 
 Facturación filtrada de Clientes, 18/09: no repetir automáticamente errores `57014`; cancelar solicitudes obsoletas al cambiar filtros y vaciar agregados anteriores. Coberturas muestran carga/error, no porcentajes desactualizados ni cero inventado. Optimización SQL por joins de factura/código interno y nombre exacto conserva prioridades, importes, ambigüedades, NC, exclusiones y cobertura independiente del rubro monetario. Requiere SQL manual `20260918220000_optimize_filtered_park_billing.sql`; push no lo aplica. 40 combinaciones equivalentes en PostgreSQL aislado y navegador ficticio, no validación productiva. Alcance y pruebas: `docs/parque-facturacion-filtros.md`.
