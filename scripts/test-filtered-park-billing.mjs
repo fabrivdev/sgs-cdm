@@ -6,6 +6,7 @@ const {PGlite}=await import(process.argv[2]??'@electric-sql/pglite');
 const db=new PGlite();
 const migration='supabase/migrations/20260918220000_optimize_filtered_park_billing.sql';
 const nextMigration='supabase/migrations/20261126200000_optimize_park_brand_billing.sql';
+const indexedMigration='supabase/migrations/20261126213000_use_park_billing_owner_index.sql';
 const definition=(file,name)=>readFileSync(file,'utf8').match(new RegExp(`CREATE OR REPLACE FUNCTION public\\.${name}\\([\\s\\S]*?\\$\\$;`))[0];
 try {
  await db.exec(`
@@ -88,4 +89,35 @@ try {
  assert.deepEqual(setBased.rows,priorOptimized.rows,'all source amounts must reconcile');
  assert.deepEqual(await run('AMBAS','ALL'),setBasedRows,'repeated lines, invoice key priority, branch and null compatibility');
  console.log(JSON.stringify({fixtureLines:4808,baselineMs:old.ms,initialSetBasedMs:optimized.ms,priorFilteredMs:priorOptimized.ms,setBasedMs:setBased.ms}));
+ await db.exec(readFileSync(nextMigration,'utf8'));
+ await db.exec(`
+ CREATE TABLE public.parque_factura_os_cliente(factura_clave text primary key, cliente_id uuid not null references public.clientes(id) on delete cascade, marca text);
+ `);
+ const unindexedBefore = new Map();
+ for(const brand of brands)for(const rubro of rubros)unindexedBefore.set(brand+'/'+rubro,await run(brand,rubro));
+ const disjoint=`SELECT * FROM parque_resumen_facturacion_filtros('2026-08-01','2026-08-06','2025-08-01','2025-08-06','AMBAS','ALL') ORDER BY cliente_id`;
+ const beforeDisjoint=(await db.query(disjoint)).rows;
+ const priorWork=await bench('parque_facturacion_atribuida_rango');
+ await db.exec(readFileSync(indexedMigration,'utf8'));
+ const indexedWork=await bench('parque_facturacion_atribuida_indexada_rango');
+ assert.deepEqual(indexedWork.rows,priorWork.rows,'indexed ownership reconciles with the live join');
+ for(const brand of brands)for(const rubro of rubros)assert.deepEqual(await run(brand,rubro),unindexedBefore.get(brand+'/'+rubro));
+ assert.deepEqual((await db.query(disjoint)).rows,beforeDisjoint,'non-adjacent comparable ranges');
+ const owner=async()=> (await db.query("SELECT cliente_id::text FROM parque_factura_os_cliente WHERE factura_clave='INV1'")).rows[0]?.cliente_id;
+ assert.match(await owner(),/001$/);
+ await db.exec(`UPDATE parque_maquinas SET cliente_id='00000000-0000-0000-0000-000000000002' WHERE serie='CHA-001'`);
+ assert.match(await owner(),/002$/);
+ await db.exec(`DELETE FROM parque_maquinas WHERE serie='CHA-001'`);
+ assert.equal(await owner(),undefined);
+ await db.exec(`INSERT INTO parque_maquinas VALUES ('00000000-0000-0000-0000-000000000010','CHA-001','00000000-0000-0000-0000-000000000001','CLAAS',true)`);
+ assert.match(await owner(),/001$/);
+ assert.deepEqual((await db.query(disjoint)).rows,beforeDisjoint,'inserting the original owner restores reporting');
+ await db.exec(readFileSync(indexedMigration,'utf8'));
+ await db.exec(`SET test.uid='00000000-0000-0000-0000-000000000099'; SET test.allowed='false';`);
+ assert.deepEqual(await run('AMBAS','ALL'),[],'authorization unchanged');
+ await db.exec('SET ROLE authenticated');
+ await assert.rejects(db.query("SELECT public.parque_reconstruir_indice_factura_os()"),/permission denied/);
+ await assert.rejects(db.query("SELECT * FROM public.parque_facturacion_atribuida_indexada_rango('2025-01-01','2026-12-31')"),/permission denied/);
+ await db.exec('RESET ROLE');
+ console.log(JSON.stringify({priorIndexedPreparationMs:priorWork.ms,indexedMs:indexedWork.ms,validated:'40 combinations, disjoint ranges, current ownership, permissions and idempotence'}));
 }finally{await db.close();}

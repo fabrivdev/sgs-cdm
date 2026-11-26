@@ -1,5 +1,11 @@
 # Facturación filtrada de Clientes del parque
 
+## Índice de atribución y períodos del 26/11/2026
+
+Si sigue el `57014` después de aplicar `20261126200000_optimize_park_brand_billing.sql`, ejecutar en Supabase `20261126213000_use_park_billing_owner_index.sql`. La consulta filtrada usa la atribución de factura por OS ya indexada. Las altas, bajas y cambios de propietario, chasis o marca actualizan ese índice. El resumen lee solo los períodos solicitados y combina rangos que se superponen para no contabilizar dos veces un movimiento.
+
+La validación local compara las 40 combinaciones con la consulta anterior y verifica períodos separados, transferencia de máquina, permisos e idempotencia. La fecha de la última actividad, el flujo de facturas y los datos originales mantienen su tratamiento. La migración se aplica en Supabase, independientemente de la publicación del frontend.
+
 ## Optimización del 26/11/2026
 
 Aplicar manualmente `supabase/migrations/20261126200000_optimize_park_brand_billing.sql` para los filtros de marca (incluido C/Ambas) y rubro. La migración incorpora la corrección de septiembre y resuelve la coincidencia de factura por conjunto de claves distintas (número de factura, código interno, fecha y sucursal), en vez de repetirla por cada renglón. El respaldo histórico posterior al corte usa dos comprobaciones indexables para omitir documentos presentes en TOTVS.
