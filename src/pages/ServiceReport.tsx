@@ -32,10 +32,10 @@ function plotTitle(title: string) {
   return <SectionHeader title={title} />;
 }
 
-function Chart({ title, rows, current, previous, money = false, history = false, singleLabel }: {
+function Chart({ title, rows, current, previous, money = false, singleLabel }: {
   title: string;
   rows: Array<{ name: string; current: number; previous?: number; currentInternal?: number; previousInternal?: number }>;
-  current?: number; previous?: number; money?: boolean; history?: boolean; singleLabel?: string;
+  current?: number; previous?: number; money?: boolean; singleLabel?: string;
 }) {
   const hasInternal = rows.some(row => row.currentInternal || row.previousInternal);
   const format = money ? dollar : integer.format;
@@ -58,8 +58,8 @@ function Chart({ title, rows, current, previous, money = false, history = false,
             </div>} />
             {previous !== undefined && <Bar dataKey="previous" name={String(previous)} stackId="previous" fill={priorBar} maxBarSize={34} isAnimationActive={false} />}
             {previous !== undefined && hasInternal && <Bar dataKey="previousInternal" name={"Interno " + previous} stackId="previous" fill={priorInternal} maxBarSize={34} isAnimationActive={false} />}
-            <Bar dataKey="current" name={history ? "Facturado" : String(current ?? singleLabel)} stackId="current" fill={actualBar} maxBarSize={34} isAnimationActive={false} />
-            {hasInternal && <Bar dataKey="currentInternal" name={history ? "Interno sin facturar" : "Interno " + current} stackId="current" fill={actualInternal} maxBarSize={34} isAnimationActive={false} />}
+            <Bar dataKey="current" name={String(current ?? singleLabel)} stackId="current" fill={actualBar} maxBarSize={34} isAnimationActive={false} />
+            {hasInternal && <Bar dataKey="currentInternal" name={"Interno " + current} stackId="current" fill={actualInternal} maxBarSize={34} isAnimationActive={false} />}
           </BarChart>
         </ResponsiveContainer>
       </div>}
@@ -71,11 +71,11 @@ function ComparisonTable({ summary }: { summary: Summary }) {
   const types = TIME_TYPES.filter(type => type === "Cliente" || type === "Garantia" || type === "Interno" || current.billedType[type] || previous.billedType[type]);
   const rows = [
     ...types.map(type => ({ label: TIME_LABELS[type] + (type === "Garantia" ? " facturada" : ["Cliente", "Interno"].includes(type) ? " facturado" : ""), value: (p: Period) => dollar(p.billedType[type]) })),
-    { label: "% facturado a Cliente", value: (p: Period) => percent(p.invoiced ? p.billedType.Cliente / p.invoiced * 100 : null) },
     { label: "Total facturado", value: (p: Period) => dollar(p.invoiced), strong: true },
     { label: "Garantía valorizada en OS", value: (p: Period) => dollar(p.warranty) },
     { label: "Interno valorizado en OS", value: (p: Period) => dollar(p.internal) },
     { label: "Total con interno valorizado", value: (p: Period) => dollar(p.total), strong: true },
+    { label: "% facturado a Cliente", value: (p: Period) => percent(p.clientShare), strong: true },
   ];
   return <Panel>
     {plotTitle("MO + KM por tipo de tiempo")}
@@ -87,6 +87,52 @@ function ComparisonTable({ summary }: { summary: Summary }) {
         <td className="pr-1 text-right font-medium tabular-nums">{row.value(current)}</td>
       </tr>)}</tbody>
     </table>
+  </Panel>;
+}
+
+function AnnualEvolution({ summary, cutoff }: { summary: Summary; cutoff: string }) {
+  const { current, previous, history } = summary;
+  const totals = history.map(row => row.invoiced + row.internal);
+  const max = Math.max(1, ...history.map(row => Math.max(0, row.invoiced) + Math.max(0, row.internal)));
+  const min = Math.min(0, ...history.map(row => Math.min(0, row.invoiced) + Math.min(0, row.internal)));
+  const scale = 100 / (max - min);
+  const baseline = -min * scale;
+  return <Panel>
+    <SectionHeader title="Evolución anual" actions={<span className="text-xs text-muted-foreground">MO + KM · {cutoff}</span>} />
+    {history.length ? <ol className="mt-6 grid grid-cols-4 gap-2 text-center text-xs sm:gap-4">
+      {history.map((row, index) => {
+        const total = totals[index];
+        const baseBottom = baseline + Math.min(0, row.invoiced) * scale;
+        const internalBottom = baseline + (row.internal >= 0 ? Math.max(0, row.invoiced) : Math.min(0, row.invoiced) + row.internal) * scale;
+        const top = baseline + (Math.max(0, row.invoiced) + Math.max(0, row.internal)) * scale;
+        const isCurrent = Number(row.name) === current.year;
+        const prior = history[index - 1];
+        const variance = prior && Number(prior.name) + 1 === Number(row.name) && prior.comparableWithValuation === row.comparableWithValuation
+          ? change(total, totals[index - 1]) : null;
+        return <li key={row.name} className="min-w-0" aria-label={row.name + ": " + dollar(total) + (variance == null ? "" : ", " + deltaText(variance))}>
+          <div className="relative mx-auto h-36">
+            <div className="absolute inset-x-0 border-t border-border" style={{ bottom: baseline + "%" }} />
+            <div className="absolute inset-x-[20%] rounded-t-sm" style={{ bottom: baseBottom + "%", height: Math.abs(row.invoiced) * scale + "%", backgroundColor: isCurrent ? actualBar : priorBar }} />
+            <div className="absolute inset-x-[20%] rounded-t-sm" style={{ bottom: internalBottom + "%", height: Math.abs(row.internal) * scale + "%", backgroundColor: isCurrent ? actualInternal : priorInternal }} />
+            <span className={cn("absolute inset-x-0 mb-1 whitespace-nowrap text-[10px] font-semibold tabular-nums sm:text-xs", isCurrent && "text-foreground")}
+              style={{ bottom: top + "%" }}>{dollar(total)}</span>
+          </div>
+          <p className="mt-2 font-medium">{row.name}</p>
+          <p className={cn("mt-1 min-h-4 font-medium tabular-nums", variance != null && variance > 0 && "text-emerald-700 dark:text-emerald-400", variance != null && variance < 0 && "text-destructive")}>
+            {variance != null ? deltaText(variance) : ""}
+          </p>
+        </li>;
+      })}
+    </ol> : <p className="py-8 text-center text-sm text-muted-foreground">Sin datos para el período.</p>}
+    <div className="mt-3 flex flex-wrap items-center justify-between gap-x-3 gap-y-2 border-t pt-3">
+      <h3 className="text-xs font-semibold sm:text-sm">Técnicos con horas en OS</h3>
+      <dl className="flex gap-5 text-center sm:gap-8">
+        {[previous, current].map(period => <div key={period.year} className="min-w-12">
+          <dt className="text-xs text-muted-foreground">{period.year}</dt>
+          <dd className={cn("text-lg font-semibold leading-tight tabular-nums", period.year === current.year && "text-emerald-700 dark:text-emerald-400")}>{period.hasOrders ? period.technicians : "—"}</dd>
+        </div>)}
+      </dl>
+    </div>
   </Panel>;
 }
 
@@ -147,30 +193,33 @@ function Coverage({ coverage, loading, error, retry, canSeeParts }: {
 }
 
 const localNow = () => {
-  const parts = new Intl.DateTimeFormat("en", { timeZone: "America/Asuncion", year: "numeric", month: "2-digit" }).formatToParts();
-  return { year: Number(parts.find(part => part.type === "year")?.value), month: Number(parts.find(part => part.type === "month")?.value) };
+  const parts = new Intl.DateTimeFormat("en", { timeZone: "America/Asuncion", year: "numeric", month: "2-digit", day: "2-digit" }).formatToParts();
+  return { year: Number(parts.find(part => part.type === "year")?.value),
+    month: Number(parts.find(part => part.type === "month")?.value), day: Number(parts.find(part => part.type === "day")?.value) };
 };
 
 export default function ServiceReport() {
   const { user, hasSectionAccess } = useAuth();
   const now = localNow();
-  const lastYear = now.month === 1 ? now.year - 1 : now.year;
-  const lastMonth = now.month === 1 ? 12 : now.month - 1;
+  const lastYear = now.year;
+  const lastMonth = now.month;
   const [year, setYear] = useState(lastYear);
   const [month, setMonth] = useState(lastMonth);
   const canBill = hasSectionAccess("servicios.ventas");
   const canCover = hasSectionAccess("parque.maquinas");
   const canSeeParts = hasSectionAccess("repuestos.ventas");
   const [view, setView] = useState(canBill ? "servicios" : "posventa");
-  const dates = yearWindow(year, month);
+  const cutoffDay = year === now.year && month === now.month ? now.day : undefined;
+  const dates = yearWindow(year, month, cutoffDay);
+  const cutoff = "Ene–" + MONTHS[month - 1] + (cutoffDay && dates.to !== yearWindow(year, month).to ? " · al " + cutoffDay : "");
   const orders = useQuery({
-    queryKey: ["servicios-informe-os", user?.id, year, month],
+    queryKey: ["servicios-informe-os", user?.id, dates.to],
     queryFn: ({ signal }) => loadReportOrders(yearWindow(Math.max(MIN_YEAR, year - 2)).from, dates.to, signal),
     staleTime: 60_000,
   });
   const billing = useQuery({
-    queryKey: ["servicios-informe-ventas", user?.id, year, month],
-    queryFn: ({ signal }) => loadReportBilling(year, month, signal),
+    queryKey: ["servicios-informe-ventas", user?.id, dates.to],
+    queryFn: ({ signal }) => loadReportBilling(year, month, signal, cutoffDay),
     enabled: canBill && view === "servicios",
     staleTime: 60_000,
   });
@@ -185,7 +234,7 @@ export default function ServiceReport() {
     staleTime: 60_000,
   });
   const coverage = useQuery({
-    queryKey: ["servicios-informe-cobertura", user?.id, year, month, canSeeParts],
+    queryKey: ["servicios-informe-cobertura", user?.id, dates.to, canSeeParts],
     queryFn: async ({ signal }) => {
       const source = await loadUnifiedCoverage(dates.from, dates.to, signal);
       const project = (parts: ("services" | "parts")[]) => unifiedCoverageProjection(source, dates.from, dates.to, parts)?.percent ?? null;
@@ -195,11 +244,11 @@ export default function ServiceReport() {
     enabled: canCover && view === "posventa",
     staleTime: 60_000,
   });
-  const summary = useMemo(() => summarizeReport(orders.data ?? [], canBill ? billing.data : undefined, year, month),
-    [orders.data, canBill, billing.data, year, month]);
+  const summary = useMemo(() => summarizeReport(orders.data ?? [], canBill ? billing.data : undefined, year, month, cutoffDay),
+    [orders.data, canBill, billing.data, year, month, cutoffDay]);
   const { current, previous } = summary;
   const monthOptions = MONTHS.slice(0, year === lastYear ? lastMonth : 12)
-    .map((label, i) => ({ label, value: String(i + 1) }));
+    .map((label, i) => ({ label: year === now.year && i + 1 === now.month ? label + " · al " + now.day : label, value: String(i + 1) }));
   const years = Array.from({ length: Math.max(1, lastYear - MIN_YEAR + 1) }, (_, i) => lastYear - i);
   const progressRows = (key: "machines" | "customers") => current.monthly.map((m, i) => ({ name: m.name, current: m[key], previous: previous.monthly[i][key] }));
   const totalChange = change(current.total, previous.total);
@@ -212,7 +261,7 @@ export default function ServiceReport() {
         {canBill && <TabsTrigger value="servicios">Servicios</TabsTrigger>}
         <TabsTrigger value="posventa">Atención de posventa</TabsTrigger>
       </TabsList>} />
-      <FiltersBar mobileContext={year + " · Ene–" + MONTHS[month - 1]}>
+      <FiltersBar mobileContext={year + " · " + cutoff}>
         <FilterSelect label="Año" placeholder="Año" value={String(year)} options={years.map(y => ({ label: String(y), value: String(y) }))}
           onChange={value => { const selected = Number(value); setYear(selected); if (selected === lastYear) setMonth(m => Math.min(m, lastMonth)); }} />
         <FilterSelect label="Acumulado hasta" placeholder="Mes" value={String(month)} options={monthOptions} onChange={value => setMonth(Number(value))} />
@@ -233,14 +282,9 @@ export default function ServiceReport() {
             }))} />
             <ComparisonTable summary={summary} />
           </div>
-          <HoursTable summary={summary} />
-          <div className={panelGrid}>
-            <Chart title="Evolución anual" money history rows={summary.history.map(row => ({ name: row.name, current: row.invoiced, currentInternal: row.internal }))} />
-            <Panel><SectionHeader title="Técnicos con horas en OS" /><dl className="mt-4 grid grid-cols-2 gap-3 text-center">
-              {[previous, current].map(period => <div key={period.year} className="rounded-lg bg-muted/60 p-3">
-                <dt className="text-xs text-muted-foreground">{period.year}</dt><dd className="mt-1 text-xl font-semibold">{period.technicians}</dd>
-              </div>)}
-            </dl></Panel>
+          <div className="grid min-w-0 gap-3 2xl:grid-cols-[minmax(0,3fr)_minmax(0,2fr)]">
+            <HoursTable summary={summary} />
+            <AnnualEvolution summary={summary} cutoff={cutoff} />
           </div>
         </>}
       </TabsContent>}

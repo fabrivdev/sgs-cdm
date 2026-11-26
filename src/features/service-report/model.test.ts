@@ -21,6 +21,7 @@ describe("Informe de Servicios", () => {
     ], billing, 2026, 8);
     expect(current).toMatchObject({ invoiced: 190, internal: 225, warranty: 225, total: 415, totalHours: 9 });
     expect(current.billedType).toMatchObject({ Cliente: 165, Interno: 25, "Sin tipo": 0 });
+    expect(current.clientShare).toBeCloseTo(165 / 415 * 100);
   });
 
   it("suma las horas de una OS mixta una vez y usa el año previo completo para determinar clientes nuevos", () => {
@@ -39,5 +40,22 @@ describe("Informe de Servicios", () => {
 
   it("cierra el acumulado en el último día del mes seleccionado", () => {
     expect(yearWindow(2028, 2)).toEqual({ from: "2028-01-01", to: "2028-02-29" });
+  });
+
+  it("compara el mismo día de noviembre y no cuenta órdenes posteriores en ninguno de los años", () => {
+    const { current, previous } = summarizeReport([
+      order("1", "2025-11-26", "Alfa"),
+      order("2", "2025-11-27", "Beta"),
+      order("3", "2026-11-25", "Alfa", { responsable: "Ana Maria Vera" }),
+      order("4", "2026-11-26", "Gamma", { raw_data: {
+        tecnicos_responsables: ["Ana Vera", "José López"], tecnicos_auxiliares: ["Pedro Ruiz"],
+      } }),
+      order("5", "2026-11-27", "Delta", { responsable: "Clara Vega" }),
+    ], { months: [bill("2025-11-01", 10), bill("2026-11-01", 25)], byType: {} }, 2026, 11, 26);
+    expect(yearWindow(2025, 11, 26).to).toBe("2025-11-26");
+    expect(yearWindow(2027, 2, 29).to).toBe("2027-02-28");
+    expect(previous).toMatchObject({ customers: 1, invoiced: 10, technicians: 1 });
+    expect(current).toMatchObject({ customers: 2, invoiced: 25, newCustomers: 1, technicians: 2 });
+    expect(current.monthly.at(-1)).toMatchObject({ name: "Nov", hours: { Cliente: 6 } });
   });
 });

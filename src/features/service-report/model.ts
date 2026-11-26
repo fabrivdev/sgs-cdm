@@ -20,9 +20,10 @@ export type ReportBilling = { months: BillingMonth[]; byType: Record<number, Ind
 export type ReportWindow = { from: string; to: string };
 export const MIN_YEAR = 2025;
 
-export function yearWindow(year: number, month = 12): ReportWindow {
+export function yearWindow(year: number, month = 12, cutoffDay?: number): ReportWindow {
   const lastDay = new Date(Date.UTC(year, month, 0)).getUTCDate();
-  return { from: String(year) + "-01-01", to: [year, String(month).padStart(2, "0"), lastDay].join("-") };
+  const day = Math.min(cutoffDay ?? lastDay, lastDay);
+  return { from: String(year) + "-01-01", to: [year, String(month).padStart(2, "0"), String(day).padStart(2, "0")].join("-") };
 }
 
 export async function loadReportOrders(from: string, to: string, signal: AbortSignal) {
@@ -45,13 +46,23 @@ function nextDay(iso: string) {
   return date.toISOString().slice(0, 10);
 }
 
-export async function loadReportBilling(year: number, month: number, signal: AbortSignal): Promise<ReportBilling> {
-  const { to } = yearWindow(year, month);
-  const monthly = supabase.rpc("ventas_servicios_panorama_v2", {
-    p_desde: yearWindow(year - 3).from, p_hasta: to, p_agrupacion: "mes",
-  }).abortSignal(signal);
+export async function loadReportBilling(year: number, month: number, signal: AbortSignal, cutoffDay?: number): Promise<ReportBilling> {
+  const { to } = yearWindow(year, month, cutoffDay);
+  const monthly = async (from: string, end: string) => {
+    const { data, error } = await supabase.rpc("ventas_servicios_panorama_v2", {
+      p_desde: from, p_hasta: end, p_agrupacion: "mes",
+    }).abortSignal(signal);
+    if (error) throw error;
+    const payload = data as { periodos?: BillingMonth[] } | null;
+    if (!Array.isArray(payload?.periodos)) throw new Error("Serie de facturación incompleta.");
+    return payload.periodos;
+  };
+  const comparable = Array.from({ length: 3 }, (_, index) => year - 3 + index)
+    .map(target => yearWindow(target, month, cutoffDay).to)
+    .filter((end, index) => end !== yearWindow(year - 3 + index, month).to);
+  const partialMonths = Promise.all(comparable.map(end => monthly(end.slice(0, 7) + "-01", end)));
   const types = [year - 1, year].map(async target => {
-    const { from, to: end } = yearWindow(target, month);
+    const { from, to: end } = yearWindow(target, month, cutoffDay);
     if (end < NEW_SYSTEM_START) return [target, []] as const;
     const { data, error } = await supabase.rpc("ventas_servicios_indicadores_v1", {
       p_desde: from > NEW_SYSTEM_START ? from : NEW_SYSTEM_START, p_hasta: end,
@@ -61,11 +72,10 @@ export async function loadReportBilling(year: number, month: number, signal: Abo
     if (!Array.isArray(payload?.por_tipo)) throw new Error("Desglose de facturación incompleto.");
     return [target, payload.por_tipo] as const;
   });
-  const [result, byType] = await Promise.all([monthly, Promise.all(types)]);
-  if (result.error) throw result.error;
-  const payload = result.data as { periodos?: BillingMonth[] } | null;
-  if (!Array.isArray(payload?.periodos)) throw new Error("Serie de facturación incompleta.");
-  return { months: payload.periodos, byType: Object.fromEntries(byType) };
+  const [series, partial, byType] = await Promise.all([monthly(yearWindow(year - 3).from, to), partialMonths, Promise.all(types)]);
+  const replacedMonths = new Set(comparable.map(end => end.slice(0, 7)));
+  return { months: [...series.filter(row => !replacedMonths.has(row.periodo.slice(0, 7))), ...partial.flat()],
+    byType: Object.fromEntries(byType) };
 }
 
 const amount = (value: unknown) => Number.isFinite(Number(value)) ? Number(value) : 0;
@@ -110,7 +120,13 @@ function buckets(order: ReportOrder, legacy: boolean, owner: string) {
   return [{ type, hours: amount(order.servicios_cantidad), value: amount(order.servicios_valor) + amount(order.kilometro_valor) }];
 }
 
-export function summarizeReport(orders: ReportOrder[], billing: ReportBilling | undefined, year: number, lastMonth: number) {
+function principalNames(order: ReportOrder) {
+  const imported = record(order.raw_data).tecnicos_responsables;
+  const names = Array.isArray(imported) && imported.some(value => text(value)) ? imported.map(text) : [order.responsable];
+  return names.map(normalizeTechnicianName).filter(Boolean);
+}
+
+export function summarizeReport(orders: ReportOrder[], billing: ReportBilling | undefined, year: number, lastMonth: number, cutoffDay?: number) {
   const monthlySales = new Map(billing?.months.map(row => [row.periodo.slice(0, 7), amount(row.mo) + amount(row.km)]));
   const closed = orders.filter(order => canonicalSituacion(order.situacion_os) === "Cerrada" && order.fecha_abierta_os)
     .map(order => {
@@ -118,9 +134,18 @@ export function summarizeReport(orders: ReportOrder[], billing: ReportBilling | 
       const owner = customerName(order);
       return { order, day, customer: customerKey(owner), machine: serial(order.nro_chasis), items: buckets(order, day < NEW_SYSTEM_START, owner) };
     }).sort((a, b) => a.day.localeCompare(b.day));
+  const principals = new Set(closed.flatMap(row => principalNames(row.order)));
+  const aliases = new Map([...principals].map(name => {
+    const parts = name.split(" ");
+    if (parts.length < 2) return [name, name];
+    const full = [...principals].filter(candidate => candidate.split(" ").length > parts.length
+      && parts.every(part => candidate.split(" ").includes(part)));
+    return [name, full.length === 1 ? full[0] : name];
+  }));
   const periods = [year - 1, year].map(target => {
     const prefix = String(target) + "-";
-    const all = closed.filter(row => row.day.startsWith(prefix));
+    const { to } = yearWindow(target, lastMonth, cutoffDay);
+    const all = closed.filter(row => row.day.startsWith(prefix) && row.day <= to);
     const previousCustomers = new Set(closed.filter(row => row.day.startsWith(String(target - 1) + "-")).map(row => row.customer).filter(Boolean));
     const machines = new Set<string>();
     const customers = new Set<string>();
@@ -138,8 +163,9 @@ export function summarizeReport(orders: ReportOrder[], billing: ReportBilling | 
           if (!customers.has(row.customer) && previousCustomers.size && !previousCustomers.has(row.customer)) newCustomers++;
           customers.add(row.customer);
         }
-        const technician = normalizeTechnicianName(row.order.responsable);
-        if (technician && row.items.some(item => item.hours > 0)) technicians.add(technician);
+        if (row.items.some(item => item.hours > 0)) {
+          for (const name of principalNames(row.order)) technicians.add(aliases.get(name) ?? name);
+        }
         for (const item of row.items) {
           split[item.type] += item.hours;
           hours[item.type] += item.hours;
@@ -157,18 +183,21 @@ export function summarizeReport(orders: ReportOrder[], billing: ReportBilling | 
     for (const item of billing?.byType[target] ?? []) billedType[timeType(item.tipo_tiempo)] += amount(item.mo) + amount(item.km);
     // Reconcile the type breakdown to the signed monthly sales source.
     billedType["Sin tipo"] += Number((invoiced - sum(Object.values(billedType))).toFixed(2));
-    return { year: target, monthly, invoiced, internal, warranty, total: invoiced + internal, billedType, hours,
+    const total = invoiced + internal;
+    return { year: target, monthly, invoiced, internal, warranty, total, billedType, hours,
+      clientShare: total > 0 ? billedType.Cliente / total * 100 : null,
       totalHours: sum(Object.values(hours)), machines: machines.size, customers: customers.size,
       newCustomers: previousCustomers.size ? sum(monthly.map(row => row.newCustomers)) : null,
-      technicians: technicians.size, hasOrders: all.some(row => row.day <= yearWindow(target, lastMonth).to) };
+      technicians: technicians.size, hasOrders: all.length > 0 };
   });
   const current = periods[1];
   const previous = periods[0];
   const history = Array.from({ length: 4 }, (_, index) => year - 3 + index).flatMap(target => {
     const rows = billing?.months.filter(row => row.periodo.startsWith(String(target) + "-") && Number(row.periodo.slice(5, 7)) <= lastMonth) ?? [];
     if (!rows.length) return [];
+    const period = periods.find(item => item.year === target);
     return [{ name: String(target), invoiced: sum(rows.map(row => amount(row.mo) + amount(row.km))),
-      internal: periods.find(period => period.year === target)?.internal ?? 0 }];
+      internal: period?.internal ?? 0, comparableWithValuation: period?.hasOrders === true || yearWindow(target).from >= NEW_SYSTEM_START }];
   });
   return { current, previous, history };
 }

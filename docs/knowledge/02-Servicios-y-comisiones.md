@@ -6,6 +6,8 @@
 
 Los acumulados comparan los mismos meses. La facturación usa las RPC de Ventas y el trabajo interno anterior a julio de 2026 se suma al total como valorización de OS cerradas. La garantía valorizada figura aparte. Las horas de OS se agrupan por apertura y se desglosan con los totales importados por tipo cuando existen. Máquinas y clientes se cuentan una vez por acumulado. Clientes nuevos son los atendidos sin OS cerrada en el año anterior disponible. La cobertura mantiene el denominador de clientes con máquinas activas y aplica la unión de servicio y repuestos cuando ambos rubros están autorizados.
 
+El filtro abre el mes en curso con el día local de corte. Si el mes es parcial, Ventas y OS de los años anteriores se recortan al mismo día. La participación de Cliente se presenta al final y divide su facturación por el facturado más el interno valorizado. Evolución anual comparte panel con los responsables principales únicos de OS con horas, con abreviaturas unificadas solamente cuando hay una coincidencia completa e inequívoca. La variación del gráfico se omite cuando las barras tienen distinta cobertura de valorización.
+
 AGR (Agregar repuestos) y AGS (Agregar servicios) se reconocen como Agrega al costo en importación, OS y Ventas. En Comisiones se transforman a Garantia antes de construir las claves estables de jornada y agrupar bloques, para conservar la identidad y el tratamiento previo. No se modifica la valorización de máquinas.
 
 La columna tipo_tiempo de facturacion histórica es opcional. El SQL comprueba su existencia antes de ampliar su restricción. Validado en PostgreSQL aislado con y sin esa columna, incluida una segunda ejecución.
