@@ -10,7 +10,7 @@ export default function RepuestosCompras() {
     <div className={pageShell}>
       <Tabs defaultValue="resumen">
         <PageHeader title="Compras" tabs={<TabsList aria-label="Vistas de compras">
-          <TabsTrigger value="resumen">Resumen</TabsTrigger>
+          <TabsTrigger value="resumen">Saldos TOTVS</TabsTrigger>
           <TabsTrigger value="pedidos">Pedidos</TabsTrigger>
           <TabsTrigger value="solicitudes">Solicitudes</TabsTrigger>
         </TabsList>} />

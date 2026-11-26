@@ -2941,7 +2941,7 @@
       "id": "repuestos.compras",
       "title": "Compras de repuestos",
       "module": "repuestos",
-      "description": "El Resumen de Compras mide avance de solicitudes por mes y recepción de pedidos cargados por proveedor, con detalle de necesidades pendientes. Los estados parten de cantidades informadas por TOTVS y separan saldos desconocidos. El vínculo probable no atribuye recepciones a solicitudes. Solicitudes y pedidos mantienen su detalle, seguimiento, vínculos y exportaciones.",
+      "description": "Saldos TOTVS muestra ítems de solicitud por sucursal con saldo positivo, cero o sin verificar y ofrece detalle de cantidades y observación por ítem. La vista no atribuye compras, vigencia ni recepciones a partir de un saldo. Los vínculos estimados siguen marcados como probables. Solicitudes y pedidos mantienen sus vistas de detalle y exportaciones.",
       "sources": [
         "src/pages/RepuestosCompras.tsx",
         "src/components/repuestos/ComprasResumenTab.tsx",

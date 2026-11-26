@@ -9,7 +9,6 @@ import { Fragment, useMemo, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
 import { useComprasPedidosLineas, useComprasSolicitudesLineas, useComprasVinculos, type SolicitudLinea } from "@/hooks/useCompras";
-import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import {
@@ -30,6 +29,7 @@ import { cn } from "@/lib/utils";
 import { FiltersBar, FilterSelect } from "@/components/filters/FiltersBar";
 import { FilterMultiSelect } from "@/components/filters/FilterMultiSelect";
 import { TableExportButton, type TableExportOption } from "@/components/exports/TableExportButton";
+import { purchaseProgress, purchaseProgressLabels } from "./purchaseProgress";
 
 interface Filtros {
   busqueda: string;
@@ -42,6 +42,8 @@ type SolicitudSortKey = "sucursal" | "nroSolicitud" | "fechaEmision" | "solicita
 const FILTROS_VACIOS: Filtros = { busqueda: "", sucursales: [], solicitante: "" };
 
 const rowKey = (row: { sucursal: string; nroSolicitud: string }) => `${row.sucursal}-${row.nroSolicitud}`;
+const balanceLabel = (row: SolicitudLinea) =>
+  purchaseProgressLabels[purchaseProgress(row.cantidad, row.cantidadEnPedido, row.cantidadPendiente)];
 
 function lineaCoincideBusqueda(linea: SolicitudLinea, busqueda: string) {
   return (
@@ -157,7 +159,7 @@ export function SolicitudesCompraTab() {
     {key:"descripcion",label:"Descripción",kind:"text",value:r=>r.descripcion},
     {key:"cantidad",label:"Cant.",kind:"number",align:"center",value:r=>r.cantidad},
     {key:"precio",label:"P. unit.",kind:"number",align:"right",value:r=>r.precioUnitario},
-    {key:"estado",label:"Estado",kind:"text",value:r=>resolution(r)?.estado==="reposicion_stock"?"Reposición de stock":"Cotizada"},
+    {key:"estado",label:"Saldo TOTVS",kind:"text",value:balanceLabel},
     {key:"pedido",label:"Pedido",kind:"text",value:r=>{const p=resolution(r)?.pedidoVinculado;return p?`${p.sucursal}-${p.nroPedido}`:null;}},
   ];
   const orderItems = (rows:SolicitudLinea[]) => sortSalesRows(rows.filter(r=>!filtros.busqueda.trim()||[r.nroSolicitud,r.solicitante].some(value=>value?.toLowerCase().includes(filtros.busqueda.trim().toLowerCase()))||lineaCoincideBusqueda(r,filtros.busqueda.trim().toLowerCase())),itemColumns,itemSort);
@@ -165,17 +167,18 @@ export function SolicitudesCompraTab() {
 
   const renderPedidoLink = (linea:SolicitudLinea) => {
     const resolucion=resolution(linea);
-    if (!resolucion || resolucion.estado==="reposicion_stock") return <>—</>;
+    if (!resolucion) return <>—</>;
     if (resolucion.pedidoVinculado) return <span className={cn("font-mono",!resolucion.esManual && "text-muted-foreground")}
       title={`${resolucion.pedidoVinculado.sucursal}-${resolucion.pedidoVinculado.nroPedido} · ${resolucion.esManual?"Vinculado a mano":"Sugerido por producto, sucursal y precio parecido"}`}>
       {resolucion.pedidoVinculado.sucursal}-{resolucion.pedidoVinculado.nroPedido}{!resolucion.esManual && " (probable)"}
     </span>;
+    if (resolucion.estado==="reposicion_stock") return <>—</>;
     if (resolucion.candidatos.length>1 && canManageParts) return <Button type="button" variant="outline" size="sm"
       className="h-7 max-w-full gap-1 overflow-hidden px-1 text-[12px]" title={`Vincular: ${resolucion.candidatos.length} pedidos candidatos`}
       onClick={()=>setVinculando({sucursal:linea.sucursal,nroSolicitud:linea.nroSolicitud,item:linea.item,candidatos:resolucion.candidatos})}>
       <Link2 className="h-3 w-3" />Vincular ({resolucion.candidatos.length})
     </Button>;
-    return <span className="text-muted-foreground" title="Sin pedido">Sin pedido</span>;
+    return <span className="text-muted-foreground" title="Pedido sin vincular">Sin vincular</span>;
   };
 
   const exportOptions: TableExportOption[] = [
@@ -216,7 +219,7 @@ export function SolicitudesCompraTab() {
           Transporte: linea.medioTransporte ?? "",
           "Precio unitario": linea.precioUnitario,
           Total: linea.valorTotal,
-          Estado: resolucion?.estado === "reposicion_stock" ? "Reposición de stock" : "Cotizada",
+          "Saldo TOTVS": balanceLabel(linea),
           Pedido: resolucion?.pedidoVinculado
             ? `${resolucion.pedidoVinculado.sucursal}-${resolucion.pedidoVinculado.nroPedido}`
             : "",
@@ -372,13 +375,13 @@ export function SolicitudesCompraTab() {
                             </TableHeader>
                             <TableBody>
                               {orderItems(lineasVisibles).map((linea) => {
-                                const resolucion = resolucionPorLinea.get(`${linea.sucursal}|${linea.nroSolicitud}|${linea.item}`);
+                                const balance = balanceLabel(linea);
 
                                 return (
                                   <TableRow key={linea.item}>
                                     <TableCell className={cn(purchaseCell,"hidden sm:table-cell")} title={linea.item}>{linea.item}</TableCell>
                                     <TableCell className={cn(purchaseCell,"font-mono")} title={linea.productoCodigo}>
-                                      <PurchaseInfo label={linea.productoCodigo} mobileSummary={<MobileRecord primary={linea.descripcion || "Sin descripción"} secondary={linea.productoCodigo} context={resolucion?.estado === "reposicion_stock" ? "Reposición" : "Cotizada"} />} fields={[["Ítem",linea.item],["Descripción",linea.descripcion??"—"],["Cantidad",purchaseQuantity.format(linea.cantidad)],["Unidad",linea.unidad??"—"],["P. unit.",linea.precioUnitario>0?purchaseMoney(linea.precioUnitario,linea.moneda):"—"],["Estado",resolucion?.estado==="reposicion_stock"?"Reposición de stock":"Cotizada"],["Moneda",linea.moneda??"No informada"]]}>
+                                      <PurchaseInfo label={linea.productoCodigo} mobileSummary={<MobileRecord primary={linea.descripcion || "Sin descripción"} secondary={linea.productoCodigo} context={balance} />} fields={[["Ítem",linea.item],["Descripción",linea.descripcion??"—"],["Cantidad",purchaseQuantity.format(linea.cantidad)],["En pedido",linea.cantidadEnPedido == null ? "—" : purchaseQuantity.format(linea.cantidadEnPedido)],["Saldo",linea.cantidadPendiente == null ? "—" : purchaseQuantity.format(linea.cantidadPendiente)],["Unidad",linea.unidad??"—"],["P. unit.",linea.precioUnitario>0?purchaseMoney(linea.precioUnitario,linea.moneda):"—"],["Saldo TOTVS",balance],["Moneda",linea.moneda??"No informada"]]}>
                                         {renderPedidoLink(linea)}
                                       </PurchaseInfo>
                                     </TableCell>
@@ -391,17 +394,7 @@ export function SolicitudesCompraTab() {
                                         ? purchaseMoney(linea.precioUnitario,linea.moneda)
                                         : "—"}
                                     </TableCell>
-                                    <TableCell className={cn(purchaseCell,"hidden sm:table-cell")} title={resolucion?.estado === "reposicion_stock" ? "Reposición de stock" : "Cotizada"}>
-                                      {resolucion?.estado === "reposicion_stock" ? (
-                                        <Badge variant="outline" className="max-w-full overflow-hidden whitespace-nowrap bg-muted text-muted-foreground">
-                                          <span className="truncate">Reposición</span>
-                                        </Badge>
-                                      ) : (
-                                        <Badge variant="outline" className="max-w-full overflow-hidden whitespace-nowrap border-primary/30 bg-primary/5 text-primary">
-                                          Cotizada
-                                        </Badge>
-                                      )}
-                                    </TableCell>
+                                    <TableCell className={cn(purchaseCell,"hidden sm:table-cell")} title={balance}>{balance}</TableCell>
                                     <TableCell className={cn(purchaseCell,"hidden sm:table-cell")}>{renderPedidoLink(linea)}</TableCell>
                                   </TableRow>
                                 );

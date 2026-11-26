@@ -12,5 +12,6 @@ describe("Compras", () => {
     expect(screen.getByRole("heading", { name: "Compras" }).closest("header"))
       .toContainElement(screen.getByRole("tablist", { name: "Vistas de compras" }));
     expect(screen.getByText("Resumen de compras")).toBeVisible();
+    expect(screen.getByRole("tab", { name: "Saldos TOTVS" })).toHaveAttribute("aria-selected", "true");
   });
 });

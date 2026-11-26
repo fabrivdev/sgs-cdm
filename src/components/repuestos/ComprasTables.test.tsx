@@ -77,11 +77,11 @@ describe("purchase table presentation",()=>{
     const exported=await exportItems("Exportar Ítems de pedidos");
     expect(exported).toHaveLength(1); expect(exported[0]).toMatchObject({"N° pedido":"000010",Ítem:"0001",Producto:"REPIN000001",Unidad:"UN",Cantidad:1.25,"Precio unitario":8.44,Total:10.55,Pendiente:0.25,Solicitudes:"Santa Rita-000003"});
   });
-  it("retains request classification, probable/manual linkage and zero-price absence",()=>{
+  it("keeps the probable link separate from reported balances and zero price",()=>{
     mocks.requests.mockReturnValue(query([request,{...request,item:"0002",precioUnitario:0,productoCodigo:"REPIN000002"}])); setup("requests");
     fireEvent.click(screen.getByRole("button",{name:"Ítems de la solicitud 000003 (Santa Rita)"}));
     const rows=itemRows("Ítems de la solicitud 000003"); expect(rows[0][3].textContent).toBe("1,25"); expect(rows[0][4].textContent).toBe("$ 8,44");
-    expect(rows[0][6]).toHaveTextContent("Santa Rita-000010 (probable)"); expect(rows[1][4].textContent).toBe("—"); expect(rows[1][5].textContent).toBe("Reposición"); expect(rows[1][6].textContent).toBe("—");
+    expect(rows[0][6]).toHaveTextContent("Santa Rita-000010 (probable)"); expect(rows[1][4].textContent).toBe("—"); expect(rows[1][5].textContent).toBe("Sin verificar"); expect(rows[1][6].textContent).toBe("—");
     expect(rows[0][3]).toHaveClass("text-center"); expect(rows[0][4]).toHaveClass("text-right");
   });
   it("keeps request export complete, manufacturer zeros, currency and values",async()=>{

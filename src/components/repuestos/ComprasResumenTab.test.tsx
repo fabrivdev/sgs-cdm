@@ -11,30 +11,29 @@ vi.mock("@/hooks/useCompras", () => {
       { ...request, nroSolicitud: "11", productoCodigo: "REP02", cantidadEnPedido: 4, cantidadPendiente: 6, medioTransporte: "Aéreo" },
       { ...request, nroSolicitud: "12", productoCodigo: "REP03" },
     ] }),
-    useComprasPedidosLineas: () => ({ data: [
-      { fecha: "2026-08-04", sucursal: "Santa Rita", nroPedido: "100", productoCodigo: "REP02",
-        proveedorNombre: "Proveedor", cantidad: 4, cantidadEntregada: 4, cantidadPendiente: 0 },
-    ] }),
+    useComprasPedidosLineas: () => { throw new Error("La vista de saldos no necesita consultar pedidos."); },
   };
 });
 
-describe("Resumen de compras", () => {
+describe("Saldos TOTVS", () => {
   beforeEach(() => vi.stubGlobal("ResizeObserver", class {
     observe() {}
     unobserve() {}
     disconnect() {}
   }));
   afterEach(() => vi.unstubAllGlobals());
-  it("mide la conversión con cobertura explícita y conserva recepción como etapa separada", () => {
+  it("separa los saldos conocidos de las líneas sin verificar y muestra el origen de las cantidades", () => {
     render(<ComprasResumenTab />);
-    const card = screen.getByText("Ítems pasados a pedido").closest(".kpi-item");
-    expect(card).toHaveTextContent(/50\s*%/);
-    expect(card).toHaveTextContent("1 ítems sin datos");
-    expect(screen.getByText("Ítems recibidos").closest(".kpi-item")).toHaveTextContent("De 1 ítems de pedidos cargados");
-    const backlog = within(screen.getByRole("table", { name: "Necesidades pendientes" }));
+    const summary = within(screen.getByRole("table", { name: "Ítems de solicitud por sucursal" }));
+    const row = summary.getByRole("row", { name: "Santa Rita 1 1 1" });
+    expect(within(row).getAllByRole("cell").map(cell => cell.textContent)).toEqual(["Santa Rita", "1", "1", "1"]);
+    expect(screen.queryByText("Recepción por proveedor")).not.toBeInTheDocument();
+    const backlog = within(screen.getByRole("table", { name: "Detalle por ítem" }));
     expect(backlog.getByRole("button", { name: "Detalle REP02" })).toBeVisible();
     expect(backlog.queryByText("REP03")).not.toBeInTheDocument();
     fireEvent.click(backlog.getByRole("button", { name: "Detalle REP02" }));
-    expect(screen.getByText("Aéreo")).toBeVisible();
+    const drawer = within(screen.getByRole("dialog", { name: "Detalle de solicitud" }));
+    expect(drawer.getByText("Aéreo")).toBeVisible();
+    expect(drawer.getByText("Saldo informado").parentElement).toHaveTextContent("Saldo informado6");
   });
 });
