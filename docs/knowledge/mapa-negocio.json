@@ -3,7 +3,7 @@
     {
       "id": "mercado",
       "title": "Mercado",
-      "description": "Importaciones de maquinaria agrícola de Paraguay por familia.",
+      "description": "Importaciones de maquinaria agrícola de Paraguay por familia y Market Share. Administración sincroniza el permiso de Mercado con las secciones activas asignadas. La lectura requiere el módulo y la sección correspondiente.",
       "notes": ["49-Mercado-tractores", "50-Mercado-cosechadoras", "51-Mercado-sembradoras", "52-Mercado-pulverizadores", "53-Mercado-market-share"],
       "related": ["datos", "administracion"]
     },

@@ -1,5 +1,9 @@
 # Accesos y asistente
 
+## Acceso a Mercado por sección
+
+La navegación, las rutas y la lectura de Mercado requieren el permiso del módulo y de cada sección. La migración `20261126150000_sync_market_module_access.sql` incorpora Mercado a la sincronización de `admin_actualizar_acceso_seccion`. Recupera el permiso general solo para cuentas con al menos una sección de Mercado activa y asignada. Al quitar la última sección activa, la RPC retira el permiso general. Los permisos de importación conservan sus reglas. Aplicar la migración en la base y verificar una cuenta con el perfil y las secciones asignadas.
+
 ## Autorización
 
 Administración del 18/09: Equipo y Accesos tienen encabezados ordenables y exportación filtrada/ordenada con `datos:exportar`; perfiles/roles/accesos se cargan por páginas estables. Bloquear descarga durante carga/fallo. No cambia creación de operativos, roles, cuentas ni concesión de permisos. Fuente: `src/pages/Admin.tsx`, `docs/tablas-orden-exportacion.md`; pruebas simuladas, no altas productivas.
