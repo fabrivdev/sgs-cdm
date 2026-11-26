@@ -354,8 +354,8 @@ export interface CanonicalPedidoCompraRow {
   quantity: number;
   unitPrice: number;
   total: number;
-  deliveredQuantity: number;
-  pendingQuantity: number;
+  deliveredQuantity: number | null;
+  pendingQuantity: number | null;
   deliveryType: string | null;
   raw: Record<string, unknown>;
 }
@@ -376,6 +376,9 @@ export interface CanonicalSolicitudCompraRow {
   quantity: number;
   unitPrice: number;
   total: number;
+  orderedQuantity?: number | null;
+  pendingQuantity?: number | null;
+  transportMode?: string | null;
   observation: string | null;
   raw: Record<string, unknown>;
 }

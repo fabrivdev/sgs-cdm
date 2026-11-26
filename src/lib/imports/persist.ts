@@ -373,8 +373,8 @@ export interface CompraPedidoInsert {
   cantidad: number;
   precio_unitario: number;
   valor_total: number;
-  cantidad_entregada: number;
-  cantidad_pendiente: number;
+  cantidad_entregada: number | null;
+  cantidad_pendiente: number | null;
   tipo_entrega: string | null;
 }
 
@@ -421,6 +421,9 @@ export interface CompraSolicitudInsert {
   precio_unitario: number;
   valor_total: number;
   observacion: string | null;
+  cantidad_en_pedido?: number | null;
+  cantidad_pendiente?: number | null;
+  medio_transporte?: string | null;
 }
 
 export function mapCanonicalSolicitudCompraToRow(row: CanonicalSolicitudCompraRow): CompraSolicitudInsert | null {
@@ -444,6 +447,9 @@ export function mapCanonicalSolicitudCompraToRow(row: CanonicalSolicitudCompraRo
     precio_unitario: row.unitPrice,
     valor_total: row.total,
     observacion: row.observation,
+    ...(row.orderedQuantity !== undefined && { cantidad_en_pedido: row.orderedQuantity }),
+    ...(row.pendingQuantity !== undefined && { cantidad_pendiente: row.pendingQuantity }),
+    ...(row.transportMode !== undefined && { medio_transporte: row.transportMode }),
   };
 }
 

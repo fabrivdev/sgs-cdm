@@ -1,4 +1,5 @@
 import { ComprasPedidosTab } from "@/components/repuestos/ComprasPedidosTab";
+import { ComprasResumenTab } from "@/components/repuestos/ComprasResumenTab";
 import { SolicitudesCompraTab } from "@/components/repuestos/SolicitudesCompraTab";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { pageShell } from "@/lib/ui-classes";
@@ -7,12 +8,14 @@ import { PageHeader } from "@/components/layout/AppPrimitives";
 export default function RepuestosCompras() {
   return (
     <div className={pageShell}>
-      <Tabs defaultValue="pedidos">
+      <Tabs defaultValue="resumen">
         <PageHeader title="Compras" tabs={<TabsList aria-label="Vistas de compras">
+          <TabsTrigger value="resumen">Resumen</TabsTrigger>
           <TabsTrigger value="pedidos">Pedidos</TabsTrigger>
           <TabsTrigger value="solicitudes">Solicitudes</TabsTrigger>
         </TabsList>} />
 
+        <TabsContent value="resumen" className="space-y-3"><ComprasResumenTab /></TabsContent>
         <TabsContent value="pedidos" className="space-y-3">
           <ComprasPedidosTab />
         </TabsContent>

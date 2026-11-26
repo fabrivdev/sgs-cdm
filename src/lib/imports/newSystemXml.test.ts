@@ -1305,4 +1305,19 @@ describe("importacion XML de solicitudes de compra", () => {
 
     expect(mapCanonicalSolicitudCompraToRow(result.rows[0])).toBeNull();
   });
+
+  it("conserva el avance del formato TOTVS y distingue un cero de un campo ausente", () => {
+    const [complete, pending, historical] = mapSolicitudCompraSheet("solicitudes.xml", {
+      name: "Solicitudes", headers: [],
+      rows: [
+        { "Nro.Solc.Com": "10", "Item Sl.Comp": "01", USUARIO: "Operación", MEDTRANSP: "Aéreo", "Ctd.en Pedid": "2", PENDIENTE: "0" },
+        { "Nro.Solc.Com": "10", "Item Sl.Comp": "02", MEDTRANSP: "-------", "Ctd.en Pedid": "0", PENDIENTE: "3" },
+        { "Nro.Solc.Com": "11", "Item Sl.Comp": "01", Solicitante: "Operador" },
+      ],
+    }).rows.map(mapCanonicalSolicitudCompraToRow);
+    expect(complete).toMatchObject({ solicitante: "Operación", medio_transporte: "Aéreo", cantidad_en_pedido: 2, cantidad_pendiente: 0 });
+    expect(pending).toMatchObject({ medio_transporte: null, cantidad_en_pedido: 0, cantidad_pendiente: 3 });
+    expect(historical).toMatchObject({ solicitante: "Operador" });
+    expect(historical).not.toHaveProperty("cantidad_pendiente");
+  });
 });

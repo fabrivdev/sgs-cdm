@@ -2941,9 +2941,12 @@
       "id": "repuestos.compras",
       "title": "Compras de repuestos",
       "module": "repuestos",
-      "description": "Teléfono: documento/sucursal/estado agrupados; ítems descripción/código con cantidades/importes separados. La condición de una línea de abajo corresponde a tablet/escritorio. Solicitudes y pedidos con ítems de una línea, ejes compartidos, cantidades numéricas y símbolos sin conversión monetaria. Conservar seguimiento/edición, candidatos y evidencia probable/manual. Campos secundarios y Vincular accesibles por Código en teléfonos; resumen por Pedido. Export completo filtrado y ordenado; errores y fuentes parciales bloquean exportar.",
+      "description": "El Resumen de Compras mide avance de solicitudes por mes y recepción de pedidos cargados por proveedor, con detalle de necesidades pendientes. Los estados parten de cantidades informadas por TOTVS y separan saldos desconocidos. El vínculo probable no atribuye recepciones a solicitudes. Solicitudes y pedidos mantienen su detalle, seguimiento, vínculos y exportaciones.",
       "sources": [
         "src/pages/RepuestosCompras.tsx",
+        "src/components/repuestos/ComprasResumenTab.tsx",
+        "src/components/repuestos/purchaseProgress.ts",
+        "supabase/migrations/20261126130000_purchase_request_progress.sql",
         "src/components/repuestos/ComprasPedidosTab.tsx",
         "src/components/repuestos/SolicitudesCompraTab.tsx",
         "src/components/repuestos/PurchaseTableHeading.tsx",

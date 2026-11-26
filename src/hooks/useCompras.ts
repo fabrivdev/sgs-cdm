@@ -13,8 +13,8 @@ export interface PedidoLinea extends PedidoCandidato {
   unidad: string | null;
   cantidad: number;
   valorTotal: number;
-  cantidadEntregada: number;
-  cantidadPendiente: number;
+  cantidadEntregada: number | null;
+  cantidadPendiente: number | null;
 }
 
 export function useComprasPedidosLineas() {
@@ -27,7 +27,7 @@ export function useComprasPedidosLineas() {
           .select(
             "sucursal, nro_pedido, item, fecha_emision, proveedor_codigo, proveedor_nombre, moneda, producto_codigo, descripcion, unidad, cantidad, precio_unitario, valor_total, cantidad_entregada, cantidad_pendiente",
           )
-          .ilike("producto_codigo", "REP%"),
+          .ilike("producto_codigo", "REP%").order("sucursal").order("nro_pedido").order("item"),
       );
 
       return rows.map(
@@ -45,8 +45,8 @@ export function useComprasPedidosLineas() {
           unidad: r.unidad,
           cantidad: Number(r.cantidad || 0),
           valorTotal: Number(r.valor_total || 0),
-          cantidadEntregada: Number(r.cantidad_entregada || 0),
-          cantidadPendiente: Number(r.cantidad_pendiente || 0),
+          cantidadEntregada: r.cantidad_entregada == null ? null : Number(r.cantidad_entregada),
+          cantidadPendiente: r.cantidad_pendiente == null ? null : Number(r.cantidad_pendiente),
         }),
       );
     },
@@ -63,6 +63,9 @@ export interface SolicitudLinea extends SolicitudLineaCompleta {
   cantidad: number;
   valorTotal: number;
   observacion: string | null;
+  cantidadEnPedido?: number | null;
+  cantidadPendiente?: number | null;
+  medioTransporte?: string | null;
 }
 
 export function useComprasSolicitudesLineas() {
@@ -70,13 +73,15 @@ export function useComprasSolicitudesLineas() {
     queryKey: ["compras", "solicitudes_lineas"],
     staleTime: STALE_TIME,
     queryFn: async () => {
-      const rows = await cargarTodo<any>(
-        (supabase.from("compras_solicitudes" as any) as any)
-          .select(
-            "sucursal, nro_solicitud, item, fecha_emision, solicitante, moneda, producto_codigo, codigo_fabricante, marca_solicitada, descripcion, unidad, cantidad, precio_unitario, valor_total, observacion",
-          )
-          .ilike("producto_codigo", "REP%"),
+      const baseFields = "sucursal, nro_solicitud, item, fecha_emision, solicitante, moneda, producto_codigo, codigo_fabricante, marca_solicitada, descripcion, unidad, cantidad, precio_unitario, valor_total, observacion";
+      const read = (fields: string) => cargarTodo<any>(
+        supabase.from("compras_solicitudes").select(fields)
+          .ilike("producto_codigo", "REP%").order("sucursal").order("nro_solicitud").order("item"),
       );
+      const rows = await read(`${baseFields}, cantidad_en_pedido, cantidad_pendiente, medio_transporte`).catch(error => {
+        if (error?.code === "42703") return read(baseFields);
+        throw error;
+      });
 
       return rows.map(
         (r): SolicitudLinea => ({
@@ -95,6 +100,9 @@ export function useComprasSolicitudesLineas() {
           cantidad: Number(r.cantidad || 0),
           valorTotal: Number(r.valor_total || 0),
           observacion: r.observacion,
+          cantidadEnPedido: r.cantidad_en_pedido == null ? null : Number(r.cantidad_en_pedido),
+          cantidadPendiente: r.cantidad_pendiente == null ? null : Number(r.cantidad_pendiente),
+          medioTransporte: r.medio_transporte ?? null,
         }),
       );
     },

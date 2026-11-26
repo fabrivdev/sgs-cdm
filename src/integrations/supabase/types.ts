@@ -857,12 +857,15 @@ export type Database = {
       compras_solicitudes: {
         Row: {
           cantidad: number | null
+          cantidad_en_pedido: number | null
+          cantidad_pendiente: number | null
           codigo_fabricante: string | null
           descripcion: string | null
           fecha_emision: string | null
           importado_en: string
           item: string
           marca_solicitada: string | null
+          medio_transporte: string | null
           moneda: string | null
           nro_solicitud: string
           observacion: string | null
@@ -875,12 +878,15 @@ export type Database = {
         }
         Insert: {
           cantidad?: number | null
+          cantidad_en_pedido?: number | null
+          cantidad_pendiente?: number | null
           codigo_fabricante?: string | null
           descripcion?: string | null
           fecha_emision?: string | null
           importado_en?: string
           item: string
           marca_solicitada?: string | null
+          medio_transporte?: string | null
           moneda?: string | null
           nro_solicitud: string
           observacion?: string | null
@@ -893,12 +899,15 @@ export type Database = {
         }
         Update: {
           cantidad?: number | null
+          cantidad_en_pedido?: number | null
+          cantidad_pendiente?: number | null
           codigo_fabricante?: string | null
           descripcion?: string | null
           fecha_emision?: string | null
           importado_en?: string
           item?: string
           marca_solicitada?: string | null
+          medio_transporte?: string | null
           moneda?: string | null
           nro_solicitud?: string
           observacion?: string | null

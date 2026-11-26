@@ -386,6 +386,12 @@ function normalizeXmlMonedaCompras(value: unknown): string | null {
   return sample;
 }
 
+function purchaseQuantityField(row: Record<string, unknown>, key: string): number | null {
+  const value = firstValue(row, [key]);
+  return /^[+-]?(?:\d+(?:[.,]\d+)*|[.,]\d+)(?:e[+-]?\d+)?$/i.test(String(value ?? "").trim())
+    ? parseFlexibleNumber(value) : null;
+}
+
 export function mapPedidoCompraSheet(
   sourceFileName: string,
   sheet: SpreadsheetXmlSheet,
@@ -411,8 +417,8 @@ export function mapPedidoCompraSheet(
       quantity: number(row, ["Cantidad"]) ?? 0,
       unitPrice: number(row, ["Prc.Unitario"]) ?? 0,
       total: number(row, ["Valor Total"]) ?? 0,
-      deliveredQuantity: number(row, ["Ctd. Entrega"]) ?? 0,
-      pendingQuantity: number(row, ["PENDIENTE"]) ?? 0,
+      deliveredQuantity: purchaseQuantityField(row, "Ctd. Entrega"),
+      pendingQuantity: purchaseQuantityField(row, "PENDIENTE"),
       deliveryType: text(row, ["TIPENT"]),
       raw: row,
     } satisfies CanonicalPedidoCompraRow;
@@ -441,7 +447,7 @@ export function mapSolicitudCompraSheet(
       item,
       emissionDate: normalizeDateLike(firstValue(row, ["Fch Emision"])),
       branch: normalizeXmlSucursal(firstValue(row, ["FILIAL"])),
-      requester: text(row, ["Solicitante"]),
+      requester: displayText(row, ["Solicitante", "USUARIO"]),
       currency: normalizeXmlMonedaCompras(firstValue(row, ["MONEDA"])),
       productCode: text(row, ["Producto"]),
       manufacturerCode: text(row, ["Cod Faricant", "Cod Fabricant"]),
@@ -451,6 +457,9 @@ export function mapSolicitudCompraSheet(
       quantity: number(row, ["Cantidad"]) ?? 0,
       unitPrice: number(row, ["Prc Unitario"]) ?? 0,
       total: number(row, ["Val.Total"]) ?? 0,
+      orderedQuantity: "Ctd.en Pedid" in row ? purchaseQuantityField(row, "Ctd.en Pedid") : undefined,
+      pendingQuantity: "PENDIENTE" in row ? purchaseQuantityField(row, "PENDIENTE") : undefined,
+      transportMode: "MEDTRANSP" in row ? displayText(row, ["MEDTRANSP"]) : undefined,
       observation: text(row, ["Observacion"]),
       raw: row,
     } satisfies CanonicalSolicitudCompraRow;

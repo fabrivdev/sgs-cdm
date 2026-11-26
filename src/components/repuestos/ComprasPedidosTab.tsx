@@ -452,7 +452,7 @@ export function ComprasPedidosTab() {
                                     <TableRow key={linea.item}>
                                       <TableCell className={cn(purchaseCell,"hidden sm:table-cell")} title={linea.item}>{linea.item}</TableCell>
                                       <TableCell className={cn(purchaseCell,"font-mono")} title={linea.productoCodigo}>
-                                        <PurchaseInfo label={linea.productoCodigo} mobileSummary={<MobileRecord primary={linea.descripcion || "Sin descripción"} secondary={linea.productoCodigo} />} fields={[["Ítem",linea.item],["Descripción",linea.descripcion??"—"],["Cantidad",purchaseQuantity.format(linea.cantidad)],["Unidad",linea.unidad??"—"],["P. unit.",purchaseMoney(linea.precioUnitario,linea.moneda)],["Total",purchaseMoney(linea.valorTotal,linea.moneda)],["Pendiente",purchaseQuantity.format(linea.cantidadPendiente)],["Solicitudes",(solicitudes??[]).map(s=>`${s.sucursal}-${s.nroSolicitud}${s.esManual?"":" (probable)"}`).join(", ")||"—"],["Moneda",linea.moneda??"No informada"]]} />
+                                        <PurchaseInfo label={linea.productoCodigo} mobileSummary={<MobileRecord primary={linea.descripcion || "Sin descripción"} secondary={linea.productoCodigo} />} fields={[["Ítem",linea.item],["Descripción",linea.descripcion??"—"],["Cantidad",purchaseQuantity.format(linea.cantidad)],["Unidad",linea.unidad??"—"],["P. unit.",purchaseMoney(linea.precioUnitario,linea.moneda)],["Total",purchaseMoney(linea.valorTotal,linea.moneda)],["Pendiente",linea.cantidadPendiente == null ? "—" : purchaseQuantity.format(linea.cantidadPendiente)],["Solicitudes",(solicitudes??[]).map(s=>`${s.sucursal}-${s.nroSolicitud}${s.esManual?"":" (probable)"}`).join(", ")||"—"],["Moneda",linea.moneda??"No informada"]]} />
                                       </TableCell>
                                       <TableCell className={cn(purchaseCell, "hidden sm:table-cell")} title={linea.descripcion ?? "—"}>{linea.descripcion ?? "—"}</TableCell>
                                       <TableCell className={cn(purchaseCell,"text-center tabular-nums")} title={`${linea.cantidad} ${linea.unidad ?? ""}`}>
@@ -467,11 +467,11 @@ export function ComprasPedidosTab() {
                                       <TableCell
                                         className={cn(
                                           purchaseCell,"hidden text-center tabular-nums sm:table-cell",
-                                          linea.cantidadPendiente > 0 && "font-semibold text-amber-700",
+                                          (linea.cantidadPendiente ?? 0) > 0 && "font-semibold text-amber-700",
                                         )}
-                                        title={String(linea.cantidadPendiente)}
+                                        title={linea.cantidadPendiente?.toString()}
                                       >
-                                        {purchaseQuantity.format(linea.cantidadPendiente)}
+                                        {linea.cantidadPendiente == null ? "—" : purchaseQuantity.format(linea.cantidadPendiente)}
                                       </TableCell>
                                       <TableCell className={cn(purchaseCell,"hidden sm:table-cell")}>
                                         {!solicitudes || solicitudes.length === 0 ? (

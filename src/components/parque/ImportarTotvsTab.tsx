@@ -701,6 +701,14 @@ export function ImportarTotvsTab({ onChanged }: { onChanged: () => void }) {
     setImportProgress(null);
     setImportError(null);
     try {
+      if (preview.solicitudes.some(row => row.orderedQuantity !== undefined
+        || row.pendingQuantity !== undefined || row.transportMode !== undefined)) {
+        activeImportStage = "compras.preflight";
+        const { error } = await supabase.from("compras_solicitudes")
+          .select("cantidad_en_pedido,cantidad_pendiente,medio_transporte").limit(0);
+        if (error?.code === "42703") throw new Error("Aplicá la migración 20261126130000_purchase_request_progress.sql para guardar las cantidades y el transporte de solicitudes.");
+        if (error) throw error;
+      }
       if (preview.receivables) {
         activeImportStage = "cxc.persist";
         const result = await persistReceivablesFile({
@@ -916,12 +924,22 @@ export function ImportarTotvsTab({ onChanged }: { onChanged: () => void }) {
         if (error) throw error;
       }
 
-      for (let i = 0; i < solicitudRows.length; i += 500) {
-        const { error } = await (supabase.from("compras_solicitudes" as any).upsert(solicitudRows.slice(i, i + 500), {
-          onConflict: "sucursal,nro_solicitud,item",
-        }) as any);
-        if (error) throw error;
+      const solicitudesPorFormato = new Map<string, typeof solicitudRows>();
+      for (const row of solicitudRows) {
+        const fields = Object.keys(row).join(",");
+        const batch = solicitudesPorFormato.get(fields) ?? [];
+        if (!batch.length) solicitudesPorFormato.set(fields, batch);
+        batch.push(row);
       }
+      for (const batch of solicitudesPorFormato.values()) {
+        for (let i = 0; i < batch.length; i += 500) {
+          const { error } = await (supabase.from("compras_solicitudes" as any).upsert(batch.slice(i, i + 500), {
+            onConflict: "sucursal,nro_solicitud,item",
+          }) as any);
+          if (error) throw error;
+        }
+      }
+      if (pedidoRows.length || solicitudRows.length) await queryClient.invalidateQueries({ queryKey: ["compras"] });
 
       if (kardexRows.length > 0) {
         activeImportStage = "kardex.persist";
