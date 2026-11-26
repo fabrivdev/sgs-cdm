@@ -18,6 +18,7 @@ const MarketShare = lazy(() => import("./features/mercado/MarketShare"));
 const Planificador = lazy(() => import("./pages/Planificador"));
 const Calendario = lazy(() => import("./pages/Calendario"));
 const OrdenesServicio = lazy(() => import("./pages/OrdenesServicio"));
+const ServiceReport = lazy(() => import("./pages/ServiceReport"));
 const MachineChecks = lazy(() => import("./pages/MachineChecks"));
 const Flota = lazy(() => import("./pages/FleetWorkspace"));
 const FlotaPreview = import.meta.env.DEV ? lazy(() => import("./pages/FlotaPreview")) : null;
@@ -79,6 +80,7 @@ const App = () => (
                 <Route path="/repuestos/historico" element={<ProtectedRoute requireModulo="repuestos" requireSection="repuestos.historico"><RepuestosHistorico /></ProtectedRoute>} />
                 <Route path="/servicios/controles-maquinas" element={<ProtectedRoute requireModulo="servicios" requireSection="servicios.controles_maquinas"><MachineChecks /></ProtectedRoute>} />
                 <Route path="/servicios/ventas" element={<ProtectedRoute requireModulo="servicios" requireSection="servicios.ventas"><Ventas area="servicios" /></ProtectedRoute>} />
+                <Route path="/servicios/informe" element={<ProtectedRoute requireRoles={["admin", "gerencia"]} requireModulo="servicios" requireSection="servicios.ordenes"><ServiceReport /></ProtectedRoute>} />
                 <Route
                   path="/servicios/ordenes"
                   element={

@@ -17,6 +17,7 @@ const moduleByPath: Record<string, string> = {
   "/calendario": "Calendario",
   "/servicios/ordenes": "Órdenes de servicio",
   "/servicios/ventas": "Ventas de Servicios",
+  "/servicios/informe": "Informe de Servicios",
   "/parque-ventas": "Ventas de Máquinas",
   "/repuestos/ventas": "Ventas de Repuestos",
   "/parque-clientes": "Clientes del parque",

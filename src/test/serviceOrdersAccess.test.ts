@@ -26,7 +26,8 @@ describe("service orders integration contract", () => {
   it("protects new and redirected routes with both section and legacy role boundary", () => {
     const app = read("src/App.tsx");
     expect(app).not.toContain('import("./pages/Dashboard")');
-    expect(app.match(/requireRoles=\{\["admin", "gerencia"\]\} requireModulo="servicios" requireSection="servicios.ordenes"/g)).toHaveLength(2);
+    expect(app.match(/requireRoles=\{\["admin", "gerencia"\]\} requireModulo="servicios" requireSection="servicios.ordenes"/g)).toHaveLength(3);
+    expect(app).toContain('path="/servicios/informe" element={<ProtectedRoute requireRoles={["admin", "gerencia"]} requireModulo="servicios" requireSection="servicios.ordenes">');
     expect(app).toContain('<Navigate to="/servicios/ordenes" replace />');
   });
   it("keeps reusable financial chart modules and maps the source primary key for details", () => {

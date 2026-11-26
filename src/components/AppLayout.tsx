@@ -26,6 +26,7 @@ import {
   Ship,
   BadgeDollarSign,
   CarFront,
+  FileChartColumn,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
@@ -92,6 +93,7 @@ const navGroups: NavGroup[] = [
     icon: BriefcaseBusiness,
     items: [
       { to: "/servicios/ventas", label: "Ventas", icon: BadgeDollarSign, section: "servicios.ventas", end: true },
+      { to: "/servicios/informe", label: "Informe", icon: FileChartColumn, section: "servicios.ordenes", managementOnly: true },
       { to: "/", label: "Planificador", icon: ListChecks, section: "servicios.planificador", end: true },
       { to: "/trabajos", label: "Trabajos", icon: Wrench, section: "servicios.trabajos" },
       { to: "/calendario", label: "Calendario", icon: CalendarDays, section: "servicios.calendario" },

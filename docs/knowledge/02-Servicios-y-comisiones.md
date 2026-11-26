@@ -1,5 +1,11 @@
 # Servicios y comisiones
 
+## Informe
+
+`/servicios/informe` reúne Servicios y Atención de posventa. Usa el acceso gerencial de Órdenes de servicio. La pestaña financiera requiere el permiso de Ventas de Servicios. Cobertura consulta el parque activo según los permisos de Parque y Repuestos.
+
+Los acumulados comparan los mismos meses. La facturación usa las RPC de Ventas y el trabajo interno anterior a julio de 2026 se suma al total como valorización de OS cerradas. La garantía valorizada figura aparte. Las horas de OS se agrupan por apertura y se desglosan con los totales importados por tipo cuando existen. Máquinas y clientes se cuentan una vez por acumulado. Clientes nuevos son los atendidos sin OS cerrada en el año anterior disponible. La cobertura mantiene el denominador de clientes con máquinas activas y aplica la unión de servicio y repuestos cuando ambos rubros están autorizados.
+
 AGR (Agregar repuestos) y AGS (Agregar servicios) se reconocen como Agrega al costo en importación, OS y Ventas. En Comisiones se transforman a Garantia antes de construir las claves estables de jornada y agrupar bloques, para conservar la identidad y el tratamiento previo. No se modifica la valorización de máquinas.
 
 La columna tipo_tiempo de facturacion histórica es opcional. El SQL comprueba su existencia antes de ampliar su restricción. Validado en PostgreSQL aislado con y sin esa columna, incluida una segunda ejecución.
