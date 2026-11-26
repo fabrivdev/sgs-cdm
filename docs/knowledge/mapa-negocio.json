@@ -2941,10 +2941,9 @@
       "id": "repuestos.compras",
       "title": "Compras de repuestos",
       "module": "repuestos",
-      "description": "Saldos TOTVS muestra ítems de solicitud por sucursal con saldo positivo, cero o sin verificar y ofrece detalle de cantidades y observación por ítem. La vista no atribuye compras, vigencia ni recepciones a partir de un saldo. Los vínculos estimados siguen marcados como probables. Solicitudes y pedidos mantienen sus vistas de detalle y exportaciones.",
+      "description": "Compras tiene dos vistas, Pedidos y Solicitudes, con Pedidos como entrada. Solicitudes conserva el saldo TOTVS en el detalle de cada ítem. Los vínculos estimados siguen marcados como probables. Ambas vistas conservan sus exportaciones.",
       "sources": [
         "src/pages/RepuestosCompras.tsx",
-        "src/components/repuestos/ComprasResumenTab.tsx",
         "src/components/repuestos/purchaseProgress.ts",
         "supabase/migrations/20261126130000_purchase_request_progress.sql",
         "src/components/repuestos/ComprasPedidosTab.tsx",
